@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Card,
-  CardContent,
   IconButton,
   Dialog,
   DialogTitle,
@@ -13,25 +12,22 @@ import {
   TextField,
   FormControlLabel,
   Switch,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Chip,
   Alert,
   CircularProgress,
+  Collapse,
+  Tooltip,
+  Divider,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Folder as FolderIcon,
-  Category as CategoryIcon,
-  MoreVert as MoreVertIcon,
+  FolderOpen as FolderOpenIcon,
+  Label as LabelIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
+  CreateNewFolder as CreateNewFolderIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -60,17 +56,16 @@ const Categories: React.FC = () => {
   const { token } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [treeData, setTreeData] = useState<CategoryNode[]>([]);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [parentForNew, setParentForNew] = useState<Category | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
     isFolder: false,
-    parentId: '',
     color: '#667eea',
   });
 
@@ -81,6 +76,8 @@ const Categories: React.FC = () => {
   useEffect(() => {
     if (categories.length > 0) {
       buildTree();
+    } else {
+      setTreeData([]);
     }
   }, [categories]);
 
@@ -102,12 +99,10 @@ const Categories: React.FC = () => {
   const buildTree = () => {
     const nodeMap = new Map<string, CategoryNode>();
     
-    // Create nodes
     categories.forEach((cat) => {
       nodeMap.set(cat.id, { ...cat, children: [], level: cat.path.length });
     });
     
-    // Build hierarchy
     const roots: CategoryNode[] = [];
     categories.forEach((cat) => {
       const node = nodeMap.get(cat.id)!;
@@ -119,17 +114,48 @@ const Categories: React.FC = () => {
       }
     });
     
+    // Sort: folders first, then alphabetically
+    const sortNodes = (nodes: CategoryNode[]) => {
+      nodes.sort((a, b) => {
+        if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      nodes.forEach(node => {
+        if (node.children.length > 0) sortNodes(node.children);
+      });
+    };
+    
+    sortNodes(roots);
     setTreeData(roots);
+    
+    // Auto-expand all folders initially
+    const allFolderIds = new Set<string>();
+    categories.forEach(cat => {
+      if (cat.isFolder) allFolderIds.add(cat.id);
+    });
+    setExpandedNodes(allFolderIds);
+  };
+
+  const toggleNode = (nodeId: string) => {
+    setExpandedNodes(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
   };
 
   const handleOpenDialog = (parent?: Category) => {
     setFormData({
       name: '',
       isFolder: false,
-      parentId: parent?.id || '',
       color: '#667eea',
     });
     setEditingCategory(null);
+    setParentForNew(parent || null);
     setOpenDialog(true);
   };
 
@@ -137,18 +163,18 @@ const Categories: React.FC = () => {
     setFormData({
       name: category.name,
       isFolder: category.isFolder,
-      parentId: category.parentId || '',
       color: category.color || '#667eea',
     });
     setEditingCategory(category);
+    setParentForNew(null);
     setOpenDialog(true);
-    setAnchorEl(null);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingCategory(null);
-    setFormData({ name: '', isFolder: false, parentId: '', color: '#667eea' });
+    setParentForNew(null);
+    setFormData({ name: '', isFolder: false, color: '#667eea' });
   };
 
   const handleSubmit = async () => {
@@ -162,7 +188,7 @@ const Categories: React.FC = () => {
       } else {
         await axios.post(
           `${API_URL}/api/categories`,
-          formData,
+          { ...formData, parentId: parentForNew?.id || null },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       }
@@ -185,67 +211,105 @@ const Categories: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchCategories();
-      setAnchorEl(null);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete category');
     }
   };
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, category: Category) => {
-    event.stopPropagation();
-    setAnchorEl(event.currentTarget);
-    setSelectedCategory(category);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedCategory(null);
-  };
-
   const renderTree = (nodes: CategoryNode[]) => {
     return nodes.map((node) => (
       <Box key={node.id}>
-        <ListItem
-          disablePadding
+        {/* Tree Node */}
+        <Box
           sx={{
-            pl: node.level * 4,
-            borderLeft: node.level > 0 ? '2px solid rgba(102, 126, 234, 0.1)' : 'none',
+            pl: node.level * 3,
+            py: 1,
+            display: 'flex',
+            alignItems: 'center',
+            borderLeft: node.level > 0 ? '2px solid rgba(102, 126, 234, 0.15)' : 'none',
+            ml: node.level > 0 ? 2 : 0,
+            '&:hover': {
+              bgcolor: 'rgba(102, 126, 234, 0.05)',
+              borderRadius: 1,
+            },
           }}
         >
-          <ListItemButton
-            sx={{
-              borderRadius: 1,
-              mb: 0.5,
-              '&:hover': {
-                bgcolor: 'action.hover',
-              },
-            }}
-          >
-            <ListItemIcon>
-              {node.isFolder ? (
-                <FolderIcon sx={{ color: node.color || '#667eea' }} />
-              ) : (
-                <CategoryIcon sx={{ color: node.color || '#667eea' }} />
-              )}
-            </ListItemIcon>
-            <ListItemText
-              primary={node.name}
-              secondary={node.isFolder ? `${node.children.length} items` : 'Category'}
-            />
-            {node.isFolder && node.children.length > 0 && (
-              <ChevronRightIcon sx={{ color: 'text.secondary' }} />
-            )}
+          {/* Expand/Collapse Button */}
+          {node.isFolder && (
             <IconButton
               size="small"
-              onClick={(e) => handleMenuOpen(e, node)}
-              sx={{ ml: 1 }}
+              onClick={() => toggleNode(node.id)}
+              sx={{ mr: 0.5 }}
             >
-              <MoreVertIcon fontSize="small" />
+              <ExpandMoreIcon
+                fontSize="small"
+                sx={{
+                  transform: expandedNodes.has(node.id) ? 'rotate(0deg)' : 'rotate(-90deg)',
+                  transition: 'transform 0.2s',
+                }}
+              />
             </IconButton>
-          </ListItemButton>
-        </ListItem>
-        {node.children.length > 0 && (
-          <List disablePadding>{renderTree(node.children)}</List>
+          )}
+          
+          {/* Icon */}
+          <Box sx={{ mr: 1.5, display: 'flex', alignItems: 'center', ml: !node.isFolder ? 4 : 0 }}>
+            {node.isFolder ? (
+              <FolderOpenIcon sx={{ color: node.color || '#667eea' }} />
+            ) : (
+              <LabelIcon sx={{ color: node.color || '#667eea' }} />
+            )}
+          </Box>
+
+          {/* Name */}
+          <Typography
+            variant="body1"
+            sx={{
+              flexGrow: 1,
+              fontWeight: node.isFolder ? 600 : 400,
+            }}
+          >
+            {node.name}
+          </Typography>
+
+          {/* Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}>
+            {node.isFolder && (
+              <Tooltip title="Add subcategory">
+                <IconButton
+                  size="small"
+                  onClick={() => handleOpenDialog(node)}
+                  sx={{ color: '#667eea' }}
+                >
+                  <CreateNewFolderIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title="Edit">
+              <IconButton
+                size="small"
+                onClick={() => handleEditCategory(node)}
+                sx={{ color: '#667eea' }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton
+                size="small"
+                onClick={() => handleDeleteCategory(node)}
+                sx={{ color: '#f44336' }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+
+        {/* Children (Collapsible) */}
+        {node.isFolder && node.children.length > 0 && (
+          <Collapse in={expandedNodes.has(node.id)} timeout="auto">
+            {renderTree(node.children)}
+          </Collapse>
         )}
       </Box>
     ));
@@ -265,19 +329,40 @@ const Categories: React.FC = () => {
         <Typography variant="h4" fontWeight={700}>
           Categories
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
-            },
-          }}
-        >
-          New Category
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<FolderOpenIcon />}
+            onClick={() => {
+              setFormData({ name: '', color: '#667eea', isFolder: true });
+              setParentForNew(null);
+              setOpenDialog(true);
+            }}
+            sx={{
+              borderColor: '#667eea',
+              color: '#667eea',
+              '&:hover': {
+                borderColor: '#5568d3',
+                bgcolor: 'rgba(102, 126, 234, 0.05)',
+              },
+            }}
+          >
+            New Folder
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+              },
+            }}
+          >
+            New Category
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -286,7 +371,7 @@ const Categories: React.FC = () => {
         </Alert>
       )}
 
-      <Card
+      <Box
         sx={{
           background: (theme) =>
             theme.palette.mode === 'light'
@@ -295,38 +380,71 @@ const Categories: React.FC = () => {
           backdropFilter: 'blur(10px)',
           borderRadius: 2,
           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          p: 2,
+          minHeight: '400px',
         }}
       >
-        <CardContent>
-          {treeData.length === 0 ? (
-            <Box textAlign="center" py={6}>
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No categories yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary" mb={2}>
-                Create your first category or folder to get started
-              </Typography>
+        {treeData.length === 0 ? (
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            minHeight="300px"
+          >
+            <FolderOpenIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No categories yet
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={3} textAlign="center">
+              Create folders and categories to organize your expenses.<br />
+              Folders can contain subcategories for better hierarchy.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="outlined"
+                startIcon={<FolderOpenIcon />}
+                onClick={() => {
+                  setFormData({ name: '', color: '#667eea', isFolder: true });
+                  setParentForNew(null);
+                  setOpenDialog(true);
+                }}
+              >
+                Create Folder
+              </Button>
+              <Button
+                variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => handleOpenDialog()}
               >
                 Create Category
               </Button>
             </Box>
-          ) : (
-            <List>{renderTree(treeData)}</List>
-          )}
-        </CardContent>
-      </Card>
+          </Box>
+        ) : (
+          <Box sx={{ py: 1 }}>
+            {renderTree(treeData)}
+          </Box>
+        )}
+      </Box>
 
       {/* Create/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingCategory ? 'Edit Category' : 'Create New Category'}
+          {editingCategory 
+            ? 'Edit Category' 
+            : parentForNew 
+            ? `Add to "${parentForNew.name}"` 
+            : 'Create New Category'}
         </DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {parentForNew && (
+              <Alert severity="info" sx={{ mb: 1 }}>
+                Creating subcategory under <strong>{parentForNew.name}</strong>
+              </Alert>
+            )}
+            
             <TextField
               label="Name"
               fullWidth
@@ -347,13 +465,31 @@ const Categories: React.FC = () => {
               />
             )}
 
-            <TextField
-              label="Color"
-              type="color"
-              fullWidth
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-            />
+            <Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Color
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <input
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  style={{
+                    width: '60px',
+                    height: '40px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                />
+                <TextField
+                  size="small"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  sx={{ flex: 1 }}
+                />
+              </Box>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -367,37 +503,6 @@ const Categories: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Context Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={() => selectedCategory && handleEditCategory(selectedCategory)}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Edit</ListItemText>
-        </MenuItem>
-        {selectedCategory?.isFolder && (
-          <MenuItem onClick={() => { handleOpenDialog(selectedCategory); handleMenuClose(); }}>
-            <ListItemIcon>
-              <AddIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Add Subcategory</ListItemText>
-          </MenuItem>
-        )}
-        <MenuItem
-          onClick={() => selectedCategory && handleDeleteCategory(selectedCategory)}
-          sx={{ color: 'error.main' }}
-        >
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" color="error" />
-          </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
-        </MenuItem>
-      </Menu>
     </Box>
   );
 };
