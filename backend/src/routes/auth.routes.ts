@@ -20,50 +20,49 @@ interface LoginBody {
 }
 
 // POST /api/auth/register
-router.post('/register', async (req: Request<{}, {}, RegisterBody>, res: Response) => {
+router.post('/register', async (req: Request<{}, {}, RegisterBody>, res: Response): Promise<void> => {
   try {
     const { email, password, firstName, lastName, currency } = req.body;
 
     // Validate required fields
     if (!email || !password || !firstName || !lastName || !currency) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         success: false, 
         message: 'All fields are required' 
       });
+      return;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         success: false, 
         message: 'Invalid email format' 
       });
+      return;
     }
 
     // Validate password length
     if (password.length < 6) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         success: false, 
         message: 'Password must be at least 6 characters' 
       });
+      return;
     }
 
     const usersContainer = await cosmosDBService.getUsersContainer();
 
     // Check if user already exists
-    const { resources: existingUsers } = await usersContainer.items
-      .query({
-        query: 'SELECT * FROM c WHERE c.email = @email',
-        parameters: [{ name: '@email', value: email.toLowerCase() }]
-      })
-      .fetchAll();
+    const existingUser = await usersContainer.findOne({ email: email.toLowerCase() });
 
-    if (existingUsers.length > 0) {
-      return res.status(409).json({ 
+    if (existingUser) {
+      res.status(409).json({ 
         success: false, 
         message: 'User with this email already exists' 
       });
+      return;
     }
 
     // Hash password
@@ -82,13 +81,13 @@ router.post('/register', async (req: Request<{}, {}, RegisterBody>, res: Respons
     };
 
     // Save to database
-    await usersContainer.items.create(newUser);
+    await usersContainer.insertOne(newUser);
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: newUser.id, email: newUser.email },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      (process.env.JWT_SECRET as jwt.Secret),
+      { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
     );
 
     // Return user without password
@@ -110,51 +109,47 @@ router.post('/register', async (req: Request<{}, {}, RegisterBody>, res: Respons
 });
 
 // POST /api/auth/login
-router.post('/login', async (req: Request<{}, {}, LoginBody>, res: Response) => {
+router.post('/login', async (req: Request<{}, {}, LoginBody>, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     // Validate required fields
     if (!email || !password) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         success: false, 
         message: 'Email and password are required' 
       });
+      return;
     }
 
     const usersContainer = await cosmosDBService.getUsersContainer();
 
     // Find user by email
-    const { resources: users } = await usersContainer.items
-      .query({
-        query: 'SELECT * FROM c WHERE c.email = @email',
-        parameters: [{ name: '@email', value: email.toLowerCase() }]
-      })
-      .fetchAll();
+    const user = await usersContainer.findOne({ email: email.toLowerCase() }) as User | null;
 
-    if (users.length === 0) {
-      return res.status(401).json({ 
+    if (!user) {
+      res.status(401).json({ 
         success: false, 
         message: 'Invalid email or password' 
       });
+      return;
     }
-
-    const user = users[0] as User;
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ 
+      res.status(401).json({ 
         success: false, 
         message: 'Invalid email or password' 
       });
+      return;
     }
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      (process.env.JWT_SECRET as jwt.Secret),
+      { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
     );
 
     // Return user without password
