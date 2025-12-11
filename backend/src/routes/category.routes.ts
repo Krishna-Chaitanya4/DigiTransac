@@ -15,7 +15,6 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     
     const categories = (await categoriesContainer
       .find({ userId })
-      .sort({ createdAt: 1 })
       .toArray()) as unknown as Category[];
 
     res.json({
@@ -34,6 +33,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 // POST /api/categories - Create folder or category
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    console.log('📝 Creating category:', req.body);
     const userId = req.userId!;
     const { name, parentId, isFolder, icon, color } = req.body;
 
