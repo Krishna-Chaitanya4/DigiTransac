@@ -12,6 +12,8 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -23,6 +25,8 @@ import {
   Lightbulb as LightbulbIcon,
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
+  Folder as FolderIcon,
+  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -141,6 +145,15 @@ interface SmartInsights {
     percentChange: number;
     trend: 'increasing' | 'decreasing';
   }>;
+  folderTrends: Array<{
+    folderName: string;
+    categoryId: string;
+    categoryColor: string;
+    currentAmount: number;
+    previousAmount: number;
+    percentChange: number;
+    trend: 'increasing' | 'decreasing';
+  }>;
   summary: {
     totalExpenses: number;
     avgDailySpending: number;
@@ -172,6 +185,8 @@ const Analytics: React.FC = () => {
   
   const [overview, setOverview] = useState<Overview | null>(null);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
+  const [folderBreakdown, setFolderBreakdown] = useState<CategoryBreakdown[]>([]);
+  const [viewMode, setViewMode] = useState<'category' | 'folder'>('category');
   const [trends, setTrends] = useState<Trend[]>([]);
   const [budgetComparison, setBudgetComparison] = useState<BudgetComparison[]>([]);
   const [topExpenses, setTopExpenses] = useState<TopExpense[]>([]);
@@ -227,11 +242,14 @@ const Analytics: React.FC = () => {
         endDate: endDate.format('YYYY-MM-DD'),
       });
 
-      const [overviewRes, breakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes, insightsRes, reviewStatsRes] = await Promise.all([
+      const [overviewRes, breakdownRes, folderBreakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes, insightsRes, reviewStatsRes] = await Promise.all([
         axios.get(`${API_URL}/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`${API_URL}/api/analytics/category-breakdown?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_URL}/api/analytics/folder-breakdown?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`${API_URL}/api/analytics/trends?${params}&groupBy=${trendGroupBy}`, {
@@ -259,6 +277,7 @@ const Analytics: React.FC = () => {
 
       setOverview(overviewRes.data.overview);
       setCategoryBreakdown(breakdownRes.data.breakdown || []);
+      setFolderBreakdown(folderBreakdownRes.data.breakdown || []);
       setTrends(trendsRes.data.trends || []);
       setBudgetComparison(comparisonRes.data.comparisons || []);
       setTopExpenses(topExpensesRes.data.expenses || []);
@@ -473,6 +492,75 @@ const Analytics: React.FC = () => {
               </Grid>
             )}
 
+            {/* Folder Trends */}
+            {smartInsights.folderTrends && smartInsights.folderTrends.length > 0 && (
+              <Grid item xs={12}>
+                <Card sx={{ borderLeft: '4px solid', borderColor: 'primary.main' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
+                      <FolderIcon color="primary" />
+                      <Typography variant="h6" fontWeight={600}>
+                        Folder Spending Trends
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" mb={2} display="block">
+                      High-level spending patterns across your folder structure
+                    </Typography>
+                    <Grid container spacing={2}>
+                      {smartInsights.folderTrends.map((trend, idx) => (
+                        <Grid item xs={12} sm={6} md={4} key={idx}>
+                          <Box 
+                            p={2} 
+                            borderRadius={2} 
+                            sx={{ 
+                              bgcolor: trend.trend === 'increasing' ? 'rgba(211, 47, 47, 0.08)' : 'rgba(46, 125, 50, 0.08)',
+                              border: '1px solid',
+                              borderColor: trend.trend === 'increasing' ? 'rgba(211, 47, 47, 0.2)' : 'rgba(46, 125, 50, 0.2)',
+                            }}
+                          >
+                            <Box display="flex" alignItems="center" gap={1} mb={1}>
+                              <Box
+                                width={16}
+                                height={16}
+                                borderRadius="50%"
+                                bgcolor={trend.categoryColor}
+                                flexShrink={0}
+                              />
+                              <Typography variant="body2" fontWeight={600}>
+                                {trend.folderName} 📁
+                              </Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" justifyContent="space-between">
+                              <Box display="flex" alignItems="center" gap={0.5}>
+                                {trend.trend === 'increasing' ? (
+                                  <TrendingUpIcon fontSize="small" color="error" />
+                                ) : (
+                                  <TrendingDownIcon fontSize="small" color="success" />
+                                )}
+                                <Typography 
+                                  variant="body2"
+                                  color={trend.trend === 'increasing' ? 'error.main' : 'success.main'}
+                                  fontWeight={700}
+                                >
+                                  {Math.abs(trend.percentChange)}%
+                                </Typography>
+                              </Box>
+                              <Typography variant="caption" color="text.secondary">
+                                {formatCurrency(trend.currentAmount)}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary" mt={0.5} display="block">
+                              Previous: {formatCurrency(trend.previousAmount)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
             {/* Unusual Expenses */}
             {smartInsights.unusualExpenses && smartInsights.unusualExpenses.length > 0 && (
               <Grid item xs={12}>
@@ -617,15 +705,45 @@ const Analytics: React.FC = () => {
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
           }}>
             <CardContent>
-              <Typography variant="h6" fontWeight={600} mb={2}>
-                Spending by Category
-              </Typography>
-              {categoryBreakdown.length > 0 ? (
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" fontWeight={600}>
+                  Spending by {viewMode === 'folder' ? 'Folder' : 'Category'}
+                </Typography>
+                <ToggleButtonGroup
+                  value={viewMode}
+                  exclusive
+                  onChange={(e, newMode) => {
+                    if (newMode !== null) {
+                      setViewMode(newMode);
+                    }
+                  }}
+                  size="small"
+                  sx={{ height: 32 }}
+                >
+                  <ToggleButton value="category">
+                    <Tooltip title="View by individual categories">
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        <CategoryIcon fontSize="small" />
+                        <Typography variant="caption">Categories</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="folder">
+                    <Tooltip title="View grouped by folders">
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        <FolderIcon fontSize="small" />
+                        <Typography variant="caption">Folders</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              {(viewMode === 'category' ? categoryBreakdown : folderBreakdown).length > 0 ? (
                 <>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        data={categoryBreakdown}
+                        data={viewMode === 'category' ? categoryBreakdown : folderBreakdown}
                         dataKey="amount"
                         nameKey="categoryName"
                         cx="50%"
@@ -633,7 +751,7 @@ const Analytics: React.FC = () => {
                         outerRadius={100}
                         label={(entry) => `${entry.percentage}%`}
                       >
-                        {categoryBreakdown.map((entry, index) => (
+                        {(viewMode === 'category' ? categoryBreakdown : folderBreakdown).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.categoryColor} />
                         ))}
                     </Pie>
@@ -649,14 +767,14 @@ const Analytics: React.FC = () => {
                     </PieChart>
                   </ResponsiveContainer>
                   <Box mt={2}>
-                    {categoryBreakdown.map((cat, index) => (
+                    {(viewMode === 'category' ? categoryBreakdown : folderBreakdown).map((cat, index) => (
                       <Box
                         key={cat.categoryId}
                         display="flex"
                         justifyContent="space-between"
                         alignItems="center"
                         py={1}
-                        borderBottom={index < categoryBreakdown.length - 1 ? '1px solid' : 'none'}
+                        borderBottom={index < (viewMode === 'category' ? categoryBreakdown : folderBreakdown).length - 1 ? '1px solid' : 'none'}
                         borderColor="divider"
                       >
                         <Box display="flex" alignItems="center" gap={1} minWidth={0} flex={1}>
@@ -675,7 +793,7 @@ const Analytics: React.FC = () => {
                               whiteSpace: 'nowrap' 
                             }}
                           >
-                            {cat.path.join(' > ')} {cat.isFolder && '📁'}
+                            {viewMode === 'folder' ? cat.categoryName : cat.path.join(' > ')} {cat.isFolder && '📁'}
                           </Typography>
                         </Box>
                         <Box textAlign="right" flexShrink={0}>

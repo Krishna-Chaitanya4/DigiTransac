@@ -156,6 +156,105 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
   }
 });
 
+// GET /api/analytics/folder-breakdown - Get spending aggregated by folders
+router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { startDate, endDate } = req.query;
+
+    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+
+    const expensesContainer = await cosmosDBService.getExpensesContainer();
+    const expenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: start, $lte: end }
+      })
+      .toArray();
+
+    // Get all categories
+    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categories = await categoriesContainer
+      .find({ userId })
+      .toArray();
+
+    const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
+
+    // Helper to get root folder for a category
+    const getRootFolder = (categoryId: string): any => {
+      const category = categoryLookup.get(categoryId);
+      if (!category) return null;
+      
+      if (!category.parentId) {
+        // This is already a root category/folder
+        return category;
+      }
+      
+      // Traverse up to find root
+      let current = category;
+      while (current.parentId) {
+        const parent = categoryLookup.get(current.parentId);
+        if (!parent) break;
+        current = parent;
+      }
+      return current;
+    };
+
+    // Aggregate expenses by root folder
+    const folderMap = new Map<string, { amount: number; count: number; children: Set<string> }>();
+    
+    expenses.forEach((expense: any) => {
+      const rootFolder = getRootFolder(expense.categoryId);
+      if (!rootFolder) return;
+      
+      const folderId = rootFolder.id;
+      const current = folderMap.get(folderId) || { amount: 0, count: 0, children: new Set<string>() };
+      folderMap.set(folderId, {
+        amount: current.amount + expense.amount,
+        count: current.count + 1,
+        children: current.children.add(expense.categoryId)
+      });
+    });
+
+    const breakdown = Array.from(folderMap.entries()).map(([folderId, data]) => {
+      const folder = categoryLookup.get(folderId);
+      return {
+        categoryId: folderId,
+        categoryName: folder?.name || 'Unknown',
+        categoryColor: folder?.color || '#667eea',
+        isFolder: folder?.isFolder || false,
+        parentId: null, // Root folders have no parent
+        path: [folder?.name || 'Unknown'],
+        amount: data.amount,
+        count: data.count,
+        childCount: data.children.size,
+        percentage: 0 // Will calculate after
+      };
+    });
+
+    const totalAmount = breakdown.reduce((sum, item) => sum + item.amount, 0);
+    breakdown.forEach(item => {
+      item.percentage = totalAmount > 0 ? Math.round((item.amount / totalAmount) * 100) : 0;
+    });
+
+    // Sort by amount descending
+    breakdown.sort((a, b) => b.amount - a.amount);
+
+    res.json({
+      success: true,
+      breakdown,
+      total: totalAmount
+    });
+  } catch (error) {
+    console.error('Error fetching folder breakdown:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching folder breakdown'
+    });
+  }
+});
+
 // GET /api/analytics/trends - Get spending trends over time
 router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -576,6 +675,60 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
 
     categoryTrends.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange));
 
+    // Folder-level insights
+    const getRootFolder = (categoryId: string): any => {
+      const category = categoryLookup.get(categoryId);
+      if (!category) return null;
+      
+      if (!category.parentId) return category;
+      
+      let current = category;
+      while (current.parentId) {
+        const parent = categoryLookup.get(current.parentId);
+        if (!parent) break;
+        current = parent;
+      }
+      return current;
+    };
+
+    const currentFolderMap = new Map<string, number>();
+    const previousFolderMap = new Map<string, number>();
+
+    currentExpenses.forEach((exp: any) => {
+      const rootFolder = getRootFolder(exp.categoryId);
+      if (rootFolder) {
+        currentFolderMap.set(rootFolder.id, (currentFolderMap.get(rootFolder.id) || 0) + exp.amount);
+      }
+    });
+
+    previousExpenses.forEach((exp: any) => {
+      const rootFolder = getRootFolder(exp.categoryId);
+      if (rootFolder) {
+        previousFolderMap.set(rootFolder.id, (previousFolderMap.get(rootFolder.id) || 0) + exp.amount);
+      }
+    });
+
+    const folderTrends: any[] = [];
+    currentFolderMap.forEach((currentAmount, folderId) => {
+      const previousAmount = previousFolderMap.get(folderId) || 0;
+      const change = previousAmount > 0 ? ((currentAmount - previousAmount) / previousAmount) * 100 : 100;
+      const folder = categoryLookup.get(folderId);
+      
+      if (Math.abs(change) > 15) { // Slightly lower threshold for folders (broader categories)
+        folderTrends.push({
+          folderName: folder?.name || 'Unknown',
+          categoryId: folderId,
+          categoryColor: folder?.color || '#667eea',
+          currentAmount,
+          previousAmount,
+          percentChange: Math.round(change),
+          trend: change > 0 ? 'increasing' : 'decreasing'
+        });
+      }
+    });
+
+    folderTrends.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange));
+
     res.json({
       success: true,
       insights: {
@@ -588,6 +741,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
         overBudgetAlerts,
         unusualExpenses,
         categoryTrends: categoryTrends.slice(0, 5),
+        folderTrends: folderTrends.slice(0, 5),
         summary: {
           totalExpenses: currentExpenses.length,
           avgDailySpending: Math.round(currentTotal / (periodDays || 1)),
