@@ -83,7 +83,7 @@ router.post('/inbound', async (req: Request, res: Response) => {
         confidence: parsedTransaction.confidence,
       },
       reviewStatus: 'pending',
-      notes: suggestedCategory ? '' : 'Category needs to be assigned',
+      notes: '',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

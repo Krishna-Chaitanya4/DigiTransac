@@ -290,7 +290,7 @@ const Dashboard: React.FC = () => {
                   <Button
                     color="inherit"
                     size="small"
-                    onClick={() => navigate('/review-queue')}
+                    onClick={() => navigate('/review')}
                   >
                     Review
                   </Button>

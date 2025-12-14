@@ -89,12 +89,13 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
           category.isFolder
         );
 
-        // Calculate spending across all relevant categories
+        // Calculate spending across all relevant categories (approved expenses only)
         const expenses = await expensesContainer
           .find({
             userId,
             categoryId: { $in: categoryIds },
-            date: { $gte: startDate, $lte: endDate }
+            date: { $gte: startDate, $lte: endDate },
+            reviewStatus: 'approved'
           })
           .toArray();
 

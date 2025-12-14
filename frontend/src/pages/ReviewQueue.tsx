@@ -241,6 +241,22 @@ const ReviewQueue: React.FC = () => {
     }
   };
 
+  // Check if a quick filter is active
+  const isQuickFilterActive = (filter: string) => {
+    const today = dayjs();
+    
+    switch (filter) {
+      case 'thisWeek':
+        return startDate?.isSame(today.startOf('week'), 'day') && 
+               endDate?.isSame(today, 'day');
+      case 'last7Days':
+        return startDate?.isSame(today.subtract(7, 'day'), 'day') && 
+               endDate?.isSame(today, 'day');
+      default:
+        return false;
+    }
+  };
+
   // Export to CSV
   const handleExportCSV = () => {
     const dataToExport = selectedExpenses.size > 0
@@ -503,8 +519,9 @@ const ReviewQueue: React.FC = () => {
                   setStartDate(dayjs().startOf('week'));
                   setEndDate(dayjs());
                 }}
+                variant={isQuickFilterActive('thisWeek') ? 'filled' : 'outlined'}
+                color={isQuickFilterActive('thisWeek') ? 'primary' : 'default'}
                 size="small"
-                variant="outlined"
               />
               <Chip
                 label="Last 7 Days"
@@ -512,8 +529,9 @@ const ReviewQueue: React.FC = () => {
                   setStartDate(dayjs().subtract(7, 'day'));
                   setEndDate(dayjs());
                 }}
+                variant={isQuickFilterActive('last7Days') ? 'filled' : 'outlined'}
+                color={isQuickFilterActive('last7Days') ? 'primary' : 'default'}
                 size="small"
-                variant="outlined"
               />
             </Box>
 

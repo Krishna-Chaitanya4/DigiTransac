@@ -19,7 +19,8 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
     const expenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -78,7 +79,8 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     const expenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -169,7 +171,8 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
     const expenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -268,7 +271,8 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
     const expenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -369,7 +373,8 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
           .find({
             userId,
             categoryId: { $in: categoryIds },
-            date: { $gte: budgetStart, $lte: budgetEnd }
+            date: { $gte: budgetStart, $lte: budgetEnd },
+            reviewStatus: 'approved'
           })
           .toArray();
 
@@ -415,7 +420,8 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
     const expenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -464,7 +470,8 @@ router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response):
     const expenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -528,7 +535,8 @@ router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<vo
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        merchantName: { $exists: true, $ne: null }
+        merchantName: { $exists: true, $ne: null },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -583,11 +591,12 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
 
-    // Get current period expenses
+    // Get current period expenses (approved only)
     const currentExpenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved'
       })
       .toArray();
 
@@ -601,7 +610,8 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const previousExpenses = await expensesContainer
       .find({
         userId,
-        date: { $gte: prevStart, $lte: prevEnd }
+        date: { $gte: prevStart, $lte: prevEnd },
+        reviewStatus: 'approved'
       })
       .toArray();
 
