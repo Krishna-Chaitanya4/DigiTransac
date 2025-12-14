@@ -17,6 +17,7 @@ import {
   Collapse,
   Tooltip,
   Divider,
+  MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -67,6 +68,7 @@ const Categories: React.FC = () => {
     name: '',
     isFolder: false,
     color: '#667eea',
+    parentId: null as string | null,
   });
 
   useEffect(() => {
@@ -153,6 +155,7 @@ const Categories: React.FC = () => {
       name: '',
       isFolder: false,
       color: '#667eea',
+      parentId: parent?.id || null,
     });
     setEditingCategory(null);
     setParentForNew(parent || null);
@@ -164,6 +167,7 @@ const Categories: React.FC = () => {
       name: category.name,
       isFolder: category.isFolder,
       color: category.color || '#667eea',
+      parentId: category.parentId,
     });
     setEditingCategory(category);
     setParentForNew(null);
@@ -174,7 +178,7 @@ const Categories: React.FC = () => {
     setOpenDialog(false);
     setEditingCategory(null);
     setParentForNew(null);
-    setFormData({ name: '', isFolder: false, color: '#667eea' });
+    setFormData({ name: '', isFolder: false, color: '#667eea', parentId: null });
   };
 
   const handleSubmit = async () => {
@@ -182,13 +186,17 @@ const Categories: React.FC = () => {
       if (editingCategory) {
         await axios.put(
           `${API_URL}/api/categories/${editingCategory.id}`,
-          { name: formData.name, color: formData.color },
+          { 
+            name: formData.name, 
+            color: formData.color,
+            parentId: formData.parentId 
+          },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         await axios.post(
           `${API_URL}/api/categories`,
-          { ...formData, parentId: parentForNew?.id || null },
+          { ...formData, parentId: formData.parentId },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       }
@@ -452,6 +460,35 @@ const Categories: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               autoFocus
             />
+            
+            <TextField
+              select
+              label="Parent Folder"
+              fullWidth
+              value={formData.parentId || ''}
+              onChange={(e) => setFormData({ ...formData, parentId: e.target.value || null })}
+              helperText={editingCategory ? "Change parent to reorganize category hierarchy" : "Select a parent folder or leave empty for root level"}
+            >
+              <MenuItem value="">
+                <em>Root Level (No Parent)</em>
+              </MenuItem>
+              {categories
+                .filter((cat) => {
+                  // Only show folders
+                  if (!cat.isFolder) return false;
+                  // When editing, exclude self and descendants to prevent circular refs
+                  if (editingCategory) {
+                    if (cat.id === editingCategory.id) return false;
+                    if (cat.path.includes(editingCategory.id)) return false;
+                  }
+                  return true;
+                })
+                .map((folder) => (
+                  <MenuItem key={folder.id} value={folder.id}>
+                    {'  '.repeat(folder.path.length)} 📁 {folder.name}
+                  </MenuItem>
+                ))}
+            </TextField>
             
             {!editingCategory && (
               <FormControlLabel
