@@ -35,6 +35,7 @@ interface Category {
   name: string;
   isFolder: boolean;
   color?: string;
+  path: string[];
 }
 
 interface Budget {
@@ -98,7 +99,8 @@ const Budgets: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const allCategories = response.data.categories || [];
-      setCategories(allCategories.filter((cat: Category) => !cat.isFolder));
+      // Include both folders and categories for budget selection
+      setCategories(allCategories);
     } catch (err: any) {
       console.error('Failed to fetch categories:', err);
     }
@@ -299,15 +301,25 @@ const Budgets: React.FC = () => {
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
                     <Box>
-                      <Chip
-                        label={getCategoryName(budget.categoryId)}
-                        size="small"
-                        sx={{
-                          bgcolor: getCategoryColor(budget.categoryId) + '20',
-                          color: getCategoryColor(budget.categoryId),
-                          mb: 1,
-                        }}
-                      />
+                      <Box display="flex" alignItems="center" gap={0.5} mb={1}>
+                        <Chip
+                          icon={categories.find(c => c.id === budget.categoryId)?.isFolder ? <span>📁</span> : <span>📄</span>}
+                          label={getCategoryName(budget.categoryId)}
+                          size="small"
+                          sx={{
+                            bgcolor: getCategoryColor(budget.categoryId) + '20',
+                            color: getCategoryColor(budget.categoryId),
+                          }}
+                        />
+                        {categories.find(c => c.id === budget.categoryId)?.isFolder && (
+                          <Chip 
+                            label="Folder Budget" 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                        )}
+                      </Box>
                       <Typography variant="h5" fontWeight={700}>
                         {formatCurrency(budget.amount)}
                       </Typography>
@@ -372,23 +384,31 @@ const Budgets: React.FC = () => {
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               select
-              label="Category"
+              label="Category or Folder"
               fullWidth
               value={formData.categoryId}
               onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
               required
-              disabled={!!editingBudget}
+              helperText="Select a folder to budget across all subcategories, or a specific category"
             >
               {categories.length === 0 ? (
                 <MenuItem value="" disabled>
                   No categories available. Create one first.
                 </MenuItem>
               ) : (
-                categories.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.name}
-                  </MenuItem>
-                ))
+                categories
+                  .sort((a, b) => {
+                    // Sort by path depth first, then by name
+                    const depthDiff = a.path.length - b.path.length;
+                    if (depthDiff !== 0) return depthDiff;
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map((category) => (
+                    <MenuItem key={category.id} value={category.id}>
+                      {'  '.repeat(category.path.length)}
+                      {category.isFolder ? '📁' : '📄'} {category.name}
+                    </MenuItem>
+                  ))
               )}
             </TextField>
 

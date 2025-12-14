@@ -1,11 +1,49 @@
 import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
-import { Budget } from '../models/types';
+import { Budget, Category } from '../models/types';
 
 const router = Router();
 
 router.use(authenticate);
+
+/**
+ * Get all descendant category IDs for a given category/folder
+ * For regular categories: returns just the categoryId
+ * For folders: returns all child category IDs recursively
+ */
+async function getAllDescendantCategoryIds(
+  categoriesContainer: any,
+  userId: string,
+  categoryId: string,
+  isFolder: boolean
+): Promise<string[]> {
+  if (!isFolder) {
+    // Regular category - return just itself
+    return [categoryId];
+  }
+
+  // Folder - recursively get all descendants
+  const categoryIds: string[] = [];
+  
+  const collectDescendants = async (parentId: string): Promise<void> => {
+    const children = await categoriesContainer
+      .find({ parentId, userId })
+      .toArray() as Category[];
+    
+    for (const child of children) {
+      if (!child.isFolder) {
+        // It's a category - add to list
+        categoryIds.push(child.id);
+      }
+      // Whether folder or category, check for children
+      await collectDescendants(child.id);
+    }
+  };
+
+  await collectDescendants(categoryId);
+  return categoryIds;
+}
 
 // GET /api/budgets - Get all budgets with spending info
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -19,15 +57,43 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Calculate spending for each budget
     const expensesContainer = await cosmosDBService.getExpensesContainer();
+    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    
     const budgetsWithSpending = await Promise.all(
       budgets.map(async (budget) => {
         const startDate = new Date(budget.startDate);
         const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
         
+        // Get the category to check if it's a folder
+        const category = await categoriesContainer.findOne({ 
+          id: budget.categoryId, 
+          userId 
+        }) as Category | null;
+        
+        if (!category) {
+          // Category not found - return budget with zero spending
+          return {
+            ...budget,
+            spent: 0,
+            remaining: budget.amount,
+            percentUsed: 0,
+            isOverBudget: false
+          };
+        }
+
+        // Get all category IDs to include in calculation
+        const categoryIds = await getAllDescendantCategoryIds(
+          categoriesContainer,
+          userId,
+          budget.categoryId,
+          category.isFolder
+        );
+
+        // Calculate spending across all relevant categories
         const expenses = await expensesContainer
           .find({
             userId,
-            categoryId: budget.categoryId,
+            categoryId: { $in: categoryIds },
             date: { $gte: startDate, $lte: endDate }
           })
           .toArray();
@@ -73,14 +139,14 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    // Validate category exists
+    // Validate category exists (can be folder or category)
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
     const category = await categoriesContainer.findOne({ id: categoryId, userId });
     
     if (!category) {
       res.status(404).json({
         success: false,
-        message: 'Category not found'
+        message: 'Category or folder not found'
       });
       return;
     }
@@ -136,7 +202,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { id } = req.params;
-    const { amount, period, startDate, endDate, alertThreshold } = req.body;
+    const { categoryId, amount, period, startDate, endDate, alertThreshold } = req.body;
 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
     
@@ -149,10 +215,25 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    // If categoryId is being changed, validate the new category exists
+    if (categoryId !== undefined && categoryId !== budget.categoryId) {
+      const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+      const category = await categoriesContainer.findOne({ id: categoryId, userId });
+      
+      if (!category) {
+        res.status(404).json({
+          success: false,
+          message: 'Category or folder not found'
+        });
+        return;
+      }
+    }
+
     const updateData: any = {
       updatedAt: new Date()
     };
 
+    if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (amount !== undefined) updateData.amount = parseFloat(amount);
     if (period) updateData.period = period;
     if (startDate) updateData.startDate = new Date(startDate);
