@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -10,12 +10,15 @@ import {
   Alert,
   MenuItem,
   Chip,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   AccountBalance as AccountBalanceIcon,
   Receipt as ReceiptIcon,
+  RestartAlt as RestartAltIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -32,7 +35,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
 } from 'recharts';
@@ -120,12 +123,38 @@ const Analytics: React.FC = () => {
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<PaymentMethodBreakdown[]>([]);
   const [topMerchants, setTopMerchants] = useState<MerchantData[]>([]);
 
-  const [startDate, setStartDate] = useState<Dayjs | null>(
-    dayjs().startOf('month')
-  );
-  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs());
+  // Load saved preferences from localStorage or use defaults
+  const [startDate, setStartDate] = useState<Dayjs | null>(() => {
+    const saved = localStorage.getItem('analytics_startDate');
+    return saved ? dayjs(saved) : dayjs().startOf('month');
+  });
+  
+  const [endDate, setEndDate] = useState<Dayjs | null>(() => {
+    const saved = localStorage.getItem('analytics_endDate');
+    return saved ? dayjs(saved) : dayjs();
+  });
 
-  const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'week' | 'month'>('day');
+  const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'week' | 'month'>(() => {
+    const saved = localStorage.getItem('analytics_trendGroupBy');
+    return (saved as 'day' | 'week' | 'month') || 'day';
+  });
+
+  // Save preferences to localStorage whenever they change
+  useEffect(() => {
+    if (startDate) {
+      localStorage.setItem('analytics_startDate', startDate.format('YYYY-MM-DD'));
+    }
+  }, [startDate]);
+
+  useEffect(() => {
+    if (endDate) {
+      localStorage.setItem('analytics_endDate', endDate.format('YYYY-MM-DD'));
+    }
+  }, [endDate]);
+
+  useEffect(() => {
+    localStorage.setItem('analytics_trendGroupBy', trendGroupBy);
+  }, [trendGroupBy]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -196,6 +225,15 @@ const Analytics: React.FC = () => {
     });
   };
 
+  const handleResetFilters = () => {
+    setStartDate(dayjs().startOf('month'));
+    setEndDate(dayjs());
+    setTrendGroupBy('day');
+    localStorage.removeItem('analytics_startDate');
+    localStorage.removeItem('analytics_endDate');
+    localStorage.removeItem('analytics_trendGroupBy');
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -232,6 +270,18 @@ const Analytics: React.FC = () => {
                 },
               }}
             />
+            <Tooltip title="Reset to default (current month)">
+              <IconButton 
+                onClick={handleResetFilters}
+                color="primary"
+                sx={{ 
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <RestartAltIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
 
@@ -356,13 +406,21 @@ const Analytics: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         outerRadius={100}
-                        label={(entry) => `${entry.categoryName} (${entry.percentage}%)`}
+                        label={(entry) => `${entry.percentage}%`}
                       >
                         {categoryBreakdown.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.categoryColor} />
                         ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    </Pie>
+                      <RechartsTooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px',
+                          padding: '8px',
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   <Box mt={2}>
@@ -376,22 +434,30 @@ const Analytics: React.FC = () => {
                         borderBottom={index < categoryBreakdown.length - 1 ? '1px solid' : 'none'}
                         borderColor="divider"
                       >
-                        <Box display="flex" alignItems="center" gap={1}>
+                        <Box display="flex" alignItems="center" gap={1} minWidth={0} flex={1}>
                           <Box
                             width={12}
                             height={12}
                             borderRadius="50%"
                             bgcolor={cat.categoryColor}
+                            flexShrink={0}
                           />
-                          <Typography variant="body2">
-                            {cat.path && cat.path.length > 0 ? cat.path.join(' > ') : cat.categoryName} {cat.isFolder && '📁'}
+                          <Typography 
+                            variant="body2"
+                            sx={{ 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap' 
+                            }}
+                          >
+                            {cat.path.join(' > ')} {cat.isFolder && '📁'}
                           </Typography>
                         </Box>
-                        <Box textAlign="right">
-                          <Typography variant="body2" fontWeight={600}>
+                        <Box textAlign="right" flexShrink={0}>
+                          <Typography variant="body2" fontWeight={600} noWrap>
                             {formatCurrency(cat.amount)}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" noWrap>
                             {cat.count} expenses · {cat.percentage}%
                           </Typography>
                         </Box>
@@ -444,7 +510,7 @@ const Analytics: React.FC = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" tickFormatter={formatDate} />
                     <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                    <Tooltip
+                    <RechartsTooltip
                       formatter={(value: number) => formatCurrency(value)}
                       labelFormatter={formatDate}
                     />
@@ -493,9 +559,9 @@ const Analytics: React.FC = () => {
                         tick={{ fontSize: 12 }}
                       />
                       <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                      <Tooltip 
+                      <RechartsTooltip 
                         formatter={(value: number) => formatCurrency(value)}
-                        content={({ active, payload }) => {
+                        content={({ active, payload }: any) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
                             return (
@@ -540,23 +606,32 @@ const Analytics: React.FC = () => {
                         borderBottom={index < budgetComparison.length - 1 ? '1px solid' : 'none'}
                         borderColor="divider"
                       >
-                        <Box>
-                          <Typography variant="body2" fontWeight={500}>
+                        <Box minWidth={0} flex={1}>
+                          <Typography 
+                            variant="body2" 
+                            fontWeight={500}
+                            sx={{ 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap' 
+                            }}
+                          >
                             {budget.categoryName} {budget.isFolder && '📁'}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" noWrap>
                             {budget.percentUsed}% used
                           </Typography>
                         </Box>
-                        <Box textAlign="right">
+                        <Box textAlign="right" flexShrink={0}>
                           <Typography
                             variant="body2"
                             fontWeight={600}
                             color={budget.isOverBudget ? 'error.main' : 'success.main'}
+                            noWrap
                           >
                             {formatCurrency(budget.actualSpent)} / {formatCurrency(budget.budgetAmount)}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" noWrap>
                             {budget.isOverBudget ? 'Over by ' : 'Remaining '}{formatCurrency(Math.abs(budget.difference))}
                           </Typography>
                         </Box>
@@ -602,30 +677,41 @@ const Analytics: React.FC = () => {
                       borderBottom={index < topExpenses.length - 1 ? '1px solid' : 'none'}
                       borderColor="divider"
                     >
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <Typography variant="h6" color="text.secondary" fontWeight={600}>
+                      <Box display="flex" alignItems="center" gap={2} minWidth={0} flex={1}>
+                        <Typography variant="h6" color="text.secondary" fontWeight={600} flexShrink={0}>
                           #{index + 1}
                         </Typography>
-                        <Box>
-                          <Typography variant="body1" fontWeight={500}>
+                        <Box minWidth={0} flex={1}>
+                          <Typography 
+                            variant="body1" 
+                            fontWeight={500}
+                            sx={{ 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap' 
+                            }}
+                          >
                             {expense.description}
                           </Typography>
-                          <Box display="flex" gap={1} mt={0.5}>
+                          <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
                             <Chip
                               label={expense.categoryName}
                               size="small"
                               sx={{
                                 bgcolor: expense.categoryColor + '20',
                                 color: expense.categoryColor,
+                                maxWidth: '200px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
                               }}
                             />
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" noWrap>
                               {formatDate(expense.date)}
                             </Typography>
                           </Box>
                         </Box>
                       </Box>
-                      <Typography variant="h6" fontWeight={700} color="error.main">
+                      <Typography variant="h6" fontWeight={700} color="error.main" flexShrink={0} noWrap>
                         {formatCurrency(expense.amount)}
                       </Typography>
                     </Box>
@@ -658,17 +744,26 @@ const Analytics: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ paymentMethodName, percentage }) => `${paymentMethodName}: ${percentage}%`}
+                        label={({ percentage }) => `${percentage}%`}
                         outerRadius={100}
                         fill="#8884d8"
                         dataKey="amount"
+                        nameKey="paymentMethodName"
                       >
                         {paymentMethodBreakdown.map((_entry, index) => {
                           const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0', '#a8edea'];
                           return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
                         })}
                       </Pie>
-                      <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                      <RechartsTooltip 
+                        formatter={(value: any) => formatCurrency(value)}
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          padding: '8px',
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   <Box mt={2}>
@@ -684,20 +779,30 @@ const Analytics: React.FC = () => {
                           borderBottom={index < paymentMethodBreakdown.length - 1 ? '1px solid' : 'none'}
                           borderColor="divider"
                         >
-                          <Box display="flex" alignItems="center" gap={1}>
+                          <Box display="flex" alignItems="center" gap={1} minWidth={0} flex={1}>
                             <Box
                               width={12}
                               height={12}
                               borderRadius="50%"
                               bgcolor={colors[index % colors.length]}
+                              flexShrink={0}
                             />
-                            <Typography variant="body2">{pm.paymentMethodName}</Typography>
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                overflow: 'hidden', 
+                                textOverflow: 'ellipsis', 
+                                whiteSpace: 'nowrap' 
+                              }}
+                            >
+                              {pm.paymentMethodName}
+                            </Typography>
                           </Box>
-                          <Box textAlign="right">
-                            <Typography variant="body2" fontWeight={600}>
+                          <Box textAlign="right" flexShrink={0}>
+                            <Typography variant="body2" fontWeight={600} noWrap>
                               {formatCurrency(pm.amount)}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" noWrap>
                               {pm.count} transactions
                             </Typography>
                           </Box>
@@ -736,20 +841,28 @@ const Analytics: React.FC = () => {
                       borderBottom={index < topMerchants.length - 1 ? '1px solid' : 'none'}
                       borderColor="divider"
                     >
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <Typography variant="h6" color="text.secondary" fontWeight={600}>
+                      <Box display="flex" alignItems="center" gap={2} minWidth={0} flex={1}>
+                        <Typography variant="h6" color="text.secondary" fontWeight={600} flexShrink={0}>
                           #{index + 1}
                         </Typography>
-                        <Box>
-                          <Typography variant="body1" fontWeight={500}>
+                        <Box minWidth={0} flex={1}>
+                          <Typography 
+                            variant="body1" 
+                            fontWeight={500}
+                            sx={{ 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap' 
+                            }}
+                          >
                             {merchant.merchantName}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" noWrap>
                             {merchant.count} transactions · {merchant.percentage}% of total
                           </Typography>
                         </Box>
                       </Box>
-                      <Typography variant="h6" fontWeight={700} color="primary.main">
+                      <Typography variant="h6" fontWeight={700} color="primary.main" flexShrink={0} noWrap>
                         {formatCurrency(merchant.amount)}
                       </Typography>
                     </Box>
