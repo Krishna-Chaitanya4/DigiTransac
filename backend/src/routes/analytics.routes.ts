@@ -13,7 +13,7 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
     const { startDate, endDate } = req.query;
 
     const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(endDate as string) : new Date();
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
@@ -65,14 +65,14 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
   }
 });
 
-// GET /api/analytics/category-breakdown - Get spending by category
+// GET /api/analytics/category-breakdown - Get spending by category with folder hierarchy
 router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(endDate as string) : new Date();
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
@@ -102,12 +102,32 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
 
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
+    // Helper function to build name path from category IDs
+    const buildNamePath = (categoryId: string): string[] => {
+      const category = categoryLookup.get(categoryId);
+      if (!category) return ['Unknown'];
+      
+      const namePath: string[] = [];
+      if (category.parentId) {
+        // Recursively get parent names
+        const parentCategory = categoryLookup.get(category.parentId);
+        if (parentCategory) {
+          namePath.push(...buildNamePath(category.parentId));
+        }
+      }
+      namePath.push(category.name);
+      return namePath;
+    };
+
     const breakdown = Array.from(categoryMap.entries()).map(([categoryId, data]) => {
       const category = categoryLookup.get(categoryId);
       return {
         categoryId,
         categoryName: category?.name || 'Unknown',
         categoryColor: category?.color || '#667eea',
+        isFolder: category?.isFolder || false,
+        parentId: category?.parentId || null,
+        path: buildNamePath(categoryId),
         amount: data.amount,
         count: data.count,
         percentage: 0 // Will calculate after
@@ -143,7 +163,7 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
     const { startDate, endDate, groupBy = 'day' } = req.query;
 
     const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(endDate as string) : new Date();
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
@@ -197,14 +217,14 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
   }
 });
 
-// GET /api/analytics/budget-comparison - Compare actual spending vs budgets
+// GET /api/analytics/budget-comparison - Compare actual spending vs budgets (with folder support)
 router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(endDate as string) : new Date();
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
 
     // Get active budgets
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
@@ -225,26 +245,42 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
     const categories = await categoriesContainer.find({ userId }).toArray();
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
+    // Helper function to get all descendant category IDs (for folder budgets)
+    const getAllDescendantCategoryIds = (categoryId: string): string[] => {
+      const result = [categoryId];
+      const children = categories.filter((cat: any) => cat.parentId === categoryId);
+      children.forEach((child: any) => {
+        result.push(...getAllDescendantCategoryIds(child.id));
+      });
+      return result;
+    };
+
     const comparisons = await Promise.all(
       budgets.map(async (budget: any) => {
         const budgetStart = new Date(budget.startDate) > start ? new Date(budget.startDate) : start;
         const budgetEnd = budget.endDate && new Date(budget.endDate) < end ? new Date(budget.endDate) : end;
 
+        const category = categoryLookup.get(budget.categoryId);
+        const isFolder = category?.isFolder || false;
+
+        // For folders, get all descendant categories
+        const categoryIds = isFolder ? getAllDescendantCategoryIds(budget.categoryId) : [budget.categoryId];
+
         const expenses = await expensesContainer
           .find({
             userId,
-            categoryId: budget.categoryId,
+            categoryId: { $in: categoryIds },
             date: { $gte: budgetStart, $lte: budgetEnd }
           })
           .toArray();
 
         const spent = expenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
-        const category = categoryLookup.get(budget.categoryId);
 
         return {
           categoryId: budget.categoryId,
           categoryName: category?.name || 'Unknown',
           categoryColor: category?.color || '#667eea',
+          isFolder,
           budgetAmount: budget.amount,
           actualSpent: spent,
           difference: budget.amount - spent,
@@ -274,7 +310,7 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
     const { startDate, endDate, limit = '10' } = req.query;
 
     const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(endDate as string) : new Date();
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
@@ -312,6 +348,124 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
     res.status(500).json({
       success: false,
       message: 'Error fetching top expenses'
+    });
+  }
+});
+
+// GET /api/analytics/payment-method-breakdown - Get spending by payment method
+router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { startDate, endDate } = req.query;
+
+    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+
+    const expensesContainer = await cosmosDBService.getExpensesContainer();
+    const expenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: start, $lte: end }
+      })
+      .toArray();
+
+    // Aggregate by payment method
+    const paymentMethodMap = new Map<string, { amount: number; count: number }>();
+    
+    expenses.forEach((expense: any) => {
+      const paymentMethodId = expense.paymentMethodId || 'none';
+      const current = paymentMethodMap.get(paymentMethodId) || { amount: 0, count: 0 };
+      paymentMethodMap.set(paymentMethodId, {
+        amount: current.amount + expense.amount,
+        count: current.count + 1
+      });
+    });
+
+    // Get payment method details
+    const paymentMethodsContainer = await cosmosDBService.getPaymentMethodsContainer();
+    const paymentMethods = await paymentMethodsContainer
+      .find({ userId })
+      .toArray();
+
+    const totalAmount = Array.from(paymentMethodMap.values()).reduce((sum, pm) => sum + pm.amount, 0);
+
+    const breakdown = Array.from(paymentMethodMap.entries()).map(([paymentMethodId, data]) => {
+      const paymentMethod = paymentMethods.find((pm: any) => pm.id === paymentMethodId);
+      return {
+        paymentMethodId,
+        paymentMethodName: paymentMethodId === 'none' ? 'Not Specified' : (paymentMethod?.name || 'Unknown'),
+        paymentMethodType: paymentMethod?.type || 'other',
+        amount: data.amount,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0
+      };
+    }).sort((a, b) => b.amount - a.amount);
+
+    res.json({
+      success: true,
+      breakdown
+    });
+  } catch (error) {
+    console.error('Error fetching payment method breakdown:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching payment method breakdown'
+    });
+  }
+});
+
+// GET /api/analytics/top-merchants - Get top merchants from parsed email data
+router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { startDate, endDate, limit } = req.query;
+
+    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const topLimit = limit ? parseInt(limit as string) : 10;
+
+    const expensesContainer = await cosmosDBService.getExpensesContainer();
+    const expenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: start, $lte: end },
+        merchantName: { $exists: true, $ne: null }
+      })
+      .toArray();
+
+    // Aggregate by merchant
+    const merchantMap = new Map<string, { amount: number; count: number }>();
+    
+    expenses.forEach((expense: any) => {
+      const merchant = expense.merchantName;
+      const current = merchantMap.get(merchant) || { amount: 0, count: 0 };
+      merchantMap.set(merchant, {
+        amount: current.amount + expense.amount,
+        count: current.count + 1
+      });
+    });
+
+    const totalAmount = Array.from(merchantMap.values()).reduce((sum, m) => sum + m.amount, 0);
+
+    const topMerchants = Array.from(merchantMap.entries())
+      .map(([merchantName, data]) => ({
+        merchantName,
+        amount: data.amount,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, topLimit);
+
+    res.json({
+      success: true,
+      merchants: topMerchants
+    });
+  } catch (error) {
+    console.error('Error fetching top merchants:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching top merchants'
     });
   }
 });

@@ -53,6 +53,9 @@ interface CategoryBreakdown {
   categoryId: string;
   categoryName: string;
   categoryColor: string;
+  isFolder: boolean;
+  parentId: string | null;
+  path: string[];
   amount: number;
   count: number;
   percentage: number;
@@ -67,6 +70,7 @@ interface BudgetComparison {
   categoryId: string;
   categoryName: string;
   categoryColor: string;
+  isFolder: boolean;
   budgetAmount: number;
   actualSpent: number;
   difference: number;
@@ -83,6 +87,22 @@ interface TopExpense {
   categoryColor: string;
 }
 
+interface PaymentMethodBreakdown {
+  paymentMethodId: string;
+  paymentMethodName: string;
+  paymentMethodType: string;
+  amount: number;
+  count: number;
+  percentage: number;
+}
+
+interface MerchantData {
+  merchantName: string;
+  amount: number;
+  count: number;
+  percentage: number;
+}
+
 const Analytics: React.FC = () => {
   const { token, user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -93,6 +113,8 @@ const Analytics: React.FC = () => {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [budgetComparison, setBudgetComparison] = useState<BudgetComparison[]>([]);
   const [topExpenses, setTopExpenses] = useState<TopExpense[]>([]);
+  const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<PaymentMethodBreakdown[]>([]);
+  const [topMerchants, setTopMerchants] = useState<MerchantData[]>([]);
 
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
@@ -113,7 +135,7 @@ const Analytics: React.FC = () => {
         endDate: dateRange.endDate,
       });
 
-      const [overviewRes, breakdownRes, trendsRes, comparisonRes, topExpensesRes] = await Promise.all([
+      const [overviewRes, breakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes] = await Promise.all([
         axios.get(`${API_URL}/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -129,6 +151,12 @@ const Analytics: React.FC = () => {
         axios.get(`${API_URL}/api/analytics/top-expenses?${params}&limit=5`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        axios.get(`${API_URL}/api/analytics/payment-method-breakdown?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_URL}/api/analytics/top-merchants?${params}&limit=10`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
 
       setOverview(overviewRes.data.overview);
@@ -136,6 +164,8 @@ const Analytics: React.FC = () => {
       setTrends(trendsRes.data.trends || []);
       setBudgetComparison(comparisonRes.data.comparisons || []);
       setTopExpenses(topExpensesRes.data.expenses || []);
+      setPaymentMethodBreakdown(paymentMethodRes.data.breakdown || []);
+      setTopMerchants(merchantsRes.data.merchants || []);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch analytics');
@@ -305,24 +335,59 @@ const Analytics: React.FC = () => {
                 Spending by Category
               </Typography>
               {categoryBreakdown.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={categoryBreakdown}
-                      dataKey="amount"
-                      nameKey="categoryName"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={(entry) => `${entry.categoryName} (${entry.percentage}%)`}
-                    >
-                      {categoryBreakdown.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.categoryColor} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={categoryBreakdown}
+                        dataKey="amount"
+                        nameKey="categoryName"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={(entry) => `${entry.categoryName} (${entry.percentage}%)`}
+                      >
+                        {categoryBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.categoryColor} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <Box mt={2}>
+                    {categoryBreakdown.map((cat, index) => (
+                      <Box
+                        key={cat.categoryId}
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        py={1}
+                        borderBottom={index < categoryBreakdown.length - 1 ? '1px solid' : 'none'}
+                        borderColor="divider"
+                      >
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Box
+                            width={12}
+                            height={12}
+                            borderRadius="50%"
+                            bgcolor={cat.categoryColor}
+                          />
+                          <Typography variant="body2">
+                            {cat.path && cat.path.length > 0 ? cat.path.join(' > ') : cat.categoryName} {cat.isFolder && '📁'}
+                          </Typography>
+                        </Box>
+                        <Box textAlign="right">
+                          <Typography variant="body2" fontWeight={600}>
+                            {formatCurrency(cat.amount)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {cat.count} expenses · {cat.percentage}%
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
               ) : (
                 <Box textAlign="center" py={6}>
                   <Typography color="text.secondary">
@@ -408,17 +473,86 @@ const Analytics: React.FC = () => {
                 Budget vs Actual Spending
               </Typography>
               {budgetComparison.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={budgetComparison}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="categoryName" />
-                    <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend />
-                    <Bar dataKey="budgetAmount" fill="#667eea" name="Budget" />
-                    <Bar dataKey="actualSpent" fill="#f5576c" name="Actual" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={budgetComparison}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="categoryName" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                      <Tooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <Box
+                                sx={{
+                                  bgcolor: 'background.paper',
+                                  p: 1.5,
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  borderRadius: 1,
+                                }}
+                              >
+                                <Typography variant="body2" fontWeight={600}>
+                                  {data.categoryName} {data.isFolder && '📁'}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Budget: {formatCurrency(data.budgetAmount)}
+                                </Typography>
+                                <br />
+                                <Typography variant="caption" color="text.secondary">
+                                  Spent: {formatCurrency(data.actualSpent)} ({data.percentUsed}%)
+                                </Typography>
+                              </Box>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="budgetAmount" fill="#667eea" name="Budget" />
+                      <Bar dataKey="actualSpent" fill="#f5576c" name="Actual" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <Box mt={2}>
+                    {budgetComparison.map((budget, index) => (
+                      <Box
+                        key={budget.categoryId}
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        py={1}
+                        borderBottom={index < budgetComparison.length - 1 ? '1px solid' : 'none'}
+                        borderColor="divider"
+                      >
+                        <Box>
+                          <Typography variant="body2" fontWeight={500}>
+                            {budget.categoryName} {budget.isFolder && '📁'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {budget.percentUsed}% used
+                          </Typography>
+                        </Box>
+                        <Box textAlign="right">
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            color={budget.isOverBudget ? 'error.main' : 'success.main'}
+                          >
+                            {formatCurrency(budget.actualSpent)} / {formatCurrency(budget.budgetAmount)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {budget.isOverBudget ? 'Over by ' : 'Remaining '}{formatCurrency(Math.abs(budget.difference))}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
               ) : (
                 <Box textAlign="center" py={6}>
                   <Typography color="text.secondary">
@@ -490,6 +624,130 @@ const Analytics: React.FC = () => {
                 <Box textAlign="center" py={6}>
                   <Typography color="text.secondary">
                     No expenses for this period
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Payment Method Breakdown */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={3}>
+                Payment Method Breakdown
+              </Typography>
+              {paymentMethodBreakdown.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={paymentMethodBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ paymentMethodName, percentage }) => `${paymentMethodName}: ${percentage}%`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="amount"
+                      >
+                        {paymentMethodBreakdown.map((_entry, index) => {
+                          const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0', '#a8edea'];
+                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        })}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <Box mt={2}>
+                    {paymentMethodBreakdown.map((pm, index) => {
+                      const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0', '#a8edea'];
+                      return (
+                        <Box
+                          key={pm.paymentMethodId}
+                          display="flex"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          py={1}
+                          borderBottom={index < paymentMethodBreakdown.length - 1 ? '1px solid' : 'none'}
+                          borderColor="divider"
+                        >
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Box
+                              width={12}
+                              height={12}
+                              borderRadius="50%"
+                              bgcolor={colors[index % colors.length]}
+                            />
+                            <Typography variant="body2">{pm.paymentMethodName}</Typography>
+                          </Box>
+                          <Box textAlign="right">
+                            <Typography variant="body2" fontWeight={600}>
+                              {formatCurrency(pm.amount)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {pm.count} transactions
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </>
+              ) : (
+                <Box textAlign="center" py={6}>
+                  <Typography color="text.secondary">
+                    No payment method data available
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Top Merchants */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={3}>
+                Top Merchants
+              </Typography>
+              {topMerchants.length > 0 ? (
+                <Box>
+                  {topMerchants.map((merchant, index) => (
+                    <Box
+                      key={merchant.merchantName}
+                      display="flex"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      py={1.5}
+                      borderBottom={index < topMerchants.length - 1 ? '1px solid' : 'none'}
+                      borderColor="divider"
+                    >
+                      <Box display="flex" alignItems="center" gap={2}>
+                        <Typography variant="h6" color="text.secondary" fontWeight={600}>
+                          #{index + 1}
+                        </Typography>
+                        <Box>
+                          <Typography variant="body1" fontWeight={500}>
+                            {merchant.merchantName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {merchant.count} transactions · {merchant.percentage}% of total
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Typography variant="h6" fontWeight={700} color="primary.main">
+                        {formatCurrency(merchant.amount)}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <Box textAlign="center" py={6}>
+                  <Typography color="text.secondary">
+                    No merchant data available
                   </Typography>
                 </Box>
               )}
