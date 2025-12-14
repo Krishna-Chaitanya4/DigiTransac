@@ -29,6 +29,7 @@ import {
   Grid,
   Collapse,
   Divider,
+  Checkbox,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -39,6 +40,10 @@ import {
   Clear as ClearIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  FileDownload as FileDownloadIcon,
+  ViewList as ViewListIcon,
+  CalendarToday as CalendarIcon,
+  Store as StoreIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -95,12 +100,15 @@ const Expenses: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
-  const [reviewStatus, setReviewStatus] = useState<string>('approved');
+  const [reviewStatus, setReviewStatus] = useState<string>('all');
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs());
   const [amountRange, setAmountRange] = useState<number[]>([0, 10000]);
   const [sortBy, setSortBy] = useState<string>('date-desc');
   const [showFilters, setShowFilters] = useState(false);
+  const [groupBy, setGroupBy] = useState<string>('none');
+  const [selectedExpenses, setSelectedExpenses] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
   
   const [formData, setFormData] = useState({
     categoryId: '',
@@ -131,9 +139,13 @@ const Expenses: React.FC = () => {
   const fetchExpenses = async () => {
     try {
       setLoading(true);
+      const params: any = {};
+      if (reviewStatus !== 'all') {
+        params.reviewStatus = reviewStatus;
+      }
       const response = await axios.get(`${API_URL}/api/expenses`, {
         headers: { Authorization: `Bearer ${token}` },
-        params: { reviewStatus: 'approved' },
+        params,
       });
       setExpenses(response.data.expenses || []);
       setError('');
@@ -323,7 +335,7 @@ const Expenses: React.FC = () => {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedPaymentMethod('');
-    setReviewStatus('approved');
+    setReviewStatus('all');
     setStartDate(dayjs().startOf('month'));
     setEndDate(dayjs());
     setAmountRange([0, maxExpenseAmount]);
@@ -365,10 +377,169 @@ const Expenses: React.FC = () => {
     if (searchQuery) count++;
     if (selectedCategory) count++;
     if (selectedPaymentMethod) count++;
-    if (reviewStatus !== 'approved') count++;
+    if (reviewStatus !== 'all') count++;
     if (!startDate?.isSame(dayjs().startOf('month'), 'day') || !endDate?.isSame(dayjs(), 'day')) count++;
     if (amountRange[0] !== 0 || amountRange[1] !== maxExpenseAmount) count++;
     return count;
+  };
+
+  // Check if a quick filter is active
+  const isQuickFilterActive = (filter: string) => {
+    const today = dayjs();
+    
+    switch (filter) {
+      case 'thisWeek':
+        return startDate?.isSame(today.startOf('week'), 'day') && 
+               endDate?.isSame(today.endOf('week'), 'day');
+      case 'lastWeek':
+        return startDate?.isSame(today.subtract(1, 'week').startOf('week'), 'day') && 
+               endDate?.isSame(today.subtract(1, 'week').endOf('week'), 'day');
+      case 'thisMonth':
+        return startDate?.isSame(today.startOf('month'), 'day') && 
+               endDate?.isSame(today.endOf('month'), 'day');
+      case 'lastMonth':
+        return startDate?.isSame(today.subtract(1, 'month').startOf('month'), 'day') && 
+               endDate?.isSame(today.subtract(1, 'month').endOf('month'), 'day');
+      default:
+        return false;
+    }
+  };
+
+  // Group expenses by category, date, or merchant
+  const getGroupedExpenses = () => {
+    const filtered = getFilteredAndSortedExpenses();
+    
+    if (groupBy === 'none') {
+      return { grouped: false, expenses: filtered };
+    }
+
+    const groups: { [key: string]: { expenses: Expense[], total: number } } = {};
+
+    filtered.forEach(expense => {
+      let groupKey: string;
+      
+      if (groupBy === 'category') {
+        const category = categories.find(c => c.id === expense.categoryId);
+        groupKey = category ? category.name : 'Uncategorized';
+      } else if (groupBy === 'date') {
+        groupKey = dayjs(expense.date).format('MMMM YYYY');
+      } else if (groupBy === 'merchant') {
+        groupKey = expense.description || 'No Description';
+      } else {
+        groupKey = 'Other';
+      }
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = { expenses: [], total: 0 };
+      }
+      groups[groupKey].expenses.push(expense);
+      groups[groupKey].total += expense.amount;
+    });
+
+    // Sort groups by total spending (descending)
+    const sortedGroups = Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+
+    return {
+      grouped: true,
+      groups: sortedGroups.map(([name, data]) => ({
+        name,
+        expenses: data.expenses,
+        total: data.total,
+        count: data.expenses.length
+      }))
+    };
+  };
+
+  // Handle bulk selection
+  const handleSelectAll = () => {
+    const filtered = getFilteredAndSortedExpenses();
+    if (selectAll) {
+      setSelectedExpenses(new Set());
+      setSelectAll(false);
+    } else {
+      setSelectedExpenses(new Set(filtered.map(e => e.id)));
+      setSelectAll(true);
+    }
+  };
+
+  const handleSelectExpense = (expenseId: string) => {
+    const newSelected = new Set(selectedExpenses);
+    if (newSelected.has(expenseId)) {
+      newSelected.delete(expenseId);
+    } else {
+      newSelected.add(expenseId);
+    }
+    setSelectedExpenses(newSelected);
+    setSelectAll(newSelected.size === getFilteredAndSortedExpenses().length);
+  };
+
+  // Bulk actions
+  const handleBulkDelete = async () => {
+    if (selectedExpenses.size === 0) return;
+    
+    if (!window.confirm(`Are you sure you want to delete ${selectedExpenses.size} expense(s)?`)) {
+      return;
+    }
+
+    try {
+      await Promise.all(
+        Array.from(selectedExpenses).map(id =>
+          axios.delete(`${API_URL}/api/expenses/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      );
+      setSelectedExpenses(new Set());
+      setSelectAll(false);
+      fetchExpenses();
+    } catch (err: any) {
+      console.error('Error deleting expenses:', err);
+      setError('Failed to delete expenses');
+    }
+  };
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const filtered = getFilteredAndSortedExpenses();
+    const dataToExport = selectedExpenses.size > 0
+      ? filtered.filter(e => selectedExpenses.has(e.id))
+      : filtered;
+
+    if (dataToExport.length === 0) {
+      setError('No expenses to export');
+      return;
+    }
+
+    const headers = ['Date', 'Category', 'Description', 'Amount', 'Payment Method', 'Status', 'Notes'];
+    const rows = dataToExport.map(expense => {
+      const category = categories.find(c => c.id === expense.categoryId);
+      const paymentMethod = paymentMethods.find(p => p.id === expense.paymentMethodId);
+      
+      return [
+        dayjs(expense.date).format('YYYY-MM-DD'),
+        category?.name || 'N/A',
+        expense.description || '',
+        expense.amount.toFixed(2),
+        paymentMethod?.name || 'N/A',
+        expense.reviewStatus || 'pending',
+        expense.notes || ''
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `expenses_${dayjs().format('YYYY-MM-DD')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const formatCurrency = (amount: number) => {
@@ -476,13 +647,6 @@ const Expenses: React.FC = () => {
             {/* Quick Filter Chips */}
             <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
               <Chip
-                label="Pending Review"
-                onClick={() => handleQuickFilter('pending')}
-                variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
-                color={reviewStatus === 'pending' ? 'primary' : 'default'}
-                size="small"
-              />
-              <Chip
                 label="Over ₹1000"
                 onClick={() => handleQuickFilter('highValue')}
                 variant={(amountRange[0] === 1000) ? 'filled' : 'outlined'}
@@ -492,25 +656,29 @@ const Expenses: React.FC = () => {
               <Chip
                 label="This Week"
                 onClick={() => handleQuickFilter('thisWeek')}
-                variant="outlined"
+                variant={isQuickFilterActive('thisWeek') ? 'filled' : 'outlined'}
+                color={isQuickFilterActive('thisWeek') ? 'primary' : 'default'}
                 size="small"
               />
               <Chip
                 label="Last Week"
                 onClick={() => handleQuickFilter('lastWeek')}
-                variant="outlined"
+                variant={isQuickFilterActive('lastWeek') ? 'filled' : 'outlined'}
+                color={isQuickFilterActive('lastWeek') ? 'primary' : 'default'}
                 size="small"
               />
               <Chip
                 label="This Month"
                 onClick={() => handleQuickFilter('thisMonth')}
-                variant="outlined"
+                variant={isQuickFilterActive('thisMonth') ? 'filled' : 'outlined'}
+                color={isQuickFilterActive('thisMonth') ? 'primary' : 'default'}
                 size="small"
               />
               <Chip
                 label="Last Month"
                 onClick={() => handleQuickFilter('lastMonth')}
-                variant="outlined"
+                variant={isQuickFilterActive('lastMonth') ? 'filled' : 'outlined'}
+                color={isQuickFilterActive('lastMonth') ? 'primary' : 'default'}
                 size="small"
               />
             </Box>
@@ -551,6 +719,22 @@ const Expenses: React.FC = () => {
                           {pm.name}
                         </MenuItem>
                       ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={reviewStatus}
+                      onChange={(e) => setReviewStatus(e.target.value)}
+                      label="Status"
+                    >
+                      <MenuItem value="all">All Statuses</MenuItem>
+                      <MenuItem value="approved">Approved</MenuItem>
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="rejected">Rejected</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -623,25 +807,108 @@ const Expenses: React.FC = () => {
             )}
 
             {/* Results Info and Sort */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
-              <Typography variant="body2" color="text.secondary">
-                Showing {filteredExpenses.length} of {expenses.length} expenses
-              </Typography>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel>Sort by</InputLabel>
-                <Select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  label="Sort by"
-                >
-                  <MenuItem value="date-desc">Date (Newest)</MenuItem>
-                  <MenuItem value="date-asc">Date (Oldest)</MenuItem>
-                  <MenuItem value="amount-desc">Amount (High to Low)</MenuItem>
-                  <MenuItem value="amount-asc">Amount (Low to High)</MenuItem>
-                  <MenuItem value="category">Category</MenuItem>
-                </Select>
-              </FormControl>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mt={2} flexWrap="wrap" gap={2}>
+              <Box display="flex" alignItems="center" gap={2}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {filteredExpenses.length} of {expenses.length} expenses
+                </Typography>
+                {selectedExpenses.size > 0 && (
+                  <Chip
+                    label={`${selectedExpenses.size} selected`}
+                    size="small"
+                    color="primary"
+                    onDelete={() => {
+                      setSelectedExpenses(new Set());
+                      setSelectAll(false);
+                    }}
+                  />
+                )}
+              </Box>
+              <Box display="flex" gap={1} alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>Group by</InputLabel>
+                  <Select
+                    value={groupBy}
+                    onChange={(e) => setGroupBy(e.target.value)}
+                    label="Group by"
+                  >
+                    <MenuItem value="none">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <ViewListIcon fontSize="small" />
+                        None
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="category">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <ViewListIcon fontSize="small" />
+                        Category
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="date">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <CalendarIcon fontSize="small" />
+                        Date
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="merchant">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <StoreIcon fontSize="small" />
+                        Merchant
+                      </Box>
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Sort by</InputLabel>
+                  <Select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    label="Sort by"
+                  >
+                    <MenuItem value="date-desc">Date (Newest)</MenuItem>
+                    <MenuItem value="date-asc">Date (Oldest)</MenuItem>
+                    <MenuItem value="amount-desc">Amount (High to Low)</MenuItem>
+                    <MenuItem value="amount-asc">Amount (Low to High)</MenuItem>
+                    <MenuItem value="category">Category</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
             </Box>
+
+            {/* Bulk Actions Bar */}
+            {selectedExpenses.size > 0 && (
+              <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={handleBulkDelete}
+                  startIcon={<DeleteIcon />}
+                >
+                  Delete ({selectedExpenses.size})
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleExportCSV}
+                  startIcon={<FileDownloadIcon />}
+                >
+                  Export Selected
+                </Button>
+              </Box>
+            )}
+            {selectedExpenses.size === 0 && (
+              <Box mt={2} display="flex" justifyContent="flex-end">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleExportCSV}
+                  startIcon={<FileDownloadIcon />}
+                >
+                  Export All
+                </Button>
+              </Box>
+            )}
           </CardContent>
         </Card>
 
@@ -697,6 +964,13 @@ const Expenses: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                        indeterminate={selectedExpenses.size > 0 && !selectAll}
+                      />
+                    </TableCell>
                     <TableCell>Date</TableCell>
                     <TableCell>Description</TableCell>
                     <TableCell>Category</TableCell>
@@ -706,58 +980,165 @@ const Expenses: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredExpenses.map((expense) => (
-                    <TableRow key={expense.id} hover>
-                      <TableCell>{formatDate(expense.date)}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={500}>
-                          {expense.description}
-                        </Typography>
-                        {expense.notes && (
-                          <Typography variant="caption" color="text.secondary">
-                            {expense.notes}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getCategoryName(expense.categoryId)}
-                          size="small"
-                          sx={{
-                            bgcolor: getCategoryColor(expense.categoryId) + '20',
-                            color: getCategoryColor(expense.categoryId),
-                            borderColor: getCategoryColor(expense.categoryId),
+                  {(() => {
+                    const groupedData = getGroupedExpenses();
+                    
+                    if (!groupedData.grouped) {
+                      // Regular ungrouped view
+                      return groupedData.expenses.map((expense) => (
+                        <TableRow 
+                          key={expense.id} 
+                          hover
+                          selected={selectedExpenses.has(expense.id)}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={selectedExpenses.has(expense.id)}
+                              onChange={() => handleSelectExpense(expense.id)}
+                            />
+                          </TableCell>
+                          <TableCell>{formatDate(expense.date)}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={500}>
+                              {expense.description}
+                            </Typography>
+                            {expense.notes && (
+                              <Typography variant="caption" color="text.secondary">
+                                {expense.notes}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={
+                                categories.find((c) => c.id === expense.categoryId)?.name ||
+                                'N/A'
+                              }
+                              size="small"
+                              sx={{
+                                bgcolor: categories.find((c) => c.id === expense.categoryId)
+                                  ?.color || '#ccc',
+                                color: '#fff',
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {paymentMethods.find((pm) => pm.id === expense.paymentMethodId)
+                              ?.name || 'N/A'}
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" fontWeight={600}>
+                              {formatCurrency(expense.amount)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEditExpense(expense)}
+                              color="primary"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteExpense(expense.id)}
+                              color="error"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ));
+                    } else {
+                      // Grouped view
+                      return groupedData.groups.flatMap((group, groupIndex) => [
+                        // Group header row
+                        <TableRow 
+                          key={`group-${groupIndex}`}
+                          sx={{ 
+                            bgcolor: 'action.hover',
+                            '& td': { fontWeight: 600, borderBottom: 2, borderColor: 'divider' }
                           }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {getPaymentMethodName(expense.paymentMethodId)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight={600}>
-                          {formatCurrency(expense.amount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditExpense(expense)}
-                          sx={{ mr: 1 }}
                         >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteExpense(expense)}
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          <TableCell colSpan={7}>
+                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                              <Typography variant="subtitle2">
+                                {group.name} ({group.count} expense{group.count !== 1 ? 's' : ''})
+                              </Typography>
+                              <Typography variant="subtitle2" color="primary">
+                                Total: {formatCurrency(group.total)}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>,
+                        // Group expenses
+                        ...group.expenses.map((expense) => (
+                          <TableRow 
+                            key={expense.id} 
+                            hover
+                            selected={selectedExpenses.has(expense.id)}
+                          >
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={selectedExpenses.has(expense.id)}
+                                onChange={() => handleSelectExpense(expense.id)}
+                              />
+                            </TableCell>
+                            <TableCell>{formatDate(expense.date)}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500}>
+                                {expense.description}
+                              </Typography>
+                              {expense.notes && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {expense.notes}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={
+                                  categories.find((c) => c.id === expense.categoryId)?.name ||
+                                  'N/A'
+                                }
+                                size="small"
+                                sx={{
+                                  bgcolor: categories.find((c) => c.id === expense.categoryId)
+                                    ?.color || '#ccc',
+                                  color: '#fff',
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {paymentMethods.find((pm) => pm.id === expense.paymentMethodId)
+                                ?.name || 'N/A'}
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontWeight={600}>
+                                {formatCurrency(expense.amount)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleEditExpense(expense)}
+                                color="primary"
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteExpense(expense.id)}
+                                color="error"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ]);
+                    }
+                  })()}
                 </TableBody>
               </Table>
             </TableContainer>

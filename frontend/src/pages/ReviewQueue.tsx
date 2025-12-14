@@ -14,15 +14,33 @@ import {
   CircularProgress,
   Divider,
   Stack,
+  InputAdornment,
+  Checkbox,
+  FormControl,
+  InputLabel,
+  Select,
+  Collapse,
 } from '@mui/material';
 import {
   CheckCircle as ApproveIcon,
   Cancel as RejectIcon,
   Edit as EditIcon,
   Info as InfoIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
+  FilterList as FilterListIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  FileDownload as FileDownloadIcon,
+  CheckBox as CheckBoxIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -60,6 +78,18 @@ const ReviewQueue: React.FC = () => {
     amount: '',
     description: '',
   });
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [startDate, setStartDate] = useState<Dayjs | null>(null);
+  const [endDate, setEndDate] = useState<Dayjs | null>(null);
+  const [amountMin, setAmountMin] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Bulk selection states
+  const [selectedExpenses, setSelectedExpenses] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   useEffect(() => {
     fetchPendingExpenses();
@@ -92,6 +122,161 @@ const ReviewQueue: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to fetch categories:', err);
     }
+  };
+
+  // Filter pending expenses
+  const getFilteredExpenses = () => {
+    return pendingExpenses.filter(expense => {
+      // Search filter
+      if (searchQuery && !expense.description.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !expense.merchantName?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Category filter
+      if (selectedCategory && expense.categoryId !== selectedCategory) {
+        return false;
+      }
+      
+      // Date range filter
+      if (startDate && dayjs(expense.date).isBefore(startDate, 'day')) {
+        return false;
+      }
+      if (endDate && dayjs(expense.date).isAfter(endDate, 'day')) {
+        return false;
+      }
+      
+      // Amount filter
+      if (amountMin && expense.amount < parseFloat(amountMin)) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
+  const filteredExpenses = getFilteredExpenses();
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('');
+    setStartDate(null);
+    setEndDate(null);
+    setAmountMin('');
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (searchQuery) count++;
+    if (selectedCategory) count++;
+    if (startDate || endDate) count++;
+    if (amountMin) count++;
+    return count;
+  };
+
+  // Bulk selection handlers
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedExpenses(new Set());
+      setSelectAll(false);
+    } else {
+      setSelectedExpenses(new Set(filteredExpenses.map(e => e.id)));
+      setSelectAll(true);
+    }
+  };
+
+  const handleSelectExpense = (expenseId: string) => {
+    const newSelected = new Set(selectedExpenses);
+    if (newSelected.has(expenseId)) {
+      newSelected.delete(expenseId);
+    } else {
+      newSelected.add(expenseId);
+    }
+    setSelectedExpenses(newSelected);
+    setSelectAll(newSelected.size === filteredExpenses.length);
+  };
+
+  // Bulk actions
+  const handleBulkApprove = async () => {
+    if (selectedExpenses.size === 0) return;
+    
+    try {
+      await Promise.all(
+        Array.from(selectedExpenses).map(id =>
+          axios.put(
+            `${API_URL}/api/expenses/${id}`,
+            { reviewStatus: 'approved' },
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+        )
+      );
+      setPendingExpenses(pendingExpenses.filter(e => !selectedExpenses.has(e.id)));
+      setSelectedExpenses(new Set());
+      setSelectAll(false);
+    } catch (err: any) {
+      setError('Failed to approve expenses');
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedExpenses.size === 0) return;
+    
+    if (!window.confirm(`Are you sure you want to reject ${selectedExpenses.size} expense(s)?`)) {
+      return;
+    }
+    
+    try {
+      await Promise.all(
+        Array.from(selectedExpenses).map(id =>
+          axios.delete(`${API_URL}/api/expenses/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      );
+      setPendingExpenses(pendingExpenses.filter(e => !selectedExpenses.has(e.id)));
+      setSelectedExpenses(new Set());
+      setSelectAll(false);
+    } catch (err: any) {
+      setError('Failed to reject expenses');
+    }
+  };
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const dataToExport = selectedExpenses.size > 0
+      ? filteredExpenses.filter(e => selectedExpenses.has(e.id))
+      : filteredExpenses;
+
+    if (dataToExport.length === 0) {
+      setError('No expenses to export');
+      return;
+    }
+
+    const headers = ['Date', 'Merchant', 'Description', 'Category', 'Amount', 'Bank', 'Confidence'];
+    const rows = dataToExport.map(expense => [
+      dayjs(expense.date).format('YYYY-MM-DD'),
+      expense.merchantName || '',
+      expense.description || '',
+      getCategoryName(expense.categoryId),
+      expense.amount.toFixed(2),
+      expense.parsedData?.bankName || 'N/A',
+      expense.parsedData ? `${Math.round(expense.parsedData.confidence * 100)}%` : 'N/A'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `review_queue_${dayjs().format('YYYY-MM-DD')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleEdit = (expense: PendingExpense) => {
@@ -196,40 +381,225 @@ const ReviewQueue: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            Review Queue
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mt={0.5}>
-            {pendingExpenses.length} {pendingExpenses.length === 1 ? 'expense' : 'expenses'} pending review
-          </Typography>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Box>
+            <Typography variant="h4" fontWeight={700}>
+              Review Queue
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mt={0.5}>
+              {filteredExpenses.length} {filteredExpenses.length === 1 ? 'expense' : 'expenses'} 
+              {getActiveFilterCount() > 0 && ` (filtered from ${pendingExpenses.length})`}
+            </Typography>
+          </Box>
+          <Box display="flex" gap={1}>
+            {selectedExpenses.size > 0 && (
+              <Chip
+                label={`${selectedExpenses.size} selected`}
+                size="small"
+                color="primary"
+                onDelete={() => {
+                  setSelectedExpenses(new Set());
+                  setSelectAll(false);
+                }}
+              />
+            )}
+            {filteredExpenses.length > 0 && selectedExpenses.size === 0 && (
+              <Button
+                variant="contained"
+                startIcon={<ApproveIcon />}
+                onClick={handleApproveAll}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+                  },
+                }}
+              >
+                Approve All
+              </Button>
+            )}
+          </Box>
         </Box>
-        {pendingExpenses.length > 0 && (
-          <Button
-            variant="contained"
-            startIcon={<ApproveIcon />}
-            onClick={handleApproveAll}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
-              },
-            }}
-          >
-            Approve All
-          </Button>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            {error}
+          </Alert>
         )}
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
+        {/* Filter Section */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            {/* Search and Filter Controls */}
+            <Grid container spacing={2} mb={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search merchant or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} display="flex" gap={1} justifyContent="flex-end" flexWrap="wrap">
+                <Button
+                  size="small"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => setShowFilters(!showFilters)}
+                  endIcon={showFilters ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  variant={getActiveFilterCount() > 0 ? 'contained' : 'outlined'}
+                >
+                  Filters {getActiveFilterCount() > 0 && `(${getActiveFilterCount()})`}
+                </Button>
+                {getActiveFilterCount() > 0 && (
+                  <Button
+                    size="small"
+                    startIcon={<ClearIcon />}
+                    onClick={handleClearFilters}
+                    variant="outlined"
+                  >
+                    Clear All
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  startIcon={<FileDownloadIcon />}
+                  onClick={handleExportCSV}
+                  variant="outlined"
+                >
+                  Export
+                </Button>
+              </Grid>
+            </Grid>
 
-      {pendingExpenses.length === 0 ? (
+            {/* Quick Filter Chips */}
+            <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
+              <Chip
+                label="High Value (>₹1000)"
+                onClick={() => setAmountMin(amountMin === '1000' ? '' : '1000')}
+                variant={amountMin === '1000' ? 'filled' : 'outlined'}
+                color={amountMin === '1000' ? 'primary' : 'default'}
+                size="small"
+              />
+              <Chip
+                label="This Week"
+                onClick={() => {
+                  setStartDate(dayjs().startOf('week'));
+                  setEndDate(dayjs());
+                }}
+                size="small"
+                variant="outlined"
+              />
+              <Chip
+                label="Last 7 Days"
+                onClick={() => {
+                  setStartDate(dayjs().subtract(7, 'day'));
+                  setEndDate(dayjs());
+                }}
+                size="small"
+                variant="outlined"
+              />
+            </Box>
+
+            {/* Advanced Filters */}
+            <Collapse in={showFilters}>
+              <Divider sx={{ my: 2 }} />
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      label="Category"
+                    >
+                      <MenuItem value="">All Categories</MenuItem>
+                      {categories.map((cat) => (
+                        <MenuItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <DatePicker
+                    label="Start Date"
+                    value={startDate}
+                    onChange={(date) => setStartDate(date)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <DatePicker
+                    label="End Date"
+                    value={endDate}
+                    onChange={(date) => setEndDate(date)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Min Amount"
+                    type="number"
+                    value={amountMin}
+                    onChange={(e) => setAmountMin(e.target.value)}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">{user?.currency || '₹'}</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </Collapse>
+
+            {/* Bulk Actions */}
+            {selectedExpenses.size > 0 && (
+              <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="success"
+                  onClick={handleBulkApprove}
+                  startIcon={<CheckBoxIcon />}
+                >
+                  Approve ({selectedExpenses.size})
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={handleBulkReject}
+                  startIcon={<DeleteIcon />}
+                >
+                  Reject ({selectedExpenses.size})
+                </Button>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+
+        {filteredExpenses.length === 0 ? (
         <Card
           sx={{
             background: (theme) =>
@@ -245,17 +615,44 @@ const ReviewQueue: React.FC = () => {
             <Box textAlign="center" py={6}>
               <ApproveIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                All caught up!
+                {pendingExpenses.length === 0 ? 'All caught up!' : 'No expenses match your filters'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                No expenses pending review
+                {pendingExpenses.length === 0 
+                  ? 'No expenses pending review'
+                  : 'Try adjusting your filters to see more results'
+                }
               </Typography>
+              {pendingExpenses.length > 0 && (
+                <Button
+                  variant="outlined"
+                  startIcon={<ClearIcon />}
+                  onClick={handleClearFilters}
+                  sx={{ mt: 2 }}
+                >
+                  Clear Filters
+                </Button>
+              )}
             </Box>
           </CardContent>
         </Card>
       ) : (
         <Grid container spacing={3}>
-          {pendingExpenses.map((expense) => (
+          {/* Select All Checkbox */}
+          <Grid item xs={12}>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Checkbox
+                checked={selectAll}
+                onChange={handleSelectAll}
+                indeterminate={selectedExpenses.size > 0 && !selectAll}
+              />
+              <Typography variant="body2" color="text.secondary">
+                Select all {filteredExpenses.length} expense{filteredExpenses.length !== 1 ? 's' : ''}
+              </Typography>
+            </Box>
+          </Grid>
+          
+          {filteredExpenses.map((expense) => (
             <Grid item xs={12} key={expense.id}>
               <Card
                 sx={{
@@ -267,13 +664,21 @@ const ReviewQueue: React.FC = () => {
                   borderRadius: 2,
                   boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
                   border: '2px solid',
-                  borderColor: 'warning.light',
+                  borderColor: selectedExpenses.has(expense.id) ? 'primary.main' : 'warning.light',
                 }}
               >
                 <CardContent>
                   <Grid container spacing={2}>
+                    {/* Checkbox Column */}
+                    <Grid item xs={12} md="auto" display="flex" alignItems="center">
+                      <Checkbox
+                        checked={selectedExpenses.has(expense.id)}
+                        onChange={() => handleSelectExpense(expense.id)}
+                      />
+                    </Grid>
+                    
                     {/* Left side - Transaction details */}
-                    <Grid item xs={12} md={7}>
+                    <Grid item xs={12} md={6}>
                       {editingId === expense.id ? (
                         // Edit mode
                         <Stack spacing={2}>
@@ -429,6 +834,7 @@ const ReviewQueue: React.FC = () => {
         </Grid>
       )}
     </Box>
+    </LocalizationProvider>
   );
 };
 
