@@ -22,14 +22,31 @@ import {
   Alert,
   CircularProgress,
   InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  Slider,
+  Grid,
+  Collapse,
+  Divider,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  Clear as ClearIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -65,6 +82,7 @@ interface Expense {
 
 const Expenses: React.FC = () => {
   const { token, user } = useAuth();
+  const location = useLocation();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -72,6 +90,17 @@ const Expenses: React.FC = () => {
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  const [reviewStatus, setReviewStatus] = useState<string>('approved');
+  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
+  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs());
+  const [amountRange, setAmountRange] = useState<number[]>([0, 10000]);
+  const [sortBy, setSortBy] = useState<string>('date-desc');
+  const [showFilters, setShowFilters] = useState(false);
   
   const [formData, setFormData] = useState({
     categoryId: '',
@@ -86,7 +115,18 @@ const Expenses: React.FC = () => {
     fetchExpenses();
     fetchCategories();
     fetchPaymentMethods();
+
+    // Check if navigated from Analytics with a filter
+    if (location.state?.filterCategoryId) {
+      setSelectedCategory(location.state.filterCategoryId);
+      setShowFilters(true);
+    }
   }, []);
+
+  // Calculate max amount for slider
+  const maxExpenseAmount = expenses.length > 0
+    ? Math.max(...expenses.map(e => e.amount))
+    : 10000;
 
   const fetchExpenses = async () => {
     try {
@@ -221,6 +261,116 @@ const Expenses: React.FC = () => {
     }
   };
 
+  // Filter and sort expenses
+  const getFilteredAndSortedExpenses = () => {
+    let filtered = expenses.filter((expense) => {
+      // Search filter
+      if (searchQuery && !expense.description.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+
+      // Category filter
+      if (selectedCategory && expense.categoryId !== selectedCategory) {
+        return false;
+      }
+
+      // Payment method filter
+      if (selectedPaymentMethod && expense.paymentMethodId !== selectedPaymentMethod) {
+        return false;
+      }
+
+      // Date range filter
+      const expenseDate = dayjs(expense.date);
+      if (startDate && expenseDate.isBefore(startDate, 'day')) {
+        return false;
+      }
+      if (endDate && expenseDate.isAfter(endDate, 'day')) {
+        return false;
+      }
+
+      // Amount range filter
+      if (expense.amount < amountRange[0] || expense.amount > amountRange[1]) {
+        return false;
+      }
+
+      return true;
+    });
+
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc':
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        case 'date-asc':
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        case 'amount-desc':
+          return b.amount - a.amount;
+        case 'amount-asc':
+          return a.amount - b.amount;
+        case 'category':
+          return getCategoryName(a.categoryId).localeCompare(getCategoryName(b.categoryId));
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  const filteredExpenses = getFilteredAndSortedExpenses();
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('');
+    setSelectedPaymentMethod('');
+    setReviewStatus('approved');
+    setStartDate(dayjs().startOf('month'));
+    setEndDate(dayjs());
+    setAmountRange([0, maxExpenseAmount]);
+    setSortBy('date-desc');
+  };
+
+  const handleQuickFilter = (filter: string) => {
+    handleClearFilters();
+    const today = dayjs();
+    
+    switch (filter) {
+      case 'pending':
+        setReviewStatus('pending');
+        break;
+      case 'highValue':
+        setAmountRange([1000, maxExpenseAmount]);
+        break;
+      case 'thisWeek':
+        setStartDate(today.startOf('week'));
+        setEndDate(today.endOf('week'));
+        break;
+      case 'lastWeek':
+        setStartDate(today.subtract(1, 'week').startOf('week'));
+        setEndDate(today.subtract(1, 'week').endOf('week'));
+        break;
+      case 'thisMonth':
+        setStartDate(today.startOf('month'));
+        setEndDate(today.endOf('month'));
+        break;
+      case 'lastMonth':
+        setStartDate(today.subtract(1, 'month').startOf('month'));
+        setEndDate(today.subtract(1, 'month').endOf('month'));
+        break;
+    }
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (searchQuery) count++;
+    if (selectedCategory) count++;
+    if (selectedPaymentMethod) count++;
+    if (reviewStatus !== 'approved') count++;
+    if (!startDate?.isSame(dayjs().startOf('month'), 'day') || !endDate?.isSame(dayjs(), 'day')) count++;
+    if (amountRange[0] !== 0 || amountRange[1] !== maxExpenseAmount) count++;
+    return count;
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -245,25 +395,255 @@ const Expenses: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" fontWeight={700}>
-          Expenses
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
-          sx={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
-            },
-          }}
-        >
-          Add Expense
-        </Button>
-      </Box>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4" fontWeight={700}>
+            Expenses
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleOpenDialog}
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+              },
+            }}
+          >
+            Add Expense
+          </Button>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Filter Section */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            {/* Search and Quick Filters Row */}
+            <Grid container spacing={2} mb={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search descriptions..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} display="flex" gap={1} justifyContent="flex-end" flexWrap="wrap">
+                <Button
+                  size="small"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => setShowFilters(!showFilters)}
+                  endIcon={showFilters ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  variant={getActiveFilterCount() > 0 ? 'contained' : 'outlined'}
+                >
+                  Filters {getActiveFilterCount() > 0 && `(${getActiveFilterCount()})`}
+                </Button>
+                {getActiveFilterCount() > 0 && (
+                  <Button
+                    size="small"
+                    startIcon={<ClearIcon />}
+                    onClick={handleClearFilters}
+                    variant="outlined"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </Grid>
+            </Grid>
+
+            {/* Quick Filter Chips */}
+            <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
+              <Chip
+                label="Pending Review"
+                onClick={() => handleQuickFilter('pending')}
+                variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
+                color={reviewStatus === 'pending' ? 'primary' : 'default'}
+                size="small"
+              />
+              <Chip
+                label="Over ₹1000"
+                onClick={() => handleQuickFilter('highValue')}
+                variant={(amountRange[0] === 1000) ? 'filled' : 'outlined'}
+                color={(amountRange[0] === 1000) ? 'primary' : 'default'}
+                size="small"
+              />
+              <Chip
+                label="This Week"
+                onClick={() => handleQuickFilter('thisWeek')}
+                variant="outlined"
+                size="small"
+              />
+              <Chip
+                label="Last Week"
+                onClick={() => handleQuickFilter('lastWeek')}
+                variant="outlined"
+                size="small"
+              />
+              <Chip
+                label="This Month"
+                onClick={() => handleQuickFilter('thisMonth')}
+                variant="outlined"
+                size="small"
+              />
+              <Chip
+                label="Last Month"
+                onClick={() => handleQuickFilter('lastMonth')}
+                variant="outlined"
+                size="small"
+              />
+            </Box>
+
+            {/* Advanced Filters */}
+            <Collapse in={showFilters}>
+              <Divider sx={{ mb: 2 }} />
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      label="Category"
+                    >
+                      <MenuItem value="">All Categories</MenuItem>
+                      {categories.filter(cat => !cat.isFolder).map((category) => (
+                        <MenuItem key={category.id} value={category.id}>
+                          {category.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Payment Method</InputLabel>
+                    <Select
+                      value={selectedPaymentMethod}
+                      onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                      label="Payment Method"
+                    >
+                      <MenuItem value="">All Methods</MenuItem>
+                      {paymentMethods.map((pm) => (
+                        <MenuItem key={pm.id} value={pm.id}>
+                          {pm.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <DatePicker
+                    label="Start Date"
+                    value={startDate}
+                    onChange={(date) => setStartDate(date)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <DatePicker
+                    label="End Date"
+                    value={endDate}
+                    onChange={(date) => setEndDate(date)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                    Amount Range: {formatCurrency(amountRange[0])} - {formatCurrency(amountRange[1])}
+                  </Typography>
+                  <Slider
+                    value={amountRange}
+                    onChange={(_, value) => setAmountRange(value as number[])}
+                    min={0}
+                    max={maxExpenseAmount}
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(value) => formatCurrency(value)}
+                  />
+                </Grid>
+              </Grid>
+            </Collapse>
+
+            {/* Active Filters Display */}
+            {getActiveFilterCount() > 0 && (
+              <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+                <Typography variant="caption" color="text.secondary" alignSelf="center">
+                  Active filters:
+                </Typography>
+                {selectedCategory && (
+                  <Chip
+                    label={`Category: ${getCategoryName(selectedCategory)}`}
+                    onDelete={() => setSelectedCategory('')}
+                    size="small"
+                    color="primary"
+                  />
+                )}
+                {selectedPaymentMethod && (
+                  <Chip
+                    label={`Payment: ${getPaymentMethodName(selectedPaymentMethod)}`}
+                    onDelete={() => setSelectedPaymentMethod('')}
+                    size="small"
+                    color="primary"
+                  />
+                )}
+                {searchQuery && (
+                  <Chip
+                    label={`Search: "${searchQuery}"`}
+                    onDelete={() => setSearchQuery('')}
+                    size="small"
+                    color="primary"
+                  />
+                )}
+              </Box>
+            )}
+
+            {/* Results Info and Sort */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
+              <Typography variant="body2" color="text.secondary">
+                Showing {filteredExpenses.length} of {expenses.length} expenses
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Sort by</InputLabel>
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  label="Sort by"
+                >
+                  <MenuItem value="date-desc">Date (Newest)</MenuItem>
+                  <MenuItem value="date-asc">Date (Oldest)</MenuItem>
+                  <MenuItem value="amount-desc">Amount (High to Low)</MenuItem>
+                  <MenuItem value="amount-asc">Amount (Low to High)</MenuItem>
+                  <MenuItem value="category">Category</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          </CardContent>
+        </Card>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
@@ -283,21 +663,34 @@ const Expenses: React.FC = () => {
         }}
       >
         <CardContent>
-          {expenses.length === 0 ? (
+          {filteredExpenses.length === 0 ? (
             <Box textAlign="center" py={6}>
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                No expenses yet
+                {expenses.length === 0 ? 'No expenses yet' : 'No expenses match your filters'}
               </Typography>
               <Typography variant="body2" color="text.secondary" mb={2}>
-                Start tracking your expenses by adding your first one
+                {expenses.length === 0 
+                  ? 'Start tracking your expenses by adding your first one'
+                  : 'Try adjusting your filters to see more results'
+                }
               </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleOpenDialog}
-              >
-                Add Expense
-              </Button>
+              {expenses.length === 0 ? (
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={handleOpenDialog}
+                >
+                  Add Expense
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  startIcon={<ClearIcon />}
+                  onClick={handleClearFilters}
+                >
+                  Clear Filters
+                </Button>
+              )}
             </Box>
           ) : (
             <TableContainer>
@@ -313,7 +706,7 @@ const Expenses: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {expenses.map((expense) => (
+                  {filteredExpenses.map((expense) => (
                     <TableRow key={expense.id} hover>
                       <TableCell>{formatDate(expense.date)}</TableCell>
                       <TableCell>
@@ -476,6 +869,7 @@ const Expenses: React.FC = () => {
         </DialogActions>
       </Dialog>
     </Box>
+    </LocalizationProvider>
   );
 };
 
