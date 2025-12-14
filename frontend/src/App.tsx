@@ -11,6 +11,7 @@ import Categories from './pages/Categories';
 import Budgets from './pages/Budgets';
 import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
+import ReviewQueue from './pages/ReviewQueue';
 import Loading from './components/Loading';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -53,6 +54,7 @@ const App: React.FC = () => {
           <Route index element={<Navigate to="/dashboard" />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="expenses" element={<Expenses />} />
+          <Route path="review" element={<ReviewQueue />} />
           <Route path="categories" element={<Categories />} />
           <Route path="budgets" element={<Budgets />} />
           <Route path="analytics" element={<Analytics />} />

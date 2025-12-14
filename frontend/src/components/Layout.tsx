@@ -32,6 +32,7 @@ import {
   Menu as MenuIcon,
   Logout as LogoutIcon,
   AccountBalance,
+  RateReview as ReviewIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';
@@ -47,6 +48,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Expenses', icon: <ReceiptIcon />, path: '/expenses' },
+  { text: 'Review Queue', icon: <ReviewIcon />, path: '/review' },
   { text: 'Categories', icon: <CategoryIcon />, path: '/categories' },
   { text: 'Budgets', icon: <BudgetIcon />, path: '/budgets' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },

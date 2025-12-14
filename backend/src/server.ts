@@ -12,6 +12,9 @@ import categoryRoutes from './routes/category.routes';
 import expenseRoutes from './routes/expense.routes';
 import budgetRoutes from './routes/budget.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import emailRoutes from './routes/email.routes';
+import gmailRoutes from './routes/gmail.routes';
+import { startEmailPollingJob } from './jobs/emailPolling.job';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +45,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/email', emailRoutes);
+app.use('/api/gmail', gmailRoutes);
 
 // Error handling
 app.use(errorHandler);
@@ -51,6 +56,9 @@ const startServer = async () => {
   try {
     // Initialize Cosmos DB connection
     await cosmosDBService.initialize();
+    
+    // Start email polling cron job
+    startEmailPollingJob();
     
     // Start server
     app.listen(PORT, () => {

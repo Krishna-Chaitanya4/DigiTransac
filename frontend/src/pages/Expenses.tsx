@@ -81,6 +81,7 @@ const Expenses: React.FC = () => {
       setLoading(true);
       const response = await axios.get(`${API_URL}/api/expenses`, {
         headers: { Authorization: `Bearer ${token}` },
+        params: { reviewStatus: 'approved' },
       });
       setExpenses(response.data.expenses || []);
       setError('');

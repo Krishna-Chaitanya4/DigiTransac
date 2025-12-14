@@ -11,7 +11,7 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { categoryId, startDate, endDate, isRecurring } = req.query;
+    const { categoryId, startDate, endDate, isRecurring, reviewStatus } = req.query;
     
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     
@@ -19,6 +19,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const filter: any = { userId };
     if (categoryId) filter.categoryId = categoryId;
     if (isRecurring !== undefined) filter.isRecurring = isRecurring === 'true';
+    if (reviewStatus) filter.reviewStatus = reviewStatus;
     if (startDate || endDate) {
       filter.date = {};
       if (startDate) filter.date.$gte = new Date(startDate as string);
@@ -161,7 +162,8 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       isRecurring,
       recurrencePattern,
       tags,
-      notes
+      notes,
+      reviewStatus
     } = req.body;
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
@@ -209,6 +211,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (recurrencePattern) updateData.recurrencePattern = recurrencePattern;
     if (tags) updateData.tags = tags;
     if (notes !== undefined) updateData.notes = notes;
+    if (reviewStatus !== undefined) updateData.reviewStatus = reviewStatus;
 
     await expensesContainer.updateOne(
       { id, userId },
