@@ -14,6 +14,12 @@ import {
   Tooltip,
   ToggleButton,
   ToggleButtonGroup,
+  Collapse,
+  List,
+  ListItemButton,
+  ListItemText,
+  LinearProgress,
+  Button,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -27,6 +33,10 @@ import {
   Pending as PendingIcon,
   Folder as FolderIcon,
   Category as CategoryIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  UnfoldMore as UnfoldMoreIcon,
+  UnfoldLess as UnfoldLessIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -49,6 +59,7 @@ import {
 } from 'recharts';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -180,12 +191,16 @@ interface ReviewQueueStats {
 
 const Analytics: React.FC = () => {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
   const [overview, setOverview] = useState<Overview | null>(null);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
   const [folderBreakdown, setFolderBreakdown] = useState<CategoryBreakdown[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'amount' | 'name' | 'count'>('amount');
   const [viewMode, setViewMode] = useState<'category' | 'folder'>('category');
   const [trends, setTrends] = useState<Trend[]>([]);
   const [budgetComparison, setBudgetComparison] = useState<BudgetComparison[]>([]);
@@ -242,7 +257,7 @@ const Analytics: React.FC = () => {
         endDate: endDate.format('YYYY-MM-DD'),
       });
 
-      const [overviewRes, breakdownRes, folderBreakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes, insightsRes, reviewStatsRes] = await Promise.all([
+      const [overviewRes, breakdownRes, folderBreakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes, insightsRes, reviewStatsRes, categoriesRes] = await Promise.all([
         axios.get(`${API_URL}/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -273,11 +288,19 @@ const Analytics: React.FC = () => {
         axios.get(`${API_URL}/api/analytics/review-queue-stats`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        axios.get(`${API_URL}/api/categories`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
 
+      const breakdown = breakdownRes.data.breakdown || [];
+      const folders = folderBreakdownRes.data.breakdown || [];
+      const allCategories = categoriesRes.data.categories || [];
+
       setOverview(overviewRes.data.overview);
-      setCategoryBreakdown(breakdownRes.data.breakdown || []);
-      setFolderBreakdown(folderBreakdownRes.data.breakdown || []);
+      setCategoryBreakdown(breakdown);
+      setFolderBreakdown(folders);
+      setCategories(allCategories);
       setTrends(trendsRes.data.trends || []);
       setBudgetComparison(comparisonRes.data.comparisons || []);
       setTopExpenses(topExpensesRes.data.expenses || []);
@@ -285,6 +308,13 @@ const Analytics: React.FC = () => {
       setTopMerchants(merchantsRes.data.merchants || []);
       setSmartInsights(insightsRes.data.insights || null);
       setReviewQueueStats(reviewStatsRes.data.stats || null);
+
+      // Auto-expand top 3 spending folders
+      const top3Folders = folders
+        .slice(0, 3)
+        .map((f: any) => f.categoryId);
+      setExpandedFolders(new Set(top3Folders));
+
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch analytics');
@@ -317,6 +347,104 @@ const Analytics: React.FC = () => {
     localStorage.removeItem('analytics_endDate');
     localStorage.removeItem('analytics_trendGroupBy');
   };
+
+  // Tree view helper functions
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
+  };
+
+  const expandAll = () => {
+    const allFolderIds = categories
+      .filter((cat) => cat.isFolder)
+      .map((cat) => cat.id);
+    setExpandedFolders(new Set(allFolderIds));
+  };
+
+  const collapseAll = () => {
+    setExpandedFolders(new Set());
+  };
+
+  const handleCategoryClick = (categoryId: string) => {
+    navigate('/expenses', { state: { filterCategoryId: categoryId } });
+  };
+
+  // Build hierarchical tree structure with spending data
+  const buildTreeData = () => {
+    const totalSpent = categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
+    
+    // Create a map of category spending
+    const spendingMap = new Map(
+      categoryBreakdown.map((item) => [item.categoryId, item])
+    );
+
+    // Helper to calculate total spending for a category/folder (including children)
+    const calculateTotalSpending = (categoryId: string): { amount: number; count: number } => {
+      const directSpending = spendingMap.get(categoryId);
+      const children = categories.filter((cat) => cat.parentId === categoryId);
+      
+      let totalAmount = directSpending?.amount || 0;
+      let totalCount = directSpending?.count || 0;
+
+      children.forEach((child) => {
+        const childTotal = calculateTotalSpending(child.id);
+        totalAmount += childTotal.amount;
+        totalCount += childTotal.count;
+      });
+
+      return { amount: totalAmount, count: totalCount };
+    };
+
+    // Build tree nodes
+    const buildNode = (category: any, level: number = 0): any => {
+      const spending = calculateTotalSpending(category.id);
+      const children = categories
+        .filter((cat) => cat.parentId === category.id)
+        .map((child) => buildNode(child, level + 1));
+
+      // Sort children based on sortBy
+      if (sortBy === 'amount') {
+        children.sort((a, b) => b.spending.amount - a.spending.amount);
+      } else if (sortBy === 'name') {
+        children.sort((a, b) => a.category.name.localeCompare(b.category.name));
+      } else if (sortBy === 'count') {
+        children.sort((a, b) => b.spending.count - a.spending.count);
+      }
+
+      return {
+        category,
+        spending,
+        percentage: totalSpent > 0 ? (spending.amount / totalSpent) * 100 : 0,
+        children,
+        level,
+      };
+    };
+
+    // Get root categories (no parent)
+    const roots = categories
+      .filter((cat) => !cat.parentId)
+      .map((cat) => buildNode(cat));
+
+    // Sort roots
+    if (sortBy === 'amount') {
+      roots.sort((a, b) => b.spending.amount - a.spending.amount);
+    } else if (sortBy === 'name') {
+      roots.sort((a, b) => a.category.name.localeCompare(b.category.name));
+    } else if (sortBy === 'count') {
+      roots.sort((a, b) => b.spending.count - a.spending.count);
+    }
+
+    return roots;
+  };
+
+  const treeData = buildTreeData();
 
   if (loading) {
     return (
@@ -1221,10 +1349,183 @@ const Analytics: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Folder Structure Tree View */}
+        <Grid item xs={12}>
+          <Card sx={{
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(255, 255, 255, 0.9)'
+                : 'rgba(30, 30, 30, 0.9)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 2,
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          }}>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    Folder Structure Analysis
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Hierarchical view of your spending by categories and folders
+                  </Typography>
+                </Box>
+                <Box display="flex" gap={1} flexWrap="wrap">
+                  <TextField
+                    select
+                    size="small"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'amount' | 'name' | 'count')}
+                    sx={{ minWidth: 140 }}
+                    label="Sort by"
+                  >
+                    <MenuItem value="amount">Amount</MenuItem>
+                    <MenuItem value="name">Name</MenuItem>
+                    <MenuItem value="count">Expense Count</MenuItem>
+                  </TextField>
+                  <Button
+                    size="small"
+                    startIcon={<UnfoldMoreIcon />}
+                    onClick={expandAll}
+                    variant="outlined"
+                  >
+                    Expand All
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<UnfoldLessIcon />}
+                    onClick={collapseAll}
+                    variant="outlined"
+                  >
+                    Collapse All
+                  </Button>
+                </Box>
+              </Box>
+
+              {treeData.length > 0 ? (
+                <List disablePadding>
+                  {treeData.map((node) => renderTreeNode(node))}
+                </List>
+              ) : (
+                <Box textAlign="center" py={6}>
+                  <Typography color="text.secondary">
+                    No spending data available for this period
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
       </Box>
     </LocalizationProvider>
   );
+
+  // Render tree node recursively
+  function renderTreeNode(node: any): React.ReactNode {
+    const { category, spending, percentage, children, level } = node;
+    const isFolder = category.isFolder;
+    const hasChildren = children.length > 0;
+    const isExpanded = expandedFolders.has(category.id);
+    const hasSpending = spending.amount > 0;
+
+    if (!hasSpending && !hasChildren) {
+      return null; // Don't show empty categories
+    }
+
+    return (
+      <Box key={category.id}>
+        <ListItemButton
+          onClick={() => {
+            if (hasChildren && isFolder) {
+              toggleFolder(category.id);
+            } else {
+              handleCategoryClick(category.id);
+            }
+          }}
+          sx={{
+            pl: 2 + level * 3,
+            py: 1.5,
+            borderRadius: 1,
+            mb: 0.5,
+            '&:hover': {
+              backgroundColor: 'action.hover',
+            },
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1} flex={1} minWidth={0}>
+            {/* Expand/Collapse Icon */}
+            {hasChildren && isFolder ? (
+              <IconButton size="small" sx={{ p: 0 }}>
+                {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+              </IconButton>
+            ) : (
+              <Box width={24} /> // Spacer
+            )}
+
+            {/* Category/Folder Icon and Color */}
+            <Box display="flex" alignItems="center" gap={1}>
+              <Box
+                width={16}
+                height={16}
+                borderRadius="50%"
+                bgcolor={category.color}
+                flexShrink={0}
+              />
+              <Typography variant="body2" fontWeight={isFolder ? 600 : 500}>
+                {isFolder ? '📁' : '🏷️'} {category.name}
+              </Typography>
+            </Box>
+
+            {/* Expense Count */}
+            {spending.count > 0 && (
+              <Chip
+                label={`${spending.count} expense${spending.count > 1 ? 's' : ''}`}
+                size="small"
+                variant="outlined"
+                sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+              />
+            )}
+          </Box>
+
+          {/* Amount and Progress */}
+          <Box display="flex" alignItems="center" gap={2} flexShrink={0}>
+            <Box width={120} display={{ xs: 'none', sm: 'block' }}>
+              <LinearProgress
+                variant="determinate"
+                value={Math.min(percentage, 100)}
+                sx={{
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: 'action.hover',
+                  '& .MuiLinearProgress-bar': {
+                    borderRadius: 3,
+                    backgroundColor: category.color,
+                  },
+                }}
+              />
+            </Box>
+            <Box textAlign="right" minWidth={100}>
+              <Typography variant="body2" fontWeight={700}>
+                {formatCurrency(spending.amount)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {percentage.toFixed(1)}%
+              </Typography>
+            </Box>
+          </Box>
+        </ListItemButton>
+
+        {/* Render children if expanded */}
+        {hasChildren && isExpanded && (
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            {children.map((child: any) => renderTreeNode(child))}
+          </Collapse>
+        )}
+      </Box>
+    );
+  }
 };
 
 export default Analytics;
