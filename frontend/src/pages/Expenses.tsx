@@ -40,10 +40,19 @@ interface Category {
   color?: string;
 }
 
+interface PaymentMethod {
+  id: string;
+  name: string;
+  type: string;
+  bankName?: string;
+  last4?: string;
+}
+
 interface Expense {
   id: string;
   userId: string;
   categoryId: string;
+  paymentMethodId?: string;
   amount: number;
   description: string;
   date: string;
@@ -58,6 +67,7 @@ const Expenses: React.FC = () => {
   const { token, user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
@@ -65,6 +75,7 @@ const Expenses: React.FC = () => {
   
   const [formData, setFormData] = useState({
     categoryId: '',
+    paymentMethodId: '',
     amount: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
@@ -74,6 +85,7 @@ const Expenses: React.FC = () => {
   useEffect(() => {
     fetchExpenses();
     fetchCategories();
+    fetchPaymentMethods();
   }, []);
 
   const fetchExpenses = async () => {
@@ -105,6 +117,17 @@ const Expenses: React.FC = () => {
     }
   };
 
+  const fetchPaymentMethods = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/payment-methods`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPaymentMethods(response.data || []);
+    } catch (err: any) {
+      console.error('Failed to fetch payment methods:', err);
+    }
+  };
+
   const getCategoryName = (categoryId: string) => {
     const category = categories.find(c => c.id === categoryId);
     return category?.name || 'Unknown';
@@ -115,9 +138,16 @@ const Expenses: React.FC = () => {
     return category?.color || '#667eea';
   };
 
+  const getPaymentMethodName = (paymentMethodId?: string) => {
+    if (!paymentMethodId) return '-';
+    const method = paymentMethods.find(m => m.id === paymentMethodId);
+    return method?.name || 'Unknown';
+  };
+
   const handleOpenDialog = () => {
     setFormData({
       categoryId: '',
+      paymentMethodId: '',
       amount: '',
       description: '',
       date: new Date().toISOString().split('T')[0],
@@ -130,6 +160,7 @@ const Expenses: React.FC = () => {
   const handleEditExpense = (expense: Expense) => {
     setFormData({
       categoryId: expense.categoryId,
+      paymentMethodId: expense.paymentMethodId || '',
       amount: expense.amount.toString(),
       description: expense.description,
       date: new Date(expense.date).toISOString().split('T')[0],
@@ -276,6 +307,7 @@ const Expenses: React.FC = () => {
                     <TableCell>Date</TableCell>
                     <TableCell>Description</TableCell>
                     <TableCell>Category</TableCell>
+                    <TableCell>Payment Method</TableCell>
                     <TableCell align="right">Amount</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
@@ -304,6 +336,11 @@ const Expenses: React.FC = () => {
                             borderColor: getCategoryColor(expense.categoryId),
                           }}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {getPaymentMethodName(expense.paymentMethodId)}
+                        </Typography>
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="body2" fontWeight={600}>
@@ -370,6 +407,23 @@ const Expenses: React.FC = () => {
                   </MenuItem>
                 ))
               )}
+            </TextField>
+
+            <TextField
+              select
+              label="Payment Method"
+              fullWidth
+              value={formData.paymentMethodId}
+              onChange={(e) => setFormData({ ...formData, paymentMethodId: e.target.value })}
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {paymentMethods.map((method) => (
+                <MenuItem key={method.id} value={method.id}>
+                  {method.name}
+                </MenuItem>
+              ))}
             </TextField>
 
             <TextField

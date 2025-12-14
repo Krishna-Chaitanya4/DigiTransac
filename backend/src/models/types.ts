@@ -53,10 +53,25 @@ export interface Category {
   updatedAt: Date;
 }
 
+export interface PaymentMethod {
+  id: string;
+  userId: string;
+  name: string; // e.g., "HDFC Credit Card", "ICICI Debit Card", "Cash"
+  type: 'credit_card' | 'debit_card' | 'bank_account' | 'cash' | 'upi' | 'wallet' | 'other';
+  bankName?: string; // e.g., "HDFC Bank", "ICICI Bank"
+  last4?: string; // Last 4 digits of card
+  icon?: string;
+  color?: string;
+  isDefault?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Expense {
   id: string;
   userId: string;
   categoryId: string;
+  paymentMethodId?: string; // Optional: which card/bank was used
   amount: number;
   description: string;
   date: Date;
