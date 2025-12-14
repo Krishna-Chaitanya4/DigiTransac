@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { cosmosDBService } from '../config/cosmosdb';
 import { emailParserService } from './emailParser.service';
-import { Expense, PaymentMethod } from '../models/types';
+import { Expense, PaymentMethod, Category } from '../models/types';
 import { randomUUID } from 'crypto';
 
 class GmailPollingService {
@@ -95,6 +95,51 @@ class GmailPollingService {
     } catch (error) {
       console.error('Error getting/creating payment method:', error);
       // Return empty string if failed, expense will be created without payment method
+      return '';
+    }
+  }
+
+  /**
+   * Find existing "Uncategorized" category or create new one
+   */
+  private async getOrCreateUncategorizedCategory(
+    userId: string
+  ): Promise<string> {
+    try {
+      const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+
+      // Try to find existing "Uncategorized" category
+      const existing = await categoriesContainer.findOne({
+        userId,
+        name: 'Uncategorized',
+        isFolder: false,
+      });
+
+      if (existing) {
+        return existing.id;
+      }
+
+      // Create new "Uncategorized" category
+      const newCategory: Category = {
+        id: randomUUID(),
+        userId,
+        name: 'Uncategorized',
+        parentId: null,
+        isFolder: false,
+        icon: 'help_outline',
+        color: '#9e9e9e',
+        path: ['Uncategorized'],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await categoriesContainer.insertOne(newCategory);
+      console.log(`📂 Auto-created "Uncategorized" category for user ${userId}`);
+
+      return newCategory.id;
+    } catch (error) {
+      console.error('Error getting/creating uncategorized category:', error);
+      // Return empty string if failed
       return '';
     }
   }
@@ -291,11 +336,19 @@ class GmailPollingService {
           console.log('   Merchant:', parsedTransaction.merchant);
           console.log('   Bank:', parsedTransaction.bankName);
 
-          // Suggest category
-          const suggestedCategory = emailParserService.suggestCategory(
+          // Suggest category based on merchant mappings
+          let categoryId = emailParserService.suggestCategory(
             parsedTransaction.merchant,
             user.emailIntegration?.merchantMappings
           );
+
+          // If no category suggested, use "Uncategorized" as fallback
+          if (!categoryId) {
+            categoryId = await this.getOrCreateUncategorizedCategory(user.id);
+            console.log('   📂 No category match - using Uncategorized');
+          } else {
+            console.log('   📂 Category suggested from mapping');
+          }
 
           // Find or create payment method for this bank/card
           const paymentMethodId = await this.getOrCreatePaymentMethod(
@@ -310,7 +363,7 @@ class GmailPollingService {
           const newExpense: Expense = {
             id: randomUUID(),
             userId: user.id,
-            categoryId: suggestedCategory || '',
+            categoryId: categoryId,
             paymentMethodId: paymentMethodId,
             amount: parsedTransaction.amount,
             description: `${parsedTransaction.merchant} - ${parsedTransaction.bankName}`,
@@ -327,7 +380,7 @@ class GmailPollingService {
               confidence: parsedTransaction.confidence,
             },
             reviewStatus: 'pending',
-            notes: suggestedCategory ? '' : 'Category needs to be assigned',
+            notes: '',
             createdAt: new Date(),
             updatedAt: new Date(),
           };

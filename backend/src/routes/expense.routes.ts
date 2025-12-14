@@ -220,6 +220,51 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const updatedExpense = await expensesContainer.findOne({ id, userId });
 
+    // Auto-learning: If expense is being approved with a category and has merchant info,
+    // save the merchant → category mapping for future auto-categorization
+    if (reviewStatus === 'approved' && categoryId && updatedExpense) {
+      const merchantName = updatedExpense.merchantName;
+      
+      if (merchantName) {
+        try {
+          const userContainer = await cosmosDBService.getUsersContainer();
+          const user = await userContainer.findOne({ id: userId });
+          
+          if (user?.emailIntegration) {
+            const existingMappings = user.emailIntegration.merchantMappings || [];
+            
+            // Check if mapping already exists
+            const mappingExists = existingMappings.some(
+              (m: any) => m.merchantKeyword.toLowerCase() === merchantName.toLowerCase()
+            );
+            
+            if (!mappingExists) {
+              // Add new merchant mapping using array concatenation
+              const newMapping = {
+                merchantKeyword: merchantName,
+                categoryId: categoryId,
+                createdAt: new Date(),
+              };
+              
+              await userContainer.updateOne(
+                { id: userId },
+                {
+                  $set: {
+                    'emailIntegration.merchantMappings': [...existingMappings, newMapping],
+                  },
+                } as any
+              );
+              
+              console.log(`🎓 Learned: "${merchantName}" → category ${categoryId}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error saving merchant mapping:', error);
+          // Don't fail the expense update if mapping save fails
+        }
+      }
+    }
+
     res.json({
       success: true,
       message: 'Expense updated successfully',
