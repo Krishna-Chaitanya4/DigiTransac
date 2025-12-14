@@ -18,7 +18,7 @@ export interface EmailIntegration {
   refreshToken: string;
   tokenExpiry: Date;
   lastProcessedAt?: Date;
-  lastProcessedEmailId?: string; // Marker for the last processed email (for pagination)
+  lastHistoryId?: string; // Gmail History ID for incremental delta sync
   totalEmailsProcessed: number;
   merchantMappings?: MerchantCategoryMapping[];
   customBankPatterns?: BankPattern[];

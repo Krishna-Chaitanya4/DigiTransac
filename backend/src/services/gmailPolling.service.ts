@@ -45,7 +45,7 @@ class GmailPollingService {
   }
 
   /**
-   * Fetch and process emails for a single user with optimized pagination
+   * Fetch and process emails using Gmail History API (industry standard)
    */
   async processUserEmails(user: any): Promise<number> {
     try {
@@ -61,125 +61,105 @@ class GmailPollingService {
       oauth2Client.setCredentials({ access_token: accessToken });
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-      // Build query to fetch bank emails
+      const lastHistoryId = user.emailIntegration?.lastHistoryId;
+      
+      // First-time setup: Get initial historyId
+      if (!lastHistoryId) {
+        console.log(`🆕 First-time setup for user ${user.id} - Getting initial historyId`);
+        const profile = await gmail.users.getProfile({ userId: 'me' });
+        const initialHistoryId = profile.data.historyId;
+        
+        // Store initial historyId
+        const userContainer = await cosmosDBService.getUsersContainer();
+        await userContainer.updateOne(
+          { id: user.id },
+          { $set: { 'emailIntegration.lastHistoryId': initialHistoryId } }
+        );
+        
+        console.log(`✅ Stored initial historyId: ${initialHistoryId}`);
+        console.log(`📭 No emails to process on first setup - will start tracking from now`);
+        return 0;
+      }
+      
+      console.log(`🔄 Fetching changes since historyId: ${lastHistoryId}`);
+      
+      // Fetch history changes (only new emails added to INBOX)
+      let history: any;
+      try {
+        history = await gmail.users.history.list({
+          userId: 'me',
+          startHistoryId: lastHistoryId,
+          historyTypes: ['messageAdded'],
+          labelId: 'INBOX',
+        });
+      } catch (error: any) {
+        if (error.code === 404) {
+          console.warn(`⚠️ HistoryId ${lastHistoryId} expired. Getting fresh historyId.`);
+          const profile = await gmail.users.getProfile({ userId: 'me' });
+          const freshHistoryId = profile.data.historyId;
+          
+          const userContainer = await cosmosDBService.getUsersContainer();
+          await userContainer.updateOne(
+            { id: user.id },
+            { $set: { 'emailIntegration.lastHistoryId': freshHistoryId } }
+          );
+          
+          console.log(`✅ Reset to fresh historyId: ${freshHistoryId}`);
+          return 0;
+        }
+        throw error;
+      }
+      
+      const historyRecords = history.data.history || [];
+      
+      if (historyRecords.length === 0) {
+        console.log(`📭 No new changes since last check`);
+        return 0;
+      }
+      
+      console.log(`📬 Found ${historyRecords.length} history record(s) with changes`);
+      
+      // Extract new message IDs from history
+      const newMessageIds: string[] = [];
+      for (const record of historyRecords) {
+        const messagesAdded = record.messagesAdded || [];
+        for (const msgAdded of messagesAdded) {
+          if (msgAdded.message?.id) {
+            newMessageIds.push(msgAdded.message.id);
+          }
+        }
+      }
+      
+      console.log(`📨 Extracted ${newMessageIds.length} new message ID(s)`);
+      
+      if (newMessageIds.length === 0) {
+        // Update historyId even if no messages to process
+        const newHistoryId = history.data.historyId;
+        const userContainer = await cosmosDBService.getUsersContainer();
+        await userContainer.updateOne(
+          { id: user.id },
+          { $set: { 'emailIntegration.lastHistoryId': newHistoryId } }
+        );
+        return 0;
+      }
+      
+      // Bank sender filters
       const bankSenders = [
         'HDFCBK', 'HDFC', 'ICICIB', 'ICICI', 'SBIIN', 'SBI',
         'AXISBK', 'AXIS', 'KOTAKB', 'KOTAK', 'PNBSMS', 'PNB',
         'BOBIN', 'BOB', 'CANBNK', 'CANARA', 'UBOI', 'UNION',
-        'IDBIBN', 'IDBI',
+        'IDBIBN', 'IDBI', 'perugukrishna8@gmail.com', // Test email
       ];
-
-      const query = `from:(${bankSenders.join(' OR ')})`;
-      const lastProcessedId = user.emailIntegration?.lastProcessedEmailId;
-      const lastProcessedAt = user.emailIntegration?.lastProcessedAt;
-      
-      // Calculate smart batch size based on offline time
-      const hoursOffline = lastProcessedAt ? 
-        (Date.now() - new Date(lastProcessedAt).getTime()) / (1000 * 60 * 60) : 168;
-      
-      let batchSize;
-      if (hoursOffline < 1) {
-        batchSize = 20;    // Recent polling - small batch
-      } else if (hoursOffline < 24) {
-        batchSize = 100;   // Few hours offline - medium batch
-      } else {
-        batchSize = 500;   // Long offline - large batch for efficiency
-      }
-      
-      console.log(`📊 User ${user.id} - Offline for ${hoursOffline.toFixed(1)}h, using batch size ${batchSize}`);
-      
-      // Pagination to find all new emails until marker
-      let allNewMessages = [];
-      let pageToken = undefined;
-      let foundMarker = false;
-      let pageCount = 0;
-      const maxPages = 20; // Safety limit
-      
-      console.log(`🔍 Searching for emails after marker: ${lastProcessedId || 'none (new user)'}`);
-      
-      do {
-        const response: any = await gmail.users.messages.list({
-          userId: 'me',
-          q: query,
-          maxResults: batchSize,
-          pageToken: pageToken,
-        });
-        
-        const messages = response.data.messages || [];
-        pageCount++;
-        
-        console.log(`📄 Page ${pageCount}: Found ${messages.length} emails`);
-        
-        if (!lastProcessedId) {
-          // New user - process all messages in this batch
-          allNewMessages.push(...messages);
-          console.log(`👤 New user: Added ${messages.length} emails to process`);
-          break;
-        }
-        
-        // Check if our marker is in this batch
-        const markerIndex = messages.findIndex((msg: any) => msg.id === lastProcessedId);
-        
-        if (markerIndex !== -1) {
-          // Found the marker! Take only emails BEFORE it (newer emails)
-          const newEmails = messages.slice(0, markerIndex);
-          allNewMessages.push(...newEmails);
-          foundMarker = true;
-          console.log(`✅ Found marker at position ${markerIndex}, added ${newEmails.length} new emails`);
-          break;
-        } else {
-          // Marker not found, add all messages and continue to next page
-          allNewMessages.push(...messages);
-          pageToken = response.data.nextPageToken;
-          console.log(`⏭️ Marker not found, added ${messages.length} emails, continuing to next page`);
-        }
-        
-        // Safety: prevent infinite loops
-        if (pageCount >= maxPages) {
-          console.warn(`⚠️ Reached maximum page limit (${maxPages}). Processing available emails.`);
-          break;
-        }
-        
-        // Rate limiting protection
-        if (pageToken) {
-          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay between pages
-        }
-        
-      } while (pageToken && !foundMarker);
-      
-      // Handle edge cases
-      if (!foundMarker && lastProcessedId && pageCount > 0) {
-        if (hoursOffline > 168) { // More than 7 days
-          console.warn(`⚠️ LastProcessedEmailId not found after ${pageCount} pages. Marker might be too old (${hoursOffline.toFixed(1)}h offline). Processing recent emails only.`);
-        } else {
-          console.warn(`⚠️ Could not find lastProcessedEmailId ${lastProcessedId} after ${pageCount} pages. Processing all fetched emails.`);
-        }
-      }
-      
-      if (allNewMessages.length === 0) {
-        console.log(`📭 No new emails to process for user ${user.id}`);
-        return 0;
-      }
-      
-      console.log(`🎯 Processing ${allNewMessages.length} new emails (reduced from potentially ${pageCount * batchSize}+ total emails)`);
       
       let processedCount = 0;
-      let latestEmailId = null;
 
-      // Process emails in reverse order (oldest new email first) for chronological expense creation
-      for (let i = allNewMessages.length - 1; i >= 0; i--) {
-        const message = allNewMessages[i];
-        
+      // Process each new message
+      for (const messageId of newMessageIds) {
         try {
-          // Track the latest (newest) email ID for updating marker
-          if (i === 0) {
-            latestEmailId = message.id!;
-          }
-
           // Get full message details
           const msg = await gmail.users.messages.get({
             userId: 'me',
-            id: message.id!,
+            id: messageId,
             format: 'full',
           });
 
@@ -188,6 +168,13 @@ class GmailPollingService {
           const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from');
           
           const from = fromHeader?.value || '';
+          
+          // Check if email is from a bank sender
+          const isFromBank = bankSenders.some(sender => from.includes(sender));
+          if (!isFromBank) {
+            console.log(`⏭️ Skipping non-bank email from: ${from}`);
+            continue;
+          }
           
           // Get email body
           let body = '';
@@ -222,9 +209,9 @@ class GmailPollingService {
           }
 
           // Log email details for debugging
-          console.log(`📧 Processing email ${allNewMessages.length - i}/${allNewMessages.length}:`);
+          console.log(`📧 Processing new email:`);
           console.log('  From:', from);
-          console.log('  Message ID:', message.id);
+          console.log('  Message ID:', messageId);
           console.log('  Body:', body.substring(0, 200)); // First 200 chars
 
           // Check if it's a transaction SMS
@@ -267,7 +254,7 @@ class GmailPollingService {
             date: parsedTransaction.date,
             isRecurring: false,
             source: 'email',
-            sourceEmailId: message.id!,
+            sourceEmailId: messageId,
             merchantName: parsedTransaction.merchant,
             parsedData: {
               rawText: parsedTransaction.rawText,
@@ -284,35 +271,33 @@ class GmailPollingService {
 
           await expenseContainer.insertOne(newExpense);
           processedCount++;
-          console.log(`💰 Created expense ${newExpense.id} from email ${message.id}`);
+          console.log(`💰 Created expense ${newExpense.id} from email ${messageId}`);
 
         } catch (error) {
-          console.error(`❌ Error processing message ${message.id}:`, error);
+          console.error(`❌ Error processing message ${messageId}:`, error);
           // Continue processing other emails even if one fails
         }
       }
 
-      // Update user stats with new marker-based approach
+      // Update historyId to the latest from Gmail (critical for delta sync)
+      const newHistoryId = history.data.historyId;
       const userContainer = await cosmosDBService.getUsersContainer();
-      const updateData: any = {
-        'emailIntegration.lastProcessedAt': new Date(),
-        'emailIntegration.totalEmailsProcessed': 
-          (user.emailIntegration.totalEmailsProcessed || 0) + processedCount,
-      };
-      
-      // Update the marker to the latest processed email (if any new emails were processed)
-      if (latestEmailId) {
-        updateData['emailIntegration.lastProcessedEmailId'] = latestEmailId;
-        console.log(`📌 Updated marker to latest email ID: ${latestEmailId}`);
-      }
       
       await userContainer.updateOne(
         { id: user.id },
-        { $set: updateData }
+        {
+          $set: {
+            'emailIntegration.lastHistoryId': newHistoryId,
+            'emailIntegration.lastProcessedAt': new Date(),
+            'emailIntegration.totalEmailsProcessed': 
+              (user.emailIntegration.totalEmailsProcessed || 0) + processedCount,
+          },
+        }
       );
       
-      console.log(`✅ Successfully processed ${processedCount} new emails for user ${user.id}`);
-      console.log(`📊 Performance: Checked ${allNewMessages.length} emails vs potentially ${pageCount * batchSize}+ without optimization`);
+      console.log(`✅ Successfully processed ${processedCount} expense(s) from ${newMessageIds.length} new email(s)`);
+      console.log(`📌 Updated historyId: ${lastHistoryId} → ${newHistoryId}`);
+      console.log(`🚀 Delta sync complete - only fetched changes, not full inbox!`);
       
       return processedCount;
 
