@@ -17,6 +17,10 @@ import {
   AccountBalance as AccountBalanceIcon,
   Receipt as ReceiptIcon,
 } from '@mui/icons-material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import {
   PieChart,
   Pie,
@@ -116,23 +120,25 @@ const Analytics: React.FC = () => {
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<PaymentMethodBreakdown[]>([]);
   const [topMerchants, setTopMerchants] = useState<MerchantData[]>([]);
 
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-  });
+  const [startDate, setStartDate] = useState<Dayjs | null>(
+    dayjs().startOf('month')
+  );
+  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs());
 
   const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'week' | 'month'>('day');
 
   useEffect(() => {
     fetchAnalytics();
-  }, [dateRange, trendGroupBy]);
+  }, [startDate, endDate, trendGroupBy]);
 
   const fetchAnalytics = async () => {
+    if (!startDate || !endDate) return;
+    
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
+        startDate: startDate.format('YYYY-MM-DD'),
+        endDate: endDate.format('YYYY-MM-DD'),
       });
 
       const [overviewRes, breakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes] = await Promise.all([
@@ -199,36 +205,41 @@ const Analytics: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" fontWeight={700}>
-          Analytics
-        </Typography>
-        <Box display="flex" gap={2}>
-          <TextField
-            label="Start Date"
-            type="date"
-            size="small"
-            value={dateRange.startDate}
-            onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="End Date"
-            type="date"
-            size="small"
-            value={dateRange.endDate}
-            onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-            InputLabelProps={{ shrink: true }}
-          />
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4" fontWeight={700}>
+            Analytics
+          </Typography>
+          <Box display="flex" gap={2}>
+            <DatePicker
+              label="Start Date"
+              value={startDate}
+              onChange={(newValue) => setStartDate(newValue)}
+              slotProps={{
+                textField: {
+                  size: 'small',
+                },
+              }}
+            />
+            <DatePicker
+              label="End Date"
+              value={endDate}
+              onChange={(newValue) => setEndDate(newValue)}
+              slotProps={{
+                textField: {
+                  size: 'small',
+                },
+              }}
+            />
+          </Box>
         </Box>
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            {error}
+          </Alert>
+        )}
 
       {/* Overview Stats */}
       <Grid container spacing={3} mb={3}>
@@ -755,7 +766,8 @@ const Analytics: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
-    </Box>
+      </Box>
+    </LocalizationProvider>
   );
 };
 
