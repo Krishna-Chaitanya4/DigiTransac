@@ -470,4 +470,205 @@ router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<vo
   }
 });
 
+// GET /api/analytics/smart-insights - Get AI-powered spending insights
+router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { startDate, endDate } = req.query;
+
+    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(endDate as string) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const expensesContainer = await cosmosDBService.getExpensesContainer();
+    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+
+    // Get current period expenses
+    const currentExpenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: start, $lte: end }
+      })
+      .toArray();
+
+    // Get previous period for comparison
+    const periodDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const prevStart = new Date(start);
+    prevStart.setDate(prevStart.getDate() - periodDays);
+    const prevEnd = new Date(end);
+    prevEnd.setDate(prevEnd.getDate() - periodDays);
+
+    const previousExpenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: prevStart, $lte: prevEnd }
+      })
+      .toArray();
+
+    const currentTotal = currentExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
+    const previousTotal = previousExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
+    const percentChange = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
+
+    // Get budgets and check for over-budget categories
+    const budgets = await budgetsContainer.find({ userId }).toArray();
+    const categories = await categoriesContainer.find({ userId }).toArray();
+    const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
+
+    const overBudgetAlerts: any[] = [];
+    for (const budget of budgets) {
+      const budgetExpenses = currentExpenses.filter((exp: any) => exp.categoryId === budget.categoryId);
+      const spent = budgetExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
+      
+      if (spent > budget.amount) {
+        const category = categoryLookup.get(budget.categoryId);
+        overBudgetAlerts.push({
+          categoryName: category?.name || 'Unknown',
+          budgetAmount: budget.amount,
+          spent,
+          overBy: spent - budget.amount,
+          percentOver: Math.round(((spent - budget.amount) / budget.amount) * 100)
+        });
+      }
+    }
+
+    // Detect unusual spending patterns (expenses significantly higher than average)
+    const avgExpense = currentTotal / (currentExpenses.length || 1);
+    const unusualExpenses = currentExpenses
+      .filter((exp: any) => exp.amount > avgExpense * 2.5)
+      .map((exp: any) => ({
+        description: exp.description,
+        amount: exp.amount,
+        date: exp.date,
+        timesAverage: Math.round(exp.amount / avgExpense * 10) / 10
+      }))
+      .sort((a: any, b: any) => b.amount - a.amount)
+      .slice(0, 5);
+
+    // Category growth analysis
+    const currentCategoryMap = new Map<string, number>();
+    const previousCategoryMap = new Map<string, number>();
+
+    currentExpenses.forEach((exp: any) => {
+      currentCategoryMap.set(exp.categoryId, (currentCategoryMap.get(exp.categoryId) || 0) + exp.amount);
+    });
+
+    previousExpenses.forEach((exp: any) => {
+      previousCategoryMap.set(exp.categoryId, (previousCategoryMap.get(exp.categoryId) || 0) + exp.amount);
+    });
+
+    const categoryTrends: any[] = [];
+    currentCategoryMap.forEach((currentAmount, categoryId) => {
+      const previousAmount = previousCategoryMap.get(categoryId) || 0;
+      const change = previousAmount > 0 ? ((currentAmount - previousAmount) / previousAmount) * 100 : 100;
+      const category = categoryLookup.get(categoryId);
+      
+      if (Math.abs(change) > 20) { // Only show significant changes
+        categoryTrends.push({
+          categoryName: category?.name || 'Unknown',
+          currentAmount,
+          previousAmount,
+          percentChange: Math.round(change),
+          trend: change > 0 ? 'increasing' : 'decreasing'
+        });
+      }
+    });
+
+    categoryTrends.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange));
+
+    res.json({
+      success: true,
+      insights: {
+        overallTrend: {
+          currentTotal,
+          previousTotal,
+          percentChange: Math.round(percentChange),
+          direction: percentChange > 0 ? 'up' : 'down'
+        },
+        overBudgetAlerts,
+        unusualExpenses,
+        categoryTrends: categoryTrends.slice(0, 5),
+        summary: {
+          totalExpenses: currentExpenses.length,
+          avgDailySpending: Math.round(currentTotal / (periodDays || 1)),
+          topSpendingDay: await getTopSpendingDay(currentExpenses)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching smart insights:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching smart insights'
+    });
+  }
+});
+
+// Helper function to find the day with highest spending
+async function getTopSpendingDay(expenses: any[]): Promise<{ date: string; amount: number }> {
+  const dailyMap = new Map<string, number>();
+  
+  expenses.forEach((exp: any) => {
+    const dateKey = new Date(exp.date).toISOString().split('T')[0];
+    dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + exp.amount);
+  });
+
+  let topDay = { date: '', amount: 0 };
+  dailyMap.forEach((amount, date) => {
+    if (amount > topDay.amount) {
+      topDay = { date, amount };
+    }
+  });
+
+  return topDay;
+}
+
+// GET /api/analytics/review-queue-stats - Get review queue analytics
+router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const expensesContainer = await cosmosDBService.getExpensesContainer();
+    
+    const allExpenses = await expensesContainer.find({ userId }).toArray();
+    
+    const pending = allExpenses.filter((exp: any) => exp.reviewStatus === 'pending').length;
+    const approved = allExpenses.filter((exp: any) => exp.reviewStatus === 'approved').length;
+    const rejected = allExpenses.filter((exp: any) => exp.reviewStatus === 'rejected').length;
+    
+    const total = approved + rejected;
+    const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
+
+    // Get pending expenses details
+    const pendingExpenses = allExpenses
+      .filter((exp: any) => exp.reviewStatus === 'pending')
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5)
+      .map((exp: any) => ({
+        id: exp.id,
+        description: exp.description,
+        amount: exp.amount,
+        date: exp.date,
+        daysSinceParsed: Math.floor((Date.now() - new Date(exp.createdAt || exp.date).getTime()) / (1000 * 60 * 60 * 24))
+      }));
+
+    res.json({
+      success: true,
+      stats: {
+        pending,
+        approved,
+        rejected,
+        approvalRate,
+        pendingExpenses
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching review queue stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching review queue stats'
+    });
+  }
+});
+
 export default router;

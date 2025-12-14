@@ -19,6 +19,10 @@ import {
   AccountBalance as AccountBalanceIcon,
   Receipt as ReceiptIcon,
   RestartAlt as RestartAltIcon,
+  Warning as WarningIcon,
+  Lightbulb as LightbulbIcon,
+  CheckCircle as CheckCircleIcon,
+  Pending as PendingIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -110,6 +114,57 @@ interface MerchantData {
   percentage: number;
 }
 
+interface SmartInsights {
+  overallTrend: {
+    currentTotal: number;
+    previousTotal: number;
+    percentChange: number;
+    direction: 'up' | 'down';
+  };
+  overBudgetAlerts: Array<{
+    categoryName: string;
+    budgetAmount: number;
+    spent: number;
+    overBy: number;
+    percentOver: number;
+  }>;
+  unusualExpenses: Array<{
+    description: string;
+    amount: number;
+    date: string;
+    timesAverage: number;
+  }>;
+  categoryTrends: Array<{
+    categoryName: string;
+    currentAmount: number;
+    previousAmount: number;
+    percentChange: number;
+    trend: 'increasing' | 'decreasing';
+  }>;
+  summary: {
+    totalExpenses: number;
+    avgDailySpending: number;
+    topSpendingDay: {
+      date: string;
+      amount: number;
+    };
+  };
+}
+
+interface ReviewQueueStats {
+  pending: number;
+  approved: number;
+  rejected: number;
+  approvalRate: number;
+  pendingExpenses: Array<{
+    id: string;
+    description: string;
+    amount: number;
+    date: string;
+    daysSinceParsed: number;
+  }>;
+}
+
 const Analytics: React.FC = () => {
   const { token, user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -122,6 +177,8 @@ const Analytics: React.FC = () => {
   const [topExpenses, setTopExpenses] = useState<TopExpense[]>([]);
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<PaymentMethodBreakdown[]>([]);
   const [topMerchants, setTopMerchants] = useState<MerchantData[]>([]);
+  const [smartInsights, setSmartInsights] = useState<SmartInsights | null>(null);
+  const [reviewQueueStats, setReviewQueueStats] = useState<ReviewQueueStats | null>(null);
 
   // Load saved preferences from localStorage or use defaults
   const [startDate, setStartDate] = useState<Dayjs | null>(() => {
@@ -170,7 +227,7 @@ const Analytics: React.FC = () => {
         endDate: endDate.format('YYYY-MM-DD'),
       });
 
-      const [overviewRes, breakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes] = await Promise.all([
+      const [overviewRes, breakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes, insightsRes, reviewStatsRes] = await Promise.all([
         axios.get(`${API_URL}/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -192,6 +249,12 @@ const Analytics: React.FC = () => {
         axios.get(`${API_URL}/api/analytics/top-merchants?${params}&limit=10`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        axios.get(`${API_URL}/api/analytics/smart-insights?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_URL}/api/analytics/review-queue-stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
 
       setOverview(overviewRes.data.overview);
@@ -201,6 +264,8 @@ const Analytics: React.FC = () => {
       setTopExpenses(topExpensesRes.data.expenses || []);
       setPaymentMethodBreakdown(paymentMethodRes.data.breakdown || []);
       setTopMerchants(merchantsRes.data.merchants || []);
+      setSmartInsights(insightsRes.data.insights || null);
+      setReviewQueueStats(reviewStatsRes.data.stats || null);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch analytics');
@@ -289,6 +354,166 @@ const Analytics: React.FC = () => {
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
             {error}
           </Alert>
+        )}
+
+        {/* Smart Insights Section */}
+        {smartInsights && (
+          <Grid container spacing={2} mb={3}>
+            {/* Overall Trend Alert */}
+            {smartInsights.overallTrend && (
+              <Grid item xs={12}>
+                <Alert 
+                  severity={smartInsights.overallTrend.direction === 'up' ? 'warning' : 'success'}
+                  icon={smartInsights.overallTrend.direction === 'up' ? <TrendingUpIcon /> : <TrendingDownIcon />}
+                  sx={{ borderRadius: 2 }}
+                >
+                  <Typography variant="body2">
+                    <strong>Spending Trend:</strong> Your spending is{' '}
+                    <strong>{Math.abs(smartInsights.overallTrend.percentChange)}%{' '}
+                    {smartInsights.overallTrend.direction === 'up' ? 'higher' : 'lower'}</strong>{' '}
+                    compared to the previous period 
+                    ({formatCurrency(smartInsights.overallTrend.previousTotal)} → {formatCurrency(smartInsights.overallTrend.currentTotal)})
+                  </Typography>
+                </Alert>
+              </Grid>
+            )}
+
+            {/* Over Budget Alerts */}
+            {smartInsights.overBudgetAlerts && smartInsights.overBudgetAlerts.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card sx={{ borderLeft: '4px solid', borderColor: 'error.main' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
+                      <WarningIcon color="error" />
+                      <Typography variant="h6" fontWeight={600}>
+                        Over Budget ({smartInsights.overBudgetAlerts.length})
+                      </Typography>
+                    </Box>
+                    {smartInsights.overBudgetAlerts.map((alert, idx) => (
+                      <Box key={idx} mb={idx < smartInsights.overBudgetAlerts.length - 1 ? 2 : 0}>
+                        <Typography variant="body2" fontWeight={500}>
+                          {alert.categoryName}
+                        </Typography>
+                        <Typography variant="caption" color="error.main">
+                          {formatCurrency(alert.spent)} / {formatCurrency(alert.budgetAmount)} 
+                          ({alert.percentOver}% over)
+                        </Typography>
+                      </Box>
+                    ))}
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Review Queue Stats */}
+            {reviewQueueStats && reviewQueueStats.pending > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card sx={{ borderLeft: '4px solid', borderColor: 'warning.main' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
+                      <PendingIcon color="warning" />
+                      <Typography variant="h6" fontWeight={600}>
+                        Pending Reviews ({reviewQueueStats.pending})
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" mb={1}>
+                      Approval Rate: <strong>{reviewQueueStats.approvalRate}%</strong>
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {reviewQueueStats.pendingExpenses.length} expenses waiting for review
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Category Trends */}
+            {smartInsights.categoryTrends && smartInsights.categoryTrends.length > 0 && (
+              <Grid item xs={12}>
+                <Card sx={{ borderLeft: '4px solid', borderColor: 'info.main' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
+                      <LightbulbIcon color="info" />
+                      <Typography variant="h6" fontWeight={600}>
+                        Category Insights
+                      </Typography>
+                    </Box>
+                    <Grid container spacing={2}>
+                      {smartInsights.categoryTrends.map((trend, idx) => (
+                        <Grid item xs={12} sm={6} md={4} key={idx}>
+                          <Box 
+                            p={1.5} 
+                            borderRadius={1} 
+                            bgcolor={trend.trend === 'increasing' ? 'error.lighter' : 'success.lighter'}
+                            sx={{ bgcolor: trend.trend === 'increasing' ? 'rgba(211, 47, 47, 0.08)' : 'rgba(46, 125, 50, 0.08)' }}
+                          >
+                            <Typography variant="body2" fontWeight={500}>
+                              {trend.categoryName}
+                            </Typography>
+                            <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
+                              {trend.trend === 'increasing' ? (
+                                <TrendingUpIcon fontSize="small" color="error" />
+                              ) : (
+                                <TrendingDownIcon fontSize="small" color="success" />
+                              )}
+                              <Typography 
+                                variant="caption" 
+                                color={trend.trend === 'increasing' ? 'error.main' : 'success.main'}
+                                fontWeight={600}
+                              >
+                                {Math.abs(trend.percentChange)}% {trend.trend}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Unusual Expenses */}
+            {smartInsights.unusualExpenses && smartInsights.unusualExpenses.length > 0 && (
+              <Grid item xs={12}>
+                <Card sx={{ borderLeft: '4px solid', borderColor: 'warning.main' }}>
+                  <CardContent>
+                    <Box display="flex" alignments="center" gap={1} mb={2}>
+                      <WarningIcon color="warning" />
+                      <Typography variant="h6" fontWeight={600}>
+                        Unusual Expenses
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" mb={2} display="block">
+                      These expenses are significantly higher than your average
+                    </Typography>
+                    {smartInsights.unusualExpenses.map((expense, idx) => (
+                      <Box 
+                        key={idx} 
+                        display="flex" 
+                        justifyContent="space-between"
+                        py={1}
+                        borderBottom={idx < smartInsights.unusualExpenses.length - 1 ? '1px solid' : 'none'}
+                        borderColor="divider"
+                      >
+                        <Box>
+                          <Typography variant="body2" fontWeight={500}>
+                            {expense.description}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(expense.date).toLocaleDateString()} • {expense.timesAverage}x average
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" fontWeight={600} color="warning.main">
+                          {formatCurrency(expense.amount)}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
         )}
 
       {/* Overview Stats */}
