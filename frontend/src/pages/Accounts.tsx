@@ -80,7 +80,7 @@ const accountTypeConfig = {
 };
 
 const Accounts: React.FC = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountBalances, setAccountBalances] = useState<Map<string, AccountBalance>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -90,6 +90,10 @@ const Accounts: React.FC = () => {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+  const [adjustBalanceOpen, setAdjustBalanceOpen] = useState(false);
+  const [adjustingAccount, setAdjustingAccount] = useState<Account | null>(null);
+  const [actualBalance, setActualBalance] = useState('');
+  const [adjustmentNotes, setAdjustmentNotes] = useState('');
 
   // Form states
   const [formData, setFormData] = useState({
@@ -97,7 +101,7 @@ const Accounts: React.FC = () => {
     type: 'checking' as Account['type'],
     bankName: '',
     accountNumber: '',
-    currency: 'USD',
+    currency: user?.currency || 'USD',
     initialBalance: 0,
     color: '#1976d2',
     isDefault: false,
@@ -163,7 +167,7 @@ const Accounts: React.FC = () => {
         type: 'checking',
         bankName: '',
         accountNumber: '',
-        currency: 'USD',
+        currency: user?.currency || 'USD',
         initialBalance: 0,
         color: '#1976d2',
         isDefault: false,
@@ -261,6 +265,82 @@ const Accounts: React.FC = () => {
       style: 'currency',
       currency,
     }).format(amount);
+  };
+
+  const handleAdjustBalance = (account: Account) => {
+    setAdjustingAccount(account);
+    const balance = accountBalances.get(account.id);
+    setActualBalance((balance?.calculatedBalance || account.balance).toString());
+    setAdjustmentNotes('');
+    setAdjustBalanceOpen(true);
+  };
+
+  const handleSaveAdjustment = async () => {
+    if (!adjustingAccount) return;
+
+    try {
+      const balance = accountBalances.get(adjustingAccount.id);
+      const currentBalance = balance?.calculatedBalance || adjustingAccount.balance;
+      const newBalance = parseFloat(actualBalance);
+      const difference = newBalance - currentBalance;
+
+      if (difference === 0) {
+        setError('No adjustment needed - balances match');
+        return;
+      }
+
+      // Get categories to find or create a balance adjustment category
+      const categoriesRes = await axios.get(`${API_URL}/api/categories`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      let adjustmentCategory = categoriesRes.data.categories?.find(
+        (cat: any) => cat.name === 'Balance Adjustment'
+      );
+
+      // If category doesn't exist, create it
+      if (!adjustmentCategory) {
+        const newCategoryRes = await axios.post(
+          `${API_URL}/api/categories`,
+          {
+            name: 'Balance Adjustment',
+            type: 'both',
+            color: '#9e9e9e',
+            icon: 'adjustment',
+            description: 'Automatic adjustments to reconcile account balances',
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        adjustmentCategory = newCategoryRes.data.category;
+      }
+
+      // Create a balance adjustment transaction
+      await axios.post(
+        `${API_URL}/api/transactions`,
+        {
+          type: difference > 0 ? 'credit' : 'debit',
+          amount: Math.abs(difference),
+          accountId: adjustingAccount.id,
+          categoryId: adjustmentCategory.id,
+          description: 'Balance Adjustment',
+          notes: adjustmentNotes || `Adjusted to match actual balance: ${formatCurrency(newBalance, adjustingAccount.currency)}`,
+          tags: ['balance-adjustment'],
+          date: new Date().toISOString(),
+          isRecurring: false,
+          reviewStatus: 'approved',
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess(`Balance adjusted successfully by ${formatCurrency(Math.abs(difference), adjustingAccount.currency)}`);
+      setAdjustBalanceOpen(false);
+      setAdjustingAccount(null);
+      setActualBalance('');
+      setAdjustmentNotes('');
+      fetchAccounts();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to adjust balance');
+    }
   };
 
   if (loading) {
@@ -427,6 +507,15 @@ const Accounts: React.FC = () => {
                         </Box>
                       </Box>
                       <Box display="flex" gap={0.5}>
+                        <Tooltip title="Adjust Balance">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleAdjustBalance(account)}
+                            color="primary"
+                          >
+                            <RefreshIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <IconButton
                           size="small"
                           onClick={() => handleSetDefault(account.id)}
@@ -685,6 +774,108 @@ const Accounts: React.FC = () => {
             }
           >
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Balance Adjustment Dialog */}
+      <Dialog 
+        open={adjustBalanceOpen} 
+        onClose={() => setAdjustBalanceOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Adjust Account Balance</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            {adjustingAccount && (
+              <>
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Account:</strong> {adjustingAccount.name}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Current Calculated Balance:</strong>{' '}
+                    {formatCurrency(
+                      accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance,
+                      adjustingAccount.currency
+                    )}
+                  </Typography>
+                </Alert>
+
+                <TextField
+                  fullWidth
+                  label="Actual Balance (from bank/wallet)"
+                  type="number"
+                  value={actualBalance}
+                  onChange={(e) => setActualBalance(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        {new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: adjustingAccount.currency,
+                        })
+                          .format(0)
+                          .replace(/[\d.,]/g, '')}
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText="Enter the actual balance from your bank statement or wallet"
+                  sx={{ mb: 2 }}
+                />
+
+                <TextField
+                  fullWidth
+                  label="Notes (Optional)"
+                  multiline
+                  rows={3}
+                  value={adjustmentNotes}
+                  onChange={(e) => setAdjustmentNotes(e.target.value)}
+                  placeholder="Reason for adjustment (e.g., bank fees, interest, cash transaction)"
+                  sx={{ mb: 2 }}
+                />
+
+                {actualBalance && (
+                  <Alert 
+                    severity={
+                      parseFloat(actualBalance) - (accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance) >= 0
+                        ? 'success'
+                        : 'warning'
+                    }
+                  >
+                    <Typography variant="body2">
+                      <strong>Adjustment Amount:</strong>{' '}
+                      {formatCurrency(
+                        Math.abs(
+                          parseFloat(actualBalance) - 
+                          (accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance)
+                        ),
+                        adjustingAccount.currency
+                      )}
+                      {' '}
+                      ({parseFloat(actualBalance) - (accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance) >= 0 
+                        ? 'Credit' 
+                        : 'Debit'
+                      })
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      A balance adjustment transaction will be created
+                    </Typography>
+                  </Alert>
+                )}
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAdjustBalanceOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleSaveAdjustment} 
+            variant="contained" 
+            disabled={!actualBalance || parseFloat(actualBalance) === (accountBalances.get(adjustingAccount?.id || '')?.calculatedBalance || adjustingAccount?.balance || 0)}
+          >
+            Adjust Balance
           </Button>
         </DialogActions>
       </Dialog>

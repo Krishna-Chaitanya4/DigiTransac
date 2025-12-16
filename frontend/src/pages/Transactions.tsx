@@ -97,7 +97,7 @@ interface Tag {
 }
 
 const Transactions: React.FC = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -427,6 +427,13 @@ const Transactions: React.FC = () => {
     }).format(amount);
   };
 
+  const formatUserCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: user?.currency || 'USD',
+    }).format(amount);
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -496,7 +503,7 @@ const Transactions: React.FC = () => {
                   Total Credits
                 </Typography>
                 <Typography variant="h4" color="white" fontWeight="bold">
-                  ${totalCredits.toFixed(2)}
+                  {formatUserCurrency(totalCredits)}
                 </Typography>
               </CardContent>
             </Card>
@@ -508,7 +515,7 @@ const Transactions: React.FC = () => {
                   Total Debits
                 </Typography>
                 <Typography variant="h4" color="white" fontWeight="bold">
-                  ${totalDebits.toFixed(2)}
+                  {formatUserCurrency(totalDebits)}
                 </Typography>
               </CardContent>
             </Card>
@@ -524,7 +531,7 @@ const Transactions: React.FC = () => {
                   Net Amount
                 </Typography>
                 <Typography variant="h4" color="white" fontWeight="bold">
-                  ${Math.abs(netAmount).toFixed(2)}
+                  {formatUserCurrency(Math.abs(netAmount))}
                   {netAmount < 0 && ' deficit'}
                 </Typography>
               </CardContent>
