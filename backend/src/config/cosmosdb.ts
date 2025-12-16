@@ -12,6 +12,9 @@ class CosmosDBService {
   public expensesContainer: Collection | null = null;
   public budgetsContainer: Collection | null = null;
   public paymentMethodsContainer: Collection | null = null;
+  public transactionsContainer: Collection | null = null;
+  public accountsContainer: Collection | null = null;
+  public tagsContainer: Collection | null = null;
 
   constructor() {
     // Build MongoDB connection string from Cosmos DB credentials
@@ -63,6 +66,15 @@ class CosmosDBService {
     
     // Payment Methods collection
     this.paymentMethodsContainer = this.db.collection('paymentMethods');
+    
+    // Transactions collection (new)
+    this.transactionsContainer = this.db.collection('transactions');
+    
+    // Accounts collection (new)
+    this.accountsContainer = this.db.collection('accounts');
+    
+    // Tags collection (new)
+    this.tagsContainer = this.db.collection('tags');
 
     // Create indexes for better query performance
     await this.usersContainer.createIndex({ email: 1 }, { unique: true });
@@ -72,6 +84,17 @@ class CosmosDBService {
     await this.expensesContainer.createIndex({ paymentMethodId: 1 });
     await this.budgetsContainer.createIndex({ userId: 1 });
     await this.paymentMethodsContainer.createIndex({ userId: 1 });
+    
+    // New indexes for transactions, accounts, and tags
+    await this.transactionsContainer.createIndex({ userId: 1 });
+    await this.transactionsContainer.createIndex({ accountId: 1 });
+    await this.transactionsContainer.createIndex({ categoryId: 1 });
+    await this.transactionsContainer.createIndex({ date: 1 });
+    await this.transactionsContainer.createIndex({ type: 1 });
+    await this.transactionsContainer.createIndex({ tags: 1 });
+    await this.accountsContainer.createIndex({ userId: 1 });
+    await this.tagsContainer.createIndex({ userId: 1 });
+    await this.tagsContainer.createIndex({ name: 1 });
   }
 
   async getUsersContainer(): Promise<Collection> {
@@ -107,6 +130,27 @@ class CosmosDBService {
       throw new Error('Cosmos DB not initialized. Call initialize() first.');
     }
     return this.paymentMethodsContainer;
+  }
+
+  async getTransactionsContainer(): Promise<Collection> {
+    if (!this.transactionsContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.transactionsContainer;
+  }
+
+  async getAccountsContainer(): Promise<Collection> {
+    if (!this.accountsContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.accountsContainer;
+  }
+
+  async getTagsContainer(): Promise<Collection> {
+    if (!this.tagsContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.tagsContainer;
   }
 
   async close(): Promise<void> {

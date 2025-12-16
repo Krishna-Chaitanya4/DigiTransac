@@ -123,3 +123,75 @@ export interface BudgetAlert {
   percentageUsed: number;
   isExceeded: boolean;
 }
+
+// Account types for managing multiple accounts
+export interface Account {
+  id: string;
+  userId: string;
+  name: string; // e.g., "HDFC Checking", "Savings Account", "Cash Wallet"
+  type: 'checking' | 'savings' | 'credit_card' | 'investment' | 'cash' | 'loan' | 'other';
+  bankName?: string;
+  accountNumber?: string; // Encrypted or last 4 digits
+  currency: string;
+  balance: number; // Current balance
+  initialBalance?: number; // Starting balance when account was added
+  icon?: string;
+  color?: string;
+  isDefault?: boolean;
+  isActive: boolean;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// New Transaction model (replaces/extends Expense)
+export interface Transaction {
+  id: string;
+  userId: string;
+  
+  // CORE FIELDS
+  type: 'credit' | 'debit'; // Money IN or OUT
+  amount: number; // Always positive
+  accountId: string; // Which account this affects
+  
+  // CLASSIFICATION
+  categoryId: string;
+  description: string;
+  tags: string[]; // Flexible labels: ['investment', 'tax-deductible', 'recurring', etc.]
+  
+  // PAYMENT DETAILS
+  paymentMethodId?: string; // How was it paid (card, UPI, cash, etc.)
+  date: Date;
+  notes?: string;
+  
+  // RECURRENCE
+  isRecurring: boolean;
+  recurrencePattern?: RecurrencePattern;
+  
+  // SOURCE & PARSING
+  source?: 'manual' | 'email' | 'sms' | 'api';
+  sourceEmailId?: string;
+  merchantName?: string;
+  parsedData?: ParsedTransactionData;
+  
+  // REVIEW & APPROVAL
+  reviewStatus: 'pending' | 'approved' | 'rejected';
+  
+  // LINKED TRANSACTIONS (for transfers)
+  linkedTransactionId?: string; // If this is part of a transfer, links to the other side
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Tag management
+export interface Tag {
+  id: string;
+  userId: string;
+  name: string;
+  color?: string;
+  usageCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
