@@ -35,6 +35,7 @@ import {
   RateReview as ReviewIcon,
   CreditCard as PaymentIcon,
   AccountBalanceWallet as AccountsIcon,
+  SwapHoriz as TransactionsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';
@@ -50,6 +51,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Expenses', icon: <ReceiptIcon />, path: '/expenses' },
+  { text: 'Transactions', icon: <TransactionsIcon />, path: '/transactions' },
   { text: 'Review Queue', icon: <ReviewIcon />, path: '/review' },
   { text: 'Categories', icon: <CategoryIcon />, path: '/categories' },
   { text: 'Payment Methods', icon: <PaymentIcon />, path: '/payment-methods' },
