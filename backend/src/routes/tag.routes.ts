@@ -8,10 +8,43 @@ const router = Router();
 
 router.use(authenticate);
 
+// Helper function to ensure default tags exist
+async function ensureDefaultTags(userId: string): Promise<void> {
+  const tagsContainer = await cosmosDBService.getTagsContainer();
+  
+  const defaultTags = [
+    { name: 'expense', color: '#f44336' },
+    { name: 'income', color: '#4caf50' }
+  ];
+
+  for (const defaultTag of defaultTags) {
+    const exists = await tagsContainer.findOne({ 
+      userId, 
+      name: defaultTag.name 
+    });
+
+    if (!exists) {
+      const newTag: Tag = {
+        id: uuidv4(),
+        userId,
+        name: defaultTag.name,
+        color: defaultTag.color,
+        usageCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      await tagsContainer.insertOne(newTag);
+    }
+  }
+}
+
 // GET /api/tags - Get all tags for a user
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
+    
+    // Ensure default tags exist
+    await ensureDefaultTags(userId);
     
     const tagsContainer = await cosmosDBService.getTagsContainer();
     const tags = (await tagsContainer

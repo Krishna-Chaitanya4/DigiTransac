@@ -247,13 +247,14 @@ const Transactions: React.FC = () => {
       });
     } else {
       setEditingTransaction(null);
+      const defaultTag = 'expense'; // Default for debit transactions
       setFormData({
         type: 'debit',
         amount: '',
         accountId: accounts.find(a => a.isDefault)?.id || '',
         categoryId: '',
         description: '',
-        tags: [],
+        tags: [defaultTag],
         date: dayjs().format('YYYY-MM-DD'),
         notes: '',
         merchantName: '',
@@ -269,6 +270,21 @@ const Transactions: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingTransaction(null);
+  };
+
+  const handleTypeChange = (newType: 'credit' | 'debit') => {
+    const oldTag = formData.type === 'debit' ? 'expense' : 'income';
+    const newTag = newType === 'debit' ? 'expense' : 'income';
+    
+    // Remove old auto-tag and add new one
+    const updatedTags = formData.tags.filter(tag => tag !== oldTag && tag !== newTag);
+    updatedTags.push(newTag);
+    
+    setFormData({
+      ...formData,
+      type: newType,
+      tags: updatedTags,
+    });
   };
 
   const handleSubmit = async () => {
@@ -894,7 +910,7 @@ const Transactions: React.FC = () => {
               <ToggleButtonGroup
                 value={formData.type}
                 exclusive
-                onChange={(_, value) => value && setFormData({ ...formData, type: value })}
+                onChange={(_, value) => value && handleTypeChange(value as 'credit' | 'debit')}
                 fullWidth
               >
                 <ToggleButton value="credit" color="success">

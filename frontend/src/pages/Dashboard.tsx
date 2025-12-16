@@ -15,6 +15,9 @@ import {
   List,
   ListItem,
   ListItemText,
+  Menu,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -25,6 +28,10 @@ import {
   Add as AddIcon,
   Lightbulb as LightbulbIcon,
   Repeat as RepeatIcon,
+  FilterList as FilterListIcon,
+  Close as CloseIcon,
+  Check as CheckIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -108,6 +115,12 @@ interface AccountBalance {
   currency: string;
 }
 
+interface Tag {
+  id: string;
+  name: string;
+  color?: string;
+}
+
 const Dashboard: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -123,10 +136,17 @@ const Dashboard: React.FC = () => {
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
   const [spentChange, setSpentChange] = useState(0);
   const [incomeChange, setIncomeChange] = useState(0);
+  
+  // Tag filtering states
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [includeTags, setIncludeTags] = useState<string[]>(['expense', 'income']); // Include by default
+  const [excludeTags, setExcludeTags] = useState<string[]>([]);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [includeTags, excludeTags]); // Re-fetch when filters change
 
   const fetchDashboardData = async () => {
     try {
@@ -138,7 +158,7 @@ const Dashboard: React.FC = () => {
         endDate: now.toISOString().split('T')[0],
       });
 
-      const [overviewRes, transactionsRes, budgetsRes, accountsRes] = await Promise.all([
+      const [overviewRes, transactionsRes, budgetsRes, accountsRes, tagsRes] = await Promise.all([
         axios.get(`${API_URL}/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -151,10 +171,37 @@ const Dashboard: React.FC = () => {
         axios.get(`${API_URL}/api/accounts`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        axios.get(`${API_URL}/api/tags`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
 
+      // Store all tags
+      const tags = tagsRes.data.tags || [];
+      setAllTags(tags);
+
       const overview = overviewRes.data.overview;
-      const transactions = transactionsRes.data.transactions || [];
+      let transactions = transactionsRes.data.transactions || [];
+      
+      // Apply tag filtering
+      transactions = transactions.filter((t: any) => {
+        const txnTags = t.tags || [];
+        
+        // If include tags specified, transaction must have at least one
+        if (includeTags.length > 0) {
+          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
+          if (!hasIncluded) return false;
+        }
+        
+        // If exclude tags specified, transaction must not have any
+        if (excludeTags.length > 0) {
+          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
+          if (hasExcluded) return false;
+        }
+        
+        return true;
+      });
+      
       const debits = transactions.filter((t: any) => t.type === 'debit');
       const credits = transactions.filter((t: any) => t.type === 'credit');
       const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
@@ -413,6 +460,27 @@ const Dashboard: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const handleClearFilters = () => {
+    setIncludeTags([]);
+    setExcludeTags([]);
+  };
+
+  const handleToggleIncludeTag = (tagName: string) => {
+    setIncludeTags(prev => 
+      prev.includes(tagName) 
+        ? prev.filter(t => t !== tagName)
+        : [...prev, tagName]
+    );
+  };
+
+  const handleToggleExcludeTag = (tagName: string) => {
+    setExcludeTags(prev => 
+      prev.includes(tagName) 
+        ? prev.filter(t => t !== tagName)
+        : [...prev, tagName]
+    );
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -479,6 +547,159 @@ const Dashboard: React.FC = () => {
         </Box>
         <Box display="flex" gap={2}>
           <Button
+            variant="outlined"
+            startIcon={<FilterListIcon />}
+            onClick={(e) => setFilterMenuAnchor(e.currentTarget)}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3,
+              py: 1.5,
+              ...((includeTags.length > 0 || excludeTags.length > 0) && {
+                borderColor: 'primary.main',
+                bgcolor: 'primary.main',
+                color: 'white',
+                '&:hover': {
+                  borderColor: 'primary.dark',
+                  bgcolor: 'primary.dark',
+                }
+              })
+            }}
+          >
+            Filter by Tags
+          </Button>
+          <Menu
+            anchorEl={filterMenuAnchor}
+            open={Boolean(filterMenuAnchor)}
+            onClose={() => {
+              setFilterMenuAnchor(null);
+              setTagSearchQuery('');
+            }}
+            PaperProps={{
+              sx: {
+                mt: 1,
+                minWidth: 360,
+                maxHeight: 500,
+                borderRadius: 2,
+              }
+            }}
+          >
+            <Box sx={{ p: 2, pb: 1 }}>
+              <Typography variant="subtitle2" fontWeight={600} mb={1.5}>
+                Filter transactions by tags
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search tags..."
+                value={tagSearchQuery}
+                onChange={(e) => setTagSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 1.5 }}
+              />
+            </Box>
+            <Box sx={{ maxHeight: 300, overflowY: 'auto', px: 2, pb: 2 }}>
+              <Box display="flex" flexDirection="column" gap={1}>
+                {allTags
+                  .filter(tag => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()))
+                  .map((tag) => {
+                    const isIncluded = includeTags.includes(tag.name);
+                    const isExcluded = excludeTags.includes(tag.name);
+                    const chipColor = isIncluded ? 'success' : isExcluded ? 'error' : 'default';
+                    
+                    return (
+                      <Chip
+                        key={tag.id}
+                        label={tag.name}
+                        size="small"
+                        color={chipColor}
+                        variant={(isIncluded || isExcluded) ? 'filled' : 'outlined'}
+                        sx={{
+                          justifyContent: 'space-between',
+                          bgcolor: isIncluded ? 'success.main' : isExcluded ? 'error.main' : tag.color ? `${tag.color}15` : undefined,
+                          borderColor: (isIncluded || isExcluded) ? undefined : tag.color || undefined,
+                          color: (isIncluded || isExcluded) ? 'white' : undefined,
+                          pr: 0.5,
+                        }}
+                        deleteIcon={
+                          <Box display="flex" gap={0.25} alignItems="center">
+                            <Box
+                              component="span"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleIncludeTag(tag.name);
+                              }}
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              cursor: 'pointer',
+                              bgcolor: isIncluded ? 'rgba(255,255,255,0.3)' : 'transparent',
+                              '&:hover': {
+                                bgcolor: isIncluded ? 'rgba(255,255,255,0.4)' : 'success.light',
+                              },
+                            }}
+                          >
+                            <CheckIcon sx={{ fontSize: 16, color: isIncluded ? 'white' : 'inherit' }} />
+                          </Box>
+                          <Box
+                            component="span"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleExcludeTag(tag.name);
+                            }}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              cursor: 'pointer',
+                              bgcolor: isExcluded ? 'rgba(255,255,255,0.3)' : 'transparent',
+                              '&:hover': {
+                                bgcolor: isExcluded ? 'rgba(255,255,255,0.4)' : 'error.light',
+                              },
+                            }}
+                          >
+                            <CloseIcon sx={{ fontSize: 16, color: isExcluded ? 'white' : 'inherit' }} />
+                          </Box>
+                        </Box>
+                      }
+                      onDelete={() => {}}
+                    />
+                  );
+                })}
+                {allTags.filter(tag => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase())).length === 0 && (
+                  <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
+                    {tagSearchQuery ? 'No tags match your search' : 'No tags available'}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            {(includeTags.length > 0 || excludeTags.length > 0) && (
+              <Box sx={{ p: 2, pt: 0, borderTop: 1, borderColor: 'divider' }}>
+                <Button
+                  fullWidth
+                  size="small"
+                  onClick={handleClearFilters}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Clear All Filters
+                </Button>
+              </Box>
+            )}
+          </Menu>
+          <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => navigate('/transactions')}
@@ -518,6 +739,79 @@ const Dashboard: React.FC = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Active Filters Display */}
+      {(includeTags.length > 0 || excludeTags.length > 0) && (
+        <Paper
+          sx={{
+            p: 1.5,
+            mb: 3,
+            borderRadius: 2,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(25, 118, 210, 0.08)'
+                : 'rgba(30, 30, 30, 0.8)',
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+            {includeTags.length > 0 && (
+              <>
+                <Typography variant="caption" color="text.secondary">
+                  Include:
+                </Typography>
+                {includeTags.map((tagName) => (
+                  <Chip
+                    key={`include-${tagName}`}
+                    label={tagName}
+                    size="small"
+                    onDelete={() => handleToggleIncludeTag(tagName)}
+                    deleteIcon={<CloseIcon />}
+                    sx={{ 
+                      height: 24,
+                      fontSize: '0.75rem',
+                      bgcolor: 'success.main',
+                      color: 'white',
+                      '& .MuiChip-deleteIcon': { color: 'white' }
+                    }}
+                  />
+                ))}
+              </>
+            )}
+            
+            {excludeTags.length > 0 && (
+              <>
+                <Typography variant="caption" color="text.secondary" ml={includeTags.length > 0 ? 2 : 0}>
+                  Exclude:
+                </Typography>
+                {excludeTags.map((tagName) => (
+                  <Chip
+                    key={`exclude-${tagName}`}
+                    label={tagName}
+                    size="small"
+                    onDelete={() => handleToggleExcludeTag(tagName)}
+                    deleteIcon={<CloseIcon />}
+                    sx={{ 
+                      height: 24,
+                      fontSize: '0.75rem',
+                      bgcolor: 'error.main',
+                      color: 'white',
+                      '& .MuiChip-deleteIcon': { color: 'white' }
+                    }}
+                  />
+                ))}
+              </>
+            )}
+            
+            <Button
+              size="small"
+              onClick={handleClearFilters}
+              sx={{ textTransform: 'none', minWidth: 'auto' }}
+            >
+              Clear All
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
