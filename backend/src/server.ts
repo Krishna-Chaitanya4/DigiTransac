@@ -17,6 +17,7 @@ import gmailRoutes from './routes/gmail.routes';
 import paymentMethodRoutes from './routes/paymentMethod.routes';
 import accountRoutes from './routes/account.routes';
 import tagRoutes from './routes/tag.routes';
+import transactionRoutes from './routes/transaction.routes';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
 
 // Load environment variables
@@ -53,6 +54,7 @@ app.use('/api/gmail', gmailRoutes);
 app.use('/api/payment-methods', paymentMethodRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/tags', tagRoutes);
+app.use('/api/transactions', transactionRoutes);
 app.use('/api/payment-methods', paymentMethodRoutes);
 
 // Error handling
