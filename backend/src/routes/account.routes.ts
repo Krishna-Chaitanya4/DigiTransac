@@ -16,13 +16,17 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const accountsContainer = await cosmosDBService.getAccountsContainer();
     const accounts = (await accountsContainer
       .find({ userId })
-      .sort({ isDefault: -1, createdAt: 1 })
       .toArray()) as unknown as Account[];
 
-    res.json({
-      success: true,
-      accounts
+    // Sort in memory to avoid composite index requirement
+    accounts.sort((a, b) => {
+      if (a.isDefault !== b.isDefault) {
+        return b.isDefault ? 1 : -1; // isDefault accounts first
+      }
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
+
+    res.json(accounts);
   } catch (error) {
     console.error('Error fetching accounts:', error);
     res.status(500).json({

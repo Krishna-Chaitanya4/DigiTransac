@@ -81,6 +81,7 @@ interface Expense {
   isRecurring: boolean;
   tags?: string[];
   notes?: string;
+  reviewStatus?: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   updatedAt: string;
 }
@@ -185,11 +186,6 @@ const Expenses: React.FC = () => {
     return category?.name || 'Unknown';
   };
 
-  const getCategoryColor = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
-    return category?.color || '#667eea';
-  };
-
   const getPaymentMethodName = (paymentMethodId?: string) => {
     if (!paymentMethodId) return '-';
     const method = paymentMethods.find(m => m.id === paymentMethodId);
@@ -227,6 +223,7 @@ const Expenses: React.FC = () => {
     setEditingExpense(null);
     setFormData({
       categoryId: '',
+      paymentMethodId: '',
       amount: '',
       description: '',
       date: new Date().toISOString().split('T')[0],
@@ -985,7 +982,7 @@ const Expenses: React.FC = () => {
                     
                     if (!groupedData.grouped) {
                       // Regular ungrouped view
-                      return groupedData.expenses.map((expense) => (
+                      return groupedData.expenses?.map((expense) => (
                         <TableRow 
                           key={expense.id} 
                           hover
@@ -1041,7 +1038,7 @@ const Expenses: React.FC = () => {
                             </IconButton>
                             <IconButton
                               size="small"
-                              onClick={() => handleDeleteExpense(expense.id)}
+                              onClick={() => handleDeleteExpense(expense)}
                               color="error"
                             >
                               <DeleteIcon fontSize="small" />
@@ -1051,7 +1048,7 @@ const Expenses: React.FC = () => {
                       ));
                     } else {
                       // Grouped view
-                      return groupedData.groups.flatMap((group, groupIndex) => [
+                      return groupedData.groups?.flatMap((group, groupIndex) => [
                         // Group header row
                         <TableRow 
                           key={`group-${groupIndex}`}
@@ -1128,7 +1125,7 @@ const Expenses: React.FC = () => {
                               </IconButton>
                               <IconButton
                                 size="small"
-                                onClick={() => handleDeleteExpense(expense.id)}
+                                onClick={() => handleDeleteExpense(expense)}
                                 color="error"
                               >
                                 <DeleteIcon fontSize="small" />

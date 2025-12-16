@@ -12,14 +12,11 @@ import {
   Grid,
   Divider,
   Chip,
-  IconButton,
-  Tooltip,
 } from '@mui/material';
 import {
   Email as EmailIcon,
   CheckCircle as CheckCircleIcon,
   Google as GoogleIcon,
-  Link as LinkIcon,
   LinkOff as LinkOffIcon,
 } from '@mui/icons-material';
 import axios from 'axios';

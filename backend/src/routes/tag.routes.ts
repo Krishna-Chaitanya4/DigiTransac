@@ -16,8 +16,15 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const tagsContainer = await cosmosDBService.getTagsContainer();
     const tags = (await tagsContainer
       .find({ userId })
-      .sort({ usageCount: -1, name: 1 })
       .toArray()) as unknown as Tag[];
+
+    // Sort in-memory to avoid composite index requirement
+    tags.sort((a, b) => {
+      if (a.usageCount !== b.usageCount) {
+        return b.usageCount - a.usageCount; // Descending by usageCount
+      }
+      return a.name.localeCompare(b.name); // Ascending by name
+    });
 
     res.json({
       success: true,
@@ -180,7 +187,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     await transactionsContainer.updateMany(
       { userId, tags: tag.name },
-      { $pull: { tags: tag.name } }
+      { $pull: { tags: tag.name } as any }
     );
 
     await tagsContainer.deleteOne({ id, userId });

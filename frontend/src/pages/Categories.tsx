@@ -3,7 +3,6 @@ import {
   Typography,
   Box,
   Button,
-  Card,
   IconButton,
   Dialog,
   DialogTitle,
@@ -16,18 +15,15 @@ import {
   CircularProgress,
   Collapse,
   Tooltip,
-  Divider,
   MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,
   Label as LabelIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon,
   CreateNewFolder as CreateNewFolderIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -342,7 +338,7 @@ const Categories: React.FC = () => {
             variant="outlined"
             startIcon={<FolderOpenIcon />}
             onClick={() => {
-              setFormData({ name: '', color: '#667eea', isFolder: true });
+              setFormData({ name: '', color: '#667eea', isFolder: true, parentId: null });
               setParentForNew(null);
               setOpenDialog(true);
             }}
@@ -413,7 +409,7 @@ const Categories: React.FC = () => {
                 variant="outlined"
                 startIcon={<FolderOpenIcon />}
                 onClick={() => {
-                  setFormData({ name: '', color: '#667eea', isFolder: true });
+                  setFormData({ name: '', color: '#667eea', isFolder: true, parentId: null });
                   setParentForNew(null);
                   setOpenDialog(true);
                 }}

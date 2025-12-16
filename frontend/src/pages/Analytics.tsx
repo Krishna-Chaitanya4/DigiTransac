@@ -17,7 +17,6 @@ import {
   Collapse,
   List,
   ListItemButton,
-  ListItemText,
   LinearProgress,
   Button,
 } from '@mui/material';
@@ -29,7 +28,6 @@ import {
   RestartAlt as RestartAltIcon,
   Warning as WarningIcon,
   Lightbulb as LightbulbIcon,
-  CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
   Folder as FolderIcon,
   Category as CategoryIcon,
@@ -694,7 +692,7 @@ const Analytics: React.FC = () => {
               <Grid item xs={12}>
                 <Card sx={{ borderLeft: '4px solid', borderColor: 'warning.main' }}>
                   <CardContent>
-                    <Box display="flex" alignments="center" gap={1} mb={2}>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
                       <WarningIcon color="warning" />
                       <Typography variant="h6" fontWeight={600}>
                         Unusual Expenses
@@ -840,7 +838,7 @@ const Analytics: React.FC = () => {
                 <ToggleButtonGroup
                   value={viewMode}
                   exclusive
-                  onChange={(e, newMode) => {
+                  onChange={(_, newMode) => {
                     if (newMode !== null) {
                       setViewMode(newMode);
                     }

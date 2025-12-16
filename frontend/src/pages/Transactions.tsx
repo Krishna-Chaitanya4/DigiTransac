@@ -38,7 +38,6 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   FilterList as FilterListIcon,
-  ExpandMore as ExpandMoreIcon,
   FileDownload as FileDownloadIcon,
   TrendingUp as CreditIcon,
   TrendingDown as DebitIcon,
@@ -139,15 +138,28 @@ const Transactions: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchTransactions();
-    fetchAccounts();
-    fetchCategories();
-    fetchTags();
+    const initializeData = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([
+          fetchAccounts(),
+          fetchCategories(),
+          fetchTags(),
+        ]);
+        await fetchTransactions();
+      } catch (err) {
+        console.error('Error initializing transactions page:', err);
+        setError('Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initializeData();
   }, []);
 
   const fetchTransactions = async () => {
     try {
-      setLoading(true);
       setError('');
 
       const params: any = {
@@ -170,9 +182,9 @@ const Transactions: React.FC = () => {
 
       setTransactions(response.data.transactions || []);
     } catch (err: any) {
+      console.error('Error fetching transactions:', err);
       setError(err.response?.data?.message || 'Failed to fetch transactions');
-    } finally {
-      setLoading(false);
+      setTransactions([]); // Set empty array on error
     }
   };
 
@@ -184,6 +196,7 @@ const Transactions: React.FC = () => {
       setAccounts(response.data.filter((a: Account) => a.isActive));
     } catch (err: any) {
       console.error('Failed to fetch accounts:', err);
+      setAccounts([]); // Set empty array on error
     }
   };
 
@@ -195,6 +208,7 @@ const Transactions: React.FC = () => {
       setCategories(response.data.categories?.filter((c: Category) => !c.isFolder) || []);
     } catch (err: any) {
       console.error('Failed to fetch categories:', err);
+      setCategories([]); // Set empty array on error
     }
   };
 
@@ -203,9 +217,10 @@ const Transactions: React.FC = () => {
       const response = await axios.get(`${API_URL}/api/tags`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTags(response.data || []);
+      setTags(response.data.tags || []);
     } catch (err: any) {
       console.error('Failed to fetch tags:', err);
+      setTags([]); // Set empty array on error to prevent white screen
     }
   };
 

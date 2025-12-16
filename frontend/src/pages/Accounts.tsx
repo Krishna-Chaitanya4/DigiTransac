@@ -263,11 +263,6 @@ const Accounts: React.FC = () => {
     }).format(amount);
   };
 
-  const getAccountIcon = (type: Account['type']) => {
-    const IconComponent = accountTypeConfig[type].icon;
-    return <IconComponent />;
-  };
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">

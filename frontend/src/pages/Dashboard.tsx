@@ -10,16 +10,12 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  IconButton,
-  Tooltip,
   Button,
 } from '@mui/material';
 import {
   TrendingUp,
   TrendingDown,
-  AccountBalance,
   Receipt,
-  Category,
   AccountBalanceWallet,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
@@ -86,52 +82,54 @@ const Dashboard: React.FC = () => {
         endDate: now.toISOString().split('T')[0],
       });
 
-      const [overviewRes, expensesRes, budgetsRes, reviewStatsRes] = await Promise.all([
+      const [overviewRes, transactionsRes, budgetsRes] = await Promise.all([
         axios.get(`${API_URL}/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/expenses?limit=5`, {
+        axios.get(`${API_URL}/api/transactions?sortBy=date&sortOrder=desc&startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`${API_URL}/api/budgets`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/review-queue-stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
       ]);
 
       const overview = overviewRes.data.overview;
+      const transactions = transactionsRes.data.transactions || [];
+      const debits = transactions.filter((t: any) => t.type === 'debit');
+      const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
+      
       setStats({
-        totalSpent: overview.totalSpent,
-        monthSpent: overview.totalSpent,
-        budgetLeft: overview.totalBudget - overview.totalSpent,
-        categoryCount: 0, // Will be calculated from expenses
-        expenseCount: overview.expenseCount,
-        pendingReviews: reviewStatsRes.data.stats.pending,
-        avgDailySpending: overview.avgExpense,
+        totalSpent,
+        monthSpent: totalSpent,
+        budgetLeft: overview.totalBudget - totalSpent,
+        categoryCount: new Set(debits.map((t: any) => t.categoryId)).size,
+        expenseCount: debits.length,
+        pendingReviews: transactions.filter((t: any) => t.reviewStatus === 'pending').length,
+        avgDailySpending: totalSpent / new Date().getDate(),
         percentChange: overview.budgetUsedPercent - 100,
       });
 
-      // Process recent expenses
-      const expenses = expensesRes.data.expenses || [];
+      // Process recent transactions (debits only for expense view)
       const categoriesRes = await axios.get(`${API_URL}/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const categories = categoriesRes.data.categories || [];
-      const categoryMap = new Map(categories.map((c: any) => [c.id, c]));
+      const categoryMap = new Map<string, { name: string; color: string }>(
+        categories.map((c: any) => [c.id, { name: c.name, color: c.color }])
+      );
 
       setRecentExpenses(
-        expenses.slice(0, 5).map((exp: any) => {
-          const category = categoryMap.get(exp.categoryId);
+        debits.slice(0, 5).map((txn: any) => {
+          const category = categoryMap.get(txn.categoryId);
           return {
-            id: exp.id,
-            description: exp.description,
-            amount: exp.amount,
+            id: txn.id,
+            description: txn.description,
+            amount: txn.amount,
             categoryName: category?.name || 'Unknown',
             categoryColor: category?.color || '#667eea',
-            date: exp.date,
-            reviewStatus: exp.reviewStatus,
+            date: txn.date,
+            reviewStatus: txn.reviewStatus,
           };
         })
       );
@@ -142,8 +140,8 @@ const Dashboard: React.FC = () => {
       
       for (const budget of budgets) {
         const category = categoryMap.get(budget.categoryId);
-        const categoryExpenses = expenses.filter((e: any) => e.categoryId === budget.categoryId);
-        const spent = categoryExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
+        const categoryDebits = debits.filter((t: any) => t.categoryId === budget.categoryId);
+        const spent = categoryDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
         const percentage = Math.round((spent / budget.amount) * 100);
         
         budgetStatuses.push({
@@ -159,8 +157,9 @@ const Dashboard: React.FC = () => {
 
       // Generate alerts
       const newAlerts: string[] = [];
-      if (reviewStatsRes.data.stats.pending > 0) {
-        newAlerts.push(`You have ${reviewStatsRes.data.stats.pending} expenses pending review`);
+      const pendingCount = transactions.filter((t: any) => t.reviewStatus === 'pending').length;
+      if (pendingCount > 0) {
+        newAlerts.push(`You have ${pendingCount} transactions pending review`);
       }
       const overBudget = budgetStatuses.filter(b => b.isOver);
       if (overBudget.length > 0) {
@@ -251,7 +250,7 @@ const Dashboard: React.FC = () => {
             Dashboard
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-            Welcome back, {user?.name || 'User'}! Here's your expense overview.
+            Welcome back, {user?.firstName || user?.email || 'User'}! Here's your expense overview.
           </Typography>
         </Box>
         <Button
@@ -325,7 +324,7 @@ const Dashboard: React.FC = () => {
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
                   transform: 'translateY(-8px)',
-                  boxShadow: `0 12px 40px ${stat.color}30`,
+                  boxShadow: '0 12px 40px rgba(102, 126, 234, 0.3)',
                 },
                 '&::before': {
                   content: '\"\"',
@@ -345,7 +344,7 @@ const Dashboard: React.FC = () => {
                       background: stat.gradient,
                       width: 56,
                       height: 56,
-                      boxShadow: `0 4px 14px ${stat.color}40`,
+                      boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
                     }}
                   >
                     {stat.icon}
