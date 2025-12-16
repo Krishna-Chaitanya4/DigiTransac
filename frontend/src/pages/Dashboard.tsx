@@ -134,8 +134,6 @@ const Dashboard: React.FC = () => {
   const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
-  const [spentChange, setSpentChange] = useState(0);
-  const [incomeChange, setIncomeChange] = useState(0);
   
   // Tag filtering states
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -214,27 +212,42 @@ const Dashboard: React.FC = () => {
       const lastMonthRes = await axios.get(`${API_URL}/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const lastMonthTxns = lastMonthRes.data.transactions || [];
+      let lastMonthTxns = lastMonthRes.data.transactions || [];
+      
+      // Apply tag filtering to last month data
+      lastMonthTxns = lastMonthTxns.filter((t: any) => {
+        const txnTags = t.tags || [];
+        
+        if (includeTags.length > 0) {
+          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
+          if (!hasIncluded) return false;
+        }
+        
+        if (excludeTags.length > 0) {
+          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
+          if (hasExcluded) return false;
+        }
+        
+        return true;
+      });
+      
       const lastMonthSpent = lastMonthTxns.filter((t: any) => t.type === 'debit').reduce((sum: number, t: any) => sum + t.amount, 0);
       const lastMonthIncome = lastMonthTxns.filter((t: any) => t.type === 'credit').reduce((sum: number, t: any) => sum + t.amount, 0);
       
-      // Calculate percentage changes with better edge case handling
+      // Calculate percentage changes for stat cards
       let spentChange = 0;
       if (lastMonthSpent > 0) {
         spentChange = Math.round(((totalSpent - lastMonthSpent) / lastMonthSpent) * 100);
       } else if (totalSpent > 0) {
-        spentChange = 100; // New spending when there was none before
+        spentChange = 100;
       }
       
       let incomeChange = 0;
       if (lastMonthIncome > 0) {
         incomeChange = Math.round(((totalIncome - lastMonthIncome) / lastMonthIncome) * 100);
       } else if (totalIncome > 0) {
-        incomeChange = 100; // New income when there was none before
+        incomeChange = 100;
       }
-      
-      setSpentChange(spentChange);
-      setIncomeChange(incomeChange);
       
       setStats({
         totalSpent,
@@ -274,13 +287,17 @@ const Dashboard: React.FC = () => {
         })
       );
 
-      // Process budget status
+      // Process budget status (should use unfiltered transactions)
       const budgets = budgetsRes.data.budgets || [];
       const budgetStatuses: BudgetStatus[] = [];
       
+      // Use unfiltered transactions for budget calculation
+      const allMonthTransactions = transactionsRes.data.transactions || [];
+      const unfilteredDebits = allMonthTransactions.filter((t: any) => t.type === 'debit');
+      
       for (const budget of budgets) {
         const category = categoryMap.get(budget.categoryId);
-        const categoryDebits = debits.filter((t: any) => t.categoryId === budget.categoryId);
+        const categoryDebits = unfilteredDebits.filter((t: any) => t.categoryId === budget.categoryId);
         const spent = categoryDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
         const percentage = Math.round((spent / budget.amount) * 100);
         
@@ -314,7 +331,26 @@ const Dashboard: React.FC = () => {
       const trendsRes = await axios.get(`${API_URL}/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const allTransactions = trendsRes.data.transactions || [];
+      let allTransactions = trendsRes.data.transactions || [];
+      
+      // Apply tag filtering to spending trends
+      allTransactions = allTransactions.filter((t: any) => {
+        const txnTags = t.tags || [];
+        
+        // If include tags specified, transaction must have at least one
+        if (includeTags.length > 0) {
+          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
+          if (!hasIncluded) return false;
+        }
+        
+        // If exclude tags specified, transaction must not have any
+        if (excludeTags.length > 0) {
+          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
+          if (hasExcluded) return false;
+        }
+        
+        return true;
+      });
       
       // Group by month for both income and expenses
       const monthlyData = new Map<string, { expenses: number; income: number }>();
@@ -871,7 +907,7 @@ const Dashboard: React.FC = () => {
               }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                <Box sx={{ mb: 3 }}>
                   <Avatar
                     sx={{
                       background: stat.gradient,
@@ -882,146 +918,54 @@ const Dashboard: React.FC = () => {
                   >
                     {stat.icon}
                   </Avatar>
-                  <Chip
-                    icon={stat.trend === 'up' ? <TrendingUp /> : <TrendingDown />}
-                    label={stat.change}
-                    size="small"
-                    sx={{
-                      background: stat.trend === 'up' 
-                        ? 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
-                        : 'linear-gradient(135deg, #f44336 0%, #e91e63 100%)',
-                      color: 'white',
-                      fontWeight: 700,
-                      fontSize: '0.75rem',
-                      '& .MuiChip-icon': { color: 'white' },
-                    }}
-                  />
                 </Box>
-                <Typography variant="h4" fontWeight={800} sx={{ mb: 1, letterSpacing: '-0.02em' }}>
+                <Typography 
+                  variant="h4" 
+                  fontWeight={800} 
+                  sx={{ 
+                    mb: 0.5, 
+                    letterSpacing: '-0.02em',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
                   {stat.value}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary" 
+                  fontWeight={500}
+                  sx={{
+                    mb: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
                   {stat.title}
                 </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  {stat.trend === 'up' ? (
+                    <TrendingUp sx={{ fontSize: 16, color: 'success.main' }} />
+                  ) : (
+                    <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
+                  )}
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: stat.trend === 'up' ? 'success.main' : 'error.main',
+                      fontWeight: 600,
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    {stat.change}
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
         ))}
-      </Grid>
-
-      {/* Month-over-Month Comparison */}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid item xs={12}>
-          <Paper
-            sx={{
-              p: 3,
-              borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)'
-                  : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
-            }}
-          >
-            <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TrendingUp />
-              Month-over-Month Comparison
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Compare this month's performance with last month
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Box
-                  sx={{
-                    p: 2.5,
-                    borderRadius: 2,
-                    background: (theme) =>
-                      theme.palette.mode === 'light'
-                        ? 'white'
-                        : 'rgba(40, 40, 40, 0.5)',
-                    border: '1px solid',
-                    borderColor: spentChange > 0 ? 'error.main' : 'success.main',
-                  }}
-                >
-                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                      Expenses Change
-                    </Typography>
-                    {spentChange !== 0 && (
-                      <Chip
-                        icon={spentChange > 0 ? <TrendingUp /> : <TrendingDown />}
-                        label={`${spentChange > 0 ? '+' : ''}${spentChange}%`}
-                        size="small"
-                        sx={{
-                          background: spentChange > 0 
-                            ? 'linear-gradient(135deg, #f44336 0%, #e91e63 100%)'
-                            : 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)',
-                          color: 'white',
-                          fontWeight: 700,
-                          '& .MuiChip-icon': { color: 'white' },
-                        }}
-                      />
-                    )}
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {spentChange > 0 
-                      ? `You spent ${Math.abs(spentChange)}% more than last month`
-                      : spentChange < 0
-                      ? `You spent ${Math.abs(spentChange)}% less than last month`
-                      : 'No change from last month'}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Box
-                  sx={{
-                    p: 2.5,
-                    borderRadius: 2,
-                    background: (theme) =>
-                      theme.palette.mode === 'light'
-                        ? 'white'
-                        : 'rgba(40, 40, 40, 0.5)',
-                    border: '1px solid',
-                    borderColor: incomeChange > 0 ? 'success.main' : 'error.main',
-                  }}
-                >
-                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                      Income Change
-                    </Typography>
-                    {incomeChange !== 0 && (
-                      <Chip
-                        icon={incomeChange > 0 ? <TrendingUp /> : <TrendingDown />}
-                        label={`${incomeChange > 0 ? '+' : ''}${incomeChange}%`}
-                        size="small"
-                        sx={{
-                          background: incomeChange > 0 
-                            ? 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
-                            : 'linear-gradient(135deg, #f44336 0%, #e91e63 100%)',
-                          color: 'white',
-                          fontWeight: 700,
-                          '& .MuiChip-icon': { color: 'white' },
-                        }}
-                      />
-                    )}
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {incomeChange > 0 
-                      ? `Your income increased by ${Math.abs(incomeChange)}%`
-                      : incomeChange < 0
-                      ? `Your income decreased by ${Math.abs(incomeChange)}%`
-                      : 'No change from last month'}
-                  </Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
       </Grid>
 
       {/* Budget Status & Recent Activity */}
