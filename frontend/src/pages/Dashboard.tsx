@@ -11,6 +11,10 @@ import {
   CircularProgress,
   Alert,
   Button,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -22,10 +26,24 @@ import {
   Add as AddIcon,
   Pending as PendingIcon,
   Lightbulb as LightbulbIcon,
+  Repeat as RepeatIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import {
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -52,10 +70,32 @@ interface RecentExpense {
 
 interface BudgetStatus {
   categoryName: string;
+  categoryId: string;
+  categoryColor: string;
   spent: number;
   budget: number;
   percentage: number;
   isOver: boolean;
+}
+
+interface SpendingTrend {
+  month: string;
+  amount: number;
+}
+
+interface CategorySpending {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface UpcomingRecurring {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  nextDate: string;
+  frequency: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -67,6 +107,9 @@ const Dashboard: React.FC = () => {
   const [recentExpenses, setRecentExpenses] = useState<RecentExpense[]>([]);
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [spendingTrends, setSpendingTrends] = useState<SpendingTrend[]>([]);
+  const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
+  const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -146,6 +189,8 @@ const Dashboard: React.FC = () => {
         
         budgetStatuses.push({
           categoryName: category?.name || 'Unknown',
+          categoryId: budget.categoryId,
+          categoryColor: category?.color || '#667eea',
           spent,
           budget: budget.amount,
           percentage,
@@ -154,6 +199,109 @@ const Dashboard: React.FC = () => {
       }
 
       setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
+
+      // Calculate spending trends (last 6 months)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const trendsRes = await axios.get(`${API_URL}/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allTransactions = trendsRes.data.transactions || [];
+      
+      // Group by month
+      const monthlySpending = new Map<string, number>();
+      allTransactions
+        .filter((t: any) => t.type === 'debit')
+        .forEach((t: any) => {
+          const date = new Date(t.date);
+          const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+          monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + t.amount);
+        });
+      
+      const trends: SpendingTrend[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        trends.push({
+          month: monthKey,
+          amount: monthlySpending.get(monthKey) || 0,
+        });
+      }
+      setSpendingTrends(trends);
+
+      // Calculate top categories (current month)
+      const categorySpending = new Map<string, { name: string; value: number; color: string }>();
+      debits.forEach((t: any) => {
+        const category = categoryMap.get(t.categoryId);
+        if (category) {
+          const existing = categorySpending.get(t.categoryId);
+          categorySpending.set(t.categoryId, {
+            name: category.name,
+            value: (existing?.value || 0) + t.amount,
+            color: category.color,
+          });
+        }
+      });
+      
+      const topCats = Array.from(categorySpending.values())
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+      setTopCategories(topCats);
+
+      // Get upcoming recurring transactions
+      const recurringRes = await axios.get(`${API_URL}/api/transactions?isRecurring=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const recurringTxns = recurringRes.data.transactions || [];
+      
+      const upcoming: UpcomingRecurring[] = recurringTxns
+        .map((t: any) => {
+          if (!t.recurrencePattern) return null;
+          
+          const lastCreated = t.recurrencePattern.lastCreated ? new Date(t.recurrencePattern.lastCreated) : new Date(t.date);
+          let nextDate = new Date(lastCreated);
+          
+          switch (t.recurrencePattern.frequency) {
+            case 'daily':
+              nextDate.setDate(nextDate.getDate() + 1);
+              break;
+            case 'weekly':
+              nextDate.setDate(nextDate.getDate() + 7);
+              break;
+            case 'monthly':
+              nextDate.setMonth(nextDate.getMonth() + 1);
+              if (t.recurrencePattern.day) {
+                nextDate.setDate(t.recurrencePattern.day);
+              }
+              break;
+            case 'yearly':
+              nextDate.setFullYear(nextDate.getFullYear() + 1);
+              break;
+          }
+          
+          // Only show next 30 days
+          const thirtyDaysFromNow = new Date();
+          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+          
+          if (nextDate <= thirtyDaysFromNow && nextDate >= now) {
+            return {
+              id: t.id,
+              description: t.description,
+              amount: t.amount,
+              type: t.type,
+              nextDate: nextDate.toISOString(),
+              frequency: t.recurrencePattern.frequency,
+            };
+          }
+          return null;
+        })
+        .filter((t: any) => t !== null)
+        .sort((a: any, b: any) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
+        .slice(0, 5);
+      
+      setUpcomingRecurring(upcoming);
 
       // Generate alerts
       const newAlerts: string[] = [];
@@ -583,6 +731,307 @@ const Dashboard: React.FC = () => {
                   sx={{ mt: 2 }}
                 >
                   Add Expense
+                </Button>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Spending Trends & Category Breakdown */}
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        {/* Spending Trends Chart */}
+        <Grid item xs={12} md={8}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'white'
+                  : 'rgba(30, 30, 30, 0.8)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? '1px solid rgba(0,0,0,0.05)'
+                  : '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Spending Trends
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Last 6 months overview
+            </Typography>
+            {spendingTrends.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={spendingTrends}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                  <XAxis dataKey="month" stroke="#666" />
+                  <YAxis stroke="#666" />
+                  <Tooltip 
+                    formatter={(value: number) => formatCurrency(value)}
+                    contentStyle={{ 
+                      borderRadius: 8, 
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      background: 'rgba(255,255,255,0.95)'
+                    }}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="#667eea" 
+                    strokeWidth={3}
+                    name="Spending"
+                    dot={{ fill: '#667eea', r: 6 }}
+                    activeDot={{ r: 8 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box textAlign="center" py={6}>
+                <Typography color="text.secondary">No spending data available</Typography>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Top Categories Pie Chart */}
+        <Grid item xs={12} md={4}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'white'
+                  : 'rgba(30, 30, 30, 0.8)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? '1px solid rgba(0,0,0,0.05)'
+                  : '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Top Categories
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              This month breakdown
+            </Typography>
+            {topCategories.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={topCategories}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {topCategories.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box textAlign="center" py={6}>
+                <Typography color="text.secondary">No category data available</Typography>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Budget Progress & Upcoming Recurring */}
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        {/* Budget Progress Bars */}
+        <Grid item xs={12} md={6}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'white'
+                  : 'rgba(30, 30, 30, 0.8)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? '1px solid rgba(0,0,0,0.05)'
+                  : '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Budget Progress
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Current month status
+            </Typography>
+            {budgetStatus.length > 0 ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {budgetStatus.map((budget, idx) => (
+                  <Box key={idx}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            bgcolor: budget.categoryColor,
+                          }}
+                        />
+                        <Typography variant="body2" fontWeight={600}>
+                          {budget.categoryName}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatCurrency(budget.spent)} / {formatCurrency(budget.budget)}
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(budget.percentage, 100)}
+                      sx={{
+                        height: 8,
+                        borderRadius: 1,
+                        bgcolor: 'rgba(0,0,0,0.05)',
+                        '& .MuiLinearProgress-bar': {
+                          borderRadius: 1,
+                          bgcolor: budget.isOver
+                            ? '#f44336'
+                            : budget.percentage > 80
+                            ? '#ff9800'
+                            : '#4caf50',
+                        },
+                      }}
+                    />
+                    <Typography variant="caption" color={budget.isOver ? 'error' : 'text.secondary'}>
+                      {budget.percentage}% used
+                      {budget.isOver && ' - Over budget!'}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Box textAlign="center" py={6}>
+                <Typography color="text.secondary">No budgets set</Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => navigate('/budgets')}
+                  sx={{ mt: 2 }}
+                >
+                  Set Budget
+                </Button>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Upcoming Recurring Transactions */}
+        <Grid item xs={12} md={6}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'white'
+                  : 'rgba(30, 30, 30, 0.8)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? '1px solid rgba(0,0,0,0.05)'
+                  : '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={1} mb={1}>
+              <RepeatIcon color="primary" />
+              <Typography variant="h5" fontWeight={700}>
+                Upcoming Recurring
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Next 30 days
+            </Typography>
+            {upcomingRecurring.length > 0 ? (
+              <List sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                {upcomingRecurring.map((txn) => (
+                  <ListItem
+                    key={txn.id}
+                    sx={{
+                      borderRadius: 2,
+                      mb: 1,
+                      background: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'rgba(0,0,0,0.02)'
+                          : 'rgba(255,255,255,0.05)',
+                      '&:hover': {
+                        background: (theme) =>
+                          theme.palette.mode === 'light'
+                            ? 'rgba(0,0,0,0.04)'
+                            : 'rgba(255,255,255,0.08)',
+                      },
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                          <Typography variant="body2" fontWeight={600}>
+                            {txn.description}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            fontWeight={700}
+                            color={txn.type === 'credit' ? 'success.main' : 'error.main'}
+                          >
+                            {txn.type === 'credit' ? '+' : '-'}
+                            {formatCurrency(txn.amount)}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5}>
+                          <Chip
+                            label={txn.frequency}
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: '0.7rem',
+                              textTransform: 'capitalize',
+                            }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(txn.nextDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Box textAlign="center" py={6}>
+                <Typography color="text.secondary">No upcoming recurring transactions</Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate('/transactions')}
+                  sx={{ mt: 2 }}
+                >
+                  Add Recurring
                 </Button>
               </Box>
             )}
