@@ -32,6 +32,9 @@ import {
   Close as CloseIcon,
   Check as CheckIcon,
   Search as SearchIcon,
+  AccountBalance,
+  CreditCard,
+  Savings,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -1001,78 +1004,156 @@ const Dashboard: React.FC = () => {
               Your accounts overview
             </Typography>
             {accountBalances.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxHeight: 320, overflowY: 'auto' }}>
-                {accountBalances.map((account) => {
-                  const accountCurrency = account.currency || user?.currency || 'USD';
-                  const formattedBalance = new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: accountCurrency,
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  }).format(account.balance);
-                  
-                  return (
-                    <Box
-                      key={account.id}
-                      sx={{
-                        p: 2,
-                        borderRadius: 2,
-                        background: (theme) =>
-                          theme.palette.mode === 'light'
-                            ? 'rgba(0,0,0,0.02)'
-                            : 'rgba(255,255,255,0.05)',
-                        transition: 'all 0.2s ease',
-                        cursor: 'pointer',
-                        border: '1px solid transparent',
-                        '&:hover': {
-                          transform: 'translateX(8px)',
-                          background: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? 'rgba(0,0,0,0.04)'
-                              : 'rgba(255,255,255,0.08)',
-                          borderColor: '#667eea40',
-                        },
-                      }}
-                      onClick={() => navigate('/accounts')}
-                    >
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                        <Typography variant="body1" fontWeight={600}>
-                          {account.name}
-                        </Typography>
-                        <Typography 
-                          variant="h6" 
-                          fontWeight={700} 
-                          color={account.balance >= 0 ? 'success.main' : 'error.main'}
+              <Box 
+                sx={{ 
+                  maxHeight: 280, 
+                  overflowY: 'auto',
+                  pr: 1,
+                  '&::-webkit-scrollbar': {
+                    width: '6px',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: (theme) =>
+                      theme.palette.mode === 'light'
+                        ? 'rgba(0,0,0,0.05)'
+                        : 'rgba(255,255,255,0.05)',
+                    borderRadius: '10px',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: (theme) =>
+                      theme.palette.mode === 'light'
+                        ? 'rgba(0,0,0,0.2)'
+                        : 'rgba(255,255,255,0.2)',
+                    borderRadius: '10px',
+                    '&:hover': {
+                      background: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'rgba(0,0,0,0.3)'
+                          : 'rgba(255,255,255,0.3)',
+                    },
+                  },
+                }}
+              >
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  {accountBalances.map((account) => {
+                    const accountCurrency = account.currency || user?.currency || 'USD';
+                    const formattedBalance = new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: accountCurrency,
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(account.balance);
+                    
+                    // Determine icon and color based on account type
+                    const accountType = (account.accountType || 'wallet').toLowerCase();
+                    
+                    let accountIcon = <AccountBalanceWallet />;
+                    let accountGradient = 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
+                    
+                    if (accountType.includes('bank')) {
+                      accountIcon = <AccountBalance />;
+                      accountGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    } else if (accountType.includes('card') || accountType.includes('credit')) {
+                      accountIcon = <CreditCard />;
+                      accountGradient = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                    } else if (accountType.includes('saving')) {
+                      accountIcon = <Savings />;
+                      accountGradient = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                    }
+                    
+                    return (
+                      <Grid item xs={12} key={account.id}>
+                        <Box
+                          sx={{
+                            p: 2,
+                            borderRadius: 3,
+                            background: (theme) =>
+                              theme.palette.mode === 'light'
+                                ? 'white'
+                                : 'rgba(255,255,255,0.05)',
+                            border: (theme) =>
+                              theme.palette.mode === 'light'
+                                ? '1px solid rgba(0,0,0,0.08)'
+                                : '1px solid rgba(255,255,255,0.1)',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            cursor: 'pointer',
+                            '&:hover': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)',
+                            },
+                          }}
+                          onClick={() => navigate('/accounts')}
                         >
-                          {formattedBalance}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={account.accountType}
-                        size="small"
-                        sx={{
-                          textTransform: 'capitalize',
-                          fontSize: '0.7rem',
-                          height: 20,
-                        }}
-                      />
-                    </Box>
-                  );
-                })}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Avatar
+                              sx={{
+                                width: 44,
+                                height: 44,
+                                background: accountGradient,
+                                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                              }}
+                            >
+                              {accountIcon}
+                            </Avatar>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography 
+                                variant="body2" 
+                                fontWeight={600}
+                                sx={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  lineHeight: 1.3
+                                }}
+                              >
+                                {account.name}
+                              </Typography>
+                            </Box>
+                            <Typography 
+                              variant="h6" 
+                              fontWeight={700} 
+                              color={account.balance >= 0 ? 'success.main' : 'error.main'}
+                              sx={{
+                                fontSize: '1.1rem',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {formattedBalance}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
                 <Box
                   sx={{
-                    mt: 1,
-                    p: 2,
-                    borderRadius: 2,
+                    p: 3,
+                    borderRadius: 3,
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
                   }}
                 >
-                  <Typography variant="body2" color="white" sx={{ mb: 0.5 }}>
-                    Total Balance
-                  </Typography>
-                  <Typography variant="h5" fontWeight={700} color="white">
-                    {formatCurrency(accountBalances.reduce((sum, acc) => sum + acc.balance, 0))}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="body2" color="rgba(255,255,255,0.8)" sx={{ mb: 0.5, fontWeight: 500 }}>
+                        Total Balance
+                      </Typography>
+                      <Typography variant="h4" fontWeight={700} color="white">
+                        {formatCurrency(accountBalances.reduce((sum, acc) => sum + acc.balance, 0))}
+                      </Typography>
+                    </Box>
+                    <Avatar
+                      sx={{
+                        width: 56,
+                        height: 56,
+                        background: 'rgba(255,255,255,0.2)',
+                        backdropFilter: 'blur(10px)',
+                      }}
+                    >
+                      <AccountBalanceWallet sx={{ fontSize: 28, color: 'white' }} />
+                    </Avatar>
+                  </Box>
                 </Box>
               </Box>
             ) : (
