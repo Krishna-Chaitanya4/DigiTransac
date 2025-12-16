@@ -157,10 +157,9 @@ export interface Transaction {
   // CLASSIFICATION
   categoryId: string;
   description: string;
-  tags: string[]; // Flexible labels: ['investment', 'tax-deductible', 'recurring', etc.]
+  tags: string[]; // Flexible labels: ['UPI', 'PhonePe', 'Cash', 'Business', 'Recurring', etc.]
   
-  // PAYMENT DETAILS
-  paymentMethodId?: string; // How was it paid (card, UPI, cash, etc.)
+  // TRANSACTION DETAILS
   date: Date;
   notes?: string;
   

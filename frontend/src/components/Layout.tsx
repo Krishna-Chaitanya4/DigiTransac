@@ -22,7 +22,6 @@ import {
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  Receipt as ReceiptIcon,
   Category as CategoryIcon,
   AccountBalance as BudgetIcon,
   Analytics as AnalyticsIcon,
@@ -32,8 +31,6 @@ import {
   Menu as MenuIcon,
   Logout as LogoutIcon,
   AccountBalance,
-  RateReview as ReviewIcon,
-  CreditCard as PaymentIcon,
   AccountBalanceWallet as AccountsIcon,
   SwapHoriz as TransactionsIcon,
 } from '@mui/icons-material';
@@ -50,12 +47,9 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Expenses', icon: <ReceiptIcon />, path: '/expenses' },
   { text: 'Transactions', icon: <TransactionsIcon />, path: '/transactions' },
-  { text: 'Review Queue', icon: <ReviewIcon />, path: '/review' },
-  { text: 'Categories', icon: <CategoryIcon />, path: '/categories' },
-  { text: 'Payment Methods', icon: <PaymentIcon />, path: '/payment-methods' },
   { text: 'Accounts', icon: <AccountsIcon />, path: '/accounts' },
+  { text: 'Categories', icon: <CategoryIcon />, path: '/categories' },
   { text: 'Budgets', icon: <BudgetIcon />, path: '/budgets' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
 ];

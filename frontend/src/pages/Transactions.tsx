@@ -29,8 +29,6 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Autocomplete,
-  Paper,
-  Tooltip,
   FormControlLabel,
   Switch,
 } from '@mui/material';
@@ -40,9 +38,7 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   FilterList as FilterListIcon,
-  Clear as ClearIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   FileDownload as FileDownloadIcon,
   TrendingUp as CreditIcon,
   TrendingDown as DebitIcon,
@@ -66,7 +62,6 @@ interface Transaction {
   categoryId: string;
   description: string;
   tags: string[];
-  paymentMethodId?: string;
   date: string;
   notes?: string;
   isRecurring: boolean;
@@ -84,18 +79,15 @@ interface Account {
   name: string;
   type: string;
   currency: string;
+  isDefault?: boolean;
+  isActive: boolean;
 }
 
 interface Category {
   id: string;
   name: string;
   color?: string;
-}
-
-interface PaymentMethod {
-  id: string;
-  name: string;
-  type: string;
+  isFolder?: boolean;
 }
 
 interface Tag {
@@ -110,7 +102,6 @@ const Transactions: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -141,7 +132,6 @@ const Transactions: React.FC = () => {
     categoryId: '',
     description: '',
     tags: [] as string[],
-    paymentMethodId: '',
     date: dayjs().format('YYYY-MM-DD'),
     notes: '',
     merchantName: '',
@@ -152,7 +142,6 @@ const Transactions: React.FC = () => {
     fetchTransactions();
     fetchAccounts();
     fetchCategories();
-    fetchPaymentMethods();
     fetchTags();
   }, []);
 
@@ -209,17 +198,6 @@ const Transactions: React.FC = () => {
     }
   };
 
-  const fetchPaymentMethods = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/payment-methods`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setPaymentMethods(response.data || []);
-    } catch (err: any) {
-      console.error('Failed to fetch payment methods:', err);
-    }
-  };
-
   const fetchTags = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/tags`, {
@@ -241,7 +219,6 @@ const Transactions: React.FC = () => {
         categoryId: transaction.categoryId,
         description: transaction.description,
         tags: transaction.tags || [],
-        paymentMethodId: transaction.paymentMethodId || '',
         date: dayjs(transaction.date).format('YYYY-MM-DD'),
         notes: transaction.notes || '',
         merchantName: transaction.merchantName || '',
@@ -256,7 +233,6 @@ const Transactions: React.FC = () => {
         categoryId: '',
         description: '',
         tags: [],
-        paymentMethodId: '',
         date: dayjs().format('YYYY-MM-DD'),
         notes: '',
         merchantName: '',
@@ -564,7 +540,7 @@ const Transactions: React.FC = () => {
                 <ToggleButtonGroup
                   value={selectedType}
                   exclusive
-                  onChange={(e, value) => value && setSelectedType(value)}
+                  onChange={(_, value) => value && setSelectedType(value)}
                   size="small"
                 >
                   <ToggleButton value="all">All</ToggleButton>
@@ -683,7 +659,7 @@ const Transactions: React.FC = () => {
                     multiple
                     options={tags.map(t => t.name)}
                     value={selectedTags}
-                    onChange={(e, value) => setSelectedTags(value)}
+                    onChange={(_, value) => setSelectedTags(value)}
                     renderInput={(params) => (
                       <TextField {...params} label="Tags" size="small" />
                     )}
@@ -878,7 +854,7 @@ const Transactions: React.FC = () => {
               <ToggleButtonGroup
                 value={formData.type}
                 exclusive
-                onChange={(e, value) => value && setFormData({ ...formData, type: value })}
+                onChange={(_, value) => value && setFormData({ ...formData, type: value })}
                 fullWidth
               >
                 <ToggleButton value="credit" color="success">
@@ -968,7 +944,7 @@ const Transactions: React.FC = () => {
                     freeSolo
                     options={tags.map(t => t.name)}
                     value={formData.tags}
-                    onChange={(e, value) => setFormData({ ...formData, tags: value })}
+                    onChange={(_, value) => setFormData({ ...formData, tags: value })}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -989,24 +965,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    select
-                    label="Payment Method"
-                    value={formData.paymentMethodId}
-                    onChange={(e) => setFormData({ ...formData, paymentMethodId: e.target.value })}
-                    fullWidth
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {paymentMethods.map(method => (
-                      <MenuItem key={method.id} value={method.id}>
-                        {method.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12}>
                   <TextField
                     label="Merchant Name"
                     value={formData.merchantName}
