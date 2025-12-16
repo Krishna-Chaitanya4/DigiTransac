@@ -135,6 +135,9 @@ const Transactions: React.FC = () => {
     notes: '',
     merchantName: '',
     isRecurring: false,
+    recurrencePattern: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
+    recurrenceDay: new Date().getDate(),
+    recurrenceEndDate: '',
   });
 
   useEffect(() => {
@@ -238,6 +241,9 @@ const Transactions: React.FC = () => {
         notes: transaction.notes || '',
         merchantName: transaction.merchantName || '',
         isRecurring: transaction.isRecurring,
+        recurrencePattern: (transaction.recurrencePattern as any)?.frequency || 'monthly',
+        recurrenceDay: (transaction.recurrencePattern as any)?.day || new Date().getDate(),
+        recurrenceEndDate: (transaction.recurrencePattern as any)?.endDate || '',
       });
     } else {
       setEditingTransaction(null);
@@ -252,6 +258,9 @@ const Transactions: React.FC = () => {
         notes: '',
         merchantName: '',
         isRecurring: false,
+        recurrencePattern: 'monthly',
+        recurrenceDay: new Date().getDate(),
+        recurrenceEndDate: '',
       });
     }
     setOpenDialog(true);
@@ -267,11 +276,20 @@ const Transactions: React.FC = () => {
       setError('');
       setSuccess('');
 
-      const payload = {
+      const payload: any = {
         ...formData,
         amount: parseFloat(formData.amount),
         reviewStatus: 'approved' as const,
       };
+
+      // Add recurrence pattern if recurring
+      if (formData.isRecurring) {
+        payload.recurrencePattern = {
+          frequency: formData.recurrencePattern,
+          day: formData.recurrenceDay,
+          endDate: formData.recurrenceEndDate || undefined,
+        };
+      }
 
       if (editingTransaction) {
         await axios.put(
@@ -1026,12 +1044,63 @@ const Transactions: React.FC = () => {
                     control={
                       <Switch
                         checked={formData.isRecurring}
-                        onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                        onChange={(e) => {
+                          const isRecurring = e.target.checked;
+                          const updatedTags = isRecurring 
+                            ? [...formData.tags, 'recurring'].filter((tag, index, self) => self.indexOf(tag) === index) // Add and dedupe
+                            : formData.tags.filter(tag => tag !== 'recurring'); // Remove tag
+                          setFormData({ ...formData, isRecurring, tags: updatedTags });
+                        }}
                       />
                     }
                     label="Recurring Transaction"
                   />
                 </Grid>
+
+                {formData.isRecurring && (
+                  <>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        select
+                        label="Recurrence Frequency"
+                        value={formData.recurrencePattern}
+                        onChange={(e) => setFormData({ ...formData, recurrencePattern: e.target.value as any })}
+                        fullWidth
+                        required
+                      >
+                        <MenuItem value="daily">Daily</MenuItem>
+                        <MenuItem value="weekly">Weekly</MenuItem>
+                        <MenuItem value="monthly">Monthly</MenuItem>
+                        <MenuItem value="yearly">Yearly</MenuItem>
+                      </TextField>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        label="Day of Month (for monthly/yearly)"
+                        type="number"
+                        value={formData.recurrenceDay}
+                        onChange={(e) => setFormData({ ...formData, recurrenceDay: parseInt(e.target.value) || 1 })}
+                        fullWidth
+                        InputProps={{ inputProps: { min: 1, max: 31 } }}
+                        helperText="Day when transaction should repeat"
+                        disabled={formData.recurrencePattern === 'daily' || formData.recurrencePattern === 'weekly'}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        label="End Date (Optional)"
+                        type="date"
+                        value={formData.recurrenceEndDate}
+                        onChange={(e) => setFormData({ ...formData, recurrenceEndDate: e.target.value })}
+                        fullWidth
+                        InputLabelProps={{ shrink: true }}
+                        helperText="Leave empty for indefinite recurrence"
+                      />
+                    </Grid>
+                  </>
+                )}
               </Grid>
             </Box>
           </DialogContent>

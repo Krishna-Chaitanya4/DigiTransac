@@ -17,6 +17,7 @@ import accountRoutes from './routes/account.routes';
 import tagRoutes from './routes/tag.routes';
 import transactionRoutes from './routes/transaction.routes';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
+import { startRecurringTransactionsJob } from './jobs/recurringTransactions.job';
 
 // Load environment variables
 dotenv.config();
@@ -63,6 +64,9 @@ const startServer = async () => {
     
     // Start email polling cron job
     startEmailPollingJob();
+    
+    // Start recurring transactions cron job
+    startRecurringTransactionsJob();
     
     // Start server
     app.listen(PORT, () => {

@@ -97,10 +97,10 @@ export interface ParsedTransactionData {
 }
 
 export interface RecurrencePattern {
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
-  interval: number;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  day?: number; // Day of month (for monthly/yearly)
   endDate?: Date;
-  customDays?: number[];
+  lastCreated?: Date; // Track last time recurring transaction was created
 }
 
 export interface Budget {
