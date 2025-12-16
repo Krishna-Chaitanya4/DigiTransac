@@ -899,7 +899,21 @@ const Transactions: React.FC = () => {
                     fullWidth
                     required
                     InputProps={{
-                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          {formData.accountId
+                            ? new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                              })
+                                .format(0)
+                                .replace(/[\d.,]/g, '')
+                            : user?.currency === 'USD' ? '$' : 
+                              user?.currency === 'EUR' ? '€' : 
+                              user?.currency === 'GBP' ? '£' : 
+                              user?.currency === 'INR' ? '₹' : '$'}
+                        </InputAdornment>
+                      ),
                     }}
                   />
                 </Grid>
