@@ -1,73 +1,117 @@
-import { CosmosClient, Database, Container } from '@azure/cosmos';
+import { MongoClient, Db, Collection } from 'mongodb';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 class CosmosDBService {
-  private client: CosmosClient;
-  private database: Database | null = null;
+  private client: MongoClient;
+  private db: Db | null = null;
   
-  public usersContainer: Container | null = null;
-  public categoriesContainer: Container | null = null;
-  public expensesContainer: Container | null = null;
-  public budgetsContainer: Container | null = null;
+  public usersContainer: Collection | null = null;
+  public categoriesContainer: Collection | null = null;
+  public expensesContainer: Collection | null = null;
+  public budgetsContainer: Collection | null = null;
+  public paymentMethodsContainer: Collection | null = null;
 
   constructor() {
+    // Build MongoDB connection string from Cosmos DB credentials
     const endpoint = process.env.COSMOS_ENDPOINT!;
     const key = process.env.COSMOS_KEY!;
+    const dbName = process.env.COSMOS_DATABASE_NAME || 'ExpenseTrackerDB';
     
-    this.client = new CosmosClient({ endpoint, key });
+    // Extract account name from endpoint
+    const accountName = endpoint.match(/https:\/\/([^.]+)/)?.[1] || '';
+    
+    const connectionString = `mongodb://${accountName}:${encodeURIComponent(key)}@${accountName}.mongo.cosmos.azure.com:10255/${dbName}?ssl=true&retrywrites=false&maxIdleTimeMS=120000&appName=@${accountName}@`;
+    
+    this.client = new MongoClient(connectionString);
   }
 
   async initialize(): Promise<void> {
     try {
       const databaseName = process.env.COSMOS_DATABASE_NAME || 'ExpenseTrackerDB';
       
-      // Create database if it doesn't exist
-      const { database } = await this.client.databases.createIfNotExists({ id: databaseName });
-      this.database = database;
-      console.log(`✅ Database "${databaseName}" is ready`);
+      // Connect to Cosmos DB via MongoDB API
+      await this.client.connect();
+      this.db = this.client.db(databaseName);
+      console.log(`✅ Database "${databaseName}" connected`);
 
-      // Create containers
-      await this.createContainers();
+      // Initialize collections
+      await this.createCollections();
       
-      console.log('✅ All Cosmos DB containers are ready');
+      console.log('✅ All Cosmos DB collections are ready');
     } catch (error) {
       console.error('❌ Error initializing Cosmos DB:', error);
       throw error;
     }
   }
 
-  private async createContainers(): Promise<void> {
-    if (!this.database) throw new Error('Database not initialized');
+  private async createCollections(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
 
-    // Users container
-    const { container: usersContainer } = await this.database.containers.createIfNotExists({
-      id: 'users',
-      partitionKey: { paths: ['/id'] }
-    });
-    this.usersContainer = usersContainer;
+    // Users collection
+    this.usersContainer = this.db.collection('users');
+    
+    // Categories collection
+    this.categoriesContainer = this.db.collection('categories');
+    
+    // Expenses collection
+    this.expensesContainer = this.db.collection('expenses');
+    
+    // Budgets collection
+    this.budgetsContainer = this.db.collection('budgets');
+    
+    // Payment Methods collection
+    this.paymentMethodsContainer = this.db.collection('paymentMethods');
 
-    // Categories container (hierarchical structure)
-    const { container: categoriesContainer } = await this.database.containers.createIfNotExists({
-      id: 'categories',
-      partitionKey: { paths: ['/userId'] }
-    });
-    this.categoriesContainer = categoriesContainer;
+    // Create indexes for better query performance
+    await this.usersContainer.createIndex({ email: 1 }, { unique: true });
+    await this.categoriesContainer.createIndex({ userId: 1 });
+    await this.expensesContainer.createIndex({ userId: 1 });
+    await this.expensesContainer.createIndex({ categoryId: 1 });
+    await this.expensesContainer.createIndex({ paymentMethodId: 1 });
+    await this.budgetsContainer.createIndex({ userId: 1 });
+    await this.paymentMethodsContainer.createIndex({ userId: 1 });
+  }
 
-    // Expenses container
-    const { container: expensesContainer } = await this.database.containers.createIfNotExists({
-      id: 'expenses',
-      partitionKey: { paths: ['/userId'] }
-    });
-    this.expensesContainer = expensesContainer;
+  async getUsersContainer(): Promise<Collection> {
+    if (!this.usersContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.usersContainer;
+  }
 
-    // Budgets container
-    const { container: budgetsContainer } = await this.database.containers.createIfNotExists({
-      id: 'budgets',
-      partitionKey: { paths: ['/userId'] }
-    });
-    this.budgetsContainer = budgetsContainer;
+  async getCategoriesContainer(): Promise<Collection> {
+    if (!this.categoriesContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.categoriesContainer;
+  }
+
+  async getExpensesContainer(): Promise<Collection> {
+    if (!this.expensesContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.expensesContainer;
+  }
+
+  async getBudgetsContainer(): Promise<Collection> {
+    if (!this.budgetsContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.budgetsContainer;
+  }
+
+  async getPaymentMethodsContainer(): Promise<Collection> {
+    if (!this.paymentMethodsContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.paymentMethodsContainer;
+  }
+
+  async close(): Promise<void> {
+    await this.client.close();
+    console.log('✅ Cosmos DB connection closed');
   }
 }
 

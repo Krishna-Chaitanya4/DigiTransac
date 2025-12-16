@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 interface User {
   id: string;
   email: string;
@@ -27,6 +29,13 @@ interface RegisterData {
   currency: string;
 }
 
+interface AuthResponse {
+  success: boolean;
+  message: string;
+  token: string;
+  user: User;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
@@ -41,6 +50,9 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Configure axios defaults
+axios.defaults.baseURL = API_URL;
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => {
@@ -51,15 +63,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       const savedToken = localStorage.getItem('auth-token');
-      if (savedToken) {
+      const savedUser = localStorage.getItem('auth-user');
+      
+      if (savedToken && savedUser) {
         try {
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
           axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-          // TODO: Fetch user profile
-          // const response = await axios.get('/api/users/profile');
-          // setUser(response.data);
         } catch (error) {
+          console.error('Error restoring auth:', error);
           localStorage.removeItem('auth-token');
+          localStorage.removeItem('auth-user');
           setToken(null);
+          setUser(null);
         }
       }
       setIsLoading(false);
@@ -70,29 +86,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post('/api/auth/login', { email, password });
+      const response = await axios.post<AuthResponse>('/api/auth/login', { 
+        email, 
+        password 
+      });
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Login failed');
+      }
+
       const { token: newToken, user: userData } = response.data;
       
       setToken(newToken);
       setUser(userData);
       localStorage.setItem('auth-token', newToken);
+      localStorage.setItem('auth-user', JSON.stringify(userData));
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      throw new Error(errorMessage);
     }
   };
 
   const register = async (data: RegisterData) => {
     try {
-      const response = await axios.post('/api/auth/register', data);
+      const response = await axios.post<AuthResponse>('/api/auth/register', data);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Registration failed');
+      }
+
       const { token: newToken, user: userData } = response.data;
       
       setToken(newToken);
       setUser(userData);
       localStorage.setItem('auth-token', newToken);
+      localStorage.setItem('auth-user', JSON.stringify(userData));
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Registration failed';
+      throw new Error(errorMessage);
     }
   };
 
@@ -100,6 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('auth-token');
+    localStorage.removeItem('auth-user');
     delete axios.defaults.headers.common['Authorization'];
   };
 

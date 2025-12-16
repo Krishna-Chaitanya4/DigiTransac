@@ -6,24 +6,45 @@ export interface AuthRequest extends Request {
   userId?: string;
 }
 
+interface JWTPayload {
+  userId: string;
+  email: string;
+  iat: number;
+  exp: number;
+}
+
 export const authenticate = async (
   req: AuthRequest,
   _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const authHeader = req.headers.authorization;
 
-    if (!token) {
-      throw new AppError('Authentication required', 401);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new AppError('Authentication token required', 401);
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const token = authHeader.replace('Bearer ', '');
+
+    if (!token) {
+      throw new AppError('Authentication token required', 401);
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'fallback-secret'
+    ) as JWTPayload;
+
+    // Attach userId to request
     req.userId = decoded.userId;
     
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
+    if (error instanceof jwt.TokenExpiredError) {
+      next(new AppError('Token expired', 401));
+    } else if (error instanceof jwt.JsonWebTokenError) {
       next(new AppError('Invalid token', 401));
     } else {
       next(error);
