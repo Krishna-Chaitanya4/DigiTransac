@@ -13,6 +13,7 @@ import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
 import ReviewQueue from './pages/ReviewQueue';
 import PaymentMethods from './pages/PaymentMethods';
+import Accounts from './pages/Accounts';
 import Loading from './components/Loading';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -58,6 +59,7 @@ const App: React.FC = () => {
           <Route path="review" element={<ReviewQueue />} />
           <Route path="categories" element={<Categories />} />
           <Route path="payment-methods" element={<PaymentMethods />} />
+          <Route path="accounts" element={<Accounts />} />
           <Route path="budgets" element={<Budgets />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="profile" element={<Profile />} />
