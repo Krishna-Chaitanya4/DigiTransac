@@ -26,7 +26,10 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
-    res.json(accounts);
+    res.json({
+      success: true,
+      accounts
+    });
   } catch (error) {
     console.error('Error fetching accounts:', error);
     res.status(500).json({

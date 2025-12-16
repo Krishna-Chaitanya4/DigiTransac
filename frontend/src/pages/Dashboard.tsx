@@ -22,9 +22,7 @@ import {
   Receipt,
   AccountBalanceWallet,
   Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
   Add as AddIcon,
-  Pending as PendingIcon,
   Lightbulb as LightbulbIcon,
   Repeat as RepeatIcon,
 } from '@mui/icons-material';
@@ -50,22 +48,25 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 interface DashboardStats {
   totalSpent: number;
   monthSpent: number;
+  monthIncome: number;
+  netSavings: number;
   budgetLeft: number;
   categoryCount: number;
   expenseCount: number;
-  pendingReviews: number;
+  incomeCount: number;
   avgDailySpending: number;
   percentChange: number;
+  incomePercentChange: number;
 }
 
-interface RecentExpense {
+interface RecentTransaction {
   id: string;
   description: string;
   amount: number;
+  type: 'credit' | 'debit';
   categoryName: string;
   categoryColor: string;
   date: string;
-  reviewStatus: string;
 }
 
 interface BudgetStatus {
@@ -80,7 +81,8 @@ interface BudgetStatus {
 
 interface SpendingTrend {
   month: string;
-  amount: number;
+  expenses: number;
+  income: number;
 }
 
 interface CategorySpending {
@@ -98,18 +100,29 @@ interface UpcomingRecurring {
   frequency: string;
 }
 
+interface AccountBalance {
+  id: string;
+  name: string;
+  accountType: string;
+  balance: number;
+  currency: string;
+}
+
 const Dashboard: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentExpenses, setRecentExpenses] = useState<RecentExpense[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [spendingTrends, setSpendingTrends] = useState<SpendingTrend[]>([]);
   const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
+  const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
+  const [spentChange, setSpentChange] = useState(0);
+  const [incomeChange, setIncomeChange] = useState(0);
 
   useEffect(() => {
     fetchDashboardData();
@@ -125,7 +138,7 @@ const Dashboard: React.FC = () => {
         endDate: now.toISOString().split('T')[0],
       });
 
-      const [overviewRes, transactionsRes, budgetsRes] = await Promise.all([
+      const [overviewRes, transactionsRes, budgetsRes, accountsRes] = await Promise.all([
         axios.get(`${API_URL}/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -135,25 +148,62 @@ const Dashboard: React.FC = () => {
         axios.get(`${API_URL}/api/budgets`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        axios.get(`${API_URL}/api/accounts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
 
       const overview = overviewRes.data.overview;
       const transactions = transactionsRes.data.transactions || [];
       const debits = transactions.filter((t: any) => t.type === 'debit');
+      const credits = transactions.filter((t: any) => t.type === 'credit');
       const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
+      const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
+      const netSavings = totalIncome - totalSpent;
+      
+      // Get last month data for comparison
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const lastMonthRes = await axios.get(`${API_URL}/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const lastMonthTxns = lastMonthRes.data.transactions || [];
+      const lastMonthSpent = lastMonthTxns.filter((t: any) => t.type === 'debit').reduce((sum: number, t: any) => sum + t.amount, 0);
+      const lastMonthIncome = lastMonthTxns.filter((t: any) => t.type === 'credit').reduce((sum: number, t: any) => sum + t.amount, 0);
+      
+      // Calculate percentage changes with better edge case handling
+      let spentChange = 0;
+      if (lastMonthSpent > 0) {
+        spentChange = Math.round(((totalSpent - lastMonthSpent) / lastMonthSpent) * 100);
+      } else if (totalSpent > 0) {
+        spentChange = 100; // New spending when there was none before
+      }
+      
+      let incomeChange = 0;
+      if (lastMonthIncome > 0) {
+        incomeChange = Math.round(((totalIncome - lastMonthIncome) / lastMonthIncome) * 100);
+      } else if (totalIncome > 0) {
+        incomeChange = 100; // New income when there was none before
+      }
+      
+      setSpentChange(spentChange);
+      setIncomeChange(incomeChange);
       
       setStats({
         totalSpent,
         monthSpent: totalSpent,
+        monthIncome: totalIncome,
+        netSavings,
         budgetLeft: overview.totalBudget - totalSpent,
         categoryCount: new Set(debits.map((t: any) => t.categoryId)).size,
         expenseCount: debits.length,
-        pendingReviews: transactions.filter((t: any) => t.reviewStatus === 'pending').length,
+        incomeCount: credits.length,
         avgDailySpending: totalSpent / new Date().getDate(),
-        percentChange: overview.budgetUsedPercent - 100,
+        percentChange: spentChange,
+        incomePercentChange: incomeChange,
       });
 
-      // Process recent transactions (debits only for expense view)
+      // Process recent transactions (both credits and debits)
       const categoriesRes = await axios.get(`${API_URL}/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -162,17 +212,17 @@ const Dashboard: React.FC = () => {
         categories.map((c: any) => [c.id, { name: c.name, color: c.color }])
       );
 
-      setRecentExpenses(
-        debits.slice(0, 5).map((txn: any) => {
+      setRecentTransactions(
+        transactions.slice(0, 5).map((txn: any) => {
           const category = categoryMap.get(txn.categoryId);
           return {
             id: txn.id,
             description: txn.description,
             amount: txn.amount,
+            type: txn.type,
             categoryName: category?.name || 'Unknown',
             categoryColor: category?.color || '#667eea',
             date: txn.date,
-            reviewStatus: txn.reviewStatus,
           };
         })
       );
@@ -200,6 +250,16 @@ const Dashboard: React.FC = () => {
 
       setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
 
+      // Process account balances
+      const accounts = accountsRes.data.accounts || [];
+      setAccountBalances(accounts.map((acc: any) => ({
+        id: acc.id,
+        name: acc.name,
+        accountType: acc.accountType,
+        balance: acc.balance,
+        currency: acc.currency || user?.currency || 'USD',
+      })));
+
       // Calculate spending trends (last 6 months)
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -209,24 +269,31 @@ const Dashboard: React.FC = () => {
       });
       const allTransactions = trendsRes.data.transactions || [];
       
-      // Group by month
-      const monthlySpending = new Map<string, number>();
-      allTransactions
-        .filter((t: any) => t.type === 'debit')
-        .forEach((t: any) => {
-          const date = new Date(t.date);
-          const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-          monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + t.amount);
-        });
+      // Group by month for both income and expenses
+      const monthlyData = new Map<string, { expenses: number; income: number }>();
+      allTransactions.forEach((t: any) => {
+        const date = new Date(t.date);
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
+        const existing = monthlyData.get(monthKey) || { expenses: 0, income: 0 };
+        
+        if (t.type === 'debit') {
+          existing.expenses += t.amount;
+        } else if (t.type === 'credit') {
+          existing.income += t.amount;
+        }
+        monthlyData.set(monthKey, existing);
+      });
       
       const trends: SpendingTrend[] = [];
       for (let i = 5; i >= 0; i--) {
         const date = new Date();
         date.setMonth(date.getMonth() - i);
-        const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
+        const data = monthlyData.get(monthKey) || { expenses: 0, income: 0 };
         trends.push({
           month: monthKey,
-          amount: monthlySpending.get(monthKey) || 0,
+          expenses: data.expenses,
+          income: data.income,
         });
       }
       setSpendingTrends(trends);
@@ -305,13 +372,12 @@ const Dashboard: React.FC = () => {
 
       // Generate alerts
       const newAlerts: string[] = [];
-      const pendingCount = transactions.filter((t: any) => t.reviewStatus === 'pending').length;
-      if (pendingCount > 0) {
-        newAlerts.push(`You have ${pendingCount} transactions pending review`);
-      }
       const overBudget = budgetStatuses.filter(b => b.isOver);
       if (overBudget.length > 0) {
         newAlerts.push(`${overBudget.length} categories are over budget`);
+      }
+      if (netSavings < 0) {
+        newAlerts.push(`Spending exceeds income by ${formatCurrency(Math.abs(netSavings))} this month`);
       }
       setAlerts(newAlerts);
 
@@ -359,34 +425,44 @@ const Dashboard: React.FC = () => {
     {
       title: 'Month Spent',
       value: formatCurrency(stats?.monthSpent || 0),
-      change: `${stats?.percentChange || 0}%`,
+      change: `${(stats?.percentChange ?? 0) >= 0 ? '+' : ''}${stats?.percentChange ?? 0}% vs last month`,
       trend: (stats?.percentChange || 0) > 0 ? 'up' : 'down',
       icon: <Receipt sx={{ fontSize: 32 }} />,
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    },
+    {
+      title: 'Month Income',
+      value: formatCurrency(stats?.monthIncome || 0),
+      change: `${(stats?.incomePercentChange ?? 0) >= 0 ? '+' : ''}${stats?.incomePercentChange ?? 0}% vs last month`,
+      trend: (stats?.incomePercentChange || 0) >= 0 ? 'up' : 'down',
+      icon: <TrendingUp sx={{ fontSize: 32 }} />,
+      gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    },
+    {
+      title: 'Net Savings',
+      value: formatCurrency(stats?.netSavings || 0),
+      change: (stats?.netSavings || 0) >= 0 ? 'Positive flow' : 'Negative flow',
+      trend: (stats?.netSavings || 0) >= 0 ? 'up' : 'down',
+      icon: <AccountBalanceWallet sx={{ fontSize: 32 }} />,
+      gradient: (stats?.netSavings || 0) >= 0 
+        ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+        : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
     },
     {
       title: 'Budget Left',
       value: formatCurrency(stats?.budgetLeft || 0),
       change: `${stats?.expenseCount || 0} expenses`,
       trend: (stats?.budgetLeft || 0) > 0 ? 'up' : 'down',
-      icon: <AccountBalanceWallet sx={{ fontSize: 32 }} />,
+      icon: <LightbulbIcon sx={{ fontSize: 32 }} />,
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    },
-    {
-      title: 'Pending Reviews',
-      value: stats?.pendingReviews || 0,
-      change: 'Need attention',
-      trend: (stats?.pendingReviews || 0) > 0 ? 'up' : 'down',
-      icon: <PendingIcon sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
     },
     {
       title: 'Avg Daily',
       value: formatCurrency(stats?.avgDailySpending || 0),
       change: 'This month',
       trend: 'up',
-      icon: <TrendingUp sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+      icon: <TrendingDown sx={{ fontSize: 32 }} />,
+      gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
     },
   ];
 
@@ -401,20 +477,46 @@ const Dashboard: React.FC = () => {
             Welcome back, {user?.firstName || user?.email || 'User'}! Here's your expense overview.
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/expenses')}
-          sx={{
-            borderRadius: 2,
-            textTransform: 'none',
-            px: 3,
-            py: 1.5,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          }}
-        >
-          Add Expense
-        </Button>
+        <Box display="flex" gap={2}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/transactions')}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3,
+              py: 1.5,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            }}
+          >
+            New Transaction
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => navigate('/accounts')}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3,
+              py: 1.5,
+            }}
+          >
+            Accounts
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => navigate('/analytics')}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3,
+              py: 1.5,
+            }}
+          >
+            Analytics
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -432,17 +534,6 @@ const Dashboard: React.FC = () => {
               severity="warning"
               icon={<WarningIcon />}
               sx={{ mb: 1, borderRadius: 2 }}
-              action={
-                alert.includes('pending review') ? (
-                  <Button
-                    color="inherit"
-                    size="small"
-                    onClick={() => navigate('/review')}
-                  >
-                    Review
-                  </Button>
-                ) : null
-              }
             >
               {alert}
             </Alert>
@@ -453,7 +544,7 @@ const Dashboard: React.FC = () => {
       {/* Stats Cards */}
       <Grid container spacing={3} mb={3}>
         {statCards.map((stat, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
+          <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
             <Card
               sx={{
                 height: '100%',
@@ -524,6 +615,121 @@ const Dashboard: React.FC = () => {
         ))}
       </Grid>
 
+      {/* Month-over-Month Comparison */}
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        <Grid item xs={12}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)'
+                  : 'rgba(30, 30, 30, 0.8)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? '1px solid rgba(0,0,0,0.05)'
+                  : '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TrendingUp />
+              Month-over-Month Comparison
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Compare this month's performance with last month
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box
+                  sx={{
+                    p: 2.5,
+                    borderRadius: 2,
+                    background: (theme) =>
+                      theme.palette.mode === 'light'
+                        ? 'white'
+                        : 'rgba(40, 40, 40, 0.5)',
+                    border: '1px solid',
+                    borderColor: spentChange > 0 ? 'error.main' : 'success.main',
+                  }}
+                >
+                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                      Expenses Change
+                    </Typography>
+                    {spentChange !== 0 && (
+                      <Chip
+                        icon={spentChange > 0 ? <TrendingUp /> : <TrendingDown />}
+                        label={`${spentChange > 0 ? '+' : ''}${spentChange}%`}
+                        size="small"
+                        sx={{
+                          background: spentChange > 0 
+                            ? 'linear-gradient(135deg, #f44336 0%, #e91e63 100%)'
+                            : 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)',
+                          color: 'white',
+                          fontWeight: 700,
+                          '& .MuiChip-icon': { color: 'white' },
+                        }}
+                      />
+                    )}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {spentChange > 0 
+                      ? `You spent ${Math.abs(spentChange)}% more than last month`
+                      : spentChange < 0
+                      ? `You spent ${Math.abs(spentChange)}% less than last month`
+                      : 'No change from last month'}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box
+                  sx={{
+                    p: 2.5,
+                    borderRadius: 2,
+                    background: (theme) =>
+                      theme.palette.mode === 'light'
+                        ? 'white'
+                        : 'rgba(40, 40, 40, 0.5)',
+                    border: '1px solid',
+                    borderColor: incomeChange > 0 ? 'success.main' : 'error.main',
+                  }}
+                >
+                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                      Income Change
+                    </Typography>
+                    {incomeChange !== 0 && (
+                      <Chip
+                        icon={incomeChange > 0 ? <TrendingUp /> : <TrendingDown />}
+                        label={`${incomeChange > 0 ? '+' : ''}${incomeChange}%`}
+                        size="small"
+                        sx={{
+                          background: incomeChange > 0 
+                            ? 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
+                            : 'linear-gradient(135deg, #f44336 0%, #e91e63 100%)',
+                          color: 'white',
+                          fontWeight: 700,
+                          '& .MuiChip-icon': { color: 'white' },
+                        }}
+                      />
+                    )}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {incomeChange > 0 
+                      ? `Your income increased by ${Math.abs(incomeChange)}%`
+                      : incomeChange < 0
+                      ? `Your income decreased by ${Math.abs(incomeChange)}%`
+                      : 'No change from last month'}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+      </Grid>
+
       {/* Budget Status & Recent Activity */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
         <Grid item xs={12} md={5}>
@@ -548,77 +754,101 @@ const Dashboard: React.FC = () => {
             }}
           >
             <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <LightbulbIcon color="primary" />
+              <AccountBalanceWallet color="primary" />
               <Typography variant="h5" fontWeight={700}>
-                Budget Status
+                Account Balances
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Top 5 categories by usage
+              Your accounts overview
             </Typography>
-            {budgetStatus.length > 0 ? (
+            {accountBalances.length > 0 ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxHeight: 320, overflowY: 'auto' }}>
-                {budgetStatus.map((budget, index) => (
-                  <Box key={index}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="body2" fontWeight={600}>
-                        {budget.categoryName}
-                      </Typography>
-                      <Typography 
-                        variant="body2" 
-                        fontWeight={600}
-                        color={budget.isOver ? 'error.main' : 'text.primary'}
-                      >
-                        {budget.percentage}%
-                      </Typography>
-                    </Box>
+                {accountBalances.map((account) => {
+                  const accountCurrency = account.currency || user?.currency || 'USD';
+                  const formattedBalance = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: accountCurrency,
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  }).format(account.balance);
+                  
+                  return (
                     <Box
+                      key={account.id}
                       sx={{
-                        width: '100%',
-                        height: 8,
-                        bgcolor: 'rgba(0,0,0,0.1)',
-                        borderRadius: 1,
-                        overflow: 'hidden',
+                        p: 2,
+                        borderRadius: 2,
+                        background: (theme) =>
+                          theme.palette.mode === 'light'
+                            ? 'rgba(0,0,0,0.02)'
+                            : 'rgba(255,255,255,0.05)',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer',
+                        border: '1px solid transparent',
+                        '&:hover': {
+                          transform: 'translateX(8px)',
+                          background: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? 'rgba(0,0,0,0.04)'
+                              : 'rgba(255,255,255,0.08)',
+                          borderColor: '#667eea40',
+                        },
                       }}
+                      onClick={() => navigate('/accounts')}
                     >
-                      <Box
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Typography variant="body1" fontWeight={600}>
+                          {account.name}
+                        </Typography>
+                        <Typography 
+                          variant="h6" 
+                          fontWeight={700} 
+                          color={account.balance >= 0 ? 'success.main' : 'error.main'}
+                        >
+                          {formattedBalance}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={account.accountType}
+                        size="small"
                         sx={{
-                          width: `${Math.min(budget.percentage, 100)}%`,
-                          height: '100%',
-                          background: budget.isOver 
-                            ? 'linear-gradient(90deg, #f44336, #e91e63)'
-                            : budget.percentage > 80
-                            ? 'linear-gradient(90deg, #ff9800, #ffc107)'
-                            : 'linear-gradient(90deg, #4caf50, #8bc34a)',
-                          transition: 'width 0.5s ease',
+                          textTransform: 'capitalize',
+                          fontSize: '0.7rem',
+                          height: 20,
                         }}
                       />
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {formatCurrency(budget.spent)} / {formatCurrency(budget.budget)}
-                      </Typography>
-                      {budget.isOver && (
-                        <Typography variant="caption" color="error.main" fontWeight={600}>
-                          Over by {formatCurrency(budget.spent - budget.budget)}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                ))}
+                  );
+                })}
+                <Box
+                  sx={{
+                    mt: 1,
+                    p: 2,
+                    borderRadius: 2,
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  }}
+                >
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5 }}>
+                    Total Balance
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} color="white">
+                    {formatCurrency(accountBalances.reduce((sum, acc) => sum + acc.balance, 0))}
+                  </Typography>
+                </Box>
               </Box>
             ) : (
               <Box textAlign="center" py={6}>
                 <Typography color="text.secondary">
-                  No budgets set yet
+                  No accounts found
                 </Typography>
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => navigate('/budgets')}
+                  onClick={() => navigate('/accounts')}
                   sx={{ mt: 2 }}
                 >
-                  Create Budget
+                  Add Account
                 </Button>
               </Box>
             )}
@@ -647,14 +877,14 @@ const Dashboard: React.FC = () => {
             }}
           >
             <Typography variant="h5" fontWeight={700} gutterBottom>
-              Recent Activity
+              Recent Transactions
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Latest transactions
+              Latest activity
             </Typography>
-            {recentExpenses.length > 0 ? (
+            {recentTransactions.length > 0 ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 320, overflowY: 'auto' }}>
-                {recentExpenses.map((transaction) => (
+                {recentTransactions.map((transaction) => (
                   <Box
                     key={transaction.id}
                     sx={{
@@ -676,14 +906,18 @@ const Dashboard: React.FC = () => {
                         borderColor: transaction.categoryColor + '40',
                       },
                     }}
-                    onClick={() => navigate('/expenses')}
+                    onClick={() => navigate('/transactions')}
                   >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                       <Typography variant="body1" fontWeight={600} noWrap sx={{ maxWidth: '60%' }}>
                         {transaction.description}
                       </Typography>
-                      <Typography variant="body1" fontWeight={700} color={transaction.categoryColor}>
-                        {formatCurrency(transaction.amount)}
+                      <Typography 
+                        variant="body1" 
+                        fontWeight={700} 
+                        color={transaction.type === 'credit' ? 'success.main' : 'error.main'}
+                      >
+                        {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -697,23 +931,9 @@ const Dashboard: React.FC = () => {
                           fontSize: '0.7rem',
                         }}
                       />
-                      <Box display="flex" alignItems="center" gap={1}>
-                        {transaction.reviewStatus === 'pending' && (
-                          <Chip
-                            label="Pending"
-                            size="small"
-                            icon={<PendingIcon sx={{ fontSize: '14px !important' }} />}
-                            color="warning"
-                            sx={{ height: 20, fontSize: '0.65rem' }}
-                          />
-                        )}
-                        {transaction.reviewStatus === 'approved' && (
-                          <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
-                        )}
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDate(transaction.date)}
-                        </Typography>
-                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDate(transaction.date)}
+                      </Typography>
                     </Box>
                   </Box>
                 ))}
@@ -721,16 +941,16 @@ const Dashboard: React.FC = () => {
             ) : (
               <Box textAlign="center" py={6}>
                 <Typography color="text.secondary">
-                  No recent expenses
+                  No recent transactions
                 </Typography>
                 <Button
                   variant="outlined"
                   size="small"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/expenses')}
+                  onClick={() => navigate('/transactions')}
                   sx={{ mt: 2 }}
                 >
-                  Add Expense
+                  Add Transaction
                 </Button>
               </Box>
             )}
@@ -780,11 +1000,20 @@ const Dashboard: React.FC = () => {
                   <Legend />
                   <Line 
                     type="monotone" 
-                    dataKey="amount" 
-                    stroke="#667eea" 
+                    dataKey="expenses" 
+                    stroke="#f44336" 
                     strokeWidth={3}
-                    name="Spending"
-                    dot={{ fill: '#667eea', r: 6 }}
+                    name="Expenses"
+                    dot={{ fill: '#f44336', r: 6 }}
+                    activeDot={{ r: 8 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="income" 
+                    stroke="#4caf50" 
+                    strokeWidth={3}
+                    name="Income"
+                    dot={{ fill: '#4caf50', r: 6 }}
                     activeDot={{ r: 8 }}
                   />
                 </LineChart>
@@ -826,10 +1055,10 @@ const Dashboard: React.FC = () => {
                   <Pie
                     data={topCategories}
                     cx="50%"
-                    cy="50%"
+                    cy="45%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
+                    label={false}
+                    outerRadius={90}
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -838,6 +1067,17 @@ const Dashboard: React.FC = () => {
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Legend 
+                    formatter={(_value, entry: any) => {
+                      const name = entry.payload.name.length > 15 
+                        ? entry.payload.name.substring(0, 15) + '...' 
+                        : entry.payload.name;
+                      const percent = ((entry.payload.value / topCategories.reduce((sum, cat) => sum + cat.value, 0)) * 100).toFixed(0);
+                      return `${name} ${percent}% (${formatCurrency(entry.payload.value)})`;
+                    }}
+                    wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }}
+                    iconSize={12}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (

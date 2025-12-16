@@ -196,7 +196,7 @@ const Transactions: React.FC = () => {
       const response = await axios.get(`${API_URL}/api/accounts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setAccounts(response.data.filter((a: Account) => a.isActive));
+      setAccounts((response.data.accounts || []).filter((a: Account) => a.isActive));
     } catch (err: any) {
       console.error('Failed to fetch accounts:', err);
       setAccounts([]); // Set empty array on error

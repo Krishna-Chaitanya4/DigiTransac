@@ -122,7 +122,7 @@ const Accounts: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const accountsData = response.data;
+      const accountsData = response.data.accounts || [];
       setAccounts(accountsData);
 
       // Fetch balances for all accounts
