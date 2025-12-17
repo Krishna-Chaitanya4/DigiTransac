@@ -31,6 +31,8 @@ import {
   Autocomplete,
   FormControlLabel,
   Switch,
+  TablePagination,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -42,6 +44,8 @@ import {
   TrendingUp as CreditIcon,
   TrendingDown as DebitIcon,
   LocalOffer as TagIcon,
+  ExpandMore as ExpandMoreIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -58,9 +62,9 @@ interface Transaction {
   type: 'credit' | 'debit';
   amount: number;
   accountId: string;
-  categoryId: string;
+  categoryId?: string; // @deprecated - use splits instead
   description: string;
-  tags: string[];
+  tags?: string[]; // @deprecated - use splits instead
   date: string;
   notes?: string;
   isRecurring: boolean;
@@ -69,8 +73,22 @@ interface Transaction {
   merchantName?: string;
   reviewStatus: 'pending' | 'approved' | 'rejected';
   linkedTransactionId?: string;
+  splits?: TransactionSplit[]; // New: array of splits
   createdAt: string;
   updatedAt: string;
+}
+
+interface TransactionSplit {
+  id?: string;
+  transactionId?: string;
+  userId?: string;
+  categoryId: string;
+  amount: number;
+  tags: string[];
+  notes?: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface Account {
@@ -122,15 +140,26 @@ const Transactions: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [useSplitMode, setUseSplitMode] = useState(false); // Toggle between quick add and split mode
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // Form states
   const [formData, setFormData] = useState({
     type: 'debit' as 'credit' | 'debit',
     amount: '',
     accountId: '',
-    categoryId: '',
+    categoryId: '', // Used for quick add (single split)
     description: '',
-    tags: [] as string[],
+    tags: [] as string[], // Used for quick add (single split)
+    splits: [{
+      categoryId: '',
+      amount: 0,
+      tags: [] as string[],
+      notes: '',
+      order: 1
+    }] as TransactionSplit[],
     date: dayjs().format('YYYY-MM-DD'),
     notes: '',
     merchantName: '',
@@ -177,6 +206,7 @@ const Transactions: React.FC = () => {
       if (startDate) params.startDate = startDate.toISOString();
       if (endDate) params.endDate = endDate.toISOString();
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
+      params.includeSplits = 'true'; // Always fetch splits
 
       const response = await axios.get(`${API_URL}/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -230,13 +260,29 @@ const Transactions: React.FC = () => {
   const handleOpenDialog = (transaction?: Transaction) => {
     if (transaction) {
       setEditingTransaction(transaction);
+      // Initialize splits from transaction data
+      const splits = transaction.splits && transaction.splits.length > 0
+        ? transaction.splits
+        : [{
+            categoryId: transaction.categoryId || '',
+            amount: transaction.amount,
+            tags: transaction.tags || [],
+            notes: '',
+            order: 1
+          }];
+      
+      // Determine if we should use split mode
+      const shouldUseSplitMode = splits.length > 1;
+      setUseSplitMode(shouldUseSplitMode);
+      
       setFormData({
         type: transaction.type,
         amount: transaction.amount.toString(),
         accountId: transaction.accountId,
-        categoryId: transaction.categoryId,
+        categoryId: transaction.categoryId || '',
         description: transaction.description,
         tags: transaction.tags || [],
+        splits: splits,
         date: dayjs(transaction.date).format('YYYY-MM-DD'),
         notes: transaction.notes || '',
         merchantName: transaction.merchantName || '',
@@ -247,7 +293,8 @@ const Transactions: React.FC = () => {
       });
     } else {
       setEditingTransaction(null);
-      const defaultTag = 'expense'; // Default for debit transactions
+      setUseSplitMode(false); // Default to quick add mode
+      const defaultTag = 'expense';
       setFormData({
         type: 'debit',
         amount: '',
@@ -255,6 +302,13 @@ const Transactions: React.FC = () => {
         categoryId: '',
         description: '',
         tags: [defaultTag],
+        splits: [{
+          categoryId: '',
+          amount: 0,
+          tags: [defaultTag],
+          notes: '',
+          order: 1
+        }],
         date: dayjs().format('YYYY-MM-DD'),
         notes: '',
         merchantName: '',
@@ -292,10 +346,42 @@ const Transactions: React.FC = () => {
       setError('');
       setSuccess('');
 
+      const amount = parseFloat(formData.amount);
+      
+      // Prepare splits for submission
+      let splits = formData.splits.map((split, index) => ({
+        categoryId: split.categoryId,
+        amount: split.amount,
+        tags: split.tags,
+        notes: split.notes || '',
+        order: index + 1
+      }));
+
+      // In quick add mode, ensure the single split amount matches total
+      if (!useSplitMode && splits.length === 1) {
+        splits[0].amount = amount;
+      }
+
+      // Validate splits sum equals total in split mode
+      if (useSplitMode) {
+        const splitTotal = splits.reduce((sum, s) => sum + s.amount, 0);
+        if (Math.abs(splitTotal - amount) > 0.01) {
+          setError('Split amounts must equal the total transaction amount');
+          return;
+        }
+      }
+
       const payload: any = {
-        ...formData,
-        amount: parseFloat(formData.amount),
+        type: formData.type,
+        amount: amount,
+        accountId: formData.accountId,
+        description: formData.description,
+        date: formData.date,
+        notes: formData.notes,
+        merchantName: formData.merchantName,
+        isRecurring: formData.isRecurring,
         reviewStatus: 'approved' as const,
+        splits: splits,
       };
 
       // Add recurrence pattern if recurring
@@ -325,7 +411,7 @@ const Transactions: React.FC = () => {
 
       handleCloseDialog();
       fetchTransactions();
-      fetchAccounts(); // Refresh balances
+      fetchAccounts();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save transaction');
     }
@@ -348,6 +434,58 @@ const Transactions: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete transaction');
     }
+  };
+
+  // Split management functions
+  const addSplit = () => {
+    const newSplit: TransactionSplit = {
+      categoryId: '',
+      amount: 0,
+      tags: [],
+      notes: '',
+      order: formData.splits.length + 1
+    };
+    setFormData({
+      ...formData,
+      splits: [...formData.splits, newSplit]
+    });
+  };
+
+  const removeSplit = (index: number) => {
+    if (formData.splits.length === 1) return; // Keep at least one split
+    const newSplits = formData.splits.filter((_, i) => i !== index);
+    setFormData({
+      ...formData,
+      splits: newSplits
+    });
+  };
+
+  const updateSplit = (index: number, field: keyof TransactionSplit, value: any) => {
+    const newSplits = [...formData.splits];
+    newSplits[index] = { ...newSplits[index], [field]: value };
+    setFormData({
+      ...formData,
+      splits: newSplits
+    });
+  };
+
+  const getSplitTotal = () => {
+    return formData.splits.reduce((sum, split) => sum + split.amount, 0);
+  };
+
+  const getRemainingAmount = () => {
+    const total = parseFloat(formData.amount) || 0;
+    return total - getSplitTotal();
+  };
+
+  const toggleRowExpansion = (transactionId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(transactionId)) {
+      newExpanded.delete(transactionId);
+    } else {
+      newExpanded.add(transactionId);
+    }
+    setExpandedRows(newExpanded);
   };
 
   const handleBulkDelete = async () => {
@@ -444,11 +582,13 @@ const Transactions: React.FC = () => {
     return accounts.find(a => a.id === accountId)?.name || 'Unknown';
   };
 
-  const getCategoryName = (categoryId: string) => {
+  const getCategoryName = (categoryId?: string) => {
+    if (!categoryId) return 'Uncategorized';
     return categories.find(c => c.id === categoryId)?.name || 'Unknown';
   };
 
-  const getCategoryColor = (categoryId: string) => {
+  const getCategoryColor = (categoryId?: string) => {
+    if (!categoryId) return '#999999';
     return categories.find(c => c.id === categoryId)?.color || '#667eea';
   };
 
@@ -784,120 +924,231 @@ const Transactions: React.FC = () => {
                       disabled={filteredTransactions.length === 0}
                     />
                   </TableCell>
+                  <TableCell></TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell>Type</TableCell>
-                  <TableCell>Account</TableCell>
-                  <TableCell>Category</TableCell>
                   <TableCell>Description</TableCell>
+                  <TableCell>Category</TableCell>
                   <TableCell>Tags</TableCell>
                   <TableCell align="right">Amount</TableCell>
-                  <TableCell>Status</TableCell>
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 8 }}>
+                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
                       <Typography variant="body1" color="text.secondary">
                         No transactions found
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTransactions.map((transaction) => (
-                    <TableRow
-                      key={transaction.id}
-                      hover
-                      selected={selectedTransactions.has(transaction.id)}
-                    >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={selectedTransactions.has(transaction.id)}
-                          onChange={() => handleSelectTransaction(transaction.id)}
-                        />
-                      </TableCell>
-                      <TableCell>{dayjs(transaction.date).format('MMM DD, YYYY')}</TableCell>
-                      <TableCell>
-                        <Chip
-                          icon={transaction.type === 'credit' ? <CreditIcon /> : <DebitIcon />}
-                          label={transaction.type.toUpperCase()}
-                          color={transaction.type === 'credit' ? 'success' : 'error'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{getAccountName(transaction.accountId)}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getCategoryName(transaction.categoryId)}
-                          size="small"
-                          sx={{
-                            backgroundColor: `${getCategoryColor(transaction.categoryId)}20`,
-                            color: getCategoryColor(transaction.categoryId),
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2">{transaction.description}</Typography>
-                          {transaction.merchantName && (
-                            <Typography variant="caption" color="text.secondary">
-                              {transaction.merchantName}
-                            </Typography>
+                  filteredTransactions
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((transaction) => {
+                      const isExpanded = expandedRows.has(transaction.id);
+                      const hasSplits = transaction.splits && transaction.splits.length > 1;
+                      
+                      return (
+                        <React.Fragment key={transaction.id}>
+                          <TableRow
+                            hover
+                            selected={selectedTransactions.has(transaction.id)}
+                            sx={{ '& > *': { borderBottom: isExpanded ? 'none !important' : undefined } }}
+                          >
+                            <TableCell padding="checkbox" sx={{ width: 50 }}>
+                              <Checkbox
+                                checked={selectedTransactions.has(transaction.id)}
+                                onChange={() => handleSelectTransaction(transaction.id)}
+                              />
+                            </TableCell>
+                            <TableCell padding="none" sx={{ width: 48 }}>
+                              {hasSplits && (
+                                <Tooltip title={isExpanded ? "Hide split details" : "Show split details"}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => toggleRowExpansion(transaction.id)}
+                                  >
+                                    {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ width: 120 }}>{dayjs(transaction.date).format('MMM DD, YYYY')}</TableCell>
+                            <TableCell sx={{ width: 100 }}>
+                              <Chip
+                                icon={transaction.type === 'credit' ? <CreditIcon /> : <DebitIcon />}
+                                label={transaction.type === 'credit' ? 'Credit' : 'Debit'}
+                                color={transaction.type === 'credit' ? 'success' : 'error'}
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box>
+                                <Typography variant="body2" fontWeight="medium">
+                                  {transaction.description}
+                                </Typography>
+                                {transaction.merchantName && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {transaction.merchantName}
+                                  </Typography>
+                                )}
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  {getAccountName(transaction.accountId)}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 150, maxWidth: 250 }}>
+                              {hasSplits ? (
+                                <Box display="flex" gap={0.5} flexWrap="wrap">
+                                  {(transaction.splits || []).slice(0, 3).map((split, idx) => (
+                                    <Chip
+                                      key={idx}
+                                      label={getCategoryName(split.categoryId)}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: `${getCategoryColor(split.categoryId)}20`,
+                                        color: getCategoryColor(split.categoryId),
+                                      }}
+                                    />
+                                  ))}
+                                  {(transaction.splits || []).length > 3 && (
+                                    <Chip
+                                      label={`+${(transaction.splits || []).length - 3} more`}
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  )}
+                                </Box>
+                              ) : (
+                                <Chip
+                                  label={getCategoryName(transaction.splits?.[0]?.categoryId || transaction.categoryId)}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: `${getCategoryColor(transaction.splits?.[0]?.categoryId || transaction.categoryId)}20`,
+                                    color: getCategoryColor(transaction.splits?.[0]?.categoryId || transaction.categoryId),
+                                  }}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 180, maxWidth: 280 }}>
+                              <Box display="flex" gap={0.5} flexWrap="wrap">
+                                {transaction.splits && transaction.splits.length > 0 ? (
+                                  Array.from(new Set(transaction.splits.flatMap(s => s.tags || []))).slice(0, 3).map((tag, idx) => (
+                                    <Chip key={idx} label={tag} size="small" variant="outlined" icon={<TagIcon />} />
+                                  ))
+                                ) : (
+                                  transaction.tags?.slice(0, 3).map((tag, idx) => (
+                                    <Chip key={idx} label={tag} size="small" variant="outlined" icon={<TagIcon />} />
+                                  ))
+                                )}
+                                {transaction.splits && Array.from(new Set(transaction.splits.flatMap(s => s.tags || []))).length > 3 && (
+                                  <Chip label={`+${Array.from(new Set(transaction.splits.flatMap(s => s.tags || []))).length - 3}`} size="small" variant="outlined" />
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell align="right" sx={{ width: 130 }}>
+                              <Typography
+                                variant="body2"
+                                fontWeight="bold"
+                                color={transaction.type === 'credit' ? 'success.main' : 'error.main'}
+                              >
+                                {transaction.type === 'credit' ? '+' : '-'}
+                                {formatCurrency(transaction.amount, transaction.accountId)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={{ width: 100 }}>
+                              <Box display="flex" gap={0.5} justifyContent="flex-end">
+                                <Tooltip title="Edit">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleOpenDialog(transaction)}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDelete(transaction.id)}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                          
+                          {/* Expanded Row for Split Details */}
+                          {hasSplits && isExpanded && (
+                            <TableRow>
+                              <TableCell colSpan={9} sx={{ py: 0, bgcolor: 'action.hover' }}>
+                                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                                  <Box sx={{ py: 2, px: 6 }}>
+                                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
+                                      Split Breakdown
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                      {(transaction.splits || []).map((split, idx) => (
+                                        <Grid item xs={12} sm={6} md={4} key={idx}>
+                                          <Card variant="outlined" sx={{ p: 2 }}>
+                                            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                              <Chip
+                                                label={getCategoryName(split.categoryId)}
+                                                size="small"
+                                                sx={{
+                                                  backgroundColor: `${getCategoryColor(split.categoryId)}20`,
+                                                  color: getCategoryColor(split.categoryId),
+                                                  fontWeight: 'bold',
+                                                }}
+                                              />
+                                              <Typography variant="body1" fontWeight="bold" color={transaction.type === 'credit' ? 'success.main' : 'error.main'}>
+                                                {formatCurrency(split.amount, transaction.accountId)}
+                                              </Typography>
+                                            </Box>
+                                            {split.tags && split.tags.length > 0 && (
+                                              <Box display="flex" gap={0.5} flexWrap="wrap" mt={1.5}>
+                                                {split.tags.map((tag, tagIdx) => (
+                                                  <Chip key={tagIdx} label={tag} size="small" variant="outlined" icon={<TagIcon />} />
+                                                ))}
+                                              </Box>
+                                            )}
+                                            {split.notes && (
+                                              <Typography variant="caption" color="text.secondary" display="block" mt={1.5} sx={{ fontStyle: 'italic' }}>
+                                                Note: {split.notes}
+                                              </Typography>
+                                            )}
+                                          </Card>
+                                        </Grid>
+                                      ))}
+                                    </Grid>
+                                  </Box>
+                                </Collapse>
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box display="flex" gap={0.5} flexWrap="wrap">
-                          {transaction.tags?.map((tag, idx) => (
-                            <Chip key={idx} label={tag} size="small" variant="outlined" />
-                          ))}
-                        </Box>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          fontWeight="bold"
-                          color={transaction.type === 'credit' ? 'success.main' : 'error.main'}
-                        >
-                          {transaction.type === 'credit' ? '+' : '-'}
-                          {formatCurrency(transaction.amount, transaction.accountId)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={transaction.reviewStatus}
-                          size="small"
-                          color={
-                            transaction.reviewStatus === 'approved'
-                              ? 'success'
-                              : transaction.reviewStatus === 'pending'
-                              ? 'warning'
-                              : 'default'
-                          }
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenDialog(transaction)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDelete(transaction.id)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </React.Fragment>
+                      );
+                    })
                 )}
               </TableBody>
             </Table>
           </TableContainer>
+          
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={filteredTransactions.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={(_, newPage) => setPage(newPage)}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+          />
         </Card>
 
         {/* Add/Edit Dialog */}
@@ -981,23 +1232,6 @@ const Transactions: React.FC = () => {
                   </TextField>
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    select
-                    label="Category"
-                    value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    fullWidth
-                    required
-                  >
-                    {categories.map(category => (
-                      <MenuItem key={category.id} value={category.id}>
-                        {category.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-
                 <Grid item xs={12}>
                   <TextField
                     label="Description"
@@ -1008,32 +1242,269 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
+                {/* Split Mode Toggle */}
                 <Grid item xs={12}>
-                  <Autocomplete
-                    multiple
-                    freeSolo
-                    options={tags.map(t => t.name)}
-                    value={formData.tags}
-                    onChange={(_, value) => setFormData({ ...formData, tags: value })}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Tags"
-                        placeholder="Add tags..."
-                        helperText="Press Enter to add custom tags"
-                      />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      Transaction Mode:
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={useSplitMode}
+                      exclusive
+                      onChange={(_, value) => {
+                        if (value !== null) {
+                          setUseSplitMode(value);
+                          if (!value) {
+                            // Quick add mode - sync first split with form data
+                            const amount = parseFloat(formData.amount) || 0;
+                            setFormData({
+                              ...formData,
+                              splits: [{
+                                categoryId: formData.categoryId,
+                                amount: amount,
+                                tags: formData.tags,
+                                notes: '',
+                                order: 1
+                              }]
+                            });
+                          } else {
+                            // Split mode - ensure splits array has at least one entry
+                            if (formData.splits.length === 0) {
+                              setFormData({
+                                ...formData,
+                                splits: [{
+                                  categoryId: '',
+                                  amount: 0,
+                                  tags: [],
+                                  notes: '',
+                                  order: 1
+                                }]
+                              });
+                            }
+                          }
+                        }
+                      }}
+                      size="small"
+                    >
+                      <ToggleButton value={false}>
+                        Quick Add (Single Category)
+                      </ToggleButton>
+                      <ToggleButton value={true}>
+                        Split (Multiple Categories)
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                    {useSplitMode && (
+                      <Typography variant="caption" color="text.secondary">
+                        Split this transaction across multiple categories
+                      </Typography>
                     )}
-                    renderTags={(value, getTagProps) =>
-                      value.map((option, index) => (
-                        <Chip
-                          icon={<TagIcon />}
-                          label={option}
-                          {...getTagProps({ index })}
-                        />
-                      ))
-                    }
-                  />
+                  </Box>
                 </Grid>
+
+                {/* Simple Mode - Single Category & Tags */}
+                {!useSplitMode && (
+                  <>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        select
+                        label="Category"
+                        value={formData.categoryId}
+                        onChange={(e) => {
+                          setFormData({ ...formData, categoryId: e.target.value });
+                          // Update the single split
+                          if (formData.splits.length > 0) {
+                            const newSplits = [...formData.splits];
+                            newSplits[0] = { ...newSplits[0], categoryId: e.target.value };
+                            setFormData({ ...formData, categoryId: e.target.value, splits: newSplits });
+                          }
+                        }}
+                        fullWidth
+                        required
+                      >
+                        {categories.map(category => (
+                          <MenuItem key={category.id} value={category.id}>
+                            {category.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Autocomplete
+                        multiple
+                        freeSolo
+                        options={tags.map(t => t.name)}
+                        value={formData.tags}
+                        onChange={(_, value) => {
+                          setFormData({ ...formData, tags: value });
+                          // Update the single split
+                          if (formData.splits.length > 0) {
+                            const newSplits = [...formData.splits];
+                            newSplits[0] = { ...newSplits[0], tags: value };
+                            setFormData({ ...formData, tags: value, splits: newSplits });
+                          }
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Tags"
+                            placeholder="Add tags..."
+                          />
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              icon={<TagIcon />}
+                              label={option}
+                              size="small"
+                              {...getTagProps({ index })}
+                            />
+                          ))
+                        }
+                      />
+                    </Grid>
+                  </>
+                )}
+
+                {/* Split Mode - Multiple Splits */}
+                {useSplitMode && (
+                  <Grid item xs={12}>
+                    <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="subtitle2" fontWeight="bold">
+                          Split Details
+                        </Typography>
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={addSplit}
+                        >
+                          Add Split
+                        </Button>
+                      </Box>
+
+                      {formData.splits.map((split, index) => (
+                        <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="caption" color="text.secondary">
+                              Split {index + 1}
+                            </Typography>
+                            {formData.splits.length > 1 && (
+                              <IconButton
+                                size="small"
+                                onClick={() => removeSplit(index)}
+                                color="error"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            )}
+                          </Box>
+
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={4}>
+                              <TextField
+                                select
+                                label="Category"
+                                value={split.categoryId}
+                                onChange={(e) => updateSplit(index, 'categoryId', e.target.value)}
+                                fullWidth
+                                required
+                                size="small"
+                              >
+                                {categories.map(category => (
+                                  <MenuItem key={category.id} value={category.id}>
+                                    {category.name}
+                                  </MenuItem>
+                                ))}
+                              </TextField>
+                            </Grid>
+
+                            <Grid item xs={12} sm={3}>
+                              <TextField
+                                label="Amount"
+                                type="number"
+                                value={split.amount || ''}
+                                onChange={(e) => updateSplit(index, 'amount', parseFloat(e.target.value) || 0)}
+                                fullWidth
+                                required
+                                size="small"
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      {formData.accountId
+                                        ? new Intl.NumberFormat('en-US', {
+                                            style: 'currency',
+                                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                                          })
+                                            .format(0)
+                                            .replace(/[\d.,]/g, '')
+                                        : user?.currency === 'USD' ? '$' : 
+                                          user?.currency === 'EUR' ? '€' : 
+                                          user?.currency === 'GBP' ? '£' : 
+                                          user?.currency === 'INR' ? '₹' : '$'}
+                                    </InputAdornment>
+                                  ),
+                                }}
+                              />
+                            </Grid>
+
+                            <Grid item xs={12} sm={5}>
+                              <Autocomplete
+                                multiple
+                                freeSolo
+                                options={tags.map(t => t.name)}
+                                value={split.tags}
+                                onChange={(_, value) => updateSplit(index, 'tags', value)}
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    label="Tags"
+                                    size="small"
+                                  />
+                                )}
+                                size="small"
+                              />
+                            </Grid>
+
+                            <Grid item xs={12}>
+                              <TextField
+                                label="Notes (optional)"
+                                value={split.notes}
+                                onChange={(e) => updateSplit(index, 'notes', e.target.value)}
+                                fullWidth
+                                size="small"
+                                multiline
+                                rows={1}
+                              />
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      ))}
+
+                      {/* Split Summary */}
+                      <Box sx={{ mt: 2, p: 2, bgcolor: getRemainingAmount() !== 0 ? 'error.lighter' : 'success.lighter', borderRadius: 1 }}>
+                        <Typography variant="body2" fontWeight="bold">
+                          Total Amount: {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                          }).format(parseFloat(formData.amount) || 0)}
+                        </Typography>
+                        <Typography variant="body2">
+                          Split Total: {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                          }).format(getSplitTotal())}
+                        </Typography>
+                        <Typography variant="body2" color={getRemainingAmount() !== 0 ? 'error' : 'success.main'} fontWeight="bold">
+                          Remaining: {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                          }).format(getRemainingAmount())}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                )}
 
                 <Grid item xs={12}>
                   <TextField
@@ -1125,7 +1596,15 @@ const Transactions: React.FC = () => {
             <Button
               onClick={handleSubmit}
               variant="contained"
-              disabled={!formData.amount || !formData.accountId || !formData.categoryId || !formData.description}
+              disabled={
+                !formData.amount || 
+                !formData.accountId || 
+                !formData.description ||
+                (useSplitMode 
+                  ? formData.splits.length === 0 || formData.splits.some(s => !s.categoryId || !s.amount)
+                  : !formData.categoryId
+                )
+              }
             >
               {editingTransaction ? 'Update' : 'Create'}
             </Button>

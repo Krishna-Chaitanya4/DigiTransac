@@ -45,24 +45,36 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       if (endDate) filter.date.$lte = new Date(endDate as string);
     }
 
-    // Build sort
-    const sort: any = {};
-    sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
-
+    // Fetch all matching transactions (we'll sort in-memory to avoid Cosmos DB index issues)
     let transactions = (await transactionsContainer
       .find(filter)
-      .sort(sort)
-      .skip(parseInt(skip as string))
-      .limit(parseInt(limit as string))
       .toArray()) as unknown as Transaction[];
+
+    // Sort in-memory
+    const sortField = sortBy as string;
+    const sortDirection = sortOrder === 'desc' ? -1 : 1;
+    transactions.sort((a: any, b: any) => {
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+      if (aVal < bVal) return -sortDirection;
+      if (aVal > bVal) return sortDirection;
+      return 0;
+    });
+
+    // Apply pagination after sorting
+    const skipNum = parseInt(skip as string);
+    const limitNum = parseInt(limit as string);
+    transactions = transactions.slice(skipNum, skipNum + limitNum);
 
     // If includeSplits is true, fetch splits for each transaction
     if (includeSplits === 'true') {
       const transactionIds = transactions.map(t => t.id);
       const allSplits = (await splitsContainer
         .find({ transactionId: { $in: transactionIds } })
-        .sort({ order: 1 })
         .toArray()) as unknown as TransactionSplit[];
+      
+      // Sort splits in-memory by order
+      allSplits.sort((a, b) => a.order - b.order);
 
       // Group splits by transaction ID
       const splitsByTransaction = allSplits.reduce((acc, split) => {
@@ -148,8 +160,10 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Fetch splits for this transaction
     const splits = (await splitsContainer
       .find({ transactionId: id })
-      .sort({ order: 1 })
       .toArray()) as unknown as TransactionSplit[];
+    
+    // Sort splits in-memory by order
+    splits.sort((a, b) => a.order - b.order);
 
     res.json({
       success: true,
