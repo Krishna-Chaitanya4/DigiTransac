@@ -617,7 +617,7 @@ const Dashboard: React.FC = () => {
             PaperProps={{
               sx: {
                 mt: 1,
-                minWidth: 360,
+                minWidth: 280,
                 maxHeight: 500,
                 borderRadius: 2,
               }
@@ -661,8 +661,8 @@ const Dashboard: React.FC = () => {
                         variant={(isIncluded || isExcluded) ? 'filled' : 'outlined'}
                         sx={{
                           justifyContent: 'space-between',
-                          bgcolor: isIncluded ? 'success.main' : isExcluded ? 'error.main' : tag.color ? `${tag.color}15` : undefined,
-                          borderColor: (isIncluded || isExcluded) ? undefined : tag.color || undefined,
+                          bgcolor: isIncluded ? 'success.main' : isExcluded ? 'error.main' : undefined,
+                          borderColor: undefined,
                           color: (isIncluded || isExcluded) ? 'white' : undefined,
                           pr: 0.5,
                         }}
@@ -778,79 +778,6 @@ const Dashboard: React.FC = () => {
           </Button>
         </Box>
       </Box>
-
-      {/* Active Filters Display */}
-      {(includeTags.length > 0 || excludeTags.length > 0) && (
-        <Paper
-          sx={{
-            p: 1.5,
-            mb: 3,
-            borderRadius: 2,
-            background: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'rgba(25, 118, 210, 0.08)'
-                : 'rgba(30, 30, 30, 0.8)',
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-            {includeTags.length > 0 && (
-              <>
-                <Typography variant="caption" color="text.secondary">
-                  Include:
-                </Typography>
-                {includeTags.map((tagName) => (
-                  <Chip
-                    key={`include-${tagName}`}
-                    label={tagName}
-                    size="small"
-                    onDelete={() => handleToggleIncludeTag(tagName)}
-                    deleteIcon={<CloseIcon />}
-                    sx={{ 
-                      height: 24,
-                      fontSize: '0.75rem',
-                      bgcolor: 'success.main',
-                      color: 'white',
-                      '& .MuiChip-deleteIcon': { color: 'white' }
-                    }}
-                  />
-                ))}
-              </>
-            )}
-            
-            {excludeTags.length > 0 && (
-              <>
-                <Typography variant="caption" color="text.secondary" ml={includeTags.length > 0 ? 2 : 0}>
-                  Exclude:
-                </Typography>
-                {excludeTags.map((tagName) => (
-                  <Chip
-                    key={`exclude-${tagName}`}
-                    label={tagName}
-                    size="small"
-                    onDelete={() => handleToggleExcludeTag(tagName)}
-                    deleteIcon={<CloseIcon />}
-                    sx={{ 
-                      height: 24,
-                      fontSize: '0.75rem',
-                      bgcolor: 'error.main',
-                      color: 'white',
-                      '& .MuiChip-deleteIcon': { color: 'white' }
-                    }}
-                  />
-                ))}
-              </>
-            )}
-            
-            <Button
-              size="small"
-              onClick={handleClearFilters}
-              sx={{ textTransform: 'none', minWidth: 'auto' }}
-            >
-              Clear All
-            </Button>
-          </Box>
-        </Paper>
-      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
