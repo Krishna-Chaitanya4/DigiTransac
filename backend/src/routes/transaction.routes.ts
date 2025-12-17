@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
-import { Transaction } from '../models/types';
+import { Transaction, TransactionSplit } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -23,21 +23,20 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       limit = '100',
       skip = '0',
       sortBy = 'date',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
+      includeSplits = 'true' // Option to include splits
     } = req.query;
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
     
     // Build filter
     let filter: any = { userId };
     
     if (accountId) filter.accountId = accountId;
-    if (categoryId) filter.categoryId = categoryId;
+    // Note: categoryId and tags filtering now needs to look at splits
+    // For backwards compatibility, also check transaction.categoryId
     if (type) filter.type = type;
-    if (tags) {
-      const tagArray = (tags as string).split(',');
-      filter.tags = { $in: tagArray };
-    }
     if (reviewStatus) filter.reviewStatus = reviewStatus;
     
     if (startDate || endDate) {
@@ -50,12 +49,61 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const sort: any = {};
     sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
 
-    const transactions = (await transactionsContainer
+    let transactions = (await transactionsContainer
       .find(filter)
       .sort(sort)
       .skip(parseInt(skip as string))
       .limit(parseInt(limit as string))
       .toArray()) as unknown as Transaction[];
+
+    // If includeSplits is true, fetch splits for each transaction
+    if (includeSplits === 'true') {
+      const transactionIds = transactions.map(t => t.id);
+      const allSplits = (await splitsContainer
+        .find({ transactionId: { $in: transactionIds } })
+        .sort({ order: 1 })
+        .toArray()) as unknown as TransactionSplit[];
+
+      // Group splits by transaction ID
+      const splitsByTransaction = allSplits.reduce((acc, split) => {
+        if (!acc[split.transactionId]) {
+          acc[split.transactionId] = [];
+        }
+        acc[split.transactionId].push(split);
+        return acc;
+      }, {} as Record<string, TransactionSplit[]>);
+
+      // Attach splits to transactions
+      transactions = transactions.map(txn => ({
+        ...txn,
+        splits: splitsByTransaction[txn.id] || []
+      })) as any;
+    }
+
+    // Apply category and tag filtering AFTER fetching splits (if needed)
+    if (categoryId || tags) {
+      transactions = transactions.filter((txn: any) => {
+        const txnSplits = txn.splits || [];
+        
+        if (categoryId) {
+          // Check if any split has this category (or check backwards compat categoryId)
+          const hasCategory = txnSplits.some((s: TransactionSplit) => s.categoryId === categoryId) || 
+                            txn.categoryId === categoryId;
+          if (!hasCategory) return false;
+        }
+        
+        if (tags) {
+          const tagArray = (tags as string).split(',');
+          // Check if any split has any of these tags (or check backwards compat tags)
+          const hasTags = txnSplits.some((s: TransactionSplit) => 
+            s.tags.some(t => tagArray.includes(t))
+          ) || (txn.tags && txn.tags.some((t: string) => tagArray.includes(t)));
+          if (!hasTags) return false;
+        }
+        
+        return true;
+      });
+    }
 
     const total = await transactionsContainer.countDocuments(filter);
 
@@ -85,6 +133,8 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    
     const transaction = await transactionsContainer.findOne({ id, userId });
 
     if (!transaction) {
@@ -95,9 +145,18 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    // Fetch splits for this transaction
+    const splits = (await splitsContainer
+      .find({ transactionId: id })
+      .sort({ order: 1 })
+      .toArray()) as unknown as TransactionSplit[];
+
     res.json({
       success: true,
-      transaction
+      transaction: {
+        ...transaction,
+        splits
+      }
     });
   } catch (error) {
     console.error('Error fetching transaction:', error);
@@ -116,9 +175,8 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       type,
       amount,
       accountId,
-      categoryId,
       description,
-      tags,
+      splits, // Array of splits
       date,
       notes,
       isRecurring,
@@ -129,10 +187,10 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     } = req.body;
 
     // Validation
-    if (!type || !amount || !accountId || !categoryId || !description) {
+    if (!type || !amount || !accountId || !description) {
       res.status(400).json({
         success: false,
-        message: 'Type, amount, accountId, categoryId, and description are required'
+        message: 'Type, amount, accountId, and description are required'
       });
       return;
     }
@@ -153,7 +211,38 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate splits
+    if (!splits || !Array.isArray(splits) || splits.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'At least one split is required'
+      });
+      return;
+    }
+
+    // Validate each split has required fields
+    for (const split of splits) {
+      if (!split.categoryId || !split.amount || split.amount <= 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Each split must have a categoryId and positive amount'
+        });
+        return;
+      }
+    }
+
+    // Validate sum of splits equals total amount
+    const splitsTotal = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
+    if (Math.abs(splitsTotal - amount) > 0.01) { // Allow for small floating point differences
+      res.status(400).json({
+        success: false,
+        message: `Sum of splits (${splitsTotal}) must equal total amount (${amount})`
+      });
+      return;
+    }
+
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
     const accountsContainer = await cosmosDBService.getAccountsContainer();
     const tagsContainer = await cosmosDBService.getTagsContainer();
 
@@ -167,15 +256,14 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    const transactionId = uuidv4();
     const newTransaction: Transaction = {
-      id: uuidv4(),
+      id: transactionId,
       userId,
       type,
       amount,
       accountId,
-      categoryId,
       description,
-      tags: tags || [],
       date: date ? new Date(date) : new Date(),
       notes,
       isRecurring: isRecurring || false,
@@ -187,7 +275,23 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       updatedAt: new Date()
     };
 
+    // Create split records
+    const splitRecords: TransactionSplit[] = splits.map((split: any, index: number) => ({
+      id: uuidv4(),
+      transactionId,
+      userId,
+      categoryId: split.categoryId,
+      amount: split.amount,
+      tags: split.tags || [],
+      notes: split.notes,
+      order: index + 1,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
+
+    // Insert transaction and splits in sequence (MongoDB doesn't support multi-document transactions in all configs)
     await transactionsContainer.insertOne(newTransaction);
+    await splitsContainer.insertMany(splitRecords);
 
     // Update account balance
     const balanceChange = type === 'credit' ? amount : -amount;
@@ -199,24 +303,35 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       }
     );
 
-    // Update tag usage counts
-    if (tags && tags.length > 0) {
-      for (const tagName of tags) {
-        await tagsContainer.updateOne(
-          { userId, name: tagName },
-          { 
-            $inc: { usageCount: 1 },
-            $set: { updatedAt: new Date() }
+    // Update tag usage counts from all splits
+    const allTags = splitRecords.flatMap(split => split.tags);
+    const uniqueTags = [...new Set(allTags)];
+    
+    for (const tagName of uniqueTags) {
+      const count = allTags.filter(t => t === tagName).length;
+      await tagsContainer.updateOne(
+        { userId, name: tagName },
+        { 
+          $inc: { usageCount: count },
+          $setOnInsert: {
+            id: uuidv4(),
+            userId,
+            name: tagName,
+            createdAt: new Date()
           },
-          { upsert: true }
-        );
-      }
+          $set: { updatedAt: new Date() }
+        },
+        { upsert: true }
+      );
     }
 
     res.status(201).json({
       success: true,
       message: 'Transaction created successfully',
-      transaction: newTransaction
+      transaction: {
+        ...newTransaction,
+        splits: splitRecords
+      }
     });
   } catch (error) {
     console.error('Error creating transaction:', error);

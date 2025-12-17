@@ -151,13 +151,14 @@ export interface Transaction {
   
   // CORE FIELDS
   type: 'credit' | 'debit'; // Money IN or OUT
-  amount: number; // Always positive
+  amount: number; // Always positive (total amount - sum of all splits)
   accountId: string; // Which account this affects
   
-  // CLASSIFICATION
-  categoryId: string;
+  // CLASSIFICATION (DEPRECATED - use splits instead, kept for backwards compatibility)
+  categoryId?: string; // @deprecated Use splits[0].categoryId instead
+  tags?: string[]; // @deprecated Use splits[].tags instead
+  
   description: string;
-  tags: string[]; // Flexible labels: ['UPI', 'PhonePe', 'Cash', 'Business', 'Recurring', etc.]
   
   // TRANSACTION DETAILS
   date: Date;
@@ -178,6 +179,27 @@ export interface Transaction {
   
   // LINKED TRANSACTIONS (for transfers)
   linkedTransactionId?: string; // If this is part of a transfer, links to the other side
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Transaction Split - allows splitting one transaction across multiple categories
+export interface TransactionSplit {
+  id: string;
+  transactionId: string; // References Transaction.id
+  userId: string; // Denormalized for faster queries
+  
+  // CLASSIFICATION
+  categoryId: string; // Each split has its own category
+  amount: number; // Amount for this split (must be positive)
+  
+  // TAGS - Each split can have its own tags
+  tags: string[]; // Flexible labels per split
+  
+  // OPTIONAL
+  notes?: string; // Split-specific notes
+  order: number; // Display order (1, 2, 3...)
   
   createdAt: Date;
   updatedAt: Date;

@@ -15,6 +15,7 @@ class CosmosDBService {
   public transactionsContainer: Collection | null = null;
   public accountsContainer: Collection | null = null;
   public tagsContainer: Collection | null = null;
+  public transactionSplitsContainer: Collection | null = null;
 
   constructor() {
     // Build MongoDB connection string from Cosmos DB credentials
@@ -75,6 +76,9 @@ class CosmosDBService {
     
     // Tags collection (new)
     this.tagsContainer = this.db.collection('tags');
+    
+    // Transaction Splits collection (new)
+    this.transactionSplitsContainer = this.db.collection('transactionSplits');
 
     // Create indexes for better query performance
     await this.usersContainer.createIndex({ email: 1 }, { unique: true });
@@ -88,13 +92,17 @@ class CosmosDBService {
     // New indexes for transactions, accounts, and tags
     await this.transactionsContainer.createIndex({ userId: 1 });
     await this.transactionsContainer.createIndex({ accountId: 1 });
-    await this.transactionsContainer.createIndex({ categoryId: 1 });
     await this.transactionsContainer.createIndex({ date: 1 });
     await this.transactionsContainer.createIndex({ type: 1 });
-    await this.transactionsContainer.createIndex({ tags: 1 });
     await this.accountsContainer.createIndex({ userId: 1 });
     await this.tagsContainer.createIndex({ userId: 1 });
     await this.tagsContainer.createIndex({ name: 1 });
+    
+    // Indexes for transaction splits
+    await this.transactionSplitsContainer.createIndex({ transactionId: 1 });
+    await this.transactionSplitsContainer.createIndex({ userId: 1 });
+    await this.transactionSplitsContainer.createIndex({ categoryId: 1 });
+    await this.transactionSplitsContainer.createIndex({ tags: 1 });
   }
 
   async getUsersContainer(): Promise<Collection> {
@@ -151,6 +159,13 @@ class CosmosDBService {
       throw new Error('Cosmos DB not initialized. Call initialize() first.');
     }
     return this.tagsContainer;
+  }
+
+  async getTransactionSplitsContainer(): Promise<Collection> {
+    if (!this.transactionSplitsContainer) {
+      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+    }
+    return this.transactionSplitsContainer;
   }
 
   async close(): Promise<void> {
