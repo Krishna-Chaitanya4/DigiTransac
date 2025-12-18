@@ -532,8 +532,8 @@ const Dashboard: React.FC = () => {
     {
       title: 'Month Spent',
       value: formatCurrency(stats?.monthSpent || 0),
-      change: `${(stats?.percentChange ?? 0) >= 0 ? '+' : ''}${stats?.percentChange ?? 0}% vs last month`,
-      trend: (stats?.percentChange || 0) > 0 ? 'up' : 'down',
+      change: `${(stats?.percentChange ?? 0) <= 0 ? '+' : ''}${Math.abs(stats?.percentChange ?? 0)}% vs last month`,
+      trend: (stats?.percentChange || 0) > 0 ? 'down' : 'up',
       icon: <Receipt sx={{ fontSize: 32 }} />,
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     },
