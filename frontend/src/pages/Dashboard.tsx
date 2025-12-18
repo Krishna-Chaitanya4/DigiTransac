@@ -505,19 +505,37 @@ const Dashboard: React.FC = () => {
   };
 
   const handleToggleIncludeTag = (tagName: string) => {
-    setIncludeTags(prev => 
-      prev.includes(tagName) 
-        ? prev.filter(t => t !== tagName)
-        : [...prev, tagName]
-    );
+    const isIncluded = includeTags.includes(tagName);
+    const isExcluded = excludeTags.includes(tagName);
+    
+    // If already included, remove it (go to neutral)
+    if (isIncluded) {
+      setIncludeTags(prev => prev.filter(t => t !== tagName));
+    } else {
+      // If excluded, remove from excluded first
+      if (isExcluded) {
+        setExcludeTags(prev => prev.filter(t => t !== tagName));
+      }
+      // Add to included
+      setIncludeTags(prev => [...prev, tagName]);
+    }
   };
 
   const handleToggleExcludeTag = (tagName: string) => {
-    setExcludeTags(prev => 
-      prev.includes(tagName) 
-        ? prev.filter(t => t !== tagName)
-        : [...prev, tagName]
-    );
+    const isIncluded = includeTags.includes(tagName);
+    const isExcluded = excludeTags.includes(tagName);
+    
+    // If already excluded, remove it (go to neutral)
+    if (isExcluded) {
+      setExcludeTags(prev => prev.filter(t => t !== tagName));
+    } else {
+      // If included, remove from included first
+      if (isIncluded) {
+        setIncludeTags(prev => prev.filter(t => t !== tagName));
+      }
+      // Add to excluded
+      setExcludeTags(prev => [...prev, tagName]);
+    }
   };
 
   if (loading) {
