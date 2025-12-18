@@ -197,7 +197,17 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       recurrencePattern,
       source,
       merchantName,
-      reviewStatus
+      reviewStatus,
+      // Future fields (optional, for forward compatibility)
+      organizationId,
+      paidBy,
+      sharedWith,
+      paymentMethodType,
+      upiTransactionId,
+      paymentStatus,
+      counterpartyUserId,
+      settlementStatus,
+      settlementProof
     } = req.body;
 
     // Validation
@@ -285,6 +295,16 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       source: source || 'manual',
       merchantName,
       reviewStatus: reviewStatus || 'approved',
+      // Future fields (optional, store if provided)
+      ...(organizationId && { organizationId }),
+      ...(paidBy && { paidBy }),
+      ...(sharedWith && { sharedWith }),
+      ...(paymentMethodType && { paymentMethodType }),
+      ...(upiTransactionId && { upiTransactionId }),
+      ...(paymentStatus && { paymentStatus }),
+      ...(counterpartyUserId && { counterpartyUserId }),
+      ...(settlementStatus && { settlementStatus }),
+      ...(settlementProof && { settlementProof }),
       createdAt: new Date(),
       updatedAt: new Date()
     };
