@@ -36,9 +36,33 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
-app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check endpoint - Enhanced for production monitoring
+app.get('/health', async (_req, res) => {
+  try {
+    // Check database connectivity
+    const usersContainer = await cosmosDBService.getUsersContainer();
+    await usersContainer.findOne({}, { projection: { _id: 1 } });
+    
+    res.status(200).json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'unhealthy', 
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: 'Database connection failed'
+    });
+  }
+});
+
+// Simple liveness probe (no DB check)
+app.get('/ping', (_req, res) => {
+  res.status(200).send('pong');
 });
 
 // API Routes
