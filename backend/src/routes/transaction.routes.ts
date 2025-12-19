@@ -3,6 +3,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { Transaction, TransactionSplit } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
+import { encryptTransaction, decryptTransaction, decryptTransactions } from '../utils/transactionEncryption';
 
 const router = Router();
 
@@ -119,9 +120,12 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const total = await transactionsContainer.countDocuments(filter);
 
+    // Decrypt transactions before sending to client
+    const decryptedTransactions = decryptTransactions(transactions);
+
     res.json({
       success: true,
-      transactions,
+      transactions: decryptedTransactions,
       pagination: {
         total,
         limit: parseInt(limit as string),
@@ -165,10 +169,13 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Sort splits in-memory by order
     splits.sort((a, b) => a.order - b.order);
 
+    // Decrypt transaction before sending to client
+    const decryptedTransaction = decryptTransaction(transaction as unknown as Transaction);
+
     res.json({
       success: true,
       transaction: {
-        ...transaction,
+        ...decryptedTransaction,
         splits
       }
     });
@@ -281,15 +288,23 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     const transactionId = uuidv4();
+    
+    // Encrypt sensitive fields before storing
+    const encryptedData = encryptTransaction({
+      description,
+      notes,
+      amount
+    });
+    
     const newTransaction: Transaction = {
       id: transactionId,
       userId,
       type,
       amount,
       accountId,
-      description,
+      description: encryptedData.description || description,
       date: date ? new Date(date) : new Date(),
-      notes,
+      notes: encryptedData.notes,
       isRecurring: isRecurring || false,
       recurrencePattern,
       source: source || 'manual',
@@ -359,11 +374,14 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       );
     }
 
+    // Decrypt transaction before sending to client
+    const decryptedTransaction = decryptTransaction(newTransaction);
+
     res.status(201).json({
       success: true,
       message: 'Transaction created successfully',
       transaction: {
-        ...newTransaction,
+        ...decryptedTransaction,
         splits: splitRecords
       }
     });
@@ -466,16 +484,23 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       }
     }
 
+    // Encrypt sensitive fields if they're being updated
+    const encryptedData = encryptTransaction({
+      ...(description && { description }),
+      ...(notes !== undefined && { notes }),
+      ...(amount !== undefined && { amount })
+    });
+
     const updateData: Partial<Transaction> = {
       ...(type && { type }),
       ...(amount !== undefined && { amount }),
       ...(accountId && { accountId }),
       ...(categoryId && { categoryId }),
-      ...(description && { description }),
+      ...(description && { description: encryptedData.description }),
       ...(tags !== undefined && { tags }),
       ...(paymentMethodId !== undefined && { paymentMethodId }),
       ...(date && { date: new Date(date) }),
-      ...(notes !== undefined && { notes }),
+      ...(notes !== undefined && { notes: encryptedData.notes }),
       ...(isRecurring !== undefined && { isRecurring }),
       ...(recurrencePattern !== undefined && { recurrencePattern }),
       ...(merchantName !== undefined && { merchantName }),
@@ -490,10 +515,13 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const updatedTransaction = await transactionsContainer.findOne({ id, userId });
 
+    // Decrypt before sending to client
+    const decryptedTransaction = decryptTransaction(updatedTransaction as unknown as Transaction);
+
     res.json({
       success: true,
       message: 'Transaction updated successfully',
-      transaction: updatedTransaction
+      transaction: decryptedTransaction
     });
   } catch (error) {
     console.error('Error updating transaction:', error);

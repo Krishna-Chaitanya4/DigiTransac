@@ -6,6 +6,7 @@ import compression from 'compression';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import { cosmosDBService } from './config/cosmosdb';
+import { encryptionService } from './services/encryption.service';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import categoryRoutes from './routes/category.routes';
@@ -85,6 +86,9 @@ const startServer = async () => {
   try {
     // Initialize Cosmos DB connection
     await cosmosDBService.initialize();
+    
+    // Initialize encryption service
+    await encryptionService.initialize();
     
     // Start email polling cron job
     startEmailPollingJob();
