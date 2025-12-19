@@ -60,6 +60,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('auth-token');
+    localStorage.removeItem('auth-user');
+    delete axios.defaults.headers.common['Authorization'];
+    window.location.href = '/login';
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       const savedToken = localStorage.getItem('auth-token');
@@ -82,6 +91,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initAuth();
+
+    // Add axios interceptor to handle token expiration
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // Handle any 401 error (unauthorized/token expired)
+        if (error.response?.status === 401) {
+          console.log('Authentication error (401), logging out...', error.response?.data);
+          // Clear auth state and redirect to login
+          setUser(null);
+          setToken(null);
+          localStorage.removeItem('auth-token');
+          localStorage.removeItem('auth-user');
+          delete axios.defaults.headers.common['Authorization'];
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -127,14 +159,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const errorMessage = error.response?.data?.message || error.message || 'Registration failed';
       throw new Error(errorMessage);
     }
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('auth-token');
-    localStorage.removeItem('auth-user');
-    delete axios.defaults.headers.common['Authorization'];
   };
 
   const value: AuthContextType = {
