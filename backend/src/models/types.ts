@@ -11,6 +11,15 @@ export interface User {
   upiId?: string; // For UPI payments between users
   phoneNumber?: string; // For notifications and UPI
   
+  // FUTURE: Location tracking preferences (optional, for geo features)
+  locationSettings?: {
+    enabled: boolean;                           // Master toggle
+    captureMode: 'always' | 'ask' | 'never';   // When to capture
+    precision: 'exact' | 'approximate';         // Privacy level (exact GPS or rounded)
+    saveHistory: boolean;                       // Whether to store location data
+    sharePrecision?: 'exact' | 'city' | 'none'; // For future group features
+  };
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -199,6 +208,21 @@ export interface Transaction {
   counterpartyUserId?: string; // The other user in a send/receive transaction
   settlementStatus?: 'pending_approval' | 'approved' | 'rejected' | 'settled';
   settlementProof?: string; // URL to payment proof/receipt
+  
+  // FUTURE: LOCATION TRACKING (Optional fields for geo-based analytics)
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;           // Full address
+    placeName?: string;         // Merchant/place name (e.g., "Starbucks")
+    city?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+    accuracy?: number;          // GPS accuracy in meters
+    source?: 'gps' | 'manual' | 'ip' | 'email';  // How location was obtained
+  };
+  locationCapturedAt?: Date;    // Timestamp when location was captured
   
   createdAt: Date;
   updatedAt: Date;
