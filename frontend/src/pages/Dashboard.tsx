@@ -469,7 +469,11 @@ const Dashboard: React.FC = () => {
 
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch dashboard data');
+      console.error('Dashboard fetch error:', err);
+      // Don't show error for empty data (new users)
+      if (err.response?.status !== 404) {
+        setError(err.response?.data?.message || 'Failed to fetch dashboard data');
+      }
     } finally {
       setLoading(false);
     }
