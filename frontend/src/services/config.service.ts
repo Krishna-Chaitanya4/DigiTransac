@@ -8,8 +8,9 @@ class ConfigService {
 
   async fetchConfig(): Promise<void> {
     try {
-      // Fetch from relative path - works with any domain
-      const response = await fetch('/api/config');
+      // Try backend directly first (for runtime config)
+      const backendUrl = 'https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io';
+      const response = await fetch(`${backendUrl}/api/config`);
       if (!response.ok) {
         throw new Error('Failed to fetch config');
       }
