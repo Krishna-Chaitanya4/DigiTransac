@@ -9,7 +9,7 @@ class EncryptionService {
   private keyVaultUrl: string;
 
   constructor() {
-    this.keyVaultUrl = process.env.KEY_VAULT_URL || 'https://expense-tracker-kv-5963.vault.azure.net/';
+    this.keyVaultUrl = process.env.KEY_VAULT_URL || 'https://digitransac-kv-3895.vault.azure.net/';
   }
 
   /**
