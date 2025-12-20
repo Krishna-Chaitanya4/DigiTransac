@@ -4,7 +4,7 @@ const router = Router();
 
 // Public endpoint - no auth required
 // Returns frontend configuration from environment variables
-router.get('/config', (req, res) => {
+router.get('/', (req, res) => {
   res.json({
     apiUrl: process.env.API_URL || req.protocol + '://' + req.get('host'),
     environment: process.env.NODE_ENV || 'development',
