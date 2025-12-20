@@ -267,40 +267,40 @@ const Analytics: React.FC = () => {
       });
 
       const [overviewRes, breakdownRes, folderBreakdownRes, trendsRes, comparisonRes, topExpensesRes, accountsRes, recurringRes, tagsRes, merchantsRes, insightsRes, categoriesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/analytics/overview?${params}`, {
+        axios.get(`/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/category-breakdown?${params}`, {
+        axios.get(`/api/analytics/category-breakdown?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/folder-breakdown?${params}`, {
+        axios.get(`/api/analytics/folder-breakdown?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/trends?${params}&groupBy=${trendGroupBy}`, {
+        axios.get(`/api/analytics/trends?${params}&groupBy=${trendGroupBy}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/budget-comparison?${params}`, {
+        axios.get(`/api/analytics/budget-comparison?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/top-expenses?${params}&limit=5`, {
+        axios.get(`/api/analytics/top-expenses?${params}&limit=5`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/accounts`, {
+        axios.get(`/api/accounts`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/transactions?isRecurring=true`, {
+        axios.get(`/api/transactions?isRecurring=true`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/tags`, {
+        axios.get(`/api/tags`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/top-merchants?${params}&limit=10`, {
+        axios.get(`/api/analytics/top-merchants?${params}&limit=10`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/smart-insights?${params}`, {
+        axios.get(`/api/analytics/smart-insights?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/categories`, {
+        axios.get(`/api/categories`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -319,7 +319,7 @@ const Analytics: React.FC = () => {
       
       // Process account breakdown
       const accounts = accountsRes.data.accounts || [];
-      const transactionsRes = await axios.get(`${API_URL}/api/transactions?startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`, {
+      const transactionsRes = await axios.get(`/api/transactions?startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const transactions = transactionsRes.data.transactions || [];

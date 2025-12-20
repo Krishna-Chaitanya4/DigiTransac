@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -57,7 +57,7 @@ const Profile: React.FC = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users/profile`, {
+      const response = await axios.get(`/api/users/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -74,7 +74,7 @@ const Profile: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const response = await axios.get(`${API_URL}/api/gmail/connect`, {
+      const response = await axios.get(`/api/gmail/connect`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -110,7 +110,7 @@ const Profile: React.FC = () => {
       setError('');
 
       await axios.post(
-        `${API_URL}/api/gmail/disconnect`,
+        `/api/gmail/disconnect`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -130,7 +130,7 @@ const Profile: React.FC = () => {
       setError('');
 
       await axios.put(
-        `${API_URL}/api/users/profile`,
+        `/api/users/profile`,
         {
           emailIntegration: {
             ...emailIntegration,

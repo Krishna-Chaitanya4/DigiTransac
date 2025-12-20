@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -208,7 +208,7 @@ const Transactions: React.FC = () => {
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
       params.includeSplits = 'true'; // Always fetch splits
 
-      const response = await axios.get(`${API_URL}/api/transactions`, {
+      const response = await axios.get(`/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` },
         params,
       });
@@ -223,7 +223,7 @@ const Transactions: React.FC = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/accounts`, {
+      const response = await axios.get(`/api/accounts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAccounts((response.data.accounts || []).filter((a: Account) => a.isActive));
@@ -235,7 +235,7 @@ const Transactions: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/categories`, {
+      const response = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCategories(response.data.categories?.filter((c: Category) => !c.isFolder) || []);
@@ -247,7 +247,7 @@ const Transactions: React.FC = () => {
 
   const fetchTags = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/tags`, {
+      const response = await axios.get(`/api/tags`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setTags(response.data.tags || []);
@@ -395,14 +395,14 @@ const Transactions: React.FC = () => {
 
       if (editingTransaction) {
         await axios.put(
-          `${API_URL}/api/transactions/${editingTransaction.id}`,
+          `/api/transactions/${editingTransaction.id}`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setSuccess('Transaction updated successfully');
       } else {
         await axios.post(
-          `${API_URL}/api/transactions`,
+          `/api/transactions`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -424,7 +424,7 @@ const Transactions: React.FC = () => {
       setError('');
       setSuccess('');
       
-      await axios.delete(`${API_URL}/api/transactions/${id}`, {
+      await axios.delete(`/api/transactions/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -496,7 +496,7 @@ const Transactions: React.FC = () => {
       setError('');
       setSuccess('');
 
-      await axios.delete(`${API_URL}/api/transactions/bulk`, {
+      await axios.delete(`/api/transactions/bulk`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ids: Array.from(selectedTransactions) },
       });

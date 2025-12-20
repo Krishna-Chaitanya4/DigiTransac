@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Grid,
   Card,
@@ -160,19 +160,19 @@ const Dashboard: React.FC = () => {
       });
 
       const [overviewRes, transactionsRes, budgetsRes, accountsRes, tagsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/analytics/overview?${params}`, {
+        axios.get(`/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/transactions?sortBy=date&sortOrder=desc&startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`, {
+        axios.get(`/api/transactions?sortBy=date&sortOrder=desc&startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/budgets`, {
+        axios.get(`/api/budgets`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/accounts`, {
+        axios.get(`/api/accounts`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/tags`, {
+        axios.get(`/api/tags`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -212,7 +212,7 @@ const Dashboard: React.FC = () => {
       // Get last month data for comparison
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      const lastMonthRes = await axios.get(`${API_URL}/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`, {
+      const lastMonthRes = await axios.get(`/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       let lastMonthTxns = lastMonthRes.data.transactions || [];
@@ -267,7 +267,7 @@ const Dashboard: React.FC = () => {
       });
 
       // Process recent transactions (both credits and debits)
-      const categoriesRes = await axios.get(`${API_URL}/api/categories`, {
+      const categoriesRes = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const categories = categoriesRes.data.categories || [];
@@ -331,7 +331,7 @@ const Dashboard: React.FC = () => {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
-      const trendsRes = await axios.get(`${API_URL}/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`, {
+      const trendsRes = await axios.get(`/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       let allTransactions = trendsRes.data.transactions || [];
@@ -404,7 +404,7 @@ const Dashboard: React.FC = () => {
       setTopCategories(topCats);
 
       // Get upcoming recurring transactions
-      const recurringRes = await axios.get(`${API_URL}/api/transactions?isRecurring=true`, {
+      const recurringRes = await axios.get(`/api/transactions?isRecurring=true`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const recurringTxns = recurringRes.data.transactions || [];
