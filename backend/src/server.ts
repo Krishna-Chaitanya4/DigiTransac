@@ -17,6 +17,7 @@ import gmailRoutes from './routes/gmail.routes';
 import accountRoutes from './routes/account.routes';
 import tagRoutes from './routes/tag.routes';
 import transactionRoutes from './routes/transaction.routes';
+import configRoutes from './routes/config.routes';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
 import { startRecurringTransactionsJob } from './jobs/recurringTransactions.job';
 
@@ -67,6 +68,7 @@ app.get('/ping', (_req, res) => {
 });
 
 // API Routes
+app.use('/api/config', configRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { configService } from '../services/config.service';
 
 interface User {
   id: string;
@@ -50,9 +49,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Configure axios defaults
-axios.defaults.baseURL = API_URL;
-
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => {
@@ -71,6 +67,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
+      // Load runtime configuration first
+      await configService.fetchConfig();
+      
+      // Configure axios with runtime API URL
+      axios.defaults.baseURL = configService.getApiUrl();
+      
       const savedToken = localStorage.getItem('auth-token');
       const savedUser = localStorage.getItem('auth-user');
       
