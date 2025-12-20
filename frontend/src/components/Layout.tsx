@@ -115,7 +115,7 @@ const Layout: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            ExpenseTracker
+            DigiTransac
           </Typography>
         </Box>
       </Toolbar>

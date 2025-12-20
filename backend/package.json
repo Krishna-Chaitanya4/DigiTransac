@@ -1,7 +1,7 @@
 {
-  "name": "expense-tracker-backend",
+  "name": "digitransac-backend",
   "version": "1.0.0",
-  "description": "Expense Tracker Backend API",
+  "description": "DigiTransac Backend API",
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",

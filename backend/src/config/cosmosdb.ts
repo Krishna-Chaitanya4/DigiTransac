@@ -21,7 +21,7 @@ class CosmosDBService {
     // Build MongoDB connection string from Cosmos DB credentials
     const endpoint = process.env.COSMOS_ENDPOINT!;
     const key = process.env.COSMOS_KEY!;
-    const dbName = process.env.COSMOS_DATABASE_NAME || 'ExpenseTrackerDB';
+    const dbName = process.env.COSMOS_DATABASE_NAME || 'DigiTransacDB';
     
     // Extract account name from endpoint
     const accountName = endpoint.match(/https:\/\/([^.]+)/)?.[1] || '';
@@ -33,7 +33,7 @@ class CosmosDBService {
 
   async initialize(): Promise<void> {
     try {
-      const databaseName = process.env.COSMOS_DATABASE_NAME || 'ExpenseTrackerDB';
+      const databaseName = process.env.COSMOS_DATABASE_NAME || 'DigiTransacDB';
       
       // Connect to Cosmos DB via MongoDB API
       await this.client.connect();
