@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -38,8 +38,6 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 interface Account {
   id: string;
@@ -118,7 +116,7 @@ const Accounts: React.FC = () => {
       setLoading(true);
       setError('');
       
-      const response = await axios.get(`${API_URL}/api/accounts`, {
+      const response = await axios.get(`/api/accounts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -127,7 +125,7 @@ const Accounts: React.FC = () => {
 
       // Fetch balances for all accounts
       const balancePromises = accountsData.map((account: Account) =>
-        axios.get(`${API_URL}/api/accounts/${account.id}/balance`, {
+        axios.get(`/api/accounts/${account.id}/balance`, {
           headers: { Authorization: `Bearer ${token}` },
         })
       );
@@ -195,14 +193,14 @@ const Accounts: React.FC = () => {
 
       if (editingAccount) {
         await axios.put(
-          `${API_URL}/api/accounts/${editingAccount.id}`,
+          `/api/accounts/${editingAccount.id}`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setSuccess('Account updated successfully');
       } else {
         await axios.post(
-          `${API_URL}/api/accounts`,
+          `/api/accounts`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -228,7 +226,7 @@ const Accounts: React.FC = () => {
       setError('');
       setSuccess('');
       
-      await axios.delete(`${API_URL}/api/accounts/${accountToDelete.id}`, {
+      await axios.delete(`/api/accounts/${accountToDelete.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -248,7 +246,7 @@ const Accounts: React.FC = () => {
       if (!account) return;
 
       await axios.put(
-        `${API_URL}/api/accounts/${accountId}`,
+        `/api/accounts/${accountId}`,
         { ...account, isDefault: true },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -290,7 +288,7 @@ const Accounts: React.FC = () => {
       }
 
       // Get categories to find or create a balance adjustment category
-      const categoriesRes = await axios.get(`${API_URL}/api/categories`, {
+      const categoriesRes = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -301,7 +299,7 @@ const Accounts: React.FC = () => {
       // If category doesn't exist, create it
       if (!adjustmentCategory) {
         const newCategoryRes = await axios.post(
-          `${API_URL}/api/categories`,
+          `/api/categories`,
           {
             name: 'Balance Adjustment',
             type: 'both',
@@ -316,7 +314,7 @@ const Accounts: React.FC = () => {
 
       // Create a balance adjustment transaction
       await axios.post(
-        `${API_URL}/api/transactions`,
+        `/api/transactions`,
         {
           type: difference > 0 ? 'credit' : 'debit',
           amount: Math.abs(difference),

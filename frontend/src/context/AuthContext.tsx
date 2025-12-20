@@ -71,7 +71,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await configService.fetchConfig();
       
       // Configure axios with runtime API URL
-      axios.defaults.baseURL = configService.getApiUrl();
+      const apiUrl = configService.getApiUrl();
+      axios.defaults.baseURL = apiUrl;
+      console.log('🔧 Axios baseURL configured:', axios.defaults.baseURL);
       
       const savedToken = localStorage.getItem('auth-token');
       const savedUser = localStorage.getItem('auth-user');
