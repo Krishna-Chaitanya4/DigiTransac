@@ -10,20 +10,30 @@ class ConfigService {
     try {
       // Try backend directly first (for runtime config)
       const backendUrl = 'https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io';
-      const response = await fetch(`${backendUrl}/api/config`);
+      const response = await fetch(`${backendUrl}/api/config`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch config');
+        throw new Error(`Config fetch failed with status ${response.status}`);
       }
+      
       this.config = await response.json();
       console.log('✅ Configuration loaded:', this.config);
     } catch (error) {
       console.error('❌ Failed to load configuration:', error);
-      // Fallback to current domain
+      // Fallback to hardcoded backend URL
       this.config = {
-        apiUrl: window.location.origin,
+        apiUrl: 'https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io',
         environment: 'production',
         version: '1.0.0'
       };
+      console.log('⚠️ Using fallback configuration:', this.config);
     }
   }
 
