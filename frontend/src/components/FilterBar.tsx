@@ -30,7 +30,8 @@ export interface FilterValues {
   };
   accounts: string[];
   categories: string[];
-  tags: string[];
+  includeTags: string[];
+  excludeTags: string[];
   transactionType: 'all' | 'debit' | 'credit';
 }
 
@@ -114,7 +115,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       },
       accounts: [],
       categories: [],
-      tags: [],
+      includeTags: [],
+      excludeTags: [],
       transactionType: 'all',
     });
     setDatePreset('thisMonth');
@@ -123,7 +125,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const hasActiveFilters =
     filters.accounts.length > 0 ||
     filters.categories.length > 0 ||
-    filters.tags.length > 0 ||
+    filters.includeTags.length > 0 ||
+    filters.excludeTags.length > 0 ||
     filters.transactionType !== 'all';
 
   return (
@@ -178,7 +181,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
           {hasActiveFilters && (
             <Chip
-              label={`${filters.accounts.length + filters.categories.length + filters.tags.length} filters`}
+              label={`${filters.accounts.length + filters.categories.length + filters.includeTags.length + filters.excludeTags.length} filters`}
               color="primary"
               variant="outlined"
               size="small"
@@ -264,21 +267,51 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               size="small"
               options={tags}
               getOptionLabel={(option) => option.name}
-              value={tags.filter((t) => filters.tags.includes(t.id))}
+              value={tags.filter((t) => filters.includeTags.includes(t.id))}
               onChange={(_, newValue) => {
                 onFiltersChange({
                   ...filters,
-                  tags: newValue.map((v) => v.id),
+                  includeTags: newValue.map((v) => v.id),
                 });
               }}
               renderInput={(params) => (
-                <TextField {...params} label="Tags" placeholder="Select tags" />
+                <TextField {...params} label="Include Tags" placeholder="Any of these" />
               )}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
                     label={option.name}
                     size="small"
+                    color="success"
+                    {...getTagProps({ index })}
+                  />
+                ))
+              }
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Autocomplete
+              multiple
+              size="small"
+              options={tags}
+              getOptionLabel={(option) => option.name}
+              value={tags.filter((t) => filters.excludeTags.includes(t.id))}
+              onChange={(_, newValue) => {
+                onFiltersChange({
+                  ...filters,
+                  excludeTags: newValue.map((v) => v.id),
+                });
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Exclude Tags" placeholder="None of these" />
+              )}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip
+                    label={option.name}
+                    size="small"
+                    color="error"
                     {...getTagProps({ index })}
                   />
                 ))

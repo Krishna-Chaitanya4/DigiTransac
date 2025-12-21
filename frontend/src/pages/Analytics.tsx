@@ -243,7 +243,8 @@ const Analytics: React.FC = () => {
     },
     accounts: [],
     categories: [],
-    tags: [],
+    includeTags: [],
+    excludeTags: [],
     transactionType: 'all',
   });
 
@@ -292,9 +293,11 @@ const Analytics: React.FC = () => {
       if (filters.categories.length > 0) {
         params.append('categories', filters.categories.join(','));
       }
-      if (filters.tags.length > 0) {
-        params.append('tags', filters.tags.join(','));
+      if (filters.includeTags.length > 0) {
+        params.append('tags', filters.includeTags.join(','));
       }
+      // Note: Backend analytics doesn't support excludeTags yet, 
+      // only include filtering for now (matches old behavior)
 
       const [
         overviewRes,

@@ -146,7 +146,8 @@ const Dashboard: React.FC = () => {
     },
     accounts: [],
     categories: [],
-    tags: [],
+    includeTags: [],
+    excludeTags: [],
     transactionType: 'all',
   });
 
@@ -233,11 +234,17 @@ const Dashboard: React.FC = () => {
           if (!hasMatchingCategory) return false;
         }
         
-        // Filter by tags
-        if (filters.tags.length > 0) {
+        // Filter by tags (include/exclude logic)
+        if (filters.includeTags.length > 0) {
           const txnTags = t.tags || [];
-          const hasMatchingTag = txnTags.some((tag: string) => filters.tags.includes(tag));
-          if (!hasMatchingTag) return false;
+          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
+          if (!hasIncludedTag) return false;
+        }
+        
+        if (filters.excludeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
+          if (hasExcludedTag) return false;
         }
         
         return true;
@@ -281,10 +288,15 @@ const Dashboard: React.FC = () => {
           );
           if (!hasMatchingCategory) return false;
         }
-        if (filters.tags.length > 0) {
+        if (filters.includeTags.length > 0) {
           const txnTags = t.tags || [];
-          const hasMatchingTag = txnTags.some((tag: string) => filters.tags.includes(tag));
-          if (!hasMatchingTag) return false;
+          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
+          if (!hasIncludedTag) return false;
+        }
+        if (filters.excludeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
+          if (hasExcludedTag) return false;
         }
         return true;
       });
@@ -429,10 +441,15 @@ const Dashboard: React.FC = () => {
           );
           if (!hasMatchingCategory) return false;
         }
-        if (filters.tags.length > 0) {
+        if (filters.includeTags.length > 0) {
           const txnTags = t.tags || [];
-          const hasMatchingTag = txnTags.some((tag: string) => filters.tags.includes(tag));
-          if (!hasMatchingTag) return false;
+          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
+          if (!hasIncludedTag) return false;
+        }
+        if (filters.excludeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
+          if (hasExcludedTag) return false;
         }
         return true;
       });
