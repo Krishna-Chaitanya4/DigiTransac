@@ -35,6 +35,9 @@ import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { FilterBar, FilterValues } from '../components/FilterBar';
+import PullToRefresh from '../components/PullToRefresh';
+import ResponsiveChart from '../components/ResponsiveChart';
+import { useResponsive } from '../hooks/useResponsive';
 import {
   LineChart,
   Line,
@@ -115,6 +118,7 @@ interface AccountBalance {
 const Dashboard: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
+  const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -811,9 +815,9 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  return (
-    <Box>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  const content = (
+    <>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h3" fontWeight={800} gutterBottom sx={{ letterSpacing: '-0.02em' }}>
             Dashboard
@@ -822,7 +826,7 @@ const Dashboard: React.FC = () => {
             Welcome back, {user?.firstName || user?.email || 'User'}! Here's your expense overview.
           </Typography>
         </Box>
-        <Box display="flex" gap={2}>
+        <Box display="flex" gap={2} flexWrap="wrap">
           <Button
             variant="outlined"
             startIcon={<FileDownloadIcon />}
@@ -833,6 +837,7 @@ const Dashboard: React.FC = () => {
               textTransform: 'none',
               px: 2,
               py: 1.5,
+              display: { xs: 'none', sm: 'inline-flex' },
             }}
           >
             Export
@@ -849,32 +854,36 @@ const Dashboard: React.FC = () => {
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             }}
           >
-            New Transaction
+            {isMobile ? 'New' : 'New Transaction'}
           </Button>
-          <Button
-            variant="outlined"
-            onClick={() => navigate('/accounts')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-            }}
-          >
-            Accounts
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => navigate('/analytics')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-            }}
-          >
-            Analytics
-          </Button>
+          {!isMobile && (
+            <>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/accounts')}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  px: 3,
+                  py: 1.5,
+                }}
+              >
+                Accounts
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/analytics')}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  px: 3,
+                  py: 1.5,
+                }}
+              >
+                Analytics
+              </Button>
+            </>
+          )}
         </Box>
       </Box>
 
@@ -1503,40 +1512,42 @@ const Dashboard: React.FC = () => {
               Last 6 months overview
             </Typography>
             {spendingTrends.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={spendingTrends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                  <XAxis dataKey="month" stroke="#666" />
-                  <YAxis stroke="#666" />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      borderRadius: 8,
-                      border: '1px solid rgba(0,0,0,0.1)',
-                      background: 'rgba(255,255,255,0.95)',
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="expenses"
-                    stroke="#f44336"
-                    strokeWidth={3}
-                    name="Expenses"
-                    dot={{ fill: '#f44336', r: 6 }}
-                    activeDot={{ r: 8 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="income"
-                    stroke="#4caf50"
-                    strokeWidth={3}
-                    name="Income"
-                    dot={{ fill: '#4caf50', r: 6 }}
-                    activeDot={{ r: 8 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ResponsiveChart>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={spendingTrends}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                    <XAxis dataKey="month" stroke="#666" />
+                    <YAxis stroke="#666" />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        borderRadius: 8,
+                        border: '1px solid rgba(0,0,0,0.1)',
+                        background: 'rgba(255,255,255,0.95)',
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="#f44336"
+                      strokeWidth={3}
+                      name="Expenses"
+                      dot={{ fill: '#f44336', r: 6 }}
+                      activeDot={{ r: 8 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="income"
+                      stroke="#4caf50"
+                      strokeWidth={3}
+                      name="Income"
+                      dot={{ fill: '#4caf50', r: 6 }}
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ResponsiveChart>
             ) : (
               <Box textAlign="center" py={6}>
                 <Typography color="text.secondary">No spending data available</Typography>
@@ -1567,33 +1578,34 @@ const Dashboard: React.FC = () => {
               This month breakdown
             </Typography>
             {topCategories.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={topCategories}
-                    cx="50%"
-                    cy="45%"
-                    labelLine={false}
-                    label={false}
-                    outerRadius={90}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {topCategories.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend
-                    formatter={(_value, entry: any) => {
-                      const name =
-                        entry.payload.name.length > 15
-                          ? entry.payload.name.substring(0, 15) + '...'
-                          : entry.payload.name;
-                      const percent = (
-                        (entry.payload.value /
-                          topCategories.reduce((sum, cat) => sum + cat.value, 0)) *
-                        100
+              <ResponsiveChart>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={topCategories}
+                      cx="50%"
+                      cy="45%"
+                      labelLine={false}
+                      label={false}
+                      outerRadius={90}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {topCategories.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Legend
+                      formatter={(_value, entry: any) => {
+                        const name =
+                          entry.payload.name.length > 15
+                            ? entry.payload.name.substring(0, 15) + '...'
+                            : entry.payload.name;
+                        const percent = (
+                          (entry.payload.value /
+                            topCategories.reduce((sum, cat) => sum + cat.value, 0)) *
+                          100
                       ).toFixed(0);
                       return `${name} ${percent}% (${formatCurrency(entry.payload.value)})`;
                     }}
@@ -1602,6 +1614,7 @@ const Dashboard: React.FC = () => {
                   />
                 </PieChart>
               </ResponsiveContainer>
+              </ResponsiveChart>
             ) : (
               <Box textAlign="center" py={6}>
                 <Typography color="text.secondary">No category data available</Typography>
@@ -1804,6 +1817,14 @@ const Dashboard: React.FC = () => {
           </Paper>
         </Grid>
       </Grid>
+    </>
+  );
+
+  return (
+    <Box>
+      <PullToRefresh onRefresh={fetchDashboardData}>
+        {content}
+      </PullToRefresh>
     </Box>
   );
 };

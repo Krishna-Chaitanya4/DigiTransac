@@ -52,8 +52,11 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 import { TableSkeleton } from '../components/Skeletons';
 import TransactionCard from '../components/TransactionCard';
+import SwipeableTransactionCard from '../components/SwipeableTransactionCard';
 import ResponsiveDialog from '../components/ResponsiveDialog';
+import PullToRefresh from '../components/PullToRefresh';
 import { useResponsive } from '../hooks/useResponsive';
+import { useIsTouchDevice } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -123,6 +126,7 @@ const Transactions: React.FC = () => {
   const { token, user } = useAuth();
   const toast = useToast();
   const { isMobile } = useResponsive();
+  const isTouchDevice = useIsTouchDevice();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -914,49 +918,54 @@ const Transactions: React.FC = () => {
 
         {/* Transactions - Table for desktop, Cards for mobile */}
         {isMobile ? (
-          // Mobile Card View
-          <Box>
-            {filteredTransactions.length === 0 ? (
-              <EmptyState
-                icon={<ReceiptIcon />}
-                title="No transactions found"
-                description="Start tracking your finances by adding your first transaction"
-                actionLabel="Add Transaction"
-                onAction={() => handleOpenDialog()}
-              />
-            ) : (
-              <>
-                {filteredTransactions
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((transaction) => (
-                    <TransactionCard
-                      key={transaction.id}
-                      transaction={transaction}
-                      onEdit={() => handleOpenDialog(transaction)}
-                      onDelete={() => handleDeleteClick(transaction.id)}
-                      formatCurrency={(amount) => formatCurrency(amount, transaction.accountId)}
-                      getCategoryName={getCategoryName}
-                      getCategoryColor={getCategoryColor}
-                      getAccountName={getAccountName}
-                      isExpanded={expandedRows.has(transaction.id)}
-                      onToggleExpand={() => toggleRowExpansion(transaction.id)}
-                    />
-                  ))}
-                <TablePagination
-                  component="div"
-                  count={filteredTransactions.length}
-                  page={page}
-                  onPageChange={(_, newPage) => setPage(newPage)}
-                  rowsPerPage={rowsPerPage}
-                  onRowsPerPageChange={(e) => {
-                    setRowsPerPage(parseInt(e.target.value, 10));
-                    setPage(0);
-                  }}
-                  rowsPerPageOptions={[10, 25, 50, 100]}
+          // Mobile Card View with Pull-to-Refresh
+          <PullToRefresh onRefresh={async () => await fetchTransactions()}>
+            <Box>
+              {filteredTransactions.length === 0 ? (
+                <EmptyState
+                  icon={<ReceiptIcon />}
+                  title="No transactions found"
+                  description="Start tracking your finances by adding your first transaction"
+                  actionLabel="Add Transaction"
+                  onAction={() => handleOpenDialog()}
                 />
-              </>
-            )}
-          </Box>
+              ) : (
+                <>
+                  {filteredTransactions
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((transaction) => {
+                      const CardComponent = isTouchDevice ? SwipeableTransactionCard : TransactionCard;
+                      return (
+                        <CardComponent
+                          key={transaction.id}
+                          transaction={transaction}
+                          onEdit={() => handleOpenDialog(transaction)}
+                          onDelete={() => handleDeleteClick(transaction.id)}
+                          formatCurrency={(amount) => formatCurrency(amount, transaction.accountId)}
+                          getCategoryName={getCategoryName}
+                          getCategoryColor={getCategoryColor}
+                          getAccountName={getAccountName}
+                          isExpanded={expandedRows.has(transaction.id)}
+                          onToggleExpand={() => toggleRowExpansion(transaction.id)}
+                        />
+                      );
+                    })}
+                  <TablePagination
+                    component="div"
+                    count={filteredTransactions.length}
+                    page={page}
+                    onPageChange={(_, newPage) => setPage(newPage)}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={(e) => {
+                      setRowsPerPage(parseInt(e.target.value, 10));
+                      setPage(0);
+                    }}
+                    rowsPerPageOptions={[10, 25, 50, 100]}
+                  />
+                </>
+              )}
+            </Box>
+          </PullToRefresh>
         ) : (
           // Desktop Table View
           <Card>

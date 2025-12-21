@@ -6,7 +6,13 @@ import { SnackbarProvider } from 'notistack';
 import App from './App';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { registerServiceWorker } from './utils/pwa';
 import './index.css';
+
+// Register service worker for PWA
+if (import.meta.env.PROD) {
+  registerServiceWorker();
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
