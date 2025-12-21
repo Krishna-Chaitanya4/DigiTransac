@@ -276,8 +276,8 @@ const Analytics: React.FC = () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        startDate: filters.dateRange.start.format('YYYY-MM-DD'),
-        endDate: filters.dateRange.end.format('YYYY-MM-DD'),
+        startDate: filters.dateRange.start.startOf('day').format('YYYY-MM-DD'),
+        endDate: filters.dateRange.end.endOf('day').format('YYYY-MM-DD'),
         compareWithPrevious: 'true',
       });
 
@@ -358,7 +358,8 @@ const Analytics: React.FC = () => {
       // Process account breakdown
       const accounts = accountsRes.data.accounts || [];
       const transactionsRes = await axios.get(
-        `/api/transactions?startDate=${filters.dateRange.start.format('YYYY-MM-DD')}&endDate=${filters.dateRange.end.format('YYYY-MM-DD')}`,
+        `/api/transactions?startDate=${filters.dateRange.start.startOf('day').format('YYYY-MM-DD')}&endDate=${filters.dateRange.end.endOf('day').format('YYYY-MM-DD')}`,
+
         {
           headers: { Authorization: `Bearer ${token}` },
         }

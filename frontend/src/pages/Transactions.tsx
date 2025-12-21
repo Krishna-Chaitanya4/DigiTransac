@@ -200,8 +200,8 @@ const Transactions: React.FC = () => {
       if (selectedAccount) params.accountId = selectedAccount;
       if (selectedCategory) params.categoryId = selectedCategory;
       if (selectedTags.length > 0) params.tags = selectedTags.join(',');
-      if (startDate) params.startDate = startDate.toISOString();
-      if (endDate) params.endDate = endDate.toISOString();
+      if (startDate) params.startDate = startDate.startOf('day').toISOString();
+      if (endDate) params.endDate = endDate.endOf('day').toISOString();
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
       params.includeSplits = 'true'; // Always fetch splits
 

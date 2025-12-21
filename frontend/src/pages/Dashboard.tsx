@@ -186,8 +186,9 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const startDate = filters.dateRange.start.toISOString();
-      const endDate = filters.dateRange.end.toISOString();
+      // Ensure start date includes beginning of day and end date includes end of day
+      const startDate = filters.dateRange.start.startOf('day').toISOString();
+      const endDate = filters.dateRange.end.endOf('day').toISOString();
       
       // Build query params for transactions API
       const txnParams = new URLSearchParams({
@@ -395,6 +396,10 @@ const Dashboard: React.FC = () => {
       const now = new Date();
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      // Set to start and end of day for inclusive date range
+      sixMonthsAgo.setHours(0, 0, 0, 0);
+      now.setHours(23, 59, 59, 999);
       
       const trendParams = new URLSearchParams({
         startDate: sixMonthsAgo.toISOString(),
