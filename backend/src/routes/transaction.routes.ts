@@ -765,4 +765,199 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
   }
 });
 
+// GET /api/transactions/pending/count - Get count of pending transactions
+router.get('/pending/count', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    
+    const count = await transactionsContainer.countDocuments({
+      userId,
+      reviewStatus: 'pending'
+    });
+
+    res.json({ count });
+  } catch (error) {
+    console.error('Error getting pending count:', error);
+    res.status(500).json({ error: 'Error getting pending count' });
+  }
+});
+
+// PATCH /api/transactions/:id/approve - Approve a pending transaction
+router.patch('/:id/approve', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+
+    // Find the transaction
+    const existingTransaction = (await transactionsContainer.findOne({ 
+      id, 
+      userId 
+    })) as unknown as Transaction | null;
+
+    if (!existingTransaction) {
+      res.status(404).json({ error: 'Transaction not found' });
+      return;
+    }
+
+    if (existingTransaction.reviewStatus !== 'pending') {
+      res.status(400).json({ error: 'Transaction is not pending review' });
+      return;
+    }
+
+    // Update review status
+    await transactionsContainer.updateOne(
+      { id, userId },
+      {
+        $set: {
+          reviewStatus: 'approved',
+          reviewedAt: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    const updatedTransaction = (await transactionsContainer.findOne({ 
+      id, 
+      userId 
+    })) as unknown as Transaction;
+
+    res.json(decryptTransaction(updatedTransaction));
+  } catch (error) {
+    console.error('Error approving transaction:', error);
+    res.status(500).json({ error: 'Error approving transaction' });
+  }
+});
+
+// PATCH /api/transactions/:id/reject - Reject a pending transaction
+router.patch('/:id/reject', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { reason } = req.body;
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+
+    // Find the transaction
+    const existingTransaction = (await transactionsContainer.findOne({ 
+      id, 
+      userId 
+    })) as unknown as Transaction | null;
+
+    if (!existingTransaction) {
+      res.status(404).json({ error: 'Transaction not found' });
+      return;
+    }
+
+    if (existingTransaction.reviewStatus !== 'pending') {
+      res.status(400).json({ error: 'Transaction is not pending review' });
+      return;
+    }
+
+    // Update review status
+    await transactionsContainer.updateOne(
+      { id, userId },
+      {
+        $set: {
+          reviewStatus: 'rejected',
+          reviewedAt: new Date(),
+          rejectionReason: reason || 'Rejected by user',
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    const updatedTransaction = (await transactionsContainer.findOne({ 
+      id, 
+      userId 
+    })) as unknown as Transaction;
+
+    res.json(decryptTransaction(updatedTransaction));
+  } catch (error) {
+    console.error('Error rejecting transaction:', error);
+    res.status(500).json({ error: 'Error rejecting transaction' });
+  }
+});
+
+// POST /api/transactions/bulk-approve - Approve multiple transactions
+router.post('/bulk-approve', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { transactionIds }: { transactionIds: string[] } = req.body;
+
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+      res.status(400).json({ error: 'transactionIds array is required' });
+      return;
+    }
+
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+
+    // Update all transactions
+    const result = await transactionsContainer.updateMany(
+      {
+        id: { $in: transactionIds },
+        userId,
+        reviewStatus: 'pending'
+      },
+      {
+        $set: {
+          reviewStatus: 'approved',
+          reviewedAt: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} transactions approved`,
+      approvedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error('Error bulk approving transactions:', error);
+    res.status(500).json({ error: 'Error bulk approving transactions' });
+  }
+});
+
+// POST /api/transactions/bulk-reject - Reject multiple transactions
+router.post('/bulk-reject', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { transactionIds, reason }: { transactionIds: string[]; reason?: string } = req.body;
+
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+      res.status(400).json({ error: 'transactionIds array is required' });
+      return;
+    }
+
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+
+    // Update all transactions
+    const result = await transactionsContainer.updateMany(
+      {
+        id: { $in: transactionIds },
+        userId,
+        reviewStatus: 'pending'
+      },
+      {
+        $set: {
+          reviewStatus: 'rejected',
+          reviewedAt: new Date(),
+          rejectionReason: reason || 'Bulk rejected by user',
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} transactions rejected`,
+      rejectedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error('Error bulk rejecting transactions:', error);
+    res.status(500).json({ error: 'Error bulk rejecting transactions' });
+  }
+});
+
 export default router;

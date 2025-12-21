@@ -190,6 +190,10 @@ export interface Transaction {
   
   // REVIEW & APPROVAL
   reviewStatus: 'pending' | 'approved' | 'rejected';
+  reviewedAt?: Date; // When transaction was approved/rejected
+  rejectionReason?: string; // Why transaction was rejected
+  confidence?: number; // 0-100, parser confidence score
+  originalContent?: string; // Original email/SMS content for reference
   
   // LINKED TRANSACTIONS (for transfers)
   linkedTransactionId?: string; // If this is part of a transfer, links to the other side
