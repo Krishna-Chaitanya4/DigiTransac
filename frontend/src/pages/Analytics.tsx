@@ -97,11 +97,16 @@ interface Trend {
 }
 
 interface BudgetComparison {
-  categoryId: string;
+  budgetId: string;
+  scopeType: 'category' | 'tag' | 'account';
+  categoryId?: string;
   categoryName: string;
   categoryColor: string;
   isFolder: boolean;
+  calculationType: 'debit' | 'credit' | 'net';
   budgetAmount: number;
+  originalBudget: number;
+  rolledOver: number;
   actualSpent: number;
   difference: number;
   percentUsed: number;

@@ -2,6 +2,8 @@
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { getExpensesFromTransactions } from '../utils/expenseHelpers';
+import { calculateBudgetSpendingInRange } from '../utils/budgetHelpers';
+import { Budget, Category } from '../models/types';
 
 const router = Router();
 
@@ -414,13 +416,13 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
 
     // Get active budgets
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
-    const budgets = await budgetsContainer
+    const budgets = (await budgetsContainer
       .find({
         userId,
         startDate: { $lte: end },
         $or: [{ endDate: { $gte: start } }, { endDate: { $exists: false } }],
       })
-      .toArray();
+      .toArray()) as unknown as Budget[];
 
     if (budgets.length === 0) {
       res.json({ success: true, comparisons: [] });
@@ -429,7 +431,7 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
 
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
-    const categories = await categoriesContainer.find({ userId }).toArray();
+    const categories = (await categoriesContainer.find({ userId }).toArray()) as unknown as Category[];
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
     // Build category hierarchy map
@@ -449,8 +451,12 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       return result;
     };
 
-    // Pre-compute descendants for all budget categories
-    budgets.forEach((budget: any) => getAllDescendantCategoryIds(budget.categoryId));
+    // Pre-compute descendants for all budget categories (for category-based budgets)
+    budgets.forEach((budget: any) => {
+      if (budget.scopeType === 'category' && budget.categoryId) {
+        getAllDescendantCategoryIds(budget.categoryId);
+      }
+    });
 
     // Fetch ALL relevant expenses in ONE query
     const allExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
@@ -464,44 +470,70 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       expensesByCategory.get(exp.categoryId)!.push(exp);
     });
 
-    // Calculate comparisons using pre-fetched data
-    const comparisons = budgets.map((budget: any) => {
-      const budgetStart = new Date(budget.startDate) > start ? new Date(budget.startDate) : start;
-      const budgetEnd =
-        budget.endDate && new Date(budget.endDate) < end ? new Date(budget.endDate) : end;
+    // Calculate comparisons using new budget calculation logic
+    const comparisons = await Promise.all(
+      budgets.map(async (budget: any) => {
+        const budgetStart = new Date(budget.startDate) > start ? new Date(budget.startDate) : start;
+        const budgetEnd =
+          budget.endDate && new Date(budget.endDate) < end ? new Date(budget.endDate) : end;
 
-      const category = categoryLookup.get(budget.categoryId);
-      const isFolder = category?.isFolder || false;
+        // Use the shared budget calculation helper
+        const { spent } = await calculateBudgetSpendingInRange(
+          budget,
+          userId,
+          categories,
+          categoryToDescendantsMap,
+          expensesByCategory,
+          budgetStart,
+          budgetEnd
+        );
 
-      // For folders, get all descendant categories
-      const categoryIds = isFolder
-        ? getAllDescendantCategoryIds(budget.categoryId)
-        : [budget.categoryId];
+        // Get display name based on scope type
+        let displayName = 'Unknown';
+        let displayColor = '#667eea';
+        let isFolder = false;
 
-      // Calculate spending from pre-fetched expenses
-      let spent = 0;
-      for (const catId of categoryIds) {
-        const expenses = expensesByCategory.get(catId) || [];
-        spent += expenses
-          .filter((exp: any) => {
-            const expDate = new Date(exp.date);
-            return expDate >= budgetStart && expDate <= budgetEnd;
-          })
-          .reduce((sum: number, exp: any) => sum + exp.amount, 0);
-      }
+        if (budget.scopeType === 'category' && budget.categoryId) {
+          const category = categoryLookup.get(budget.categoryId);
+          displayName = category?.name || 'Unknown Category';
+          displayColor = category?.color || '#667eea';
+          isFolder = category?.isFolder || false;
+        } else if (budget.scopeType === 'tag' && budget.tagIds && budget.tagIds.length > 0) {
+          // Fetch tag names
+          const tagsContainer = await cosmosDBService.getTagsContainer();
+          const tags = await tagsContainer.find({ id: { $in: budget.tagIds }, userId }).toArray();
+          const tagNames = tags.map((t: any) => t.name).join(budget.tagLogic === 'AND' ? ' + ' : ' / ');
+          displayName = `Tags: ${tagNames}`;
+          displayColor = '#ff6b6b';
+        } else if (budget.scopeType === 'account' && budget.accountId) {
+          // Fetch account name
+          const accountsContainer = await cosmosDBService.getAccountsContainer();
+          const account = await accountsContainer.findOne({ id: budget.accountId, userId });
+          displayName = account?.name || 'Unknown Account';
+          displayColor = account?.color || '#4ecdc4';
+        }
 
-      return {
-        categoryId: budget.categoryId,
-        categoryName: category?.name || 'Unknown',
-        categoryColor: category?.color || '#667eea',
-        isFolder,
-        budgetAmount: budget.amount,
-        actualSpent: spent,
-        difference: budget.amount - spent,
-        percentUsed: Math.round((spent / budget.amount) * 100),
-        isOverBudget: spent > budget.amount,
-      };
-    });
+        // Apply rollover if enabled
+        const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
+
+        return {
+          budgetId: budget.id,
+          scopeType: budget.scopeType,
+          categoryId: budget.categoryId,
+          categoryName: displayName,
+          categoryColor: displayColor,
+          isFolder,
+          calculationType: budget.calculationType,
+          budgetAmount: effectiveBudget,
+          originalBudget: budget.amount,
+          rolledOver: budget.rolledOverAmount || 0,
+          actualSpent: spent,
+          difference: effectiveBudget - spent,
+          percentUsed: Math.round((spent / effectiveBudget) * 100),
+          isOverBudget: spent > effectiveBudget,
+        };
+      })
+    );
 
     res.json({
       success: true,

@@ -125,11 +125,42 @@ export const schemas = {
 
   // Budget
   createBudget: Joi.object({
-    categoryId: Joi.string().required(),
+    // Scope configuration
+    scopeType: Joi.string().valid('category', 'tag', 'account').required(),
+    categoryId: Joi.string().when('scopeType', {
+      is: 'category',
+      then: Joi.required(),
+      otherwise: Joi.forbidden(),
+    }),
+    tagIds: Joi.array().items(Joi.string()).min(1).when('scopeType', {
+      is: 'tag',
+      then: Joi.required(),
+      otherwise: Joi.forbidden(),
+    }),
+    tagLogic: Joi.string().valid('AND', 'OR').optional().default('OR'),
+    accountId: Joi.string().when('scopeType', {
+      is: 'account',
+      then: Joi.required(),
+      otherwise: Joi.forbidden(),
+    }),
+    
+    // Calculation type
+    calculationType: Joi.string().valid('debit', 'credit', 'net').required(),
+    
+    // Core budget fields
     amount: Joi.number().positive().required(),
-    period: Joi.string().valid('monthly', 'yearly').required(),
+    period: Joi.string().valid('monthly', 'yearly', 'custom').required(),
     startDate: Joi.date().iso().required(),
     endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),
+    
+    // Alert configuration
+    alertThreshold: Joi.number().min(0).max(100).default(80),
+    alertThresholds: Joi.array().items(Joi.number().min(0).max(100)).optional(),
+    notificationChannels: Joi.array().items(Joi.string().valid('in-app', 'email')).optional(),
+    
+    // Rollover configuration
+    enableRollover: Joi.boolean().optional().default(false),
+    rolloverLimit: Joi.number().positive().optional(),
   }),
 
   // Account

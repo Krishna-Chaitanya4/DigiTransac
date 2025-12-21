@@ -18,12 +18,20 @@ import {
   CircularProgress,
   InputAdornment,
   Chip,
+  ToggleButtonGroup,
+  ToggleButton,
+  FormControlLabel,
+  Switch,
+  Divider,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Warning as WarningIcon,
+  Category as CategoryIcon,
+  Label as LabelIcon,
+  AccountBalance as AccountIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -37,19 +45,55 @@ interface Category {
   path: string[];
 }
 
+interface Tag {
+  id: string;
+  name: string;
+  color?: string;
+  usageCount: number;
+}
+
+interface Account {
+  id: string;
+  name: string;
+  type: string;
+  balance: number;
+  currency: string;
+  color?: string;
+}
+
 interface Budget {
   id: string;
   userId: string;
-  categoryId: string;
+  
+  // Scope configuration
+  scopeType: 'category' | 'tag' | 'account';
+  categoryId?: string;
+  tagIds?: string[];
+  tagLogic?: 'AND' | 'OR';
+  accountId?: string;
+  
+  // Calculation type
+  calculationType: 'debit' | 'credit' | 'net';
+  
   amount: number;
   period: 'monthly' | 'yearly' | 'custom';
   startDate: string;
   endDate?: string;
   alertThreshold: number;
+  alertThresholds?: number[];
+  notificationChannels?: ('in-app' | 'email')[];
+  
+  // Rollover
+  enableRollover?: boolean;
+  rolloverLimit?: number;
+  rolledOverAmount?: number;
+  
+  // Display fields (calculated)
   spent?: number;
   remaining?: number;
   percentUsed?: number;
   isOverBudget?: boolean;
+  
   createdAt: string;
   updatedAt: string;
 }
@@ -58,23 +102,34 @@ const Budgets: React.FC = () => {
   const { token, user } = useAuth();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
   const [formData, setFormData] = useState({
+    scopeType: 'category' as 'category' | 'tag' | 'account',
     categoryId: '',
+    tagIds: [] as string[],
+    tagLogic: 'OR' as 'AND' | 'OR',
+    accountId: '',
+    calculationType: 'debit' as 'debit' | 'credit' | 'net',
     amount: '',
     period: 'custom' as 'monthly' | 'yearly' | 'custom',
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     alertThreshold: '80',
+    enableRollover: false,
+    rolloverLimit: '',
   });
 
   useEffect(() => {
     fetchBudgets();
     fetchCategories();
+    fetchTags();
+    fetchAccounts();
   }, []);
 
   const fetchBudgets = async () => {
@@ -105,6 +160,28 @@ const Budgets: React.FC = () => {
     }
   };
 
+  const fetchTags = async () => {
+    try {
+      const response = await axios.get(`/api/tags`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTags(response.data.tags || []);
+    } catch (err: any) {
+      console.error('Failed to fetch tags:', err);
+    }
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const response = await axios.get(`/api/accounts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAccounts(response.data.accounts || []);
+    } catch (err: any) {
+      console.error('Failed to fetch accounts:', err);
+    }
+  };
+
   const getCategoryName = (categoryId: string) => {
     const category = categories.find((c) => c.id === categoryId);
     return category?.name || 'Unknown';
@@ -115,14 +192,31 @@ const Budgets: React.FC = () => {
     return category?.color || '#667eea';
   };
 
+  const getTagName = (tagId: string) => {
+    const tag = tags.find((t) => t.id === tagId);
+    return tag?.name || 'Unknown';
+  };
+
+  const getAccountName = (accountId: string) => {
+    const account = accounts.find((a) => a.id === accountId);
+    return account?.name || 'Unknown';
+  };
+
   const handleOpenDialog = () => {
     setFormData({
+      scopeType: 'category',
       categoryId: '',
+      tagIds: [],
+      tagLogic: 'OR',
+      accountId: '',
+      calculationType: 'debit',
       amount: '',
       period: 'custom' as 'monthly' | 'yearly' | 'custom',
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       alertThreshold: '80',
+      enableRollover: false,
+      rolloverLimit: '',
     });
     setEditingBudget(null);
     setOpenDialog(true);
@@ -130,7 +224,12 @@ const Budgets: React.FC = () => {
 
   const handleEditBudget = (budget: Budget) => {
     setFormData({
-      categoryId: budget.categoryId,
+      scopeType: budget.scopeType,
+      categoryId: budget.categoryId || '',
+      tagIds: budget.tagIds || [],
+      tagLogic: budget.tagLogic || 'OR',
+      accountId: budget.accountId || '',
+      calculationType: budget.calculationType,
       amount: budget.amount.toString(),
       period: budget.period,
       startDate: new Date(budget.startDate).toISOString().split('T')[0],
@@ -138,6 +237,8 @@ const Budgets: React.FC = () => {
         ? new Date(budget.endDate).toISOString().split('T')[0]
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       alertThreshold: budget.alertThreshold.toString(),
+      enableRollover: budget.enableRollover || false,
+      rolloverLimit: budget.rolloverLimit?.toString() || '',
     });
     setEditingBudget(budget);
     setOpenDialog(true);
@@ -150,14 +251,33 @@ const Budgets: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      const payload = {
-        categoryId: formData.categoryId,
+      const payload: any = {
+        scopeType: formData.scopeType,
+        calculationType: formData.calculationType,
         amount: formData.amount,
         period: formData.period,
         startDate: formData.startDate,
         endDate: formData.endDate,
         alertThreshold: parseInt(formData.alertThreshold),
+        enableRollover: formData.enableRollover,
       };
+
+      // Add scope-specific fields
+      if (formData.scopeType === 'category') {
+        payload.categoryId = formData.categoryId;
+      } else if (formData.scopeType === 'tag') {
+        payload.tagIds = formData.tagIds;
+        if (formData.tagIds.length > 1) {
+          payload.tagLogic = formData.tagLogic;
+        }
+      } else if (formData.scopeType === 'account') {
+        payload.accountId = formData.accountId;
+      }
+
+      // Add rollover limit if enabled and specified
+      if (formData.enableRollover && formData.rolloverLimit) {
+        payload.rolloverLimit = parseFloat(formData.rolloverLimit);
+      }
 
       if (editingBudget) {
         await axios.put(`/api/budgets/${editingBudget.id}`, payload, {
@@ -178,11 +298,17 @@ const Budgets: React.FC = () => {
   };
 
   const handleDeleteBudget = async (budget: Budget) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the budget for "${getCategoryName(budget.categoryId)}"?`
-      )
-    ) {
+    // Get display name based on scope type
+    let displayName = 'this budget';
+    if (budget.scopeType === 'category' && budget.categoryId) {
+      displayName = `"${getCategoryName(budget.categoryId)}"`;
+    } else if (budget.scopeType === 'tag' && budget.tagIds) {
+      displayName = `tags: ${budget.tagIds.map(getTagName).join(', ')}`;
+    } else if (budget.scopeType === 'account' && budget.accountId) {
+      displayName = `"${getAccountName(budget.accountId)}"`;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete the budget for ${displayName}?`)) {
       return;
     }
 
@@ -293,33 +419,104 @@ const Budgets: React.FC = () => {
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
                     <Box>
-                      <Box display="flex" alignItems="center" gap={0.5} mb={1}>
-                        <Chip
-                          icon={
-                            categories.find((c) => c.id === budget.categoryId)?.isFolder ? (
-                              <span>📁</span>
-                            ) : (
-                              <span>📄</span>
-                            )
-                          }
-                          label={getCategoryName(budget.categoryId)}
-                          size="small"
-                          sx={{
-                            bgcolor: getCategoryColor(budget.categoryId) + '20',
-                            color: getCategoryColor(budget.categoryId),
-                          }}
-                        />
-                        {categories.find((c) => c.id === budget.categoryId)?.isFolder && (
+                      <Box display="flex" alignItems="center" gap={0.5} mb={1} flexWrap="wrap">
+                        {/* Scope chip */}
+                        {budget.scopeType === 'category' && budget.categoryId && (
+                          <>
+                            <Chip
+                              icon={
+                                categories.find((c) => c.id === budget.categoryId)?.isFolder ? (
+                                  <span>📁</span>
+                                ) : (
+                                  <span>📄</span>
+                                )
+                              }
+                              label={getCategoryName(budget.categoryId)}
+                              size="small"
+                              sx={{
+                                bgcolor: getCategoryColor(budget.categoryId) + '20',
+                                color: getCategoryColor(budget.categoryId),
+                              }}
+                            />
+                            {categories.find((c) => c.id === budget.categoryId)?.isFolder && (
+                              <Chip
+                                label="Folder"
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </>
+                        )}
+                        {budget.scopeType === 'tag' && budget.tagIds && budget.tagIds.length > 0 && (
+                          <>
+                            {budget.tagIds.map((tagId) => (
+                              <Chip
+                                key={tagId}
+                                icon={<LabelIcon sx={{ fontSize: 14 }} />}
+                                label={getTagName(tagId)}
+                                size="small"
+                                sx={{
+                                  bgcolor: '#ff6b6b20',
+                                  color: '#ff6b6b',
+                                }}
+                              />
+                            ))}
+                            {budget.tagIds.length > 1 && (
+                              <Chip
+                                label={budget.tagLogic || 'OR'}
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </>
+                        )}
+                        {budget.scopeType === 'account' && budget.accountId && (
                           <Chip
-                            label="Folder Budget"
+                            icon={<AccountIcon sx={{ fontSize: 14 }} />}
+                            label={getAccountName(budget.accountId)}
                             size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem' }}
+                            sx={{
+                              bgcolor: '#4ecdc420',
+                              color: '#4ecdc4',
+                            }}
                           />
                         )}
+                        
+                        {/* Calculation type chip */}
+                        <Chip
+                          label={
+                            budget.calculationType === 'debit'
+                              ? 'Expenses'
+                              : budget.calculationType === 'credit'
+                              ? 'Income'
+                              : 'Net'
+                          }
+                          size="small"
+                          color={
+                            budget.calculationType === 'debit'
+                              ? 'error'
+                              : budget.calculationType === 'credit'
+                              ? 'success'
+                              : 'info'
+                          }
+                          variant="outlined"
+                          sx={{ fontSize: '0.7rem' }}
+                        />
                       </Box>
                       <Typography variant="h5" fontWeight={700}>
                         {formatCurrency(budget.amount)}
+                        {budget.rolledOverAmount && budget.rolledOverAmount > 0 && (
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            color="success.main"
+                            sx={{ ml: 1 }}
+                          >
+                            (+{formatCurrency(budget.rolledOverAmount)} rollover)
+                          </Typography>
+                        )}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {formatDate(budget.startDate)} -{' '}
@@ -383,78 +580,271 @@ const Budgets: React.FC = () => {
       )}
 
       {/* Create/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>{editingBudget ? 'Edit Budget' : 'Create New Budget'}</DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              select
-              label="Category or Folder"
-              fullWidth
-              value={formData.categoryId}
-              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-              required
-              helperText="Select a folder to budget across all subcategories, or a specific category"
-            >
-              {categories.length === 0 ? (
-                <MenuItem value="" disabled>
-                  No categories available. Create one first.
-                </MenuItem>
-              ) : (
-                categories
-                  .sort((a, b) => {
-                    // Sort by path depth first, then by name
-                    const depthDiff = a.path.length - b.path.length;
-                    if (depthDiff !== 0) return depthDiff;
-                    return a.name.localeCompare(b.name);
-                  })
-                  .map((category) => (
-                    <MenuItem key={category.id} value={category.id}>
-                      {'  '.repeat(category.path.length)}
-                      {category.isFolder ? '📁' : '📄'} {category.name}
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Budget Scope Type Selection */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                What do you want to budget?
+              </Typography>
+              <ToggleButtonGroup
+                value={formData.scopeType}
+                exclusive
+                onChange={(_, newScope) => {
+                  if (newScope !== null) {
+                    setFormData({ ...formData, scopeType: newScope });
+                  }
+                }}
+                fullWidth
+                size="small"
+              >
+                <ToggleButton value="category">
+                  <CategoryIcon sx={{ mr: 1 }} fontSize="small" />
+                  Category
+                </ToggleButton>
+                <ToggleButton value="tag">
+                  <LabelIcon sx={{ mr: 1 }} fontSize="small" />
+                  Tags
+                </ToggleButton>
+                <ToggleButton value="account">
+                  <AccountIcon sx={{ mr: 1 }} fontSize="small" />
+                  Account
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+
+            {/* Scope-specific selectors */}
+            {formData.scopeType === 'category' && (
+              <TextField
+                select
+                label="Category or Folder"
+                fullWidth
+                value={formData.categoryId}
+                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                required
+                helperText="Select a folder to budget across all subcategories, or a specific category"
+              >
+                {categories.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No categories available. Create one first.
+                  </MenuItem>
+                ) : (
+                  categories
+                    .sort((a, b) => {
+                      const depthDiff = a.path.length - b.path.length;
+                      if (depthDiff !== 0) return depthDiff;
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((category) => (
+                      <MenuItem key={category.id} value={category.id}>
+                        {'  '.repeat(category.path.length)}
+                        {category.isFolder ? '📁' : '📄'} {category.name}
+                      </MenuItem>
+                    ))
+                )}
+              </TextField>
+            )}
+
+            {formData.scopeType === 'tag' && (
+              <Box>
+                <TextField
+                  select
+                  label="Select Tags"
+                  fullWidth
+                  value={formData.tagIds}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({
+                      ...formData,
+                      tagIds: typeof value === 'string' ? [value] : value,
+                    });
+                  }}
+                  SelectProps={{
+                    multiple: true,
+                    renderValue: (selected) => (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {(selected as string[]).map((tagId) => (
+                          <Chip key={tagId} label={getTagName(tagId)} size="small" />
+                        ))}
+                      </Box>
+                    ),
+                  }}
+                  required
+                  helperText={
+                    formData.tagIds.length > 1
+                      ? 'Multiple tags selected - choose logic below'
+                      : 'Select one or more tags to track'
+                  }
+                >
+                  {tags.length === 0 ? (
+                    <MenuItem value="" disabled>
+                      No tags available. Create transactions with tags first.
+                    </MenuItem>
+                  ) : (
+                    tags.map((tag) => (
+                      <MenuItem key={tag.id} value={tag.id}>
+                        {tag.name} ({tag.usageCount} uses)
+                      </MenuItem>
+                    ))
+                  )}
+                </TextField>
+
+                {formData.tagIds.length > 1 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="caption" color="text.secondary" gutterBottom>
+                      Tag Logic (for multiple tags)
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={formData.tagLogic}
+                      exclusive
+                      onChange={(_, newLogic) => {
+                        if (newLogic !== null) {
+                          setFormData({ ...formData, tagLogic: newLogic });
+                        }
+                      }}
+                      fullWidth
+                      size="small"
+                    >
+                      <ToggleButton value="OR">
+                        OR (any tag matches)
+                      </ToggleButton>
+                      <ToggleButton value="AND">
+                        AND (all tags required)
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {formData.scopeType === 'account' && (
+              <TextField
+                select
+                label="Account"
+                fullWidth
+                value={formData.accountId}
+                onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
+                required
+                helperText="Budget for all transactions in this account"
+              >
+                {accounts.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No accounts available. Create one first.
+                  </MenuItem>
+                ) : (
+                  accounts.map((account) => (
+                    <MenuItem key={account.id} value={account.id}>
+                      {account.name} ({account.type})
                     </MenuItem>
                   ))
-              )}
-            </TextField>
+                )}
+              </TextField>
+            )}
 
-            <TextField
-              label="Budget Amount"
-              type="number"
-              fullWidth
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
-                ),
-              }}
-              required
-            />
+            <Divider />
 
-            <TextField
-              label="Start Date"
-              type="date"
-              fullWidth
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              InputLabelProps={{
-                shrink: true,
-              }}
-              required
-            />
+            {/* Calculation Type */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Budget Type
+              </Typography>
+              <ToggleButtonGroup
+                value={formData.calculationType}
+                exclusive
+                onChange={(_, newType) => {
+                  if (newType !== null) {
+                    setFormData({ ...formData, calculationType: newType });
+                  }
+                }}
+                fullWidth
+                size="small"
+              >
+                <ToggleButton value="debit">
+                  Expenses Only
+                </ToggleButton>
+                <ToggleButton value="credit">
+                  Income Only
+                </ToggleButton>
+                <ToggleButton value="net">
+                  Net (Income - Expenses)
+                </ToggleButton>
+              </ToggleButtonGroup>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                {formData.calculationType === 'debit' && 'Track outgoing expenses only'}
+                {formData.calculationType === 'credit' && 'Track incoming income only'}
+                {formData.calculationType === 'net' && 'Track net flow (positive = saving, negative = spending)'}
+              </Typography>
+            </Box>
 
-            <TextField
-              label="End Date"
-              type="date"
-              fullWidth
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-              InputLabelProps={{
-                shrink: true,
-              }}
-              required
-            />
+            <Divider />
 
+            {/* Budget Amount and Period */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Budget Amount"
+                  type="number"
+                  fullWidth
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
+                    ),
+                  }}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  select
+                  label="Period"
+                  fullWidth
+                  value={formData.period}
+                  onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
+                >
+                  <MenuItem value="monthly">Monthly</MenuItem>
+                  <MenuItem value="yearly">Yearly</MenuItem>
+                  <MenuItem value="custom">Custom</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+
+            {/* Date Range */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Start Date"
+                  type="date"
+                  fullWidth
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="End Date"
+                  type="date"
+                  fullWidth
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  required
+                />
+              </Grid>
+            </Grid>
+
+            <Divider />
+
+            {/* Alert Configuration */}
             <TextField
               label="Alert Threshold (%)"
               type="number"
@@ -467,6 +857,41 @@ const Budgets: React.FC = () => {
               helperText="Get notified when spending reaches this percentage"
               required
             />
+
+            {/* Rollover Configuration */}
+            <Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.enableRollover}
+                    onChange={(e) =>
+                      setFormData({ ...formData, enableRollover: e.target.checked })
+                    }
+                  />
+                }
+                label="Enable Rollover"
+              />
+              <Typography variant="caption" color="text.secondary" display="block">
+                Allow unused budget to carry over to the next period
+              </Typography>
+              
+              {formData.enableRollover && (
+                <TextField
+                  label="Rollover Limit (optional)"
+                  type="number"
+                  fullWidth
+                  value={formData.rolloverLimit}
+                  onChange={(e) => setFormData({ ...formData, rolloverLimit: e.target.value })}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
+                    ),
+                  }}
+                  helperText="Maximum amount that can roll over (leave empty for no limit)"
+                  sx={{ mt: 2 }}
+                />
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -475,7 +900,12 @@ const Budgets: React.FC = () => {
             onClick={handleSubmit}
             variant="contained"
             disabled={
-              !formData.categoryId || !formData.amount || !formData.startDate || !formData.endDate
+              !formData.amount ||
+              !formData.startDate ||
+              !formData.endDate ||
+              (formData.scopeType === 'category' && !formData.categoryId) ||
+              (formData.scopeType === 'tag' && formData.tagIds.length === 0) ||
+              (formData.scopeType === 'account' && !formData.accountId)
             }
           >
             {editingBudget ? 'Update' : 'Create'}

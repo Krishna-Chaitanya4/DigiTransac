@@ -3,6 +3,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { Budget, Category } from '../models/types';
 import { getExpensesFromTransactions } from '../utils/expenseHelpers';
+import { calculateBudgetSpending } from '../utils/budgetHelpers';
 
 const router = Router();
 
@@ -27,7 +28,6 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const categories = (await categoriesContainer
       .find({ userId })
       .toArray()) as unknown as Category[];
-    const categoryMap = new Map(categories.map((cat) => [cat.id, cat]));
 
     // Build category hierarchy map for efficient lookups
     const categoryToDescendantsMap = new Map<string, string[]>();
@@ -71,50 +71,31 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       expensesByCategory.get(exp.categoryId)!.push(exp);
     });
 
-    // Calculate spending for each budget using pre-fetched data
-    const budgetsWithSpending = budgets.map((budget) => {
-      const startDate = new Date(budget.startDate);
-      const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
+    // Calculate spending for each budget using new logic
+    const budgetsWithSpending = await Promise.all(
+      budgets.map(async (budget) => {
+        const { spent } = await calculateBudgetSpending(
+          budget,
+          userId,
+          categories,
+          categoryToDescendantsMap,
+          expensesByCategory
+        );
 
-      const category = categoryMap.get(budget.categoryId);
-      if (!category) {
+        // Apply rollover if enabled
+        const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
+        const remaining = effectiveBudget - spent;
+        const percentUsed = Math.round((spent / effectiveBudget) * 100);
+
         return {
           ...budget,
-          spent: 0,
-          remaining: budget.amount,
-          percentUsed: 0,
-          isOverBudget: false,
+          spent,
+          remaining,
+          percentUsed,
+          isOverBudget: spent > effectiveBudget,
         };
-      }
-
-      // Get all category IDs to include in calculation
-      const categoryIds = category.isFolder
-        ? categoryToDescendantsMap.get(budget.categoryId) || []
-        : [budget.categoryId];
-
-      // Calculate spending from pre-fetched expenses
-      let spent = 0;
-      for (const catId of categoryIds) {
-        const expenses = expensesByCategory.get(catId) || [];
-        spent += expenses
-          .filter((exp: any) => {
-            const expDate = new Date(exp.date);
-            return expDate >= startDate && expDate <= endDate;
-          })
-          .reduce((sum: number, exp: any) => sum + exp.amount, 0);
-      }
-
-      const remaining = budget.amount - spent;
-      const percentUsed = Math.round((spent / budget.amount) * 100);
-
-      return {
-        ...budget,
-        spent,
-        remaining,
-        percentUsed,
-        isOverBudget: spent > budget.amount,
-      };
-    });
+      })
+    );
 
     res.json({
       success: true,
@@ -133,41 +114,74 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { categoryId, amount, period, startDate, endDate, alertThreshold } = req.body;
+    const {
+      scopeType,
+      categoryId,
+      tagIds,
+      tagLogic,
+      accountId,
+      calculationType,
+      amount,
+      period,
+      startDate,
+      endDate,
+      alertThreshold,
+      alertThresholds,
+      notificationChannels,
+      enableRollover,
+      rolloverLimit,
+    } = req.body;
 
-    if (!categoryId || !amount || !startDate) {
-      res.status(400).json({
-        success: false,
-        message: 'Category, amount, and start date are required',
-      });
-      return;
-    }
-
-    // Validate category exists (can be folder or category)
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    const category = await categoriesContainer.findOne({ id: categoryId, userId });
-
-    if (!category) {
-      res.status(404).json({
-        success: false,
-        message: 'Category or folder not found',
-      });
-      return;
+    // Validate scope-specific fields
+    if (scopeType === 'category' && categoryId) {
+      const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+      const category = await categoriesContainer.findOne({ id: categoryId, userId });
+      if (!category) {
+        res.status(404).json({
+          success: false,
+          message: 'Category or folder not found',
+        });
+        return;
+      }
+    } else if (scopeType === 'tag' && tagIds && tagIds.length > 0) {
+      const tagsContainer = await cosmosDBService.getTagsContainer();
+      const tags = await tagsContainer.find({ id: { $in: tagIds }, userId }).toArray();
+      if (tags.length !== tagIds.length) {
+        res.status(404).json({
+          success: false,
+          message: 'One or more tags not found',
+        });
+        return;
+      }
+    } else if (scopeType === 'account' && accountId) {
+      const accountsContainer = await cosmosDBService.getAccountsContainer();
+      const account = await accountsContainer.findOne({ id: accountId, userId });
+      if (!account) {
+        res.status(404).json({
+          success: false,
+          message: 'Account not found',
+        });
+        return;
+      }
     }
 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
 
-    // Check for existing budget in same period
-    const existingBudget = await budgetsContainer.findOne({
+    // Check for existing budget with same scope and period
+    const duplicateFilter: any = {
       userId,
-      categoryId,
+      scopeType,
       startDate: new Date(startDate),
-    });
+    };
+    if (scopeType === 'category') duplicateFilter.categoryId = categoryId;
+    if (scopeType === 'tag') duplicateFilter.tagIds = tagIds;
+    if (scopeType === 'account') duplicateFilter.accountId = accountId;
 
+    const existingBudget = await budgetsContainer.findOne(duplicateFilter);
     if (existingBudget) {
       res.status(400).json({
         success: false,
-        message: 'Budget already exists for this category in this period',
+        message: 'Budget already exists for this scope in this period',
       });
       return;
     }
@@ -175,12 +189,21 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const newBudget: Budget = {
       id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId,
-      categoryId,
+      scopeType,
+      categoryId: scopeType === 'category' ? categoryId : undefined,
+      tagIds: scopeType === 'tag' ? tagIds : undefined,
+      tagLogic: scopeType === 'tag' && tagIds?.length > 1 ? tagLogic || 'OR' : undefined,
+      accountId: scopeType === 'account' ? accountId : undefined,
+      calculationType,
       amount: parseFloat(amount),
       period: period || 'custom',
       startDate: new Date(startDate),
       endDate: endDate ? new Date(endDate) : undefined,
       alertThreshold: alertThreshold || 80,
+      alertThresholds,
+      notificationChannels,
+      enableRollover: enableRollover || false,
+      rolloverLimit: rolloverLimit ? parseFloat(rolloverLimit) : undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -206,7 +229,23 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { id } = req.params;
-    const { categoryId, amount, period, startDate, endDate, alertThreshold } = req.body;
+    const {
+      scopeType,
+      categoryId,
+      tagIds,
+      tagLogic,
+      accountId,
+      calculationType,
+      amount,
+      period,
+      startDate,
+      endDate,
+      alertThreshold,
+      alertThresholds,
+      notificationChannels,
+      enableRollover,
+      rolloverLimit,
+    } = req.body;
 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
 
@@ -219,15 +258,35 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    // If categoryId is being changed, validate the new category exists
-    if (categoryId !== undefined && categoryId !== budget.categoryId) {
+    // Validate scope changes
+    const newScopeType = scopeType || budget.scopeType;
+    if (newScopeType === 'category' && categoryId) {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
       const category = await categoriesContainer.findOne({ id: categoryId, userId });
-
       if (!category) {
         res.status(404).json({
           success: false,
           message: 'Category or folder not found',
+        });
+        return;
+      }
+    } else if (newScopeType === 'tag' && tagIds && tagIds.length > 0) {
+      const tagsContainer = await cosmosDBService.getTagsContainer();
+      const tags = await tagsContainer.find({ id: { $in: tagIds }, userId }).toArray();
+      if (tags.length !== tagIds.length) {
+        res.status(404).json({
+          success: false,
+          message: 'One or more tags not found',
+        });
+        return;
+      }
+    } else if (newScopeType === 'account' && accountId) {
+      const accountsContainer = await cosmosDBService.getAccountsContainer();
+      const account = await accountsContainer.findOne({ id: accountId, userId });
+      if (!account) {
+        res.status(404).json({
+          success: false,
+          message: 'Account not found',
         });
         return;
       }
@@ -237,12 +296,33 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       updatedAt: new Date(),
     };
 
-    if (categoryId !== undefined) updateData.categoryId = categoryId;
+    if (scopeType !== undefined) updateData.scopeType = scopeType;
+    if (categoryId !== undefined) {
+      updateData.categoryId = categoryId;
+      updateData.tagIds = undefined;
+      updateData.accountId = undefined;
+    }
+    if (tagIds !== undefined) {
+      updateData.tagIds = tagIds;
+      updateData.categoryId = undefined;
+      updateData.accountId = undefined;
+    }
+    if (tagLogic !== undefined) updateData.tagLogic = tagLogic;
+    if (accountId !== undefined) {
+      updateData.accountId = accountId;
+      updateData.categoryId = undefined;
+      updateData.tagIds = undefined;
+    }
+    if (calculationType !== undefined) updateData.calculationType = calculationType;
     if (amount !== undefined) updateData.amount = parseFloat(amount);
     if (period) updateData.period = period;
     if (startDate) updateData.startDate = new Date(startDate);
     if (endDate) updateData.endDate = new Date(endDate);
     if (alertThreshold !== undefined) updateData.alertThreshold = alertThreshold;
+    if (alertThresholds !== undefined) updateData.alertThresholds = alertThresholds;
+    if (notificationChannels !== undefined) updateData.notificationChannels = notificationChannels;
+    if (enableRollover !== undefined) updateData.enableRollover = enableRollover;
+    if (rolloverLimit !== undefined) updateData.rolloverLimit = rolloverLimit ? parseFloat(rolloverLimit) : undefined;
 
     await budgetsContainer.updateOne({ id, userId }, { $set: updateData });
 
@@ -359,6 +439,11 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
     const budgetAlerts = [];
 
     for (const budget of budgets) {
+      // Skip budgets without category scope (we only handle category budgets in alerts for now)
+      if (budget.scopeType !== 'category' || !budget.categoryId) {
+        continue;
+      }
+
       const startDate = new Date(budget.startDate);
       const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
 
