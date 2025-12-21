@@ -19,8 +19,6 @@ import {
   TextField,
   MenuItem,
   Chip,
-  Alert,
-  CircularProgress,
   InputAdornment,
   Grid,
   Collapse,
@@ -46,8 +44,14 @@ import {
   LocalOffer as TagIcon,
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
+  ReceiptLong as ReceiptIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { useToast } from '../components/Toast';
+import QuickAddFab from '../components/QuickAddFab';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EmptyState from '../components/EmptyState';
+import { TableSkeleton } from '../components/Skeletons';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -115,15 +119,18 @@ interface Tag {
 
 const Transactions: React.FC = () => {
   const { token, user } = useAuth();
+  const toast = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; transactionId: string | null }>({
+    open: false,
+    transactionId: null,
+  });
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -178,7 +185,7 @@ const Transactions: React.FC = () => {
         await fetchTransactions();
       } catch (err) {
         console.error('Error initializing transactions page:', err);
-        setError('Failed to load data');
+        toast.error('Failed to load data');
       } finally {
         setLoading(false);
       }
@@ -189,8 +196,6 @@ const Transactions: React.FC = () => {
 
   const fetchTransactions = async () => {
     try {
-      setError('');
-
       const params: any = {
         sortBy,
         sortOrder,
@@ -213,7 +218,7 @@ const Transactions: React.FC = () => {
       setTransactions(response.data.transactions || []);
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
-      setError(err.response?.data?.message || 'Failed to fetch transactions');
+      toast.error(err.response?.data?.message || 'Failed to fetch transactions');
       setTransactions([]); // Set empty array on error
     }
   };
@@ -349,9 +354,6 @@ const Transactions: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      setError('');
-      setSuccess('');
-
       const amount = parseFloat(formData.amount);
 
       // Prepare splits for submission
@@ -372,7 +374,7 @@ const Transactions: React.FC = () => {
       if (useSplitMode) {
         const splitTotal = splits.reduce((sum, s) => sum + s.amount, 0);
         if (Math.abs(splitTotal - amount) > 0.01) {
-          setError('Split amounts must equal the total transaction amount');
+          toast.error('Split amounts must equal the total transaction amount');
           return;
         }
       }
@@ -403,38 +405,41 @@ const Transactions: React.FC = () => {
         await axios.put(`/api/transactions/${editingTransaction.id}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setSuccess('Transaction updated successfully');
+        toast.success('Transaction updated successfully');
       } else {
         await axios.post(`/api/transactions`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setSuccess('Transaction created successfully');
+        toast.success('Transaction created successfully');
       }
 
       handleCloseDialog();
       fetchTransactions();
       fetchAccounts();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save transaction');
+      toast.error(err.response?.data?.message || 'Failed to save transaction');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this transaction?')) return;
+  const handleDeleteClick = (id: string) => {
+    setConfirmDelete({ open: true, transactionId: id });
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete.transactionId) return;
 
     try {
-      setError('');
-      setSuccess('');
-
-      await axios.delete(`/api/transactions/${id}`, {
+      await axios.delete(`/api/transactions/${confirmDelete.transactionId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setSuccess('Transaction deleted successfully');
+      toast.success('Transaction deleted successfully');
       fetchTransactions();
       fetchAccounts();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete transaction');
+      toast.error(err.response?.data?.message || 'Failed to delete transaction');
+    } finally {
+      setConfirmDelete({ open: false, transactionId: null });
     }
   };
 
@@ -495,21 +500,18 @@ const Transactions: React.FC = () => {
     if (!window.confirm(`Delete ${selectedTransactions.size} selected transactions?`)) return;
 
     try {
-      setError('');
-      setSuccess('');
-
       await axios.delete(`/api/transactions/bulk`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ids: Array.from(selectedTransactions) },
       });
 
-      setSuccess(`${selectedTransactions.size} transactions deleted`);
+      toast.success(`${selectedTransactions.size} transactions deleted`);
       setSelectedTransactions(new Set());
       setSelectAll(false);
       fetchTransactions();
       fetchAccounts();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete transactions');
+      toast.error(err.response?.data?.message || 'Failed to delete transactions');
     }
   };
 
@@ -618,8 +620,11 @@ const Transactions: React.FC = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
+      <Box>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4">Transactions</Typography>
+        </Box>
+        <TableSkeleton rows={10} />
       </Box>
     );
   }
@@ -659,18 +664,6 @@ const Transactions: React.FC = () => {
             </Button>
           </Box>
         </Box>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-            {success}
-          </Alert>
-        )}
 
         {/* Summary Cards */}
         <Grid container spacing={2} mb={3}>
@@ -942,10 +935,14 @@ const Transactions: React.FC = () => {
               <TableBody>
                 {filteredTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
-                      <Typography variant="body1" color="text.secondary">
-                        No transactions found
-                      </Typography>
+                    <TableCell colSpan={9} sx={{ border: 'none', p: 0 }}>
+                      <EmptyState
+                        icon={<ReceiptIcon />}
+                        title="No transactions found"
+                        description="Start tracking your finances by adding your first transaction"
+                        actionLabel="Add Transaction"
+                        onAction={() => handleOpenDialog()}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1122,7 +1119,7 @@ const Transactions: React.FC = () => {
                                   <IconButton
                                     size="small"
                                     color="error"
-                                    onClick={() => handleDelete(transaction.id)}
+                                    onClick={() => handleDeleteClick(transaction.id)}
                                   >
                                     <DeleteIcon fontSize="small" />
                                   </IconButton>
@@ -1767,6 +1764,21 @@ const Transactions: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmDelete.open}
+          title="Delete Transaction"
+          message="Are you sure you want to delete this transaction? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete({ open: false, transactionId: null })}
+          severity="error"
+        />
+
+        {/* Quick Add FAB */}
+        <QuickAddFab onClick={() => handleOpenDialog()} tooltip="Quick Add Transaction" />
       </Box>
     </LocalizationProvider>
   );
