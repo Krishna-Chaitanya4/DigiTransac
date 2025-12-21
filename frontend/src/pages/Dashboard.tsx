@@ -121,6 +121,7 @@ const Dashboard: React.FC = () => {
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [spendingTrends, setSpendingTrends] = useState<SpendingTrend[]>([]);
   const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
@@ -153,6 +154,15 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchInitialData();
+    // Load dismissed alerts from localStorage
+    const dismissed = localStorage.getItem('dismissedAlerts');
+    if (dismissed) {
+      try {
+        setDismissedAlerts(new Set(JSON.parse(dismissed)));
+      } catch (e) {
+        console.error('Failed to load dismissed alerts:', e);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -182,6 +192,14 @@ const Dashboard: React.FC = () => {
     } finally {
       setInitialDataLoaded(true);
     }
+  };
+
+  const handleDismissAlert = (alert: string) => {
+    const newDismissed = new Set(dismissedAlerts);
+    newDismissed.add(alert);
+    setDismissedAlerts(newDismissed);
+    // Save to localStorage
+    localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
   };
 
   const fetchDashboardData = async () => {
@@ -843,16 +861,19 @@ const Dashboard: React.FC = () => {
       {/* Alerts */}
       {alerts.length > 0 && (
         <Box mb={3}>
-          {alerts.map((alert, idx) => (
-            <Alert
-              key={idx}
-              severity="warning"
-              icon={<WarningIcon />}
-              sx={{ mb: 1, borderRadius: 2 }}
-            >
-              {alert}
-            </Alert>
-          ))}
+          {alerts
+            .filter((alert) => !dismissedAlerts.has(alert))
+            .map((alert, idx) => (
+              <Alert
+                key={idx}
+                severity="warning"
+                icon={<WarningIcon />}
+                onClose={() => handleDismissAlert(alert)}
+                sx={{ mb: 1, borderRadius: 2 }}
+              >
+                {alert}
+              </Alert>
+            ))}
         </Box>
       )}
 
