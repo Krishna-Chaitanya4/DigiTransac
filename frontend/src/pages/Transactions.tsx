@@ -131,8 +131,8 @@ const Transactions: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
-  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs());
+  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().subtract(3, 'months').startOf('month'));
+  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('month'));
   const [reviewStatus, setReviewStatus] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<string>('date');
