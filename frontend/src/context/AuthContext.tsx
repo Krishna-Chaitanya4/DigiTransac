@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 import { configService } from '../services/config.service';
+import { syncFromAPI, setupAutoSync, isOnline } from '../utils/offlineSync';
+import { initDB } from '../utils/indexedDB';
 
 interface User {
   id: string;
@@ -64,6 +66,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
     window.location.href = '/login';
   };
+
+  // Setup offline sync on token change
+  useEffect(() => {
+    if (!token) return;
+
+    // Initialize IndexedDB
+    initDB().catch(console.error);
+
+    // Sync data from API if online
+    if (isOnline()) {
+      syncFromAPI(token).catch((error) => {
+        console.error('Initial sync failed:', error);
+      });
+    }
+
+    // Setup auto-sync on network reconnection
+    const cleanup = setupAutoSync(token);
+    return cleanup;
+  }, [token]);
 
   useEffect(() => {
     const initAuth = async () => {

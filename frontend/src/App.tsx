@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
+import { InstallPrompt } from './components/InstallPrompt';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -37,6 +38,7 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <ToastProvider>
+        <InstallPrompt />
         <Box sx={{ minHeight: '100vh' }}>
           <Routes>
             <Route
