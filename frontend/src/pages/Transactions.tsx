@@ -275,13 +275,17 @@ const Transactions: React.FC = () => {
       const shouldUseSplitMode = splits.length > 1;
       setUseSplitMode(shouldUseSplitMode);
 
+      // For Quick Add mode (single split), use the category from the first split
+      const categoryId = splits.length > 0 ? splits[0].categoryId : (transaction.categoryId || '');
+      const tags = splits.length > 0 ? splits[0].tags : (transaction.tags || []);
+
       setFormData({
         type: transaction.type,
         amount: transaction.amount.toString(),
         accountId: transaction.accountId,
-        categoryId: transaction.categoryId || '',
+        categoryId: categoryId,
         description: transaction.description,
-        tags: transaction.tags || [],
+        tags: tags,
         splits: splits,
         date: dayjs(transaction.date).format('YYYY-MM-DD'),
         notes: transaction.notes || '',

@@ -16,6 +16,8 @@ export interface ExpenseFromSplit {
   createdAt: Date;
   accountId?: string;
   transactionId: string;
+  tags?: string[]; // Tags from the split
+  type?: string; // Transaction type (debit/credit)
 }
 
 /**
@@ -66,6 +68,8 @@ export async function getExpensesFromTransactions(
       createdAt: transaction?.createdAt || new Date(),
       accountId: transaction?.accountId,
       transactionId: split.transactionId,
+      tags: split.tags || [], // Include tags from the split
+      type: transaction?.type || 'debit', // Include transaction type
     };
   });
   
@@ -97,6 +101,8 @@ export async function getExpenseById(userId: string, expenseId: string): Promise
     createdAt: transaction.createdAt,
     accountId: transaction.accountId,
     transactionId: split.transactionId,
+    tags: split.tags || [], // Include tags from the split
+    type: transaction.type, // Include transaction type
   };
 }
 
