@@ -136,6 +136,7 @@ const Dashboard: React.FC = () => {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
   const [filters, setFilters] = useState<FilterValues>({
     dateRange: {
@@ -154,10 +155,11 @@ const Dashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (accounts.length > 0 && categories.length > 0 && tags.length > 0) {
+    // Only fetch dashboard data once initial data is loaded
+    if (initialDataLoaded) {
       fetchDashboardData();
     }
-  }, [filters]);
+  }, [filters, initialDataLoaded]);
 
   const fetchInitialData = async () => {
     try {
@@ -172,6 +174,12 @@ const Dashboard: React.FC = () => {
       setTags(tagsRes.data.tags || []);
     } catch (err) {
       console.error('Failed to fetch initial data:', err);
+      // Set empty arrays on error to unblock dashboard loading
+      setAccounts([]);
+      setCategories([]);
+      setTags([]);
+    } finally {
+      setInitialDataLoaded(true);
     }
   };
 
