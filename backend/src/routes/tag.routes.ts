@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
-import { Tag } from '../models/types';
+import { Tag, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -246,10 +246,10 @@ router.get('/suggestions', async (req: AuthRequest, res: Response): Promise<void
     
     const tagsContainer = await cosmosDBService.getTagsContainer();
     
-    let filter: any = { userId };
+    const filter: MongoFilter<Tag> = { userId };
     
     if (query) {
-      filter.name = { $regex: query, $options: 'i' };
+      filter.name = { $regex: query as string, $options: 'i' };
     }
     
     const tags = (await tagsContainer

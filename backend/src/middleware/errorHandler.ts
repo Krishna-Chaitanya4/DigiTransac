@@ -14,6 +14,7 @@ export const errorHandler = (
 ) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestWithId = req as any;
 
   // Log error with full context

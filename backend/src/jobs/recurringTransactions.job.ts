@@ -102,23 +102,26 @@ function shouldCreateTransaction(
     case 'daily':
       return true; // Create every day
 
-    case 'weekly':
+    case 'weekly': {
       // Create on the same day of week as the original transaction
       const originalDate = new Date(transaction.date);
       return dayOfWeek === originalDate.getDay();
+    }
 
-    case 'monthly':
+    case 'monthly': {
       // Create on the specified day of month (or last day if pattern.day > days in month)
       const targetDay = pattern.day || new Date(transaction.date).getDate();
       const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
       const effectiveDay = Math.min(targetDay, lastDayOfMonth);
       return dayOfMonth === effectiveDay;
+    }
 
-    case 'yearly':
+    case 'yearly': {
       // Create on the same month and day as the original transaction
       const originalYearly = new Date(transaction.date);
       return today.getMonth() === originalYearly.getMonth() && 
              dayOfMonth === originalYearly.getDate();
+    }
 
     default:
       return false;

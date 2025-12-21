@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
-import { Transaction, TransactionSplit } from '../models/types';
+import { Transaction, TransactionSplit, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 import { encryptTransaction, decryptTransaction, decryptTransactions } from '../utils/transactionEncryption';
 
@@ -32,7 +32,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
     
     // Build filter
-    let filter: any = { userId };
+    const filter: MongoFilter<Transaction> = { userId };
     
     if (accountId) filter.accountId = accountId;
     // Note: categoryId and tags filtering now needs to look at splits

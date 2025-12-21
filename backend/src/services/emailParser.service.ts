@@ -274,7 +274,7 @@ export class EmailParserService {
     }
 
     // Handle DD/MM/YYYY or DD-MM-YYYY
-    const match2 = dateStr.match(/(\d{2})[\/-](\d{2})[\/-](\d{2,4})/);
+    const match2 = dateStr.match(/(\d{2})[/-](\d{2})[/-](\d{2,4})/);
     if (match2) {
       const day = parseInt(match2[1]);
       const month = parseInt(match2[2]) - 1;

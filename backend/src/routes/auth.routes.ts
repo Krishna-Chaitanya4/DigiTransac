@@ -23,7 +23,7 @@ interface LoginBody {
 }
 
 // POST /api/auth/register
-router.post('/register', validate(schemas.register), async (req: Request<{}, {}, RegisterBody>, res: Response): Promise<void> => {
+router.post('/register', validate(schemas.register), async (req: Request<Record<string, never>, Record<string, never>, RegisterBody>, res: Response): Promise<void> => {
   try {
     const { email, password, firstName, lastName, currency } = req.body;
 
@@ -66,7 +66,8 @@ router.post('/register', validate(schemas.register), async (req: Request<{}, {},
     );
 
     // Return user without password
-    const { password: _, ...userWithoutPassword } = newUser;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...userWithoutPassword } = newUser;
 
     res.status(201).json({
       success: true,
@@ -84,7 +85,7 @@ router.post('/register', validate(schemas.register), async (req: Request<{}, {},
 });
 
 // POST /api/auth/login
-router.post('/login', validate(schemas.login), async (req: Request<{}, {}, LoginBody>, res: Response): Promise<void> => {
+router.post('/login', validate(schemas.login), async (req: Request<Record<string, never>, Record<string, never>, LoginBody>, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
@@ -119,7 +120,8 @@ router.post('/login', validate(schemas.login), async (req: Request<{}, {}, Login
     );
 
     // Return user without password
-    const { password: _, ...userWithoutPassword } = user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...userWithoutPassword } = user;
 
     logger.info(`User logged in successfully: ${user.email}`);
 

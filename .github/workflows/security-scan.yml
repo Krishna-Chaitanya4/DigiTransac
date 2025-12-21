@@ -1,0 +1,88 @@
+name: Security Scan
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run weekly on Monday at 9am UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+
+  npm-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        app: [backend, frontend]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Run npm audit
+      run: |
+        cd ${{ matrix.app }}
+        npm audit --production || echo "::warning::Found vulnerabilities in ${{ matrix.app }}"
+      continue-on-error: true
+    
+    - name: Generate audit report
+      run: |
+        cd ${{ matrix.app }}
+        npm audit --json > audit-report.json || true
+    
+    - name: Upload audit report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.app }}-audit-report
+        path: ${{ matrix.app }}/audit-report.json
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript', 'typescript']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+    
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3

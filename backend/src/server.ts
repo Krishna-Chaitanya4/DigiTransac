@@ -10,6 +10,8 @@ import { requestIdMiddleware } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
 import { globalLimiter, authLimiter } from './middleware/rateLimiter';
 import { validateConfig } from './utils/configValidator';
+import { validateEnv } from './utils/envValidator';
+import { setupSwagger } from './config/swagger';
 import { cosmosDBService } from './config/cosmosdb';
 import { encryptionService } from './services/encryption.service';
 import authRoutes from './routes/auth.routes';
@@ -28,6 +30,9 @@ import { startRecurringTransactionsJob } from './jobs/recurringTransactions.job'
 
 // Load environment variables
 dotenv.config();
+
+// Validate environment variables
+validateEnv();
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
@@ -67,10 +72,12 @@ app.use(cors({
 }));
 
 app.use(compression());
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use(requestIdMiddleware as any);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use(httpLogger as any);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
 app.use(globalLimiter);
 
@@ -101,6 +108,9 @@ app.get('/health', async (_req, res) => {
     });
   }
 });
+
+// API Documentation
+setupSwagger(app);
 
 // API Routes
 app.use('/api/config', configRoutes);

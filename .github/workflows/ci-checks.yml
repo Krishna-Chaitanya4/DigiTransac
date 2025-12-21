@@ -34,17 +34,20 @@ jobs:
         cd backend
         npm run build
     
-    - name: Run linter (if configured)
+    - name: Run linter
       run: |
         cd backend
-        npm run lint || echo "Linter not configured"
-      continue-on-error: true
+        npm run lint
     
-    - name: Run tests (if configured)
+    - name: Check formatting
       run: |
         cd backend
-        npm test || echo "Tests not configured"
-      continue-on-error: true
+        npm run format:check
+    
+    - name: Run tests
+      run: |
+        cd backend
+        npm test -- --coverage
 
   frontend-checks:
     name: Frontend CI

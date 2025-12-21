@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-12-21
+
+### Added - Infrastructure
+- **Testing Infrastructure**: Complete Jest setup with TypeScript support
+  - Sample health check tests included
+  - Test coverage reporting configured
+  - New scripts: `test:watch`, `test:coverage`
+- **API Documentation**: Swagger/OpenAPI 3.0 integration
+  - Interactive API docs at `/api-docs` endpoint
+  - Complete schema definitions for all models
+  - JWT authentication support in documentation
+- **Code Quality Tools**: ESLint and Prettier configurations
+  - Consistent code style enforcement
+  - Automatic formatting capabilities
+  - New scripts: `lint:fix`, `format`, `format:check`
+- **Pre-commit Hooks**: Husky + lint-staged integration
+  - Automatic linting and formatting before commits
+  - Prevents bad code from entering repository
+- **CI/CD Enhancements**: Security scanning workflows
+  - Weekly npm audit scans
+  - Dependency review on pull requests
+  - CodeQL analysis for security vulnerabilities
+- **Dependabot**: Automated dependency update management
+  - Weekly checks for npm, GitHub Actions, and Docker
+  - Grouped updates with appropriate labels
+
+### Added - Backend
+- **Environment Validation**: Startup validation for all required env variables
+  - Validates JWT secret minimum length (32 chars)
+  - Validates URI formats for endpoints
+  - Fails fast with clear error messages
+- **Request Size Limits**: 10MB limits on JSON and URL-encoded payloads
+- **Dependencies**: jest, ts-jest, supertest, husky, lint-staged, prettier, swagger-jsdoc, swagger-ui-express
+
+### Added - Frontend  
+- **Dependencies**: eslint-plugin-react, eslint-plugin-react-hooks, husky, lint-staged, prettier
+
+### Changed - Security
+- **Removed sensitive credentials from git**: Google OAuth client_secret file untracked
+- **Enhanced .gitignore**: Patterns added to exclude all OAuth credential files
+- **Enhanced .dockerignore**: Exclude test files, configs, and dev dependencies from builds
+
+### Changed - CI/CD
+- **Enhanced ci-checks.yml**: Now enforces linting, formatting, and test coverage
+- **Build optimization**: Smaller Docker images with improved .dockerignore
+
 ## [1.0.15] - 2024-12-21
 
 ### Added - Frontend

@@ -24,6 +24,14 @@ export interface User {
   updatedAt: Date;
 }
 
+// MongoDB filter helper type (simplified for flexibility)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type MongoFilter<T> = Partial<Record<keyof T, any>> & {
+  $or?: MongoFilter<T>[];
+  $and?: MongoFilter<T>[];
+  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+};
+
 export interface EmailIntegration {
   enabled: boolean;
   provider: 'gmail' | 'outlook' | null;
