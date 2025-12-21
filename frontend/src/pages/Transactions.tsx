@@ -54,8 +54,6 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
 interface Transaction {
   id: string;
   userId: string;
