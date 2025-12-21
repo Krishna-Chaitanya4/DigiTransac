@@ -39,6 +39,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import {
   LineChart,
   Line,
@@ -478,12 +479,7 @@ const Dashboard: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: user?.currency || 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
   };
 
   const formatDate = (dateString: string) => {

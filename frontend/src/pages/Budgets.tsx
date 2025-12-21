@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 
 interface Category {
   id: string;
@@ -194,10 +195,7 @@ const Budgets: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: user?.currency || 'USD',
-    }).format(amount);
+    return formatCurrencyUtil(amount, user?.currency || 'USD');
   };
 
   const formatDate = (dateString: string) => {

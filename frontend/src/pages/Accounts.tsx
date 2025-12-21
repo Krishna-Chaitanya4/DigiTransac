@@ -38,6 +38,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 
 interface Account {
   id: string;
@@ -258,11 +259,8 @@ const Accounts: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(amount);
+  const formatCurrency = (amount: number, currency: string = user?.currency || 'USD') => {
+    return formatCurrencyUtil(amount, currency);
   };
 
   const handleAdjustBalance = (account: Account) => {

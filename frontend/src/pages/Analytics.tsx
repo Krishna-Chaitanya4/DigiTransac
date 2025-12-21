@@ -57,6 +57,7 @@ import {
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 
 interface Overview {
   totalSpent: number;
@@ -458,12 +459,7 @@ const Analytics: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: user?.currency || 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
   };
 
   const formatDate = (dateString: string) => {

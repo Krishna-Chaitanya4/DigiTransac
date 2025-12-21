@@ -49,6 +49,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -592,18 +593,12 @@ const Transactions: React.FC = () => {
 
   const formatCurrency = (amount: number, accountId: string) => {
     const account = accounts.find(a => a.id === accountId);
-    const currency = account?.currency || 'USD';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(amount);
+    const currency = account?.currency || user?.currency || 'USD';
+    return formatCurrencyUtil(amount, currency);
   };
 
   const formatUserCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: user?.currency || 'USD',
-    }).format(amount);
+    return formatCurrencyUtil(amount, user?.currency || 'USD');
   };
 
   if (loading) {
