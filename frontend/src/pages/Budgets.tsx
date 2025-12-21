@@ -14,8 +14,6 @@ import {
   TextField,
   MenuItem,
   LinearProgress,
-  Alert,
-  CircularProgress,
   InputAdornment,
   Chip,
   ToggleButtonGroup,
@@ -23,6 +21,7 @@ import {
   FormControlLabel,
   Switch,
   Divider,
+  Alert,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -32,10 +31,16 @@ import {
   Category as CategoryIcon,
   Label as LabelIcon,
   AccountBalance as AccountIcon,
+  Savings as SavingsIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
+import { useToast } from '../components/Toast';
+import QuickAddFab from '../components/QuickAddFab';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EmptyState from '../components/EmptyState';
+import { BudgetCardSkeleton, GridSkeleton } from '../components/Skeletons';
 
 interface Category {
   id: string;
@@ -100,14 +105,18 @@ interface Budget {
 
 const Budgets: React.FC = () => {
   const { token, user } = useAuth();
+  const toast = useToast();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; budgetId: string | null }>({
+    open: false,
+    budgetId: null,
+  });
 
   const [formData, setFormData] = useState({
     scopeType: 'category' as 'category' | 'tag' | 'account',
@@ -139,9 +148,8 @@ const Budgets: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       setBudgets(response.data.budgets || []);
-      setError('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch budgets');
+      toast.error(err.response?.data?.message || 'Failed to fetch budgets');
     } finally {
       setLoading(false);
     }
@@ -285,55 +293,39 @@ const Budgets: React.FC = () => {
         await axios.put(`/api/budgets/${editingBudget.id}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        toast.success('Budget updated successfully');
       } else {
         await axios.post(`/api/budgets`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        toast.success('Budget created successfully');
       }
       fetchBudgets();
       handleCloseDialog();
     } catch (err: any) {
       console.error('Error saving budget:', err);
       const errorMessage = err.response?.data?.message || err.message || 'Failed to save budget';
-      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
-  const handleDeleteBudget = async (budget: Budget) => {
-    // Get display name based on scope type
-    let displayName = 'this budget';
-    if (budget.scopeType === 'category' && budget.categoryId) {
-      displayName = `"${getCategoryName(budget.categoryId)}"`;
-    } else if (budget.scopeType === 'tag' && (budget.includeTagIds || budget.excludeTagIds)) {
-      const includePart = budget.includeTagIds && budget.includeTagIds.length > 0
-        ? budget.includeTagIds.map(getTagName).join(', ')
-        : '';
-      const excludePart = budget.excludeTagIds && budget.excludeTagIds.length > 0
-        ? budget.excludeTagIds.map(getTagName).join(', ')
-        : '';
-      
-      if (includePart && excludePart) {
-        displayName = `tags: ${includePart} (excluding: ${excludePart})`;
-      } else if (includePart) {
-        displayName = `tags: ${includePart}`;
-      } else {
-        displayName = `excluding tags: ${excludePart}`;
-      }
-    } else if (budget.scopeType === 'account' && budget.accountId) {
-      displayName = `"${getAccountName(budget.accountId)}"`;
-    }
+  const handleDeleteClick = (budgetId: string) => {
+    setConfirmDelete({ open: true, budgetId });
+  };
 
-    if (!window.confirm(`Are you sure you want to delete the budget for ${displayName}?`)) {
-      return;
-    }
+  const handleDeleteBudget = async () => {
+    if (!confirmDelete.budgetId) return;
 
     try {
-      await axios.delete(`/api/budgets/${budget.id}`, {
+      await axios.delete(`/api/budgets/${confirmDelete.budgetId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      toast.success('Budget deleted successfully');
       fetchBudgets();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete budget');
+      toast.error(err.response?.data?.message || 'Failed to delete budget');
+    } finally {
+      setConfirmDelete({ open: false, budgetId: null });
     }
   };
 
@@ -357,8 +349,11 @@ const Budgets: React.FC = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
+      <Box>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4">Budgets</Typography>
+        </Box>
+        <GridSkeleton count={4} component={BudgetCardSkeleton} />
       </Box>
     );
   }
@@ -384,12 +379,6 @@ const Budgets: React.FC = () => {
         </Button>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
-
       {budgets.length === 0 ? (
         <Card
           sx={{
@@ -400,19 +389,13 @@ const Budgets: React.FC = () => {
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
           }}
         >
-          <CardContent>
-            <Box textAlign="center" py={6}>
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No budgets yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary" mb={2}>
-                Create budgets to track your spending limits
-              </Typography>
-              <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenDialog}>
-                Create Budget
-              </Button>
-            </Box>
-          </CardContent>
+          <EmptyState
+            icon={<SavingsIcon />}
+            title="No budgets yet"
+            description="Create budgets to track your spending limits and stay on top of your finances"
+            actionLabel="Create Budget"
+            onAction={handleOpenDialog}
+          />
         </Card>
       ) : (
         <Grid container spacing={3}>
@@ -577,7 +560,7 @@ const Budgets: React.FC = () => {
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={() => handleDeleteBudget(budget)}
+                        onClick={() => handleDeleteClick(budget.id)}
                         color="error"
                       >
                         <DeleteIcon fontSize="small" />
@@ -979,6 +962,21 @@ const Budgets: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmDelete.open}
+        title="Delete Budget"
+        message="Are you sure you want to delete this budget? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleDeleteBudget}
+        onCancel={() => setConfirmDelete({ open: false, budgetId: null })}
+        severity="error"
+      />
+
+      {/* Quick Add FAB */}
+      <QuickAddFab onClick={handleOpenDialog} tooltip="Create Budget" />
     </Box>
   );
 };
