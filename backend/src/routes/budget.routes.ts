@@ -7,42 +7,6 @@ const router = Router();
 
 router.use(authenticate);
 
-/**
- * Get all descendant category IDs for a given category/folder
- * For regular categories: returns just the categoryId
- * For folders: returns all child category IDs recursively
- */
-async function getAllDescendantCategoryIds(
-  categoriesContainer: any,
-  userId: string,
-  categoryId: string,
-  isFolder: boolean
-): Promise<string[]> {
-  if (!isFolder) {
-    // Regular category - return just itself
-    return [categoryId];
-  }
-
-  // Folder - recursively get all descendants
-  const categoryIds: string[] = [];
-
-  const collectDescendants = async (parentId: string): Promise<void> => {
-    const children = (await categoriesContainer.find({ parentId, userId }).toArray()) as Category[];
-
-    for (const child of children) {
-      if (!child.isFolder) {
-        // It's a category - add to list
-        categoryIds.push(child.id);
-      }
-      // Whether folder or category, check for children
-      await collectDescendants(child.id);
-    }
-  };
-
-  await collectDescendants(categoryId);
-  return categoryIds;
-}
-
 // GET /api/budgets - Get all budgets with spending info
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -51,63 +15,107 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
-    // Calculate spending for each budget
+    if (budgets.length === 0) {
+      res.json({ success: true, budgets: [] });
+      return;
+    }
+
+    // Fetch all categories and expenses once
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
-    const budgetsWithSpending = await Promise.all(
-      budgets.map(async (budget) => {
-        const startDate = new Date(budget.startDate);
-        const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
+    const categories = (await categoriesContainer
+      .find({ userId })
+      .toArray()) as unknown as Category[];
+    const categoryMap = new Map(categories.map((cat) => [cat.id, cat]));
 
-        // Get the category to check if it's a folder
-        const category = (await categoriesContainer.findOne({
-          id: budget.categoryId,
-          userId,
-        })) as Category | null;
+    // Build category hierarchy map for efficient lookups
+    const categoryToDescendantsMap = new Map<string, string[]>();
+    const buildDescendants = (parentId: string): string[] => {
+      if (categoryToDescendantsMap.has(parentId)) {
+        return categoryToDescendantsMap.get(parentId)!;
+      }
 
-        if (!category) {
-          // Category not found - return budget with zero spending
-          return {
-            ...budget,
-            spent: 0,
-            remaining: budget.amount,
-            percentUsed: 0,
-            isOverBudget: false,
-          };
+      const descendants: string[] = [];
+      const children = categories.filter((cat) => cat.parentId === parentId);
+
+      for (const child of children) {
+        if (!child.isFolder) {
+          descendants.push(child.id);
         }
+        descendants.push(...buildDescendants(child.id));
+      }
 
-        // Get all category IDs to include in calculation
-        const categoryIds = await getAllDescendantCategoryIds(
-          categoriesContainer,
-          userId,
-          budget.categoryId,
-          category.isFolder
-        );
+      categoryToDescendantsMap.set(parentId, descendants);
+      return descendants;
+    };
 
-        // Calculate spending across all relevant categories (approved expenses only)
-        const expenses = await expensesContainer
-          .find({
-            userId,
-            categoryId: { $in: categoryIds },
-            date: { $gte: startDate, $lte: endDate },
-            reviewStatus: 'approved',
-          })
-          .toArray();
+    // Pre-compute descendants for all categories
+    categories.forEach((cat) => buildDescendants(cat.id));
 
-        const spent = expenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
-        const remaining = budget.amount - spent;
-        const percentUsed = Math.round((spent / budget.amount) * 100);
+    // Fetch ALL relevant expenses in ONE query
+    const minStartDate = new Date(Math.min(...budgets.map((b) => new Date(b.startDate).getTime())));
+    const allExpenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: minStartDate },
+        reviewStatus: 'approved',
+      })
+      .toArray();
 
+    // Group expenses by category for fast lookup
+    const expensesByCategory = new Map<string, any[]>();
+    allExpenses.forEach((exp: any) => {
+      if (!expensesByCategory.has(exp.categoryId)) {
+        expensesByCategory.set(exp.categoryId, []);
+      }
+      expensesByCategory.get(exp.categoryId)!.push(exp);
+    });
+
+    // Calculate spending for each budget using pre-fetched data
+    const budgetsWithSpending = budgets.map((budget) => {
+      const startDate = new Date(budget.startDate);
+      const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
+
+      const category = categoryMap.get(budget.categoryId);
+      if (!category) {
         return {
           ...budget,
-          spent,
-          remaining,
-          percentUsed,
-          isOverBudget: spent > budget.amount,
+          spent: 0,
+          remaining: budget.amount,
+          percentUsed: 0,
+          isOverBudget: false,
         };
-      })
-    );
+      }
+
+      // Get all category IDs to include in calculation
+      const categoryIds = category.isFolder
+        ? categoryToDescendantsMap.get(budget.categoryId) || []
+        : [budget.categoryId];
+
+      // Calculate spending from pre-fetched expenses
+      let spent = 0;
+      for (const catId of categoryIds) {
+        const expenses = expensesByCategory.get(catId) || [];
+        spent += expenses
+          .filter((exp: any) => {
+            const expDate = new Date(exp.date);
+            return expDate >= startDate && expDate <= endDate;
+          })
+          .reduce((sum: number, exp: any) => sum + exp.amount, 0);
+      }
+
+      const remaining = budget.amount - spent;
+      const percentUsed = Math.round((spent / budget.amount) * 100);
+
+      return {
+        ...budget,
+        spent,
+        remaining,
+        percentUsed,
+        isOverBudget: spent > budget.amount,
+      };
+    });
 
     res.json({
       success: true,
@@ -295,26 +303,88 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
-    const alerts = [];
     const expensesContainer = await cosmosDBService.getExpensesContainer();
+    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+
+    if (budgets.length === 0) {
+      res.json({ success: true, alerts: [] });
+      return;
+    }
+
+    // Fetch all categories and expenses once
+    const categories = (await categoriesContainer
+      .find({ userId })
+      .toArray()) as unknown as Category[];
+    const categoryMap = new Map(categories.map((cat) => [cat.id, cat]));
+
+    // Build category hierarchy map
+    const categoryToDescendantsMap = new Map<string, string[]>();
+    const buildDescendants = (parentId: string): string[] => {
+      if (categoryToDescendantsMap.has(parentId)) {
+        return categoryToDescendantsMap.get(parentId)!;
+      }
+
+      const descendants: string[] = [];
+      const children = categories.filter((cat) => cat.parentId === parentId);
+
+      for (const child of children) {
+        if (!child.isFolder) {
+          descendants.push(child.id);
+        }
+        descendants.push(...buildDescendants(child.id));
+      }
+
+      categoryToDescendantsMap.set(parentId, descendants);
+      return descendants;
+    };
+
+    categories.forEach((cat) => buildDescendants(cat.id));
+
+    // Fetch ALL relevant expenses in ONE query
+    const minStartDate = new Date(Math.min(...budgets.map((b) => new Date(b.startDate).getTime())));
+    const allExpenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: minStartDate },
+      })
+      .toArray();
+
+    // Group expenses by category
+    const expensesByCategory = new Map<string, any[]>();
+    allExpenses.forEach((exp: any) => {
+      if (!expensesByCategory.has(exp.categoryId)) {
+        expensesByCategory.set(exp.categoryId, []);
+      }
+      expensesByCategory.get(exp.categoryId)!.push(exp);
+    });
+
+    const budgetAlerts = [];
 
     for (const budget of budgets) {
       const startDate = new Date(budget.startDate);
       const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
 
-      const expenses = await expensesContainer
-        .find({
-          userId,
-          categoryId: budget.categoryId,
-          date: { $gte: startDate, $lte: endDate },
-        })
-        .toArray();
+      const category = categoryMap.get(budget.categoryId);
+      const categoryIds = category?.isFolder
+        ? categoryToDescendantsMap.get(budget.categoryId) || []
+        : [budget.categoryId];
 
-      const spent = expenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
+      // Calculate spending from pre-fetched expenses
+      let spent = 0;
+      for (const catId of categoryIds) {
+        const expenses = expensesByCategory.get(catId) || [];
+        spent += expenses
+          .filter((exp: any) => {
+            const expDate = new Date(exp.date);
+            return expDate >= startDate && expDate <= endDate;
+          })
+          .reduce((sum: number, exp: any) => sum + exp.amount, 0);
+      }
+
       const percentUsed = (spent / budget.amount) * 100;
 
       if (percentUsed >= budget.alertThreshold) {
-        alerts.push({
+        budgetAlerts.push({
           budgetId: budget.id,
           categoryId: budget.categoryId,
           amount: budget.amount,
@@ -328,7 +398,7 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
 
     res.json({
       success: true,
-      alerts,
+      alerts: budgetAlerts,
     });
   } catch (error) {
     console.error('Error fetching budget alerts:', error);

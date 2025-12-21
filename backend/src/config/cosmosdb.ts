@@ -120,11 +120,24 @@ class CosmosDBService {
     await this.transactionsContainer.createIndex({ accountId: 1 });
     await this.transactionsContainer.createIndex({ date: 1 });
     await this.transactionsContainer.createIndex({ type: 1 });
-    // Compound index for userId + date sorting (required for Cosmos DB)
+    // Compound indexes for userId + various sort fields (required for Cosmos DB)
     await this.transactionsContainer.createIndex({ userId: 1, date: -1 });
+    await this.transactionsContainer.createIndex({ userId: 1, date: 1 });
+    await this.transactionsContainer.createIndex({ userId: 1, amount: -1 });
+    await this.transactionsContainer.createIndex({ userId: 1, amount: 1 });
+    await this.transactionsContainer.createIndex({ userId: 1, description: 1 });
+    await this.transactionsContainer.createIndex({ userId: 1, description: -1 });
+
     await this.accountsContainer.createIndex({ userId: 1 });
+    // Compound indexes for accounts sorting
+    await this.accountsContainer.createIndex({ userId: 1, isDefault: -1, createdAt: 1 });
+    await this.accountsContainer.createIndex({ userId: 1, createdAt: 1 });
+
     await this.tagsContainer.createIndex({ userId: 1 });
     await this.tagsContainer.createIndex({ name: 1 });
+    // Compound indexes for tags sorting
+    await this.tagsContainer.createIndex({ userId: 1, usageCount: -1, name: 1 });
+    await this.tagsContainer.createIndex({ userId: 1, name: 1 });
 
     // Indexes for transaction splits
     await this.transactionSplitsContainer.createIndex({ transactionId: 1 });

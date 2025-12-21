@@ -49,12 +49,12 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const tagsContainer = await cosmosDBService.getTagsContainer();
     const tags = (await tagsContainer.find({ userId }).toArray()) as unknown as Tag[];
 
-    // Sort in-memory to avoid composite index requirement
+    // Sort in memory for now to avoid index issues
     tags.sort((a, b) => {
       if (a.usageCount !== b.usageCount) {
-        return b.usageCount - a.usageCount; // Descending by usageCount
+        return b.usageCount - a.usageCount;
       }
-      return a.name.localeCompare(b.name); // Ascending by name
+      return a.name.localeCompare(b.name);
     });
 
     res.json({

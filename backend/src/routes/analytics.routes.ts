@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 
@@ -19,10 +19,11 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
       ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
       : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenses = await expensesContainer
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const expenses = await transactionsContainer
       .find({
         userId,
+        type: 'debit',
         date: { $gte: start, $lte: end },
         reviewStatus: 'approved',
       })
@@ -80,23 +81,34 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
       ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
       : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenses = await expensesContainer
+    // Get transactions and their splits to aggregate by category
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    
+    const transactions = await transactionsContainer
       .find({
         userId,
+        type: 'debit',
         date: { $gte: start, $lte: end },
         reviewStatus: 'approved',
       })
       .toArray();
 
-    // Aggregate by category
+    const transactionIds = transactions.map((t: any) => t.id);
+    const splits = await splitsContainer
+      .find({
+        transactionId: { $in: transactionIds },
+      })
+      .toArray();
+
+    // Aggregate by category from splits
     const categoryMap = new Map<string, { amount: number; count: number }>();
 
-    expenses.forEach((expense: any) => {
-      const categoryId = expense.categoryId;
+    splits.forEach((split: any) => {
+      const categoryId = split.categoryId;
       const current = categoryMap.get(categoryId) || { amount: 0, count: 0 };
       categoryMap.set(categoryId, {
-        amount: current.amount + expense.amount,
+        amount: current.amount + split.amount,
         count: current.count + 1,
       });
     });
@@ -357,60 +369,93 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       })
       .toArray();
 
+    if (budgets.length === 0) {
+      res.json({ success: true, comparisons: [] });
+      return;
+    }
+
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
     const categories = await categoriesContainer.find({ userId }).toArray();
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
-    // Helper function to get all descendant category IDs (for folder budgets)
+    // Build category hierarchy map
+    const categoryToDescendantsMap = new Map<string, string[]>();
     const getAllDescendantCategoryIds = (categoryId: string): string[] => {
+      if (categoryToDescendantsMap.has(categoryId)) {
+        return categoryToDescendantsMap.get(categoryId)!;
+      }
+
       const result = [categoryId];
       const children = categories.filter((cat: any) => cat.parentId === categoryId);
       children.forEach((child: any) => {
         result.push(...getAllDescendantCategoryIds(child.id));
       });
+
+      categoryToDescendantsMap.set(categoryId, result);
       return result;
     };
 
-    const comparisons = await Promise.all(
-      budgets.map(async (budget: any) => {
-        const budgetStart = new Date(budget.startDate) > start ? new Date(budget.startDate) : start;
-        const budgetEnd =
-          budget.endDate && new Date(budget.endDate) < end ? new Date(budget.endDate) : end;
+    // Pre-compute descendants for all budget categories
+    budgets.forEach((budget: any) => getAllDescendantCategoryIds(budget.categoryId));
 
-        const category = categoryLookup.get(budget.categoryId);
-        const isFolder = category?.isFolder || false;
-
-        // For folders, get all descendant categories
-        const categoryIds = isFolder
-          ? getAllDescendantCategoryIds(budget.categoryId)
-          : [budget.categoryId];
-
-        const expenses = await expensesContainer
-          .find({
-            userId,
-            categoryId: { $in: categoryIds },
-            date: { $gte: budgetStart, $lte: budgetEnd },
-            reviewStatus: 'approved',
-          })
-          .toArray();
-
-        const spent = expenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
-
-        return {
-          categoryId: budget.categoryId,
-          categoryName: category?.name || 'Unknown',
-          categoryColor: category?.color || '#667eea',
-          isFolder,
-          budgetAmount: budget.amount,
-          actualSpent: spent,
-          difference: budget.amount - spent,
-          percentUsed: Math.round((spent / budget.amount) * 100),
-          isOverBudget: spent > budget.amount,
-        };
+    // Fetch ALL relevant expenses in ONE query
+    const allExpenses = await expensesContainer
+      .find({
+        userId,
+        date: { $gte: start, $lte: end },
+        reviewStatus: 'approved',
       })
-    );
+      .toArray();
+
+    // Group expenses by category
+    const expensesByCategory = new Map<string, any[]>();
+    allExpenses.forEach((exp: any) => {
+      if (!expensesByCategory.has(exp.categoryId)) {
+        expensesByCategory.set(exp.categoryId, []);
+      }
+      expensesByCategory.get(exp.categoryId)!.push(exp);
+    });
+
+    // Calculate comparisons using pre-fetched data
+    const comparisons = budgets.map((budget: any) => {
+      const budgetStart = new Date(budget.startDate) > start ? new Date(budget.startDate) : start;
+      const budgetEnd =
+        budget.endDate && new Date(budget.endDate) < end ? new Date(budget.endDate) : end;
+
+      const category = categoryLookup.get(budget.categoryId);
+      const isFolder = category?.isFolder || false;
+
+      // For folders, get all descendant categories
+      const categoryIds = isFolder
+        ? getAllDescendantCategoryIds(budget.categoryId)
+        : [budget.categoryId];
+
+      // Calculate spending from pre-fetched expenses
+      let spent = 0;
+      for (const catId of categoryIds) {
+        const expenses = expensesByCategory.get(catId) || [];
+        spent += expenses
+          .filter((exp: any) => {
+            const expDate = new Date(exp.date);
+            return expDate >= budgetStart && expDate <= budgetEnd;
+          })
+          .reduce((sum: number, exp: any) => sum + exp.amount, 0);
+      }
+
+      return {
+        categoryId: budget.categoryId,
+        categoryName: category?.name || 'Unknown',
+        categoryColor: category?.color || '#667eea',
+        isFolder,
+        budgetAmount: budget.amount,
+        actualSpent: spent,
+        difference: budget.amount - spent,
+        percentUsed: Math.round((spent / budget.amount) * 100),
+        isOverBudget: spent > budget.amount,
+      };
+    });
 
     res.json({
       success: true,
@@ -849,29 +894,31 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
 
-    const allExpenses = await expensesContainer.find({ userId }).toArray();
-
-    const pending = allExpenses.filter((exp: any) => exp.reviewStatus === 'pending').length;
-    const approved = allExpenses.filter((exp: any) => exp.reviewStatus === 'approved').length;
-    const rejected = allExpenses.filter((exp: any) => exp.reviewStatus === 'rejected').length;
+    // Use aggregation to count by status efficiently
+    const [pending, approved, rejected, pendingExpenses] = await Promise.all([
+      expensesContainer.countDocuments({ userId, reviewStatus: 'pending' }),
+      expensesContainer.countDocuments({ userId, reviewStatus: 'approved' }),
+      expensesContainer.countDocuments({ userId, reviewStatus: 'rejected' }),
+      expensesContainer
+        .find({ userId, reviewStatus: 'pending' })
+        .sort({ date: -1 })
+        .limit(5)
+        .toArray(),
+    ]);
 
     const total = approved + rejected;
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
     // Get pending expenses details
-    const pendingExpenses = allExpenses
-      .filter((exp: any) => exp.reviewStatus === 'pending')
-      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5)
-      .map((exp: any) => ({
-        id: exp.id,
-        description: exp.description,
-        amount: exp.amount,
-        date: exp.date,
-        daysSinceParsed: Math.floor(
-          (Date.now() - new Date(exp.createdAt || exp.date).getTime()) / (1000 * 60 * 60 * 24)
-        ),
-      }));
+    const pendingExpensesFormatted = pendingExpenses.map((exp: any) => ({
+      id: exp.id,
+      description: exp.description,
+      amount: exp.amount,
+      date: exp.date,
+      daysSinceParsed: Math.floor(
+        (Date.now() - new Date(exp.createdAt || exp.date).getTime()) / (1000 * 60 * 60 * 24)
+      ),
+    }));
 
     res.json({
       success: true,
@@ -880,7 +927,7 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
         approved,
         rejected,
         approvalRate,
-        pendingExpenses,
+        pendingExpenses: pendingExpensesFormatted,
       },
     });
   } catch (error) {

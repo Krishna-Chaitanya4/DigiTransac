@@ -30,7 +30,7 @@ const envSchema = Joi.object({
   FRONTEND_URL: Joi.string().uri().required(),
   BACKEND_URL: Joi.string().uri().required(),
   MASTER_ENCRYPTION_KEY: Joi.string().optional(),
-  KEY_VAULT_URL: Joi.string().uri().optional(),
+  KEY_VAULT_URL: Joi.string().allow('', null).optional(),
   GMAIL_CLIENT_ID: Joi.string().optional(),
   GMAIL_CLIENT_SECRET: Joi.string().optional(),
 }).unknown(true);
