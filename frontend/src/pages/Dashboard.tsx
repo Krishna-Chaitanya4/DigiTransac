@@ -373,7 +373,9 @@ const Dashboard: React.FC = () => {
       }
       
       // Update budget left in stats
-      setStats(prev => prev ? { ...prev, budgetLeft: totalBudget - totalSpent } : null);
+      // Only calculate budget left if there are budgets configured
+      const budgetLeft = budgets.length > 0 ? totalBudget - totalSpent : 0;
+      setStats(prev => prev ? { ...prev, budgetLeft } : null);
 
       setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
 
@@ -716,8 +718,8 @@ const Dashboard: React.FC = () => {
     },
     {
       title: 'Budget Left',
-      value: formatCurrency(stats?.budgetLeft || 0),
-      change: `${stats?.expenseCount || 0} expenses`,
+      value: budgetStatus.length === 0 ? 'No budgets' : formatCurrency(stats?.budgetLeft || 0),
+      change: budgetStatus.length === 0 ? 'Create budgets' : `${stats?.expenseCount || 0} expenses`,
       trend: (stats?.budgetLeft || 0) > 0 ? 'up' : 'down',
       icon: <LightbulbIcon sx={{ fontSize: 32 }} />,
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
