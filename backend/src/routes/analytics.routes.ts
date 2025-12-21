@@ -11,7 +11,7 @@ router.use(authenticate);
 router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, accounts, tags, categories, compareWithPrevious } = req.query;
 
     const start = startDate
       ? new Date(startDate as string)
@@ -21,17 +21,44 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
       : new Date(new Date().setHours(23, 59, 59, 999));
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const expenses = await transactionsContainer
-      .find({
-        userId,
-        type: 'debit',
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    
+    // Build filter for transactions
+    const txFilter: any = {
+      userId,
+      type: 'debit',
+      date: { $gte: start, $lte: end },
+      reviewStatus: 'approved',
+    };
+    
+    if (accounts) {
+      const accountIds = (accounts as string).split(',');
+      txFilter.accountId = { $in: accountIds };
+    }
+    
+    const expenses = await transactionsContainer.find(txFilter).toArray();
+    
+    // Filter by categories/tags in splits if specified
+    let splits = await splitsContainer
+      .find({ 
+        transactionId: { $in: expenses.map((e: any) => e.id) }
       })
       .toArray();
-
-    const totalSpent = expenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
-    const expenseCount = expenses.length;
+    
+    if (categories) {
+      const categoryIds = (categories as string).split(',');
+      splits = splits.filter((s: any) => categoryIds.includes(s.categoryId));
+    }
+    
+    if (tags) {
+      const tagList = (tags as string).split(',');
+      splits = splits.filter((s: any) => 
+        s.tags && s.tags.some((t: string) => tagList.includes(t))
+      );
+    }
+    
+    const totalSpent = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
+    const expenseCount = splits.length;
     const avgExpense = expenseCount > 0 ? totalSpent / expenseCount : 0;
 
     // Get budget info
@@ -46,6 +73,44 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
 
     const totalBudget = budgets.reduce((sum: number, budget: any) => sum + budget.amount, 0);
 
+    // Calculate comparison with previous period if requested
+    let comparison: any = null;
+    if (compareWithPrevious === 'true') {
+      const periodLength = end.getTime() - start.getTime();
+      const prevStart = new Date(start.getTime() - periodLength);
+      const prevEnd = new Date(start.getTime() - 1);
+      
+      const prevTxFilter = { ...txFilter, date: { $gte: prevStart, $lte: prevEnd } };
+      const prevExpenses = await transactionsContainer.find(prevTxFilter).toArray();
+      
+      let prevSplits = await splitsContainer
+        .find({ transactionId: { $in: prevExpenses.map((e: any) => e.id) } })
+        .toArray();
+        
+      if (categories) {
+        const categoryIds = (categories as string).split(',');
+        prevSplits = prevSplits.filter((s: any) => categoryIds.includes(s.categoryId));
+      }
+      
+      if (tags) {
+        const tagList = (tags as string).split(',');
+        prevSplits = prevSplits.filter((s: any) => 
+          s.tags && s.tags.some((t: string) => tagList.includes(t))
+        );
+      }
+      
+      const prevTotalSpent = prevSplits.reduce((sum: number, split: any) => sum + split.amount, 0);
+      const changeAmount = totalSpent - prevTotalSpent;
+      const changePercent = prevTotalSpent > 0 ? ((changeAmount / prevTotalSpent) * 100) : 0;
+      
+      comparison = {
+        previousSpent: prevTotalSpent,
+        changeAmount,
+        changePercent: Math.round(changePercent * 100) / 100,
+        trend: changeAmount > 0 ? 'up' : changeAmount < 0 ? 'down' : 'stable',
+      };
+    }
+
     res.json({
       success: true,
       overview: {
@@ -58,6 +123,7 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
           startDate: start,
           endDate: end,
         },
+        comparison,
       },
     });
   } catch (error) {
