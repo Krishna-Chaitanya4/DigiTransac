@@ -19,13 +19,14 @@ import {
   ListItemButton,
   LinearProgress,
   Button,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   AccountBalance as AccountBalanceIcon,
   Receipt as ReceiptIcon,
-  RestartAlt as RestartAltIcon,
   Warning as WarningIcon,
   Lightbulb as LightbulbIcon,
   Folder as FolderIcon,
@@ -35,10 +36,9 @@ import {
   UnfoldMore as UnfoldMoreIcon,
   UnfoldLess as UnfoldLessIcon,
 } from '@mui/icons-material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import {
   PieChart,
   Pie,
@@ -58,6 +58,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
+import { FilterBar, FilterValues } from '../components/FilterBar';
 
 interface Overview {
   totalSpent: number;
@@ -68,6 +69,12 @@ interface Overview {
   period: {
     startDate: Date;
     endDate: Date;
+  };
+  comparison?: {
+    previousSpent: number;
+    changeAmount: number;
+    changePercent: number;
+    trend: 'up' | 'down' | 'stable';
   };
 }
 
@@ -201,11 +208,14 @@ const Analytics: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [currentTab, setCurrentTab] = useState(0);
 
   const [overview, setOverview] = useState<Overview | null>(null);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
   const [folderBreakdown, setFolderBreakdown] = useState<CategoryBreakdown[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [tags, setTags] = useState<any[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'amount' | 'name' | 'count'>('amount');
   const [viewMode, setViewMode] = useState<'category' | 'folder'>('category');
@@ -218,52 +228,67 @@ const Analytics: React.FC = () => {
   const [topMerchants, setTopMerchants] = useState<MerchantData[]>([]);
   const [smartInsights, setSmartInsights] = useState<SmartInsights | null>(null);
 
-  // Load saved preferences from localStorage or use defaults
-  const [startDate, setStartDate] = useState<Dayjs | null>(() => {
-    const saved = localStorage.getItem('analytics_startDate');
-    return saved ? dayjs(saved) : dayjs().startOf('month');
+  // Filter state
+  const [filters, setFilters] = useState<FilterValues>({
+    dateRange: {
+      start: dayjs().startOf('month'),
+      end: dayjs(),
+      preset: 'thisMonth',
+    },
+    accounts: [],
+    categories: [],
+    tags: [],
+    transactionType: 'all',
   });
 
-  const [endDate, setEndDate] = useState<Dayjs | null>(() => {
-    const saved = localStorage.getItem('analytics_endDate');
-    return saved ? dayjs(saved) : dayjs();
-  });
-
-  const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'week' | 'month'>(() => {
-    const saved = localStorage.getItem('analytics_trendGroupBy');
-    return (saved as 'day' | 'week' | 'month') || 'day';
-  });
-
-  // Save preferences to localStorage whenever they change
-  useEffect(() => {
-    if (startDate) {
-      localStorage.setItem('analytics_startDate', startDate.format('YYYY-MM-DD'));
-    }
-  }, [startDate]);
-
-  useEffect(() => {
-    if (endDate) {
-      localStorage.setItem('analytics_endDate', endDate.format('YYYY-MM-DD'));
-    }
-  }, [endDate]);
-
-  useEffect(() => {
-    localStorage.setItem('analytics_trendGroupBy', trendGroupBy);
-  }, [trendGroupBy]);
+  const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'week' | 'month'>('day');
 
   useEffect(() => {
     fetchAnalytics();
-  }, [startDate, endDate, trendGroupBy]);
+    fetchFilterData();
+  }, [filters]);
+
+  useEffect(() => {
+    fetchAnalytics();
+    fetchFilterData();
+  }, [filters]);
+
+  const fetchFilterData = async () => {
+    try {
+      const [categoriesRes, accountsRes, tagsRes] = await Promise.all([
+        axios.get(`/api/categories`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/accounts`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/tags`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      setCategories(categoriesRes.data.categories || []);
+      setAccounts(accountsRes.data.accounts || []);
+      setTags(tagsRes.data.tags || []);
+    } catch (err) {
+      console.error('Error fetching filter data:', err);
+    }
+  };
 
   const fetchAnalytics = async () => {
-    if (!startDate || !endDate) return;
+    if (!filters.dateRange.start || !filters.dateRange.end) return;
 
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        startDate: startDate.format('YYYY-MM-DD'),
-        endDate: endDate.format('YYYY-MM-DD'),
+        startDate: filters.dateRange.start.format('YYYY-MM-DD'),
+        endDate: filters.dateRange.end.format('YYYY-MM-DD'),
+        compareWithPrevious: 'true',
       });
+
+      if (filters.accounts.length > 0) {
+        params.append('accounts', filters.accounts.join(','));
+      }
+      if (filters.categories.length > 0) {
+        params.append('categories', filters.categories.join(','));
+      }
+      if (filters.tags.length > 0) {
+        params.append('tags', filters.tags.join(','));
+      }
 
       const [
         overviewRes,
@@ -332,7 +357,7 @@ const Analytics: React.FC = () => {
       // Process account breakdown
       const accounts = accountsRes.data.accounts || [];
       const transactionsRes = await axios.get(
-        `/api/transactions?startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`,
+        `/api/transactions?startDate=${filters.dateRange.start.format('YYYY-MM-DD')}&endDate=${filters.dateRange.end.format('YYYY-MM-DD')}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -497,15 +522,6 @@ const Analytics: React.FC = () => {
     });
   };
 
-  const handleResetFilters = () => {
-    setStartDate(dayjs().startOf('month'));
-    setEndDate(dayjs());
-    setTrendGroupBy('day');
-    localStorage.removeItem('analytics_startDate');
-    localStorage.removeItem('analytics_endDate');
-    localStorage.removeItem('analytics_trendGroupBy');
-  };
-
   // Tree view helper functions
   const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => {
@@ -611,42 +627,8 @@ const Analytics: React.FC = () => {
       <Box>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4" fontWeight={700}>
-            Analytics
+            📊 Analytics
           </Typography>
-          <Box display="flex" gap={2}>
-            <DatePicker
-              label="Start Date"
-              value={startDate}
-              onChange={(newValue) => setStartDate(newValue)}
-              slotProps={{
-                textField: {
-                  size: 'small',
-                },
-              }}
-            />
-            <DatePicker
-              label="End Date"
-              value={endDate}
-              onChange={(newValue) => setEndDate(newValue)}
-              slotProps={{
-                textField: {
-                  size: 'small',
-                },
-              }}
-            />
-            <Tooltip title="Reset to default (current month)">
-              <IconButton
-                onClick={handleResetFilters}
-                color="primary"
-                sx={{
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <RestartAltIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
         </Box>
 
         {error && (
@@ -655,8 +637,120 @@ const Analytics: React.FC = () => {
           </Alert>
         )}
 
-        {/* Smart Insights Section */}
-        {smartInsights && (
+        <FilterBar
+          filters={filters}
+          onFiltersChange={setFilters}
+          accounts={accounts}
+          categories={categories}
+          tags={tags}
+          showTransactionType={false}
+        />
+
+        {/* Tabs for different views */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={currentTab} onChange={(_, newValue) => setCurrentTab(newValue)}>
+            <Tab label="Overview" />
+            <Tab label="Trends & Patterns" />
+            <Tab label="Budgets & Goals" />
+          </Tabs>
+        </Box>
+
+        {/* Overview Statistics with Comparison */}
+        {overview && overview.comparison && (
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" variant="body2">
+                    Total Spent
+                  </Typography>
+                  <Typography variant="h5" fontWeight={600}>
+                    {formatCurrency(overview.totalSpent)}
+                  </Typography>
+                  {overview.comparison && (
+                    <Box display="flex" alignItems="center" gap={0.5} mt={1}>
+                      {overview.comparison.trend === 'up' ? (
+                        <TrendingUpIcon color="error" fontSize="small" />
+                      ) : overview.comparison.trend === 'down' ? (
+                        <TrendingDownIcon color="success" fontSize="small" />
+                      ) : null}
+                      <Typography
+                        variant="body2"
+                        color={
+                          overview.comparison.trend === 'up'
+                            ? 'error'
+                            : overview.comparison.trend === 'down'
+                            ? 'success'
+                            : 'textSecondary'
+                        }
+                      >
+                        {overview.comparison.changePercent > 0 ? '+' : ''}
+                        {overview.comparison.changePercent.toFixed(1)}% vs previous
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" variant="body2">
+                    Budget Used
+                  </Typography>
+                  <Typography variant="h5" fontWeight={600}>
+                    {overview.budgetUsedPercent}%
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(overview.budgetUsedPercent, 100)}
+                    color={overview.budgetUsedPercent > 100 ? 'error' : 'primary'}
+                    sx={{ mt: 1 }}
+                  />
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" variant="body2">
+                    Transactions
+                  </Typography>
+                  <Typography variant="h5" fontWeight={600}>
+                    {overview.expenseCount}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary" mt={1}>
+                    Avg: {formatCurrency(overview.avgExpense)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" variant="body2">
+                    Budget Remaining
+                  </Typography>
+                  <Typography variant="h5" fontWeight={600}>
+                    {formatCurrency(overview.totalBudget - overview.totalSpent)}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary" mt={1}>
+                    of {formatCurrency(overview.totalBudget)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Tab Content */}
+        {currentTab === 0 && (
+          <>
+            {/* Smart Insights Section */}
+            {smartInsights && (
           <Grid container spacing={2} mb={3}>
             {/* Overall Trend Alert */}
             {smartInsights.overallTrend && (
@@ -1814,6 +1908,32 @@ const Analytics: React.FC = () => {
             </Card>
           </Grid>
         </Grid>
+          </>
+        )}
+
+        {/* Tab 1: Trends & Patterns */}
+        {currentTab === 1 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Spending Trends & Patterns
+            </Typography>
+            <Typography color="textSecondary">
+              Coming soon: Detailed trend analysis, day-of-week patterns, and seasonal insights
+            </Typography>
+          </Box>
+        )}
+
+        {/* Tab 2: Budgets & Goals */}
+        {currentTab === 2 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Budget Performance & Goals
+            </Typography>
+            <Typography color="textSecondary">
+              Coming soon: Budget vs actual comparisons and goal tracking
+            </Typography>
+          </Box>
+        )}
       </Box>
     </LocalizationProvider>
   );

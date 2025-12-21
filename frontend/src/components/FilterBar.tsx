@@ -1,22 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
   TextField,
   MenuItem,
   Chip,
-  Button,
   IconButton,
   Collapse,
   Grid,
   Autocomplete,
   ToggleButtonGroup,
   ToggleButton,
-  Typography,
 } from '@mui/material';
 import {
-  FilterList as FilterListIcon,
-  Close as CloseIcon,
   Refresh as RefreshIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
@@ -45,7 +41,6 @@ interface FilterBarProps {
   categories: Array<{ id: string; name: string; color?: string; isFolder?: boolean }>;
   tags: Array<{ id: string; name: string; color?: string }>;
   showTransactionType?: boolean;
-  showComparison?: boolean;
 }
 
 const DATE_PRESETS = [
@@ -65,7 +60,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   categories,
   tags,
   showTransactionType = false,
-  showComparison = false,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [datePreset, setDatePreset] = useState('thisMonth');
