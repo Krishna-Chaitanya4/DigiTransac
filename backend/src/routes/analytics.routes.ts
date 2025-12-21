@@ -498,12 +498,27 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
           displayName = category?.name || 'Unknown Category';
           displayColor = category?.color || '#667eea';
           isFolder = category?.isFolder || false;
-        } else if (budget.scopeType === 'tag' && budget.tagIds && budget.tagIds.length > 0) {
+        } else if (budget.scopeType === 'tag' && (budget.includeTagIds || budget.excludeTagIds)) {
           // Fetch tag names
           const tagsContainer = await cosmosDBService.getTagsContainer();
-          const tags = await tagsContainer.find({ id: { $in: budget.tagIds }, userId }).toArray();
-          const tagNames = tags.map((t: any) => t.name).join(budget.tagLogic === 'AND' ? ' + ' : ' / ');
-          displayName = `Tags: ${tagNames}`;
+          const allTagIds = [...(budget.includeTagIds || []), ...(budget.excludeTagIds || [])];
+          const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
+          const tagMap = new Map(tags.map((t: any) => [t.id, t.name]));
+          
+          const includePart = budget.includeTagIds && budget.includeTagIds.length > 0
+            ? budget.includeTagIds.map((id: string) => tagMap.get(id) || id).join(' / ')
+            : '';
+          const excludePart = budget.excludeTagIds && budget.excludeTagIds.length > 0
+            ? budget.excludeTagIds.map((id: string) => tagMap.get(id) || id).join(' / ')
+            : '';
+          
+          if (includePart && excludePart) {
+            displayName = `Tags: ${includePart} (excl: ${excludePart})`;
+          } else if (includePart) {
+            displayName = `Tags: ${includePart}`;
+          } else {
+            displayName = `Exclude Tags: ${excludePart}`;
+          }
           displayColor = '#ff6b6b';
         } else if (budget.scopeType === 'account' && budget.accountId) {
           // Fetch account name

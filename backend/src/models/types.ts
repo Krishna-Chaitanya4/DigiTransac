@@ -132,8 +132,8 @@ export interface Budget {
   // Budget scope - what to track
   scopeType: 'category' | 'tag' | 'account'; // Which dimension to track
   categoryId?: string; // For category-based budgets (can be folder or leaf category)
-  tagIds?: string[]; // For tag-based budgets (multiple tags with AND/OR logic)
-  tagLogic?: 'AND' | 'OR'; // How to combine multiple tags (default: OR)
+  includeTagIds?: string[]; // For tag-based budgets: transactions MUST have these tags (OR logic)
+  excludeTagIds?: string[]; // For tag-based budgets: transactions must NOT have these tags
   accountId?: string; // For account-based budgets
   
   // Budget calculation type

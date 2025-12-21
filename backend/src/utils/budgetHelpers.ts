@@ -35,21 +35,41 @@ export async function calculateBudgetSpending(
         })
       );
     }
-  } else if (budget.scopeType === 'tag' && budget.tagIds && budget.tagIds.length > 0) {
-    // Tag-based budgets: filter by tags
-    const tagLogic = budget.tagLogic || 'OR';
-
+  } else if (budget.scopeType === 'tag' && (budget.includeTagIds || budget.excludeTagIds)) {
+    // Tag-based budgets: filter by include/exclude tags
     for (const expenses of expensesByCategory.values()) {
       for (const exp of expenses) {
         const expDate = new Date(exp.date);
-        if (expDate >= startDate && expDate <= endDate && exp.tags && exp.tags.length > 0) {
-          // Check if expense matches tag criteria
-          const matchesTag =
-            tagLogic === 'AND'
-              ? budget.tagIds!.every((tagId) => exp.tags.includes(tagId))
-              : budget.tagIds!.some((tagId) => exp.tags.includes(tagId));
+        if (expDate >= startDate && expDate <= endDate) {
+          let shouldInclude = true;
 
-          if (matchesTag) {
+          // If includeTagIds specified, transaction must have at least one of these tags
+          if (budget.includeTagIds && budget.includeTagIds.length > 0) {
+            if (!exp.tags || exp.tags.length === 0) {
+              shouldInclude = false;
+            } else {
+              const hasIncludedTag = budget.includeTagIds.some((tagId) =>
+                exp.tags.includes(tagId)
+              );
+              if (!hasIncludedTag) {
+                shouldInclude = false;
+              }
+            }
+          }
+
+          // If excludeTagIds specified, transaction must NOT have any of these tags
+          if (shouldInclude && budget.excludeTagIds && budget.excludeTagIds.length > 0) {
+            if (exp.tags && exp.tags.length > 0) {
+              const hasExcludedTag = budget.excludeTagIds.some((tagId) =>
+                exp.tags.includes(tagId)
+              );
+              if (hasExcludedTag) {
+                shouldInclude = false;
+              }
+            }
+          }
+
+          if (shouldInclude) {
             relevantExpenses.push(exp);
           }
         }

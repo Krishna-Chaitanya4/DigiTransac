@@ -117,8 +117,8 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const {
       scopeType,
       categoryId,
-      tagIds,
-      tagLogic,
+      includeTagIds,
+      excludeTagIds,
       accountId,
       calculationType,
       amount,
@@ -143,10 +143,20 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
         });
         return;
       }
-    } else if (scopeType === 'tag' && tagIds && tagIds.length > 0) {
+    } else if (scopeType === 'tag' && (includeTagIds || excludeTagIds)) {
+      // Validate at least one of include or exclude is provided
+      if ((!includeTagIds || includeTagIds.length === 0) && (!excludeTagIds || excludeTagIds.length === 0)) {
+        res.status(400).json({
+          success: false,
+          message: 'At least one include or exclude tag must be specified',
+        });
+        return;
+      }
+
       const tagsContainer = await cosmosDBService.getTagsContainer();
-      const tags = await tagsContainer.find({ id: { $in: tagIds }, userId }).toArray();
-      if (tags.length !== tagIds.length) {
+      const allTagIds = [...(includeTagIds || []), ...(excludeTagIds || [])];
+      const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
+      if (tags.length !== allTagIds.length) {
         res.status(404).json({
           success: false,
           message: 'One or more tags not found',
@@ -174,7 +184,10 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       startDate: new Date(startDate),
     };
     if (scopeType === 'category') duplicateFilter.categoryId = categoryId;
-    if (scopeType === 'tag') duplicateFilter.tagIds = tagIds;
+    if (scopeType === 'tag') {
+      duplicateFilter.includeTagIds = includeTagIds;
+      duplicateFilter.excludeTagIds = excludeTagIds;
+    }
     if (scopeType === 'account') duplicateFilter.accountId = accountId;
 
     const existingBudget = await budgetsContainer.findOne(duplicateFilter);
@@ -191,8 +204,8 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       userId,
       scopeType,
       categoryId: scopeType === 'category' ? categoryId : undefined,
-      tagIds: scopeType === 'tag' ? tagIds : undefined,
-      tagLogic: scopeType === 'tag' && tagIds?.length > 1 ? tagLogic || 'OR' : undefined,
+      includeTagIds: scopeType === 'tag' ? includeTagIds : undefined,
+      excludeTagIds: scopeType === 'tag' ? excludeTagIds : undefined,
       accountId: scopeType === 'account' ? accountId : undefined,
       calculationType,
       amount: parseFloat(amount),
@@ -232,8 +245,8 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const {
       scopeType,
       categoryId,
-      tagIds,
-      tagLogic,
+      includeTagIds,
+      excludeTagIds,
       accountId,
       calculationType,
       amount,
@@ -270,15 +283,18 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         });
         return;
       }
-    } else if (newScopeType === 'tag' && tagIds && tagIds.length > 0) {
+    } else if (newScopeType === 'tag' && (includeTagIds || excludeTagIds)) {
       const tagsContainer = await cosmosDBService.getTagsContainer();
-      const tags = await tagsContainer.find({ id: { $in: tagIds }, userId }).toArray();
-      if (tags.length !== tagIds.length) {
-        res.status(404).json({
-          success: false,
-          message: 'One or more tags not found',
-        });
-        return;
+      const allTagIds = [...(includeTagIds || []), ...(excludeTagIds || [])];
+      if (allTagIds.length > 0) {
+        const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
+        if (tags.length !== allTagIds.length) {
+          res.status(404).json({
+            success: false,
+            message: 'One or more tags not found',
+          });
+          return;
+        }
       }
     } else if (newScopeType === 'account' && accountId) {
       const accountsContainer = await cosmosDBService.getAccountsContainer();
@@ -299,19 +315,23 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (scopeType !== undefined) updateData.scopeType = scopeType;
     if (categoryId !== undefined) {
       updateData.categoryId = categoryId;
-      updateData.tagIds = undefined;
+      updateData.includeTagIds = undefined;
+      updateData.excludeTagIds = undefined;
       updateData.accountId = undefined;
     }
-    if (tagIds !== undefined) {
-      updateData.tagIds = tagIds;
+    if (includeTagIds !== undefined) {
+      updateData.includeTagIds = includeTagIds;
       updateData.categoryId = undefined;
       updateData.accountId = undefined;
     }
-    if (tagLogic !== undefined) updateData.tagLogic = tagLogic;
+    if (excludeTagIds !== undefined) {
+      updateData.excludeTagIds = excludeTagIds;
+    }
     if (accountId !== undefined) {
       updateData.accountId = accountId;
       updateData.categoryId = undefined;
-      updateData.tagIds = undefined;
+      updateData.includeTagIds = undefined;
+      updateData.excludeTagIds = undefined;
     }
     if (calculationType !== undefined) updateData.calculationType = calculationType;
     if (amount !== undefined) updateData.amount = parseFloat(amount);

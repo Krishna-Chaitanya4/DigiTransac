@@ -132,12 +132,16 @@ export const schemas = {
       then: Joi.required(),
       otherwise: Joi.forbidden(),
     }),
-    tagIds: Joi.array().items(Joi.string()).min(1).when('scopeType', {
+    includeTagIds: Joi.array().items(Joi.string()).when('scopeType', {
       is: 'tag',
-      then: Joi.required(),
+      then: Joi.optional(),
       otherwise: Joi.forbidden(),
     }),
-    tagLogic: Joi.string().valid('AND', 'OR').optional().default('OR'),
+    excludeTagIds: Joi.array().items(Joi.string()).when('scopeType', {
+      is: 'tag',
+      then: Joi.optional(),
+      otherwise: Joi.forbidden(),
+    }),
     accountId: Joi.string().when('scopeType', {
       is: 'account',
       then: Joi.required(),

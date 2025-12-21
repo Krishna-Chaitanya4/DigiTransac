@@ -68,8 +68,8 @@ interface Budget {
   // Scope configuration
   scopeType: 'category' | 'tag' | 'account';
   categoryId?: string;
-  tagIds?: string[];
-  tagLogic?: 'AND' | 'OR';
+  includeTagIds?: string[];
+  excludeTagIds?: string[];
   accountId?: string;
   
   // Calculation type
@@ -112,8 +112,8 @@ const Budgets: React.FC = () => {
   const [formData, setFormData] = useState({
     scopeType: 'category' as 'category' | 'tag' | 'account',
     categoryId: '',
-    tagIds: [] as string[],
-    tagLogic: 'OR' as 'AND' | 'OR',
+    includeTagIds: [] as string[],
+    excludeTagIds: [] as string[],
     accountId: '',
     calculationType: 'debit' as 'debit' | 'credit' | 'net',
     amount: '',
@@ -206,8 +206,8 @@ const Budgets: React.FC = () => {
     setFormData({
       scopeType: 'category',
       categoryId: '',
-      tagIds: [],
-      tagLogic: 'OR',
+      includeTagIds: [],
+      excludeTagIds: [],
       accountId: '',
       calculationType: 'debit',
       amount: '',
@@ -226,8 +226,8 @@ const Budgets: React.FC = () => {
     setFormData({
       scopeType: budget.scopeType,
       categoryId: budget.categoryId || '',
-      tagIds: budget.tagIds || [],
-      tagLogic: budget.tagLogic || 'OR',
+      includeTagIds: budget.includeTagIds || [],
+      excludeTagIds: budget.excludeTagIds || [],
       accountId: budget.accountId || '',
       calculationType: budget.calculationType,
       amount: budget.amount.toString(),
@@ -266,9 +266,11 @@ const Budgets: React.FC = () => {
       if (formData.scopeType === 'category') {
         payload.categoryId = formData.categoryId;
       } else if (formData.scopeType === 'tag') {
-        payload.tagIds = formData.tagIds;
-        if (formData.tagIds.length > 1) {
-          payload.tagLogic = formData.tagLogic;
+        if (formData.includeTagIds.length > 0) {
+          payload.includeTagIds = formData.includeTagIds;
+        }
+        if (formData.excludeTagIds.length > 0) {
+          payload.excludeTagIds = formData.excludeTagIds;
         }
       } else if (formData.scopeType === 'account') {
         payload.accountId = formData.accountId;
@@ -302,8 +304,21 @@ const Budgets: React.FC = () => {
     let displayName = 'this budget';
     if (budget.scopeType === 'category' && budget.categoryId) {
       displayName = `"${getCategoryName(budget.categoryId)}"`;
-    } else if (budget.scopeType === 'tag' && budget.tagIds) {
-      displayName = `tags: ${budget.tagIds.map(getTagName).join(', ')}`;
+    } else if (budget.scopeType === 'tag' && (budget.includeTagIds || budget.excludeTagIds)) {
+      const includePart = budget.includeTagIds && budget.includeTagIds.length > 0
+        ? budget.includeTagIds.map(getTagName).join(', ')
+        : '';
+      const excludePart = budget.excludeTagIds && budget.excludeTagIds.length > 0
+        ? budget.excludeTagIds.map(getTagName).join(', ')
+        : '';
+      
+      if (includePart && excludePart) {
+        displayName = `tags: ${includePart} (excluding: ${excludePart})`;
+      } else if (includePart) {
+        displayName = `tags: ${includePart}`;
+      } else {
+        displayName = `excluding tags: ${excludePart}`;
+      }
     } else if (budget.scopeType === 'account' && budget.accountId) {
       displayName = `"${getAccountName(budget.accountId)}"`;
     }
@@ -448,27 +463,60 @@ const Budgets: React.FC = () => {
                             )}
                           </>
                         )}
-                        {budget.scopeType === 'tag' && budget.tagIds && budget.tagIds.length > 0 && (
+                        {budget.scopeType === 'tag' && (
                           <>
-                            {budget.tagIds.map((tagId) => (
-                              <Chip
-                                key={tagId}
-                                icon={<LabelIcon sx={{ fontSize: 14 }} />}
-                                label={getTagName(tagId)}
-                                size="small"
-                                sx={{
-                                  bgcolor: '#ff6b6b20',
-                                  color: '#ff6b6b',
-                                }}
-                              />
-                            ))}
-                            {budget.tagIds.length > 1 && (
-                              <Chip
-                                label={budget.tagLogic || 'OR'}
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontSize: '0.7rem' }}
-                              />
+                            {/* Include Tags */}
+                            {budget.includeTagIds && budget.includeTagIds.length > 0 && (
+                              <>
+                                {budget.includeTagIds.map((tagId) => (
+                                  <Chip
+                                    key={tagId}
+                                    icon={<LabelIcon sx={{ fontSize: 14 }} />}
+                                    label={getTagName(tagId)}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: '#4caf5020',
+                                      color: '#4caf50',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                ))}
+                                {budget.includeTagIds.length > 1 && (
+                                  <Chip
+                                    label="OR"
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.7rem', color: '#4caf50', borderColor: '#4caf50' }}
+                                  />
+                                )}
+                              </>
+                            )}
+                            
+                            {/* Exclude Tags */}
+                            {budget.excludeTagIds && budget.excludeTagIds.length > 0 && (
+                              <>
+                                {budget.includeTagIds && budget.includeTagIds.length > 0 && (
+                                  <Chip
+                                    label="EXCEPT"
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.7rem', mx: 0.5 }}
+                                  />
+                                )}
+                                {budget.excludeTagIds.map((tagId) => (
+                                  <Chip
+                                    key={tagId}
+                                    icon={<LabelIcon sx={{ fontSize: 14 }} />}
+                                    label={getTagName(tagId)}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: '#f4433620',
+                                      color: '#f44336',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                ))}
+                              </>
                             )}
                           </>
                         )}
@@ -649,16 +697,21 @@ const Budgets: React.FC = () => {
 
             {formData.scopeType === 'tag' && (
               <Box>
+                <Typography variant="subtitle2" gutterBottom sx={{ mt: 1 }}>
+                  Tag Filters
+                </Typography>
+                
+                {/* Include Tags */}
                 <TextField
                   select
-                  label="Select Tags"
+                  label="Include Tags (optional)"
                   fullWidth
-                  value={formData.tagIds}
+                  value={formData.includeTagIds}
                   onChange={(e) => {
                     const value = e.target.value;
                     setFormData({
                       ...formData,
-                      tagIds: typeof value === 'string' ? [value] : value,
+                      includeTagIds: typeof value === 'string' ? [value] : value,
                     });
                   }}
                   SelectProps={{
@@ -666,17 +719,13 @@ const Budgets: React.FC = () => {
                     renderValue: (selected) => (
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {(selected as string[]).map((tagId) => (
-                          <Chip key={tagId} label={getTagName(tagId)} size="small" />
+                          <Chip key={tagId} label={getTagName(tagId)} size="small" color="success" />
                         ))}
                       </Box>
                     ),
                   }}
-                  required
-                  helperText={
-                    formData.tagIds.length > 1
-                      ? 'Multiple tags selected - choose logic below'
-                      : 'Select one or more tags to track'
-                  }
+                  helperText="Transactions must have at least one of these tags"
+                  sx={{ mb: 2 }}
                 >
                   {tags.length === 0 ? (
                     <MenuItem value="" disabled>
@@ -691,30 +740,48 @@ const Budgets: React.FC = () => {
                   )}
                 </TextField>
 
-                {formData.tagIds.length > 1 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="caption" color="text.secondary" gutterBottom>
-                      Tag Logic (for multiple tags)
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={formData.tagLogic}
-                      exclusive
-                      onChange={(_, newLogic) => {
-                        if (newLogic !== null) {
-                          setFormData({ ...formData, tagLogic: newLogic });
-                        }
-                      }}
-                      fullWidth
-                      size="small"
-                    >
-                      <ToggleButton value="OR">
-                        OR (any tag matches)
-                      </ToggleButton>
-                      <ToggleButton value="AND">
-                        AND (all tags required)
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
+                {/* Exclude Tags */}
+                <TextField
+                  select
+                  label="Exclude Tags (optional)"
+                  fullWidth
+                  value={formData.excludeTagIds}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({
+                      ...formData,
+                      excludeTagIds: typeof value === 'string' ? [value] : value,
+                    });
+                  }}
+                  SelectProps={{
+                    multiple: true,
+                    renderValue: (selected) => (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {(selected as string[]).map((tagId) => (
+                          <Chip key={tagId} label={getTagName(tagId)} size="small" color="error" />
+                        ))}
+                      </Box>
+                    ),
+                  }}
+                  helperText="Transactions with these tags will be ignored"
+                >
+                  {tags.length === 0 ? (
+                    <MenuItem value="" disabled>
+                      No tags available. Create transactions with tags first.
+                    </MenuItem>
+                  ) : (
+                    tags.map((tag) => (
+                      <MenuItem key={tag.id} value={tag.id}>
+                        {tag.name} ({tag.usageCount} uses)
+                      </MenuItem>
+                    ))
+                  )}
+                </TextField>
+
+                {formData.includeTagIds.length === 0 && formData.excludeTagIds.length === 0 && (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    Please select at least one include or exclude tag
+                  </Alert>
                 )}
               </Box>
             )}
@@ -904,7 +971,7 @@ const Budgets: React.FC = () => {
               !formData.startDate ||
               !formData.endDate ||
               (formData.scopeType === 'category' && !formData.categoryId) ||
-              (formData.scopeType === 'tag' && formData.tagIds.length === 0) ||
+              (formData.scopeType === 'tag' && formData.includeTagIds.length === 0 && formData.excludeTagIds.length === 0) ||
               (formData.scopeType === 'account' && !formData.accountId)
             }
           >
