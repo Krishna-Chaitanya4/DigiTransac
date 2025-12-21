@@ -136,7 +136,7 @@ const Dashboard: React.FC = () => {
   const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
-  
+
   // Tag filtering states
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [includeTags, setIncludeTags] = useState<string[]>(['expense', 'income']); // Include by default
@@ -162,9 +162,12 @@ const Dashboard: React.FC = () => {
         axios.get(`/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`/api/transactions?sortBy=date&sortOrder=desc&startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        axios.get(
+          `/api/transactions?sortBy=date&sortOrder=desc&startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        ),
         axios.get(`/api/budgets`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -182,60 +185,67 @@ const Dashboard: React.FC = () => {
 
       const overview = overviewRes.data.overview;
       let transactions = transactionsRes.data.transactions || [];
-      
+
       // Apply tag filtering
       transactions = transactions.filter((t: any) => {
         const txnTags = t.tags || [];
-        
+
         // If include tags specified, transaction must have at least one
         if (includeTags.length > 0) {
           const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
           if (!hasIncluded) return false;
         }
-        
+
         // If exclude tags specified, transaction must not have any
         if (excludeTags.length > 0) {
           const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
           if (hasExcluded) return false;
         }
-        
+
         return true;
       });
-      
+
       const debits = transactions.filter((t: any) => t.type === 'debit');
       const credits = transactions.filter((t: any) => t.type === 'credit');
       const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const netSavings = totalIncome - totalSpent;
-      
+
       // Get last month data for comparison
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      const lastMonthRes = await axios.get(`/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const lastMonthRes = await axios.get(
+        `/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       let lastMonthTxns = lastMonthRes.data.transactions || [];
-      
+
       // Apply tag filtering to last month data
       lastMonthTxns = lastMonthTxns.filter((t: any) => {
         const txnTags = t.tags || [];
-        
+
         if (includeTags.length > 0) {
           const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
           if (!hasIncluded) return false;
         }
-        
+
         if (excludeTags.length > 0) {
           const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
           if (hasExcluded) return false;
         }
-        
+
         return true;
       });
-      
-      const lastMonthSpent = lastMonthTxns.filter((t: any) => t.type === 'debit').reduce((sum: number, t: any) => sum + t.amount, 0);
-      const lastMonthIncome = lastMonthTxns.filter((t: any) => t.type === 'credit').reduce((sum: number, t: any) => sum + t.amount, 0);
-      
+
+      const lastMonthSpent = lastMonthTxns
+        .filter((t: any) => t.type === 'debit')
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
+      const lastMonthIncome = lastMonthTxns
+        .filter((t: any) => t.type === 'credit')
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
+
       // Calculate percentage changes for stat cards
       let spentChange = 0;
       if (lastMonthSpent > 0) {
@@ -243,14 +253,14 @@ const Dashboard: React.FC = () => {
       } else if (totalSpent > 0) {
         spentChange = 100;
       }
-      
+
       let incomeChange = 0;
       if (lastMonthIncome > 0) {
         incomeChange = Math.round(((totalIncome - lastMonthIncome) / lastMonthIncome) * 100);
       } else if (totalIncome > 0) {
         incomeChange = 100;
       }
-      
+
       setStats({
         totalSpent,
         monthSpent: totalSpent,
@@ -292,17 +302,19 @@ const Dashboard: React.FC = () => {
       // Process budget status (should use unfiltered transactions)
       const budgets = budgetsRes.data.budgets || [];
       const budgetStatuses: BudgetStatus[] = [];
-      
+
       // Use unfiltered transactions for budget calculation
       const allMonthTransactions = transactionsRes.data.transactions || [];
       const unfilteredDebits = allMonthTransactions.filter((t: any) => t.type === 'debit');
-      
+
       for (const budget of budgets) {
         const category = categoryMap.get(budget.categoryId);
-        const categoryDebits = unfilteredDebits.filter((t: any) => t.categoryId === budget.categoryId);
+        const categoryDebits = unfilteredDebits.filter(
+          (t: any) => t.categoryId === budget.categoryId
+        );
         const spent = categoryDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
         const percentage = Math.round((spent / budget.amount) * 100);
-        
+
         budgetStatuses.push({
           categoryName: category?.name || 'Unknown',
           categoryId: budget.categoryId,
@@ -318,49 +330,54 @@ const Dashboard: React.FC = () => {
 
       // Process account balances
       const accounts = accountsRes.data.accounts || [];
-      setAccountBalances(accounts.map((acc: any) => ({
-        id: acc.id,
-        name: acc.name,
-        accountType: acc.accountType,
-        balance: acc.balance,
-        currency: acc.currency || user?.currency || 'USD',
-      })));
+      setAccountBalances(
+        accounts.map((acc: any) => ({
+          id: acc.id,
+          name: acc.name,
+          accountType: acc.accountType,
+          balance: acc.balance,
+          currency: acc.currency || user?.currency || 'USD',
+        }))
+      );
 
       // Calculate spending trends (last 6 months)
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
-      const trendsRes = await axios.get(`/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+
+      const trendsRes = await axios.get(
+        `/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       let allTransactions = trendsRes.data.transactions || [];
-      
+
       // Apply tag filtering to spending trends
       allTransactions = allTransactions.filter((t: any) => {
         const txnTags = t.tags || [];
-        
+
         // If include tags specified, transaction must have at least one
         if (includeTags.length > 0) {
           const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
           if (!hasIncluded) return false;
         }
-        
+
         // If exclude tags specified, transaction must not have any
         if (excludeTags.length > 0) {
           const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
           if (hasExcluded) return false;
         }
-        
+
         return true;
       });
-      
+
       // Group by month for both income and expenses
       const monthlyData = new Map<string, { expenses: number; income: number }>();
       allTransactions.forEach((t: any) => {
         const date = new Date(t.date);
         const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
         const existing = monthlyData.get(monthKey) || { expenses: 0, income: 0 };
-        
+
         if (t.type === 'debit') {
           existing.expenses += t.amount;
         } else if (t.type === 'credit') {
@@ -368,7 +385,7 @@ const Dashboard: React.FC = () => {
         }
         monthlyData.set(monthKey, existing);
       });
-      
+
       const trends: SpendingTrend[] = [];
       for (let i = 5; i >= 0; i--) {
         const date = new Date();
@@ -396,7 +413,7 @@ const Dashboard: React.FC = () => {
           });
         }
       });
-      
+
       const topCats = Array.from(categorySpending.values())
         .sort((a, b) => b.value - a.value)
         .slice(0, 5);
@@ -407,14 +424,16 @@ const Dashboard: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const recurringTxns = recurringRes.data.transactions || [];
-      
+
       const upcoming: UpcomingRecurring[] = recurringTxns
         .map((t: any) => {
           if (!t.recurrencePattern) return null;
-          
-          const lastCreated = t.recurrencePattern.lastCreated ? new Date(t.recurrencePattern.lastCreated) : new Date(t.date);
+
+          const lastCreated = t.recurrencePattern.lastCreated
+            ? new Date(t.recurrencePattern.lastCreated)
+            : new Date(t.date);
           let nextDate = new Date(lastCreated);
-          
+
           switch (t.recurrencePattern.frequency) {
             case 'daily':
               nextDate.setDate(nextDate.getDate() + 1);
@@ -432,11 +451,11 @@ const Dashboard: React.FC = () => {
               nextDate.setFullYear(nextDate.getFullYear() + 1);
               break;
           }
-          
+
           // Only show next 30 days
           const thirtyDaysFromNow = new Date();
           thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-          
+
           if (nextDate <= thirtyDaysFromNow && nextDate >= now) {
             return {
               id: t.id,
@@ -452,17 +471,19 @@ const Dashboard: React.FC = () => {
         .filter((t: any) => t !== null)
         .sort((a: any, b: any) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
         .slice(0, 5);
-      
+
       setUpcomingRecurring(upcoming);
 
       // Generate alerts
       const newAlerts: string[] = [];
-      const overBudget = budgetStatuses.filter(b => b.isOver);
+      const overBudget = budgetStatuses.filter((b) => b.isOver);
       if (overBudget.length > 0) {
         newAlerts.push(`${overBudget.length} categories are over budget`);
       }
       if (netSavings < 0) {
-        newAlerts.push(`Spending exceeds income by ${formatCurrency(Math.abs(netSavings))} this month`);
+        newAlerts.push(
+          `Spending exceeds income by ${formatCurrency(Math.abs(netSavings))} this month`
+        );
       }
       setAlerts(newAlerts);
 
@@ -490,10 +511,10 @@ const Dashboard: React.FC = () => {
 
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    
+
     const daysAgo = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
     if (daysAgo < 7) return `${daysAgo} days ago`;
-    
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
@@ -505,34 +526,34 @@ const Dashboard: React.FC = () => {
   const handleToggleIncludeTag = (tagName: string) => {
     const isIncluded = includeTags.includes(tagName);
     const isExcluded = excludeTags.includes(tagName);
-    
+
     // If already included, remove it (go to neutral)
     if (isIncluded) {
-      setIncludeTags(prev => prev.filter(t => t !== tagName));
+      setIncludeTags((prev) => prev.filter((t) => t !== tagName));
     } else {
       // If excluded, remove from excluded first
       if (isExcluded) {
-        setExcludeTags(prev => prev.filter(t => t !== tagName));
+        setExcludeTags((prev) => prev.filter((t) => t !== tagName));
       }
       // Add to included
-      setIncludeTags(prev => [...prev, tagName]);
+      setIncludeTags((prev) => [...prev, tagName]);
     }
   };
 
   const handleToggleExcludeTag = (tagName: string) => {
     const isIncluded = includeTags.includes(tagName);
     const isExcluded = excludeTags.includes(tagName);
-    
+
     // If already excluded, remove it (go to neutral)
     if (isExcluded) {
-      setExcludeTags(prev => prev.filter(t => t !== tagName));
+      setExcludeTags((prev) => prev.filter((t) => t !== tagName));
     } else {
       // If included, remove from included first
       if (isIncluded) {
-        setIncludeTags(prev => prev.filter(t => t !== tagName));
+        setIncludeTags((prev) => prev.filter((t) => t !== tagName));
       }
       // Add to excluded
-      setExcludeTags(prev => [...prev, tagName]);
+      setExcludeTags((prev) => [...prev, tagName]);
     }
   };
 
@@ -567,9 +588,10 @@ const Dashboard: React.FC = () => {
       change: (stats?.netSavings || 0) >= 0 ? 'Positive flow' : 'Negative flow',
       trend: (stats?.netSavings || 0) >= 0 ? 'up' : 'down',
       icon: <AccountBalanceWallet sx={{ fontSize: 32 }} />,
-      gradient: (stats?.netSavings || 0) >= 0 
-        ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
-        : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      gradient:
+        (stats?.netSavings || 0) >= 0
+          ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+          : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
     },
     {
       title: 'Budget Left',
@@ -617,8 +639,8 @@ const Dashboard: React.FC = () => {
                 '&:hover': {
                   borderColor: 'primary.dark',
                   bgcolor: 'primary.dark',
-                }
-              })
+                },
+              }),
             }}
           >
             Filter by Tags
@@ -636,7 +658,7 @@ const Dashboard: React.FC = () => {
                 minWidth: 280,
                 maxHeight: 500,
                 borderRadius: 2,
-              }
+              },
             }}
           >
             <Box sx={{ p: 2, pb: 1 }}>
@@ -662,24 +684,28 @@ const Dashboard: React.FC = () => {
             <Box sx={{ maxHeight: 300, overflowY: 'auto', px: 2, pb: 2 }}>
               <Box display="flex" flexDirection="column" gap={1}>
                 {allTags
-                  .filter(tag => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()))
+                  .filter((tag) => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()))
                   .map((tag) => {
                     const isIncluded = includeTags.includes(tag.name);
                     const isExcluded = excludeTags.includes(tag.name);
                     const chipColor = isIncluded ? 'success' : isExcluded ? 'error' : 'default';
-                    
+
                     return (
                       <Chip
                         key={tag.id}
                         label={tag.name}
                         size="small"
                         color={chipColor}
-                        variant={(isIncluded || isExcluded) ? 'filled' : 'outlined'}
+                        variant={isIncluded || isExcluded ? 'filled' : 'outlined'}
                         sx={{
                           justifyContent: 'space-between',
-                          bgcolor: isIncluded ? 'success.main' : isExcluded ? 'error.main' : undefined,
+                          bgcolor: isIncluded
+                            ? 'success.main'
+                            : isExcluded
+                              ? 'error.main'
+                              : undefined,
                           borderColor: undefined,
-                          color: (isIncluded || isExcluded) ? 'white' : undefined,
+                          color: isIncluded || isExcluded ? 'white' : undefined,
                           pr: 0.5,
                         }}
                         deleteIcon={
@@ -695,46 +721,52 @@ const Dashboard: React.FC = () => {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              cursor: 'pointer',
-                              bgcolor: isIncluded ? 'rgba(255,255,255,0.3)' : 'transparent',
-                              '&:hover': {
-                                bgcolor: isIncluded ? 'rgba(255,255,255,0.4)' : 'success.light',
-                              },
-                            }}
-                          >
-                            <CheckIcon sx={{ fontSize: 16, color: isIncluded ? 'white' : 'inherit' }} />
+                                height: 20,
+                                borderRadius: '50%',
+                                cursor: 'pointer',
+                                bgcolor: isIncluded ? 'rgba(255,255,255,0.3)' : 'transparent',
+                                '&:hover': {
+                                  bgcolor: isIncluded ? 'rgba(255,255,255,0.4)' : 'success.light',
+                                },
+                              }}
+                            >
+                              <CheckIcon
+                                sx={{ fontSize: 16, color: isIncluded ? 'white' : 'inherit' }}
+                              />
+                            </Box>
+                            <Box
+                              component="span"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleExcludeTag(tag.name);
+                              }}
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 20,
+                                height: 20,
+                                borderRadius: '50%',
+                                cursor: 'pointer',
+                                bgcolor: isExcluded ? 'rgba(255,255,255,0.3)' : 'transparent',
+                                '&:hover': {
+                                  bgcolor: isExcluded ? 'rgba(255,255,255,0.4)' : 'error.light',
+                                },
+                              }}
+                            >
+                              <CloseIcon
+                                sx={{ fontSize: 16, color: isExcluded ? 'white' : 'inherit' }}
+                              />
+                            </Box>
                           </Box>
-                          <Box
-                            component="span"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleExcludeTag(tag.name);
-                            }}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              cursor: 'pointer',
-                              bgcolor: isExcluded ? 'rgba(255,255,255,0.3)' : 'transparent',
-                              '&:hover': {
-                                bgcolor: isExcluded ? 'rgba(255,255,255,0.4)' : 'error.light',
-                              },
-                            }}
-                          >
-                            <CloseIcon sx={{ fontSize: 16, color: isExcluded ? 'white' : 'inherit' }} />
-                          </Box>
-                        </Box>
-                      }
-                      onDelete={() => {}}
-                    />
-                  );
-                })}
-                {allTags.filter(tag => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase())).length === 0 && (
+                        }
+                        onDelete={() => {}}
+                      />
+                    );
+                  })}
+                {allTags.filter((tag) =>
+                  tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase())
+                ).length === 0 && (
                   <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
                     {tagSearchQuery ? 'No tags match your search' : 'No tags available'}
                   </Typography>
@@ -828,9 +860,7 @@ const Dashboard: React.FC = () => {
                 overflow: 'hidden',
                 borderRadius: 3,
                 background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'white'
-                    : 'rgba(30, 30, 30, 0.8)',
+                  theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
                 backdropFilter: 'blur(10px)',
                 border: (theme) =>
                   theme.palette.mode === 'light'
@@ -865,28 +895,28 @@ const Dashboard: React.FC = () => {
                     {stat.icon}
                   </Avatar>
                 </Box>
-                <Typography 
-                  variant="h4" 
-                  fontWeight={800} 
-                  sx={{ 
-                    mb: 0.5, 
+                <Typography
+                  variant="h4"
+                  fontWeight={800}
+                  sx={{
+                    mb: 0.5,
                     letterSpacing: '-0.02em',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {stat.value}
                 </Typography>
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary" 
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
                   fontWeight={500}
                   sx={{
                     mb: 1,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {stat.title}
@@ -897,12 +927,12 @@ const Dashboard: React.FC = () => {
                   ) : (
                     <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
                   )}
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
+                  <Typography
+                    variant="caption"
+                    sx={{
                       color: stat.trend === 'up' ? 'success.main' : 'error.main',
                       fontWeight: 600,
-                      fontSize: '0.75rem'
+                      fontSize: '0.75rem',
                     }}
                   >
                     {stat.change}
@@ -923,9 +953,7 @@ const Dashboard: React.FC = () => {
               height: 450,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -947,9 +975,9 @@ const Dashboard: React.FC = () => {
               Your accounts overview
             </Typography>
             {accountBalances.length > 0 ? (
-              <Box 
-                sx={{ 
-                  maxHeight: 280, 
+              <Box
+                sx={{
+                  maxHeight: 280,
                   overflowY: 'auto',
                   pr: 1,
                   '&::-webkit-scrollbar': {
@@ -964,9 +992,7 @@ const Dashboard: React.FC = () => {
                   },
                   '&::-webkit-scrollbar-thumb': {
                     background: (theme) =>
-                      theme.palette.mode === 'light'
-                        ? 'rgba(0,0,0,0.2)'
-                        : 'rgba(255,255,255,0.2)',
+                      theme.palette.mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)',
                     borderRadius: '10px',
                     '&:hover': {
                       background: (theme) =>
@@ -986,13 +1012,13 @@ const Dashboard: React.FC = () => {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
                     }).format(account.balance);
-                    
+
                     // Determine icon and color based on account type
                     const accountType = (account.accountType || 'wallet').toLowerCase();
-                    
+
                     let accountIcon = <AccountBalanceWallet />;
                     let accountGradient = 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
-                    
+
                     if (accountType.includes('bank')) {
                       accountIcon = <AccountBalance />;
                       accountGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
@@ -1003,7 +1029,7 @@ const Dashboard: React.FC = () => {
                       accountIcon = <Savings />;
                       accountGradient = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
                     }
-                    
+
                     return (
                       <Grid item xs={12} key={account.id}>
                         <Box
@@ -1011,9 +1037,7 @@ const Dashboard: React.FC = () => {
                             p: 2,
                             borderRadius: 3,
                             background: (theme) =>
-                              theme.palette.mode === 'light'
-                                ? 'white'
-                                : 'rgba(255,255,255,0.05)',
+                              theme.palette.mode === 'light' ? 'white' : 'rgba(255,255,255,0.05)',
                             border: (theme) =>
                               theme.palette.mode === 'light'
                                 ? '1px solid rgba(0,0,0,0.08)'
@@ -1039,26 +1063,26 @@ const Dashboard: React.FC = () => {
                               {accountIcon}
                             </Avatar>
                             <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography 
-                                variant="body2" 
+                              <Typography
+                                variant="body2"
                                 fontWeight={600}
                                 sx={{
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                  lineHeight: 1.3
+                                  lineHeight: 1.3,
                                 }}
                               >
                                 {account.name}
                               </Typography>
                             </Box>
-                            <Typography 
-                              variant="h6" 
-                              fontWeight={700} 
+                            <Typography
+                              variant="h6"
+                              fontWeight={700}
                               color={account.balance >= 0 ? 'success.main' : 'error.main'}
                               sx={{
                                 fontSize: '1.1rem',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {formattedBalance}
@@ -1077,9 +1101,15 @@ const Dashboard: React.FC = () => {
                     boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box
+                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                  >
                     <Box>
-                      <Typography variant="body2" color="rgba(255,255,255,0.8)" sx={{ mb: 0.5, fontWeight: 500 }}>
+                      <Typography
+                        variant="body2"
+                        color="rgba(255,255,255,0.8)"
+                        sx={{ mb: 0.5, fontWeight: 500 }}
+                      >
                         Total Balance
                       </Typography>
                       <Typography variant="h4" fontWeight={700} color="white">
@@ -1101,9 +1131,7 @@ const Dashboard: React.FC = () => {
               </Box>
             ) : (
               <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">
-                  No accounts found
-                </Typography>
+                <Typography color="text.secondary">No accounts found</Typography>
                 <Button
                   variant="outlined"
                   size="small"
@@ -1124,9 +1152,7 @@ const Dashboard: React.FC = () => {
               height: 450,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1145,7 +1171,15 @@ const Dashboard: React.FC = () => {
               Latest activity
             </Typography>
             {recentTransactions.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 320, overflowY: 'auto' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                }}
+              >
                 {recentTransactions.map((transaction) => (
                   <Box
                     key={transaction.id}
@@ -1170,19 +1204,33 @@ const Dashboard: React.FC = () => {
                     }}
                     onClick={() => navigate('/transactions')}
                   >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 0.5,
+                      }}
+                    >
                       <Typography variant="body1" fontWeight={600} noWrap sx={{ maxWidth: '60%' }}>
                         {transaction.description}
                       </Typography>
-                      <Typography 
-                        variant="body1" 
-                        fontWeight={700} 
+                      <Typography
+                        variant="body1"
+                        fontWeight={700}
                         color={transaction.type === 'credit' ? 'success.main' : 'error.main'}
                       >
-                        {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        {transaction.type === 'credit' ? '+' : '-'}
+                        {formatCurrency(transaction.amount)}
                       </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <Chip
                         label={transaction.categoryName}
                         size="small"
@@ -1202,9 +1250,7 @@ const Dashboard: React.FC = () => {
               </Box>
             ) : (
               <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">
-                  No recent transactions
-                </Typography>
+                <Typography color="text.secondary">No recent transactions</Typography>
                 <Button
                   variant="outlined"
                   size="small"
@@ -1229,9 +1275,7 @@ const Dashboard: React.FC = () => {
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1251,28 +1295,28 @@ const Dashboard: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
                   <XAxis dataKey="month" stroke="#666" />
                   <YAxis stroke="#666" />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{ 
-                      borderRadius: 8, 
+                    contentStyle={{
+                      borderRadius: 8,
                       border: '1px solid rgba(0,0,0,0.1)',
-                      background: 'rgba(255,255,255,0.95)'
+                      background: 'rgba(255,255,255,0.95)',
                     }}
                   />
                   <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="expenses" 
-                    stroke="#f44336" 
+                  <Line
+                    type="monotone"
+                    dataKey="expenses"
+                    stroke="#f44336"
                     strokeWidth={3}
                     name="Expenses"
                     dot={{ fill: '#f44336', r: 6 }}
                     activeDot={{ r: 8 }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="income" 
-                    stroke="#4caf50" 
+                  <Line
+                    type="monotone"
+                    dataKey="income"
+                    stroke="#4caf50"
                     strokeWidth={3}
                     name="Income"
                     dot={{ fill: '#4caf50', r: 6 }}
@@ -1295,9 +1339,7 @@ const Dashboard: React.FC = () => {
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1329,12 +1371,17 @@ const Dashboard: React.FC = () => {
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend 
+                  <Legend
                     formatter={(_value, entry: any) => {
-                      const name = entry.payload.name.length > 15 
-                        ? entry.payload.name.substring(0, 15) + '...' 
-                        : entry.payload.name;
-                      const percent = ((entry.payload.value / topCategories.reduce((sum, cat) => sum + cat.value, 0)) * 100).toFixed(0);
+                      const name =
+                        entry.payload.name.length > 15
+                          ? entry.payload.name.substring(0, 15) + '...'
+                          : entry.payload.name;
+                      const percent = (
+                        (entry.payload.value /
+                          topCategories.reduce((sum, cat) => sum + cat.value, 0)) *
+                        100
+                      ).toFixed(0);
                       return `${name} ${percent}% (${formatCurrency(entry.payload.value)})`;
                     }}
                     wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }}
@@ -1360,9 +1407,7 @@ const Dashboard: React.FC = () => {
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1410,12 +1455,15 @@ const Dashboard: React.FC = () => {
                           bgcolor: budget.isOver
                             ? '#f44336'
                             : budget.percentage > 80
-                            ? '#ff9800'
-                            : '#4caf50',
+                              ? '#ff9800'
+                              : '#4caf50',
                         },
                       }}
                     />
-                    <Typography variant="caption" color={budget.isOver ? 'error' : 'text.secondary'}>
+                    <Typography
+                      variant="caption"
+                      color={budget.isOver ? 'error' : 'text.secondary'}
+                    >
                       {budget.percentage}% used
                       {budget.isOver && ' - Over budget!'}
                     </Typography>
@@ -1445,9 +1493,7 @@ const Dashboard: React.FC = () => {
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1501,7 +1547,12 @@ const Dashboard: React.FC = () => {
                         </Box>
                       }
                       secondary={
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5}>
+                        <Box
+                          display="flex"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          mt={0.5}
+                        >
                           <Chip
                             label={txn.frequency}
                             size="small"

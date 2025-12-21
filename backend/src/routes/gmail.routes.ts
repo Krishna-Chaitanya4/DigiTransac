@@ -19,7 +19,7 @@ const getOAuth2Client = () => {
  */
 router.get('/connect', authenticate, (req: AuthRequest, res: Response) => {
   const oauth2Client = getOAuth2Client();
-  
+
   const scopes = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
@@ -48,7 +48,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     }
 
     const oauth2Client = getOAuth2Client();
-    
+
     // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code as string);
     oauth2Client.setCredentials(tokens);

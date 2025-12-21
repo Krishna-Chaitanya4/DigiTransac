@@ -5,12 +5,7 @@ import { logger } from './logger';
  * Throws error if critical configuration is missing
  */
 export const validateConfig = (): void => {
-  const required = [
-    'COSMOS_ENDPOINT',
-    'COSMOS_KEY',
-    'COSMOS_DATABASE_NAME',
-    'JWT_SECRET'
-  ];
+  const required = ['COSMOS_ENDPOINT', 'COSMOS_KEY', 'COSMOS_DATABASE_NAME', 'JWT_SECRET'];
 
   const missing: string[] = [];
 
@@ -26,8 +21,10 @@ export const validateConfig = (): void => {
   }
 
   // Warn about development defaults
-  if (process.env.JWT_SECRET === 'fallback-secret' || 
-      process.env.JWT_SECRET === 'your-jwt-secret-change-in-production') {
+  if (
+    process.env.JWT_SECRET === 'fallback-secret' ||
+    process.env.JWT_SECRET === 'your-jwt-secret-change-in-production'
+  ) {
     logger.warn('⚠️  Using weak JWT_SECRET - not suitable for production!');
   }
 

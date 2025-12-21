@@ -118,9 +118,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         styleOverrides: {
           root: {
             borderRadius: 12,
-            boxShadow: mode === 'light' 
-              ? '0 2px 8px rgba(0,0,0,0.1)' 
-              : '0 2px 8px rgba(0,0,0,0.3)',
+            boxShadow: mode === 'light' ? '0 2px 8px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.3)',
           },
         },
       },
@@ -136,9 +134,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   return (
     <ThemeContext.Provider value={{ mode, toggleTheme }}>
-      <MUIThemeProvider theme={theme}>
-        {children}
-      </MUIThemeProvider>
+      <MUIThemeProvider theme={theme}>{children}</MUIThemeProvider>
     </ThemeContext.Provider>
   );
 };

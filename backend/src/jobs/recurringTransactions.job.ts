@@ -10,9 +10,9 @@ import { logger } from '../utils/logger';
 export async function processRecurringTransactions(): Promise<number> {
   try {
     logger.info('🔄 Processing recurring transactions...');
-    
+
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    
+
     // Find all recurring transactions
     const recurringTransactions = (await transactionsContainer
       .find({ isRecurring: true })
@@ -29,7 +29,7 @@ export async function processRecurringTransactions(): Promise<number> {
       if (!recurringTxn.recurrencePattern) continue;
 
       const pattern = recurringTxn.recurrencePattern;
-      
+
       // Check if recurrence has ended
       if (pattern.endDate && new Date(pattern.endDate) < today) {
         continue;
@@ -52,15 +52,15 @@ export async function processRecurringTransactions(): Promise<number> {
         };
 
         await transactionsContainer.insertOne(newTransaction);
-        
+
         // Update last created timestamp on the recurring transaction
         await transactionsContainer.updateOne(
           { id: recurringTxn.id },
-          { 
-            $set: { 
+          {
+            $set: {
               'recurrencePattern.lastCreated': today,
-              updatedAt: new Date()
-            } 
+              updatedAt: new Date(),
+            },
           }
         );
 
@@ -86,7 +86,7 @@ function shouldCreateTransaction(
   today: Date
 ): boolean {
   const lastCreated = pattern.lastCreated ? new Date(pattern.lastCreated) : null;
-  
+
   // If already created today, skip
   if (lastCreated) {
     lastCreated.setHours(0, 0, 0, 0);
@@ -119,8 +119,9 @@ function shouldCreateTransaction(
     case 'yearly': {
       // Create on the same month and day as the original transaction
       const originalYearly = new Date(transaction.date);
-      return today.getMonth() === originalYearly.getMonth() && 
-             dayOfMonth === originalYearly.getDate();
+      return (
+        today.getMonth() === originalYearly.getMonth() && dayOfMonth === originalYearly.getDate()
+      );
     }
 
     default:
@@ -138,7 +139,7 @@ export function startRecurringTransactionsJob(): void {
 
   // Run every day at midnight (00:00)
   const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-  
+
   // Calculate time until next midnight
   const now = new Date();
   const midnight = new Date(now);
@@ -148,7 +149,7 @@ export function startRecurringTransactionsJob(): void {
   // Schedule first run at midnight
   setTimeout(() => {
     processRecurringTransactions();
-    
+
     // Then run every 24 hours
     setInterval(() => {
       processRecurringTransactions();

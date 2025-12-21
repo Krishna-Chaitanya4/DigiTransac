@@ -5,23 +5,25 @@ const isDevelopment = process.env.NODE_ENV !== 'production';
 // Create base logger
 export const logger = pino({
   level: process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info'),
-  
+
   // Development: Pretty print with colors
   // Production: JSON format for log aggregation
-  transport: isDevelopment ? {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'HH:MM:ss',
-      ignore: 'pid,hostname',
-      singleLine: false
-    }
-  } : undefined,
+  transport: isDevelopment
+    ? {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'HH:MM:ss',
+          ignore: 'pid,hostname',
+          singleLine: false,
+        },
+      }
+    : undefined,
 
   // Base fields for all logs
   base: {
     env: process.env.NODE_ENV || 'development',
-    service: 'digitransac-backend'
+    service: 'digitransac-backend',
   },
 
   // Timestamp format
@@ -31,8 +33,8 @@ export const logger = pino({
   serializers: {
     error: pino.stdSerializers.err,
     req: pino.stdSerializers.req,
-    res: pino.stdSerializers.res
-  }
+    res: pino.stdSerializers.res,
+  },
 });
 
 // Child logger for specific contexts

@@ -12,11 +12,9 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    
+
     const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const accounts = (await accountsContainer
-      .find({ userId })
-      .toArray()) as unknown as Account[];
+    const accounts = (await accountsContainer.find({ userId }).toArray()) as unknown as Account[];
 
     // Sort in memory to avoid composite index requirement
     accounts.sort((a, b) => {
@@ -28,13 +26,13 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     res.json({
       success: true,
-      accounts
+      accounts,
     });
   } catch (error) {
     console.error('Error fetching accounts:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching accounts'
+      message: 'Error fetching accounts',
     });
   }
 });
@@ -43,12 +41,23 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { name, type, bankName, accountNumber, currency, initialBalance, icon, color, isDefault, notes } = req.body;
+    const {
+      name,
+      type,
+      bankName,
+      accountNumber,
+      currency,
+      initialBalance,
+      icon,
+      color,
+      isDefault,
+      notes,
+    } = req.body;
 
     if (!name || !type || !currency) {
       res.status(400).json({
         success: false,
-        message: 'Name, type, and currency are required'
+        message: 'Name, type, and currency are required',
       });
       return;
     }
@@ -79,7 +88,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       isActive: true,
       notes,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await accountsContainer.insertOne(newAccount);
@@ -87,13 +96,13 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(201).json({
       success: true,
       message: 'Account created successfully',
-      account: newAccount
+      account: newAccount,
     });
   } catch (error) {
     console.error('Error creating account:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating account'
+      message: 'Error creating account',
     });
   }
 });
@@ -103,7 +112,8 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { id } = req.params;
-    const { name, type, bankName, accountNumber, icon, color, isDefault, isActive, notes } = req.body;
+    const { name, type, bankName, accountNumber, icon, color, isDefault, isActive, notes } =
+      req.body;
 
     const accountsContainer = await cosmosDBService.getAccountsContainer();
 
@@ -111,7 +121,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!account) {
       res.status(404).json({
         success: false,
-        message: 'Account not found'
+        message: 'Account not found',
       });
       return;
     }
@@ -134,26 +144,23 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       ...(isDefault !== undefined && { isDefault }),
       ...(isActive !== undefined && { isActive }),
       ...(notes !== undefined && { notes }),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
-    await accountsContainer.updateOne(
-      { id, userId },
-      { $set: updateData }
-    );
+    await accountsContainer.updateOne({ id, userId }, { $set: updateData });
 
     const updatedAccount = await accountsContainer.findOne({ id, userId });
 
     res.json({
       success: true,
       message: 'Account updated successfully',
-      account: updatedAccount
+      account: updatedAccount,
     });
   } catch (error) {
     console.error('Error updating account:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating account'
+      message: 'Error updating account',
     });
   }
 });
@@ -171,7 +178,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     if (!account) {
       res.status(404).json({
         success: false,
-        message: 'Account not found'
+        message: 'Account not found',
       });
       return;
     }
@@ -181,7 +188,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     if (transactionCount > 0) {
       res.status(400).json({
         success: false,
-        message: `Cannot delete account with ${transactionCount} transaction(s). Please delete or reassign transactions first.`
+        message: `Cannot delete account with ${transactionCount} transaction(s). Please delete or reassign transactions first.`,
       });
       return;
     }
@@ -190,13 +197,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
     res.json({
       success: true,
-      message: 'Account deleted successfully'
+      message: 'Account deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting account:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting account'
+      message: 'Error deleting account',
     });
   }
 });
@@ -210,11 +217,11 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
     const accountsContainer = await cosmosDBService.getAccountsContainer();
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
 
-    const account = await accountsContainer.findOne({ id, userId }) as unknown as Account;
+    const account = (await accountsContainer.findOne({ id, userId })) as unknown as Account;
     if (!account) {
       res.status(404).json({
         success: false,
-        message: 'Account not found'
+        message: 'Account not found',
       });
       return;
     }
@@ -242,14 +249,14 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
         initialBalance: account.initialBalance || 0,
         totalCredits: credits,
         totalDebits: debits,
-        transactionCount: transactions.length
-      }
+        transactionCount: transactions.length,
+      },
     });
   } catch (error) {
     console.error('Error fetching account balance:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching account balance'
+      message: 'Error fetching account balance',
     });
   }
 });

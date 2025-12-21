@@ -47,29 +47,31 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS configuration - support multiple origins
-const allowedOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
   : ['http://localhost:3000'];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // In production, reject requests without origin
-    if (!origin && process.env.NODE_ENV === 'production') {
-      return callback(new Error('Not allowed by CORS'));
-    }
-    // Allow requests with no origin in development (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // In production, reject requests without origin
+      if (!origin && process.env.NODE_ENV === 'production') {
+        return callback(new Error('Not allowed by CORS'));
+      }
+      // Allow requests with no origin in development (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 app.use(compression());
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,22 +91,22 @@ app.get('/ping', (_req, res) => {
 // Readiness probe - checks if DB is initialized
 app.get('/health', async (_req, res) => {
   try {
-   // Simple check: just verify DB service is initialized
+    // Simple check: just verify DB service is initialized
     const isInitialized = cosmosDBService.usersContainer !== null;
-    
-    res.status(isInitialized ? 200 : 503).json({ 
-      status: isInitialized ? 'healthy' : 'unhealthy', 
+
+    res.status(isInitialized ? 200 : 503).json({
+      status: isInitialized ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
       database: isInitialized ? 'initialized' : 'not initialized',
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
     });
   } catch (error) {
-    res.status(503).json({ 
-      status: 'unhealthy', 
+    res.status(503).json({
+      status: 'unhealthy',
       timestamp: new Date().toISOString(),
       database: 'error',
-      error: 'Health check failed'
+      error: 'Health check failed',
     });
   }
 });
@@ -133,16 +135,16 @@ const startServer = async () => {
   try {
     // Initialize Cosmos DB connection
     await cosmosDBService.initialize();
-    
+
     // Initialize encryption service
     await encryptionService.initialize();
-    
+
     // Start email polling cron job
     startEmailPollingJob();
-    
+
     // Start recurring transactions cron job
     startRecurringTransactionsJob();
-    
+
     // Start server
     app.listen(PORT, () => {
       logger.info(`🚀 Server is running on port ${PORT}`);

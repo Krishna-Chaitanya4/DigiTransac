@@ -25,12 +25,10 @@ async function getAllDescendantCategoryIds(
 
   // Folder - recursively get all descendants
   const categoryIds: string[] = [];
-  
+
   const collectDescendants = async (parentId: string): Promise<void> => {
-    const children = await categoriesContainer
-      .find({ parentId, userId })
-      .toArray() as Category[];
-    
+    const children = (await categoriesContainer.find({ parentId, userId }).toArray()) as Category[];
+
     for (const child of children) {
       if (!child.isFolder) {
         // It's a category - add to list
@@ -49,27 +47,25 @@ async function getAllDescendantCategoryIds(
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    
+
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
-    const budgets = (await budgetsContainer
-      .find({ userId })
-      .toArray()) as unknown as Budget[];
+    const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
     // Calculate spending for each budget
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    
+
     const budgetsWithSpending = await Promise.all(
       budgets.map(async (budget) => {
         const startDate = new Date(budget.startDate);
         const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
-        
+
         // Get the category to check if it's a folder
-        const category = await categoriesContainer.findOne({ 
-          id: budget.categoryId, 
-          userId 
-        }) as Category | null;
-        
+        const category = (await categoriesContainer.findOne({
+          id: budget.categoryId,
+          userId,
+        })) as Category | null;
+
         if (!category) {
           // Category not found - return budget with zero spending
           return {
@@ -77,7 +73,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
             spent: 0,
             remaining: budget.amount,
             percentUsed: 0,
-            isOverBudget: false
+            isOverBudget: false,
           };
         }
 
@@ -95,7 +91,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
             userId,
             categoryId: { $in: categoryIds },
             date: { $gte: startDate, $lte: endDate },
-            reviewStatus: 'approved'
+            reviewStatus: 'approved',
           })
           .toArray();
 
@@ -108,20 +104,20 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
           spent,
           remaining,
           percentUsed,
-          isOverBudget: spent > budget.amount
+          isOverBudget: spent > budget.amount,
         };
       })
     );
 
     res.json({
       success: true,
-      budgets: budgetsWithSpending
+      budgets: budgetsWithSpending,
     });
   } catch (error) {
     console.error('Error fetching budgets:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching budgets'
+      message: 'Error fetching budgets',
     });
   }
 });
@@ -135,7 +131,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!categoryId || !amount || !startDate) {
       res.status(400).json({
         success: false,
-        message: 'Category, amount, and start date are required'
+        message: 'Category, amount, and start date are required',
       });
       return;
     }
@@ -143,11 +139,11 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // Validate category exists (can be folder or category)
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
     const category = await categoriesContainer.findOne({ id: categoryId, userId });
-    
+
     if (!category) {
       res.status(404).json({
         success: false,
-        message: 'Category or folder not found'
+        message: 'Category or folder not found',
       });
       return;
     }
@@ -158,13 +154,13 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const existingBudget = await budgetsContainer.findOne({
       userId,
       categoryId,
-      startDate: new Date(startDate)
+      startDate: new Date(startDate),
     });
 
     if (existingBudget) {
       res.status(400).json({
         success: false,
-        message: 'Budget already exists for this category in this period'
+        message: 'Budget already exists for this category in this period',
       });
       return;
     }
@@ -179,7 +175,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       endDate: endDate ? new Date(endDate) : undefined,
       alertThreshold: alertThreshold || 80,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await budgetsContainer.insertOne(newBudget);
@@ -187,13 +183,13 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(201).json({
       success: true,
       message: 'Budget created successfully',
-      budget: newBudget
+      budget: newBudget,
     });
   } catch (error) {
     console.error('Error creating budget:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating budget'
+      message: 'Error creating budget',
     });
   }
 });
@@ -206,12 +202,12 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const { categoryId, amount, period, startDate, endDate, alertThreshold } = req.body;
 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
-    
-    const budget = await budgetsContainer.findOne({ id, userId }) as Budget | null;
+
+    const budget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
     if (!budget) {
       res.status(404).json({
         success: false,
-        message: 'Budget not found'
+        message: 'Budget not found',
       });
       return;
     }
@@ -220,18 +216,18 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (categoryId !== undefined && categoryId !== budget.categoryId) {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
       const category = await categoriesContainer.findOne({ id: categoryId, userId });
-      
+
       if (!category) {
         res.status(404).json({
           success: false,
-          message: 'Category or folder not found'
+          message: 'Category or folder not found',
         });
         return;
       }
     }
 
     const updateData: any = {
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     if (categoryId !== undefined) updateData.categoryId = categoryId;
@@ -241,23 +237,20 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (endDate) updateData.endDate = new Date(endDate);
     if (alertThreshold !== undefined) updateData.alertThreshold = alertThreshold;
 
-    await budgetsContainer.updateOne(
-      { id, userId },
-      { $set: updateData }
-    );
+    await budgetsContainer.updateOne({ id, userId }, { $set: updateData });
 
     const updatedBudget = await budgetsContainer.findOne({ id, userId });
 
     res.json({
       success: true,
       message: 'Budget updated successfully',
-      budget: updatedBudget
+      budget: updatedBudget,
     });
   } catch (error) {
     console.error('Error updating budget:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating budget'
+      message: 'Error updating budget',
     });
   }
 });
@@ -269,12 +262,12 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const { id } = req.params;
 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
-    
-    const budget = await budgetsContainer.findOne({ id, userId }) as Budget | null;
+
+    const budget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
     if (!budget) {
       res.status(404).json({
         success: false,
-        message: 'Budget not found'
+        message: 'Budget not found',
       });
       return;
     }
@@ -283,13 +276,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
     res.json({
       success: true,
-      message: 'Budget deleted successfully'
+      message: 'Budget deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting budget:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting budget'
+      message: 'Error deleting budget',
     });
   }
 });
@@ -298,11 +291,9 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    
+
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
-    const budgets = (await budgetsContainer
-      .find({ userId })
-      .toArray()) as unknown as Budget[];
+    const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
     const alerts = [];
     const expensesContainer = await cosmosDBService.getExpensesContainer();
@@ -310,12 +301,12 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
     for (const budget of budgets) {
       const startDate = new Date(budget.startDate);
       const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
-      
+
       const expenses = await expensesContainer
         .find({
           userId,
           categoryId: budget.categoryId,
-          date: { $gte: startDate, $lte: endDate }
+          date: { $gte: startDate, $lte: endDate },
         })
         .toArray();
 
@@ -330,20 +321,20 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
           spent,
           percentUsed: Math.round(percentUsed),
           threshold: budget.alertThreshold,
-          isOverBudget: spent > budget.amount
+          isOverBudget: spent > budget.amount,
         });
       }
     }
 
     res.json({
       success: true,
-      alerts
+      alerts,
     });
   } catch (error) {
     console.error('Error fetching budget alerts:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching budget alerts'
+      message: 'Error fetching budget alerts',
     });
   }
 });

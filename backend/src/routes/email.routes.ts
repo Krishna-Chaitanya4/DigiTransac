@@ -63,7 +63,7 @@ router.post('/inbound', async (req: Request, res: Response) => {
 
     // Create pending expense
     const expenseContainer = await cosmosDBService.getExpensesContainer();
-    
+
     const newExpense: Expense = {
       id: randomUUID(),
       userId: userId,
@@ -96,7 +96,8 @@ router.post('/inbound', async (req: Request, res: Response) => {
       {
         $set: {
           'emailIntegration.lastProcessedAt': new Date(),
-          'emailIntegration.totalEmailsProcessed': (user?.emailIntegration?.totalEmailsProcessed || 0) + 1,
+          'emailIntegration.totalEmailsProcessed':
+            (user?.emailIntegration?.totalEmailsProcessed || 0) + 1,
         },
       }
     );
@@ -112,7 +113,6 @@ router.post('/inbound', async (req: Request, res: Response) => {
         status: 'pending',
       },
     });
-
   } catch (error: any) {
     console.error('Error processing inbound email:', error);
     return res.status(500).json({ message: error.message || 'Internal server error' });
@@ -122,7 +122,9 @@ router.post('/inbound', async (req: Request, res: Response) => {
 /**
  * Parse inbound email from Mailgun/SendGrid format
  */
-function parseInboundEmail(body: any): { to: string; from: string; subject: string; text: string; messageId: string } | null {
+function parseInboundEmail(
+  body: any
+): { to: string; from: string; subject: string; text: string; messageId: string } | null {
   try {
     // Mailgun format
     if (body.recipient) {

@@ -62,7 +62,7 @@ const Budgets: React.FC = () => {
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  
+
   const [formData, setFormData] = useState({
     categoryId: '',
     amount: '',
@@ -106,12 +106,12 @@ const Budgets: React.FC = () => {
   };
 
   const getCategoryName = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
+    const category = categories.find((c) => c.id === categoryId);
     return category?.name || 'Unknown';
   };
 
   const getCategoryColor = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
+    const category = categories.find((c) => c.id === categoryId);
     return category?.color || '#667eea';
   };
 
@@ -134,7 +134,9 @@ const Budgets: React.FC = () => {
       amount: budget.amount.toString(),
       period: budget.period,
       startDate: new Date(budget.startDate).toISOString().split('T')[0],
-      endDate: budget.endDate ? new Date(budget.endDate).toISOString().split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      endDate: budget.endDate
+        ? new Date(budget.endDate).toISOString().split('T')[0]
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       alertThreshold: budget.alertThreshold.toString(),
     });
     setEditingBudget(budget);
@@ -158,17 +160,13 @@ const Budgets: React.FC = () => {
       };
 
       if (editingBudget) {
-        await axios.put(
-          `/api/budgets/${editingBudget.id}`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.put(`/api/budgets/${editingBudget.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       } else {
-        await axios.post(
-          `/api/budgets`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.post(`/api/budgets`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
       fetchBudgets();
       handleCloseDialog();
@@ -180,10 +178,14 @@ const Budgets: React.FC = () => {
   };
 
   const handleDeleteBudget = async (budget: Budget) => {
-    if (!window.confirm(`Are you sure you want to delete the budget for "${getCategoryName(budget.categoryId)}"?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the budget for "${getCategoryName(budget.categoryId)}"?`
+      )
+    ) {
       return;
     }
-    
+
     try {
       await axios.delete(`/api/budgets/${budget.id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -251,9 +253,7 @@ const Budgets: React.FC = () => {
         <Card
           sx={{
             background: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'rgba(255, 255, 255, 0.9)'
-                : 'rgba(30, 30, 30, 0.9)',
+              theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 30, 30, 0.9)',
             backdropFilter: 'blur(10px)',
             borderRadius: 2,
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
@@ -267,11 +267,7 @@ const Budgets: React.FC = () => {
               <Typography variant="body2" color="text.secondary" mb={2}>
                 Create budgets to track your spending limits
               </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleOpenDialog}
-              >
+              <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenDialog}>
                 Create Budget
               </Button>
             </Box>
@@ -299,7 +295,13 @@ const Budgets: React.FC = () => {
                     <Box>
                       <Box display="flex" alignItems="center" gap={0.5} mb={1}>
                         <Chip
-                          icon={categories.find(c => c.id === budget.categoryId)?.isFolder ? <span>📁</span> : <span>📄</span>}
+                          icon={
+                            categories.find((c) => c.id === budget.categoryId)?.isFolder ? (
+                              <span>📁</span>
+                            ) : (
+                              <span>📄</span>
+                            )
+                          }
                           label={getCategoryName(budget.categoryId)}
                           size="small"
                           sx={{
@@ -307,10 +309,10 @@ const Budgets: React.FC = () => {
                             color: getCategoryColor(budget.categoryId),
                           }}
                         />
-                        {categories.find(c => c.id === budget.categoryId)?.isFolder && (
-                          <Chip 
-                            label="Folder Budget" 
-                            size="small" 
+                        {categories.find((c) => c.id === budget.categoryId)?.isFolder && (
+                          <Chip
+                            label="Folder Budget"
+                            size="small"
                             variant="outlined"
                             sx={{ fontSize: '0.7rem' }}
                           />
@@ -320,14 +322,19 @@ const Budgets: React.FC = () => {
                         {formatCurrency(budget.amount)}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {formatDate(budget.startDate)} - {budget.endDate ? formatDate(budget.endDate) : 'Ongoing'}
+                        {formatDate(budget.startDate)} -{' '}
+                        {budget.endDate ? formatDate(budget.endDate) : 'Ongoing'}
                       </Typography>
                     </Box>
                     <Box>
                       <IconButton size="small" onClick={() => handleEditBudget(budget)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" onClick={() => handleDeleteBudget(budget)} color="error">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteBudget(budget)}
+                        color="error"
+                      >
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Box>
@@ -338,7 +345,11 @@ const Budgets: React.FC = () => {
                       <Typography variant="body2" color="text.secondary">
                         Spent: {formatCurrency(budget.spent || 0)}
                       </Typography>
-                      <Typography variant="body2" fontWeight={600} color={budget.isOverBudget ? 'error.main' : 'text.primary'}>
+                      <Typography
+                        variant="body2"
+                        fontWeight={600}
+                        color={budget.isOverBudget ? 'error.main' : 'text.primary'}
+                      >
                         {budget.percentUsed || 0}%
                       </Typography>
                     </Box>
@@ -351,17 +362,17 @@ const Budgets: React.FC = () => {
                   </Box>
 
                   <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="body2" color={budget.remaining && budget.remaining < 0 ? 'error.main' : 'success.main'}>
+                    <Typography
+                      variant="body2"
+                      color={
+                        budget.remaining && budget.remaining < 0 ? 'error.main' : 'success.main'
+                      }
+                    >
                       {budget.remaining && budget.remaining < 0 ? 'Over by ' : 'Remaining: '}
                       {formatCurrency(Math.abs(budget.remaining || 0))}
                     </Typography>
                     {budget.isOverBudget && (
-                      <Chip
-                        icon={<WarningIcon />}
-                        label="Over Budget"
-                        size="small"
-                        color="error"
-                      />
+                      <Chip icon={<WarningIcon />} label="Over Budget" size="small" color="error" />
                     )}
                   </Box>
                 </CardContent>
@@ -373,9 +384,7 @@ const Budgets: React.FC = () => {
 
       {/* Create/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingBudget ? 'Edit Budget' : 'Create New Budget'}
-        </DialogTitle>
+        <DialogTitle>{editingBudget ? 'Edit Budget' : 'Create New Budget'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
@@ -416,9 +425,7 @@ const Budgets: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start">
-                    {user?.currency || 'USD'}
-                  </InputAdornment>
+                  <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
                 ),
               }}
               required
@@ -467,7 +474,9 @@ const Budgets: React.FC = () => {
           <Button
             onClick={handleSubmit}
             variant="contained"
-            disabled={!formData.categoryId || !formData.amount || !formData.startDate || !formData.endDate}
+            disabled={
+              !formData.categoryId || !formData.amount || !formData.startDate || !formData.endDate
+            }
           >
             {editingBudget ? 'Update' : 'Create'}
           </Button>

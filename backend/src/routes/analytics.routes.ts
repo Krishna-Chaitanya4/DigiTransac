@@ -12,15 +12,19 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
@@ -34,10 +38,7 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
       .find({
         userId,
         startDate: { $lte: end },
-        $or: [
-          { endDate: { $gte: start } },
-          { endDate: { $exists: false } }
-        ]
+        $or: [{ endDate: { $gte: start } }, { endDate: { $exists: false } }],
       })
       .toArray();
 
@@ -53,15 +54,15 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
         budgetUsedPercent: totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0,
         period: {
           startDate: start,
-          endDate: end
-        }
-      }
+          endDate: end,
+        },
+      },
     });
   } catch (error) {
     console.error('Error fetching overview:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching overview'
+      message: 'Error fetching overview',
     });
   }
 });
@@ -72,35 +73,37 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
     // Aggregate by category
     const categoryMap = new Map<string, { amount: number; count: number }>();
-    
+
     expenses.forEach((expense: any) => {
       const categoryId = expense.categoryId;
       const current = categoryMap.get(categoryId) || { amount: 0, count: 0 };
       categoryMap.set(categoryId, {
         amount: current.amount + expense.amount,
-        count: current.count + 1
+        count: current.count + 1,
       });
     });
 
     // Get category details
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    const categories = await categoriesContainer
-      .find({ userId })
-      .toArray();
+    const categories = await categoriesContainer.find({ userId }).toArray();
 
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
@@ -108,7 +111,7 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     const buildNamePath = (categoryId: string): string[] => {
       const category = categoryLookup.get(categoryId);
       if (!category) return ['Unknown'];
-      
+
       const namePath: string[] = [];
       if (category.parentId) {
         // Recursively get parent names
@@ -132,12 +135,12 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
         path: buildNamePath(categoryId),
         amount: data.amount,
         count: data.count,
-        percentage: 0 // Will calculate after
+        percentage: 0, // Will calculate after
       };
     });
 
     const totalAmount = breakdown.reduce((sum, item) => sum + item.amount, 0);
-    breakdown.forEach(item => {
+    breakdown.forEach((item) => {
       item.percentage = totalAmount > 0 ? Math.round((item.amount / totalAmount) * 100) : 0;
     });
 
@@ -147,13 +150,13 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     res.json({
       success: true,
       breakdown,
-      total: totalAmount
+      total: totalAmount,
     });
   } catch (error) {
     console.error('Error fetching category breakdown:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching category breakdown'
+      message: 'Error fetching category breakdown',
     });
   }
 });
@@ -164,23 +167,25 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
     // Get all categories
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    const categories = await categoriesContainer
-      .find({ userId })
-      .toArray();
+    const categories = await categoriesContainer.find({ userId }).toArray();
 
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
@@ -188,12 +193,12 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
     const getRootFolder = (categoryId: string): any => {
       const category = categoryLookup.get(categoryId);
       if (!category) return null;
-      
+
       if (!category.parentId) {
         // This is already a root category/folder
         return category;
       }
-      
+
       // Traverse up to find root
       let current = category;
       while (current.parentId) {
@@ -206,17 +211,21 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
 
     // Aggregate expenses by root folder
     const folderMap = new Map<string, { amount: number; count: number; children: Set<string> }>();
-    
+
     expenses.forEach((expense: any) => {
       const rootFolder = getRootFolder(expense.categoryId);
       if (!rootFolder) return;
-      
+
       const folderId = rootFolder.id;
-      const current = folderMap.get(folderId) || { amount: 0, count: 0, children: new Set<string>() };
+      const current = folderMap.get(folderId) || {
+        amount: 0,
+        count: 0,
+        children: new Set<string>(),
+      };
       folderMap.set(folderId, {
         amount: current.amount + expense.amount,
         count: current.count + 1,
-        children: current.children.add(expense.categoryId)
+        children: current.children.add(expense.categoryId),
       });
     });
 
@@ -232,12 +241,12 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
         amount: data.amount,
         count: data.count,
         childCount: data.children.size,
-        percentage: 0 // Will calculate after
+        percentage: 0, // Will calculate after
       };
     });
 
     const totalAmount = breakdown.reduce((sum, item) => sum + item.amount, 0);
-    breakdown.forEach(item => {
+    breakdown.forEach((item) => {
       item.percentage = totalAmount > 0 ? Math.round((item.amount / totalAmount) * 100) : 0;
     });
 
@@ -247,13 +256,13 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
     res.json({
       success: true,
       breakdown,
-      total: totalAmount
+      total: totalAmount,
     });
   } catch (error) {
     console.error('Error fetching folder breakdown:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching folder breakdown'
+      message: 'Error fetching folder breakdown',
     });
   }
 });
@@ -264,15 +273,19 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
     const userId = req.userId!;
     const { startDate, endDate, groupBy = 'day' } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
@@ -310,13 +323,13 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
     res.json({
       success: true,
       trends,
-      groupBy
+      groupBy,
     });
   } catch (error) {
     console.error('Error fetching trends:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching trends'
+      message: 'Error fetching trends',
     });
   }
 });
@@ -327,8 +340,12 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     // Get active budgets
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
@@ -336,16 +353,13 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       .find({
         userId,
         startDate: { $lte: end },
-        $or: [
-          { endDate: { $gte: start } },
-          { endDate: { $exists: false } }
-        ]
+        $or: [{ endDate: { $gte: start } }, { endDate: { $exists: false } }],
       })
       .toArray();
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    
+
     const categories = await categoriesContainer.find({ userId }).toArray();
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
@@ -362,20 +376,23 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
     const comparisons = await Promise.all(
       budgets.map(async (budget: any) => {
         const budgetStart = new Date(budget.startDate) > start ? new Date(budget.startDate) : start;
-        const budgetEnd = budget.endDate && new Date(budget.endDate) < end ? new Date(budget.endDate) : end;
+        const budgetEnd =
+          budget.endDate && new Date(budget.endDate) < end ? new Date(budget.endDate) : end;
 
         const category = categoryLookup.get(budget.categoryId);
         const isFolder = category?.isFolder || false;
 
         // For folders, get all descendant categories
-        const categoryIds = isFolder ? getAllDescendantCategoryIds(budget.categoryId) : [budget.categoryId];
+        const categoryIds = isFolder
+          ? getAllDescendantCategoryIds(budget.categoryId)
+          : [budget.categoryId];
 
         const expenses = await expensesContainer
           .find({
             userId,
             categoryId: { $in: categoryIds },
             date: { $gte: budgetStart, $lte: budgetEnd },
-            reviewStatus: 'approved'
+            reviewStatus: 'approved',
           })
           .toArray();
 
@@ -390,20 +407,20 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
           actualSpent: spent,
           difference: budget.amount - spent,
           percentUsed: Math.round((spent / budget.amount) * 100),
-          isOverBudget: spent > budget.amount
+          isOverBudget: spent > budget.amount,
         };
       })
     );
 
     res.json({
       success: true,
-      comparisons
+      comparisons,
     });
   } catch (error) {
     console.error('Error fetching budget comparison:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching budget comparison'
+      message: 'Error fetching budget comparison',
     });
   }
 });
@@ -414,15 +431,19 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
     const userId = req.userId!;
     const { startDate, endDate, limit = '10' } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
@@ -441,19 +462,19 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
       return {
         ...expense,
         categoryName: category?.name || 'Unknown',
-        categoryColor: category?.color || '#667eea'
+        categoryColor: category?.color || '#667eea',
       };
     });
 
     res.json({
       success: true,
-      expenses: enrichedExpenses
+      expenses: enrichedExpenses,
     });
   } catch (error) {
     console.error('Error fetching top expenses:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching top expenses'
+      message: 'Error fetching top expenses',
     });
   }
 });
@@ -464,59 +485,67 @@ router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response):
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
     const expenses = await expensesContainer
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
     // Aggregate by payment method
     const paymentMethodMap = new Map<string, { amount: number; count: number }>();
-    
+
     expenses.forEach((expense: any) => {
       const paymentMethodId = expense.paymentMethodId || 'none';
       const current = paymentMethodMap.get(paymentMethodId) || { amount: 0, count: 0 };
       paymentMethodMap.set(paymentMethodId, {
         amount: current.amount + expense.amount,
-        count: current.count + 1
+        count: current.count + 1,
       });
     });
 
     // Get payment method details
     const paymentMethodsContainer = await cosmosDBService.getPaymentMethodsContainer();
-    const paymentMethods = await paymentMethodsContainer
-      .find({ userId })
-      .toArray();
+    const paymentMethods = await paymentMethodsContainer.find({ userId }).toArray();
 
-    const totalAmount = Array.from(paymentMethodMap.values()).reduce((sum, pm) => sum + pm.amount, 0);
+    const totalAmount = Array.from(paymentMethodMap.values()).reduce(
+      (sum, pm) => sum + pm.amount,
+      0
+    );
 
-    const breakdown = Array.from(paymentMethodMap.entries()).map(([paymentMethodId, data]) => {
-      const paymentMethod = paymentMethods.find((pm: any) => pm.id === paymentMethodId);
-      return {
-        paymentMethodId,
-        paymentMethodName: paymentMethodId === 'none' ? 'Not Specified' : (paymentMethod?.name || 'Unknown'),
-        paymentMethodType: paymentMethod?.type || 'other',
-        amount: data.amount,
-        count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0
-      };
-    }).sort((a, b) => b.amount - a.amount);
+    const breakdown = Array.from(paymentMethodMap.entries())
+      .map(([paymentMethodId, data]) => {
+        const paymentMethod = paymentMethods.find((pm: any) => pm.id === paymentMethodId);
+        return {
+          paymentMethodId,
+          paymentMethodName:
+            paymentMethodId === 'none' ? 'Not Specified' : paymentMethod?.name || 'Unknown',
+          paymentMethodType: paymentMethod?.type || 'other',
+          amount: data.amount,
+          count: data.count,
+          percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
+        };
+      })
+      .sort((a, b) => b.amount - a.amount);
 
     res.json({
       success: true,
-      breakdown
+      breakdown,
     });
   } catch (error) {
     console.error('Error fetching payment method breakdown:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching payment method breakdown'
+      message: 'Error fetching payment method breakdown',
     });
   }
 });
@@ -527,8 +556,12 @@ router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<vo
     const userId = req.userId!;
     const { startDate, endDate, limit } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999)) : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
     const topLimit = limit ? parseInt(limit as string) : 10;
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
@@ -537,19 +570,19 @@ router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<vo
         userId,
         date: { $gte: start, $lte: end },
         merchantName: { $exists: true, $ne: null },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
     // Aggregate by merchant
     const merchantMap = new Map<string, { amount: number; count: number }>();
-    
+
     expenses.forEach((expense: any) => {
       const merchant = expense.merchantName;
       const current = merchantMap.get(merchant) || { amount: 0, count: 0 };
       merchantMap.set(merchant, {
         amount: current.amount + expense.amount,
-        count: current.count + 1
+        count: current.count + 1,
       });
     });
 
@@ -560,20 +593,20 @@ router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<vo
         merchantName,
         amount: data.amount,
         count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, topLimit);
 
     res.json({
       success: true,
-      merchants: topMerchants
+      merchants: topMerchants,
     });
   } catch (error) {
     console.error('Error fetching top merchants:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching top merchants'
+      message: 'Error fetching top merchants',
     });
   }
 });
@@ -584,7 +617,9 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const end = endDate ? new Date(endDate as string) : new Date();
     end.setHours(23, 59, 59, 999);
 
@@ -597,7 +632,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
       .find({
         userId,
         date: { $gte: start, $lte: end },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
@@ -612,13 +647,14 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
       .find({
         userId,
         date: { $gte: prevStart, $lte: prevEnd },
-        reviewStatus: 'approved'
+        reviewStatus: 'approved',
       })
       .toArray();
 
     const currentTotal = currentExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
     const previousTotal = previousExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
-    const percentChange = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
+    const percentChange =
+      previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
 
     // Get budgets and check for over-budget categories
     const budgets = await budgetsContainer.find({ userId }).toArray();
@@ -627,9 +663,11 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
 
     const overBudgetAlerts: any[] = [];
     for (const budget of budgets) {
-      const budgetExpenses = currentExpenses.filter((exp: any) => exp.categoryId === budget.categoryId);
+      const budgetExpenses = currentExpenses.filter(
+        (exp: any) => exp.categoryId === budget.categoryId
+      );
       const spent = budgetExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
-      
+
       if (spent > budget.amount) {
         const category = categoryLookup.get(budget.categoryId);
         overBudgetAlerts.push({
@@ -637,7 +675,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
           budgetAmount: budget.amount,
           spent,
           overBy: spent - budget.amount,
-          percentOver: Math.round(((spent - budget.amount) / budget.amount) * 100)
+          percentOver: Math.round(((spent - budget.amount) / budget.amount) * 100),
         });
       }
     }
@@ -650,7 +688,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
         description: exp.description,
         amount: exp.amount,
         date: exp.date,
-        timesAverage: Math.round(exp.amount / avgExpense * 10) / 10
+        timesAverage: Math.round((exp.amount / avgExpense) * 10) / 10,
       }))
       .sort((a: any, b: any) => b.amount - a.amount)
       .slice(0, 5);
@@ -660,26 +698,34 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const previousCategoryMap = new Map<string, number>();
 
     currentExpenses.forEach((exp: any) => {
-      currentCategoryMap.set(exp.categoryId, (currentCategoryMap.get(exp.categoryId) || 0) + exp.amount);
+      currentCategoryMap.set(
+        exp.categoryId,
+        (currentCategoryMap.get(exp.categoryId) || 0) + exp.amount
+      );
     });
 
     previousExpenses.forEach((exp: any) => {
-      previousCategoryMap.set(exp.categoryId, (previousCategoryMap.get(exp.categoryId) || 0) + exp.amount);
+      previousCategoryMap.set(
+        exp.categoryId,
+        (previousCategoryMap.get(exp.categoryId) || 0) + exp.amount
+      );
     });
 
     const categoryTrends: any[] = [];
     currentCategoryMap.forEach((currentAmount, categoryId) => {
       const previousAmount = previousCategoryMap.get(categoryId) || 0;
-      const change = previousAmount > 0 ? ((currentAmount - previousAmount) / previousAmount) * 100 : 100;
+      const change =
+        previousAmount > 0 ? ((currentAmount - previousAmount) / previousAmount) * 100 : 100;
       const category = categoryLookup.get(categoryId);
-      
-      if (Math.abs(change) > 20) { // Only show significant changes
+
+      if (Math.abs(change) > 20) {
+        // Only show significant changes
         categoryTrends.push({
           categoryName: category?.name || 'Unknown',
           currentAmount,
           previousAmount,
           percentChange: Math.round(change),
-          trend: change > 0 ? 'increasing' : 'decreasing'
+          trend: change > 0 ? 'increasing' : 'decreasing',
         });
       }
     });
@@ -690,9 +736,9 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const getRootFolder = (categoryId: string): any => {
       const category = categoryLookup.get(categoryId);
       if (!category) return null;
-      
+
       if (!category.parentId) return category;
-      
+
       let current = category;
       while (current.parentId) {
         const parent = categoryLookup.get(current.parentId);
@@ -708,24 +754,32 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     currentExpenses.forEach((exp: any) => {
       const rootFolder = getRootFolder(exp.categoryId);
       if (rootFolder) {
-        currentFolderMap.set(rootFolder.id, (currentFolderMap.get(rootFolder.id) || 0) + exp.amount);
+        currentFolderMap.set(
+          rootFolder.id,
+          (currentFolderMap.get(rootFolder.id) || 0) + exp.amount
+        );
       }
     });
 
     previousExpenses.forEach((exp: any) => {
       const rootFolder = getRootFolder(exp.categoryId);
       if (rootFolder) {
-        previousFolderMap.set(rootFolder.id, (previousFolderMap.get(rootFolder.id) || 0) + exp.amount);
+        previousFolderMap.set(
+          rootFolder.id,
+          (previousFolderMap.get(rootFolder.id) || 0) + exp.amount
+        );
       }
     });
 
     const folderTrends: any[] = [];
     currentFolderMap.forEach((currentAmount, folderId) => {
       const previousAmount = previousFolderMap.get(folderId) || 0;
-      const change = previousAmount > 0 ? ((currentAmount - previousAmount) / previousAmount) * 100 : 100;
+      const change =
+        previousAmount > 0 ? ((currentAmount - previousAmount) / previousAmount) * 100 : 100;
       const folder = categoryLookup.get(folderId);
-      
-      if (Math.abs(change) > 15) { // Slightly lower threshold for folders (broader categories)
+
+      if (Math.abs(change) > 15) {
+        // Slightly lower threshold for folders (broader categories)
         folderTrends.push({
           folderName: folder?.name || 'Unknown',
           categoryId: folderId,
@@ -733,7 +787,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
           currentAmount,
           previousAmount,
           percentChange: Math.round(change),
-          trend: change > 0 ? 'increasing' : 'decreasing'
+          trend: change > 0 ? 'increasing' : 'decreasing',
         });
       }
     });
@@ -747,7 +801,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
           currentTotal,
           previousTotal,
           percentChange: Math.round(percentChange),
-          direction: percentChange > 0 ? 'up' : 'down'
+          direction: percentChange > 0 ? 'up' : 'down',
         },
         overBudgetAlerts,
         unusualExpenses,
@@ -756,15 +810,15 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
         summary: {
           totalExpenses: currentExpenses.length,
           avgDailySpending: Math.round(currentTotal / (periodDays || 1)),
-          topSpendingDay: await getTopSpendingDay(currentExpenses)
-        }
-      }
+          topSpendingDay: await getTopSpendingDay(currentExpenses),
+        },
+      },
     });
   } catch (error) {
     console.error('Error fetching smart insights:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching smart insights'
+      message: 'Error fetching smart insights',
     });
   }
 });
@@ -772,7 +826,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
 // Helper function to find the day with highest spending
 async function getTopSpendingDay(expenses: any[]): Promise<{ date: string; amount: number }> {
   const dailyMap = new Map<string, number>();
-  
+
   expenses.forEach((exp: any) => {
     const dateKey = new Date(exp.date).toISOString().split('T')[0];
     dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + exp.amount);
@@ -794,13 +848,13 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
     const userId = req.userId!;
 
     const expensesContainer = await cosmosDBService.getExpensesContainer();
-    
+
     const allExpenses = await expensesContainer.find({ userId }).toArray();
-    
+
     const pending = allExpenses.filter((exp: any) => exp.reviewStatus === 'pending').length;
     const approved = allExpenses.filter((exp: any) => exp.reviewStatus === 'approved').length;
     const rejected = allExpenses.filter((exp: any) => exp.reviewStatus === 'rejected').length;
-    
+
     const total = approved + rejected;
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
@@ -814,7 +868,9 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
         description: exp.description,
         amount: exp.amount,
         date: exp.date,
-        daysSinceParsed: Math.floor((Date.now() - new Date(exp.createdAt || exp.date).getTime()) / (1000 * 60 * 60 * 24))
+        daysSinceParsed: Math.floor(
+          (Date.now() - new Date(exp.createdAt || exp.date).getTime()) / (1000 * 60 * 60 * 24)
+        ),
       }));
 
     res.json({
@@ -824,14 +880,14 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
         approved,
         rejected,
         approvalRate,
-        pendingExpenses
-      }
+        pendingExpenses,
+      },
     });
   } catch (error) {
     console.error('Error fetching review queue stats:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching review queue stats'
+      message: 'Error fetching review queue stats',
     });
   }
 });

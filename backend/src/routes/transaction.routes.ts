@@ -3,7 +3,11 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { Transaction, TransactionSplit, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
-import { encryptTransaction, decryptTransaction, decryptTransactions } from '../utils/transactionEncryption';
+import {
+  encryptTransaction,
+  decryptTransaction,
+  decryptTransactions,
+} from '../utils/transactionEncryption';
 
 const router = Router();
 
@@ -13,33 +17,33 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { 
-      accountId, 
-      categoryId, 
-      type, 
-      tags, 
-      startDate, 
-      endDate, 
+    const {
+      accountId,
+      categoryId,
+      type,
+      tags,
+      startDate,
+      endDate,
       reviewStatus,
       limit = '100',
       skip = '0',
       sortBy = 'date',
       sortOrder = 'desc',
-      includeSplits = 'true' // Option to include splits
+      includeSplits = 'true', // Option to include splits
     } = req.query;
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-    
+
     // Build filter
     const filter: MongoFilter<Transaction> = { userId };
-    
+
     if (accountId) filter.accountId = accountId;
     // Note: categoryId and tags filtering now needs to look at splits
     // For backwards compatibility, also check transaction.categoryId
     if (type) filter.type = type;
     if (reviewStatus) filter.reviewStatus = reviewStatus;
-    
+
     if (startDate || endDate) {
       filter.date = {};
       if (startDate) filter.date.$gte = new Date(startDate as string);
@@ -69,27 +73,30 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // If includeSplits is true, fetch splits for each transaction
     if (includeSplits === 'true') {
-      const transactionIds = transactions.map(t => t.id);
+      const transactionIds = transactions.map((t) => t.id);
       const allSplits = (await splitsContainer
         .find({ transactionId: { $in: transactionIds } })
         .toArray()) as unknown as TransactionSplit[];
-      
+
       // Sort splits in-memory by order
       allSplits.sort((a, b) => a.order - b.order);
 
       // Group splits by transaction ID
-      const splitsByTransaction = allSplits.reduce((acc, split) => {
-        if (!acc[split.transactionId]) {
-          acc[split.transactionId] = [];
-        }
-        acc[split.transactionId].push(split);
-        return acc;
-      }, {} as Record<string, TransactionSplit[]>);
+      const splitsByTransaction = allSplits.reduce(
+        (acc, split) => {
+          if (!acc[split.transactionId]) {
+            acc[split.transactionId] = [];
+          }
+          acc[split.transactionId].push(split);
+          return acc;
+        },
+        {} as Record<string, TransactionSplit[]>
+      );
 
       // Attach splits to transactions
-      transactions = transactions.map(txn => ({
+      transactions = transactions.map((txn) => ({
         ...txn,
-        splits: splitsByTransaction[txn.id] || []
+        splits: splitsByTransaction[txn.id] || [],
       })) as any;
     }
 
@@ -97,23 +104,24 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (categoryId || tags) {
       transactions = transactions.filter((txn: any) => {
         const txnSplits = txn.splits || [];
-        
+
         if (categoryId) {
           // Check if any split has this category (or check backwards compat categoryId)
-          const hasCategory = txnSplits.some((s: TransactionSplit) => s.categoryId === categoryId) || 
-                            txn.categoryId === categoryId;
+          const hasCategory =
+            txnSplits.some((s: TransactionSplit) => s.categoryId === categoryId) ||
+            txn.categoryId === categoryId;
           if (!hasCategory) return false;
         }
-        
+
         if (tags) {
           const tagArray = (tags as string).split(',');
           // Check if any split has any of these tags (or check backwards compat tags)
-          const hasTags = txnSplits.some((s: TransactionSplit) => 
-            s.tags.some(t => tagArray.includes(t))
-          ) || (txn.tags && txn.tags.some((t: string) => tagArray.includes(t)));
+          const hasTags =
+            txnSplits.some((s: TransactionSplit) => s.tags.some((t) => tagArray.includes(t))) ||
+            (txn.tags && txn.tags.some((t: string) => tagArray.includes(t)));
           if (!hasTags) return false;
         }
-        
+
         return true;
       });
     }
@@ -130,14 +138,14 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
         total,
         limit: parseInt(limit as string),
         skip: parseInt(skip as string),
-        hasMore: total > parseInt(skip as string) + parseInt(limit as string)
-      }
+        hasMore: total > parseInt(skip as string) + parseInt(limit as string),
+      },
     });
   } catch (error) {
     console.error('Error fetching transactions:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching transactions'
+      message: 'Error fetching transactions',
     });
   }
 });
@@ -150,13 +158,13 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-    
+
     const transaction = await transactionsContainer.findOne({ id, userId });
 
     if (!transaction) {
       res.status(404).json({
         success: false,
-        message: 'Transaction not found'
+        message: 'Transaction not found',
       });
       return;
     }
@@ -165,7 +173,7 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const splits = (await splitsContainer
       .find({ transactionId: id })
       .toArray()) as unknown as TransactionSplit[];
-    
+
     // Sort splits in-memory by order
     splits.sort((a, b) => a.order - b.order);
 
@@ -176,14 +184,14 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       success: true,
       transaction: {
         ...decryptedTransaction,
-        splits
-      }
+        splits,
+      },
     });
   } catch (error) {
     console.error('Error fetching transaction:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching transaction'
+      message: 'Error fetching transaction',
     });
   }
 });
@@ -214,14 +222,14 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       paymentStatus,
       counterpartyUserId,
       settlementStatus,
-      settlementProof
+      settlementProof,
     } = req.body;
 
     // Validation
     if (!type || !amount || !accountId || !description) {
       res.status(400).json({
         success: false,
-        message: 'Type, amount, accountId, and description are required'
+        message: 'Type, amount, accountId, and description are required',
       });
       return;
     }
@@ -229,7 +237,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (type !== 'credit' && type !== 'debit') {
       res.status(400).json({
         success: false,
-        message: 'Type must be either "credit" or "debit"'
+        message: 'Type must be either "credit" or "debit"',
       });
       return;
     }
@@ -237,7 +245,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (amount <= 0) {
       res.status(400).json({
         success: false,
-        message: 'Amount must be positive'
+        message: 'Amount must be positive',
       });
       return;
     }
@@ -246,7 +254,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!splits || !Array.isArray(splits) || splits.length === 0) {
       res.status(400).json({
         success: false,
-        message: 'At least one split is required'
+        message: 'At least one split is required',
       });
       return;
     }
@@ -256,7 +264,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       if (!split.categoryId || !split.amount || split.amount <= 0) {
         res.status(400).json({
           success: false,
-          message: 'Each split must have a categoryId and positive amount'
+          message: 'Each split must have a categoryId and positive amount',
         });
         return;
       }
@@ -264,10 +272,11 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate sum of splits equals total amount
     const splitsTotal = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
-    if (Math.abs(splitsTotal - amount) > 0.01) { // Allow for small floating point differences
+    if (Math.abs(splitsTotal - amount) > 0.01) {
+      // Allow for small floating point differences
       res.status(400).json({
         success: false,
-        message: `Sum of splits (${splitsTotal}) must equal total amount (${amount})`
+        message: `Sum of splits (${splitsTotal}) must equal total amount (${amount})`,
       });
       return;
     }
@@ -282,20 +291,20 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!account) {
       res.status(404).json({
         success: false,
-        message: 'Account not found'
+        message: 'Account not found',
       });
       return;
     }
 
     const transactionId = uuidv4();
-    
+
     // Encrypt sensitive fields before storing
     const encryptedData = encryptTransaction({
       description,
       notes,
-      amount
+      amount,
     });
-    
+
     const newTransaction: Transaction = {
       id: transactionId,
       userId,
@@ -321,7 +330,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       ...(settlementStatus && { settlementStatus }),
       ...(settlementProof && { settlementProof }),
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     // Create split records
@@ -335,7 +344,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       notes: split.notes,
       order: index + 1,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     }));
 
     // Insert transaction and splits in sequence (MongoDB doesn't support multi-document transactions in all configs)
@@ -346,29 +355,29 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const balanceChange = type === 'credit' ? amount : -amount;
     await accountsContainer.updateOne(
       { id: accountId, userId },
-      { 
+      {
         $inc: { balance: balanceChange },
-        $set: { updatedAt: new Date() }
+        $set: { updatedAt: new Date() },
       }
     );
 
     // Update tag usage counts from all splits
-    const allTags = splitRecords.flatMap(split => split.tags);
+    const allTags = splitRecords.flatMap((split) => split.tags);
     const uniqueTags = [...new Set(allTags)];
-    
+
     for (const tagName of uniqueTags) {
-      const count = allTags.filter(t => t === tagName).length;
+      const count = allTags.filter((t) => t === tagName).length;
       await tagsContainer.updateOne(
         { userId, name: tagName },
-        { 
+        {
           $inc: { usageCount: count },
           $setOnInsert: {
             id: uuidv4(),
             userId,
             name: tagName,
-            createdAt: new Date()
+            createdAt: new Date(),
           },
-          $set: { updatedAt: new Date() }
+          $set: { updatedAt: new Date() },
         },
         { upsert: true }
       );
@@ -382,14 +391,14 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       message: 'Transaction created successfully',
       transaction: {
         ...decryptedTransaction,
-        splits: splitRecords
-      }
+        splits: splitRecords,
+      },
     });
   } catch (error) {
     console.error('Error creating transaction:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating transaction'
+      message: 'Error creating transaction',
     });
   }
 });
@@ -412,18 +421,21 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       isRecurring,
       recurrencePattern,
       merchantName,
-      reviewStatus
+      reviewStatus,
     } = req.body;
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const accountsContainer = await cosmosDBService.getAccountsContainer();
     const tagsContainer = await cosmosDBService.getTagsContainer();
 
-    const existingTransaction = await transactionsContainer.findOne({ id, userId }) as unknown as Transaction;
+    const existingTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
+    })) as unknown as Transaction;
     if (!existingTransaction) {
       res.status(404).json({
         success: false,
-        message: 'Transaction not found'
+        message: 'Transaction not found',
       });
       return;
     }
@@ -440,9 +452,9 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const oldBalanceChange = oldType === 'credit' ? -oldAmount : oldAmount;
     await accountsContainer.updateOne(
       { id: oldAccountId, userId },
-      { 
+      {
         $inc: { balance: oldBalanceChange },
-        $set: { updatedAt: new Date() }
+        $set: { updatedAt: new Date() },
       }
     );
 
@@ -450,9 +462,9 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const newBalanceChange = newType === 'credit' ? newAmount : -newAmount;
     await accountsContainer.updateOne(
       { id: newAccountId, userId },
-      { 
+      {
         $inc: { balance: newBalanceChange },
-        $set: { updatedAt: new Date() }
+        $set: { updatedAt: new Date() },
       }
     );
 
@@ -463,10 +475,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Decrement old tags
     for (const tagName of oldTags) {
       if (!newTags.includes(tagName)) {
-        await tagsContainer.updateOne(
-          { userId, name: tagName },
-          { $inc: { usageCount: -1 } }
-        );
+        await tagsContainer.updateOne({ userId, name: tagName }, { $inc: { usageCount: -1 } });
       }
     }
 
@@ -475,9 +484,9 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       if (!oldTags.includes(tagName)) {
         await tagsContainer.updateOne(
           { userId, name: tagName },
-          { 
+          {
             $inc: { usageCount: 1 },
-            $set: { updatedAt: new Date() }
+            $set: { updatedAt: new Date() },
           },
           { upsert: true }
         );
@@ -488,7 +497,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const encryptedData = encryptTransaction({
       ...(description && { description }),
       ...(notes !== undefined && { notes }),
-      ...(amount !== undefined && { amount })
+      ...(amount !== undefined && { amount }),
     });
 
     const updateData: Partial<Transaction> = {
@@ -505,13 +514,10 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       ...(recurrencePattern !== undefined && { recurrencePattern }),
       ...(merchantName !== undefined && { merchantName }),
       ...(reviewStatus && { reviewStatus }),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
-    await transactionsContainer.updateOne(
-      { id, userId },
-      { $set: updateData }
-    );
+    await transactionsContainer.updateOne({ id, userId }, { $set: updateData });
 
     const updatedTransaction = await transactionsContainer.findOne({ id, userId });
 
@@ -521,13 +527,13 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     res.json({
       success: true,
       message: 'Transaction updated successfully',
-      transaction: decryptedTransaction
+      transaction: decryptedTransaction,
     });
   } catch (error) {
     console.error('Error updating transaction:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating transaction'
+      message: 'Error updating transaction',
     });
   }
 });
@@ -542,11 +548,14 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const accountsContainer = await cosmosDBService.getAccountsContainer();
     const tagsContainer = await cosmosDBService.getTagsContainer();
 
-    const transaction = await transactionsContainer.findOne({ id, userId }) as unknown as Transaction;
+    const transaction = (await transactionsContainer.findOne({
+      id,
+      userId,
+    })) as unknown as Transaction;
     if (!transaction) {
       res.status(404).json({
         success: false,
-        message: 'Transaction not found'
+        message: 'Transaction not found',
       });
       return;
     }
@@ -555,19 +564,16 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const balanceChange = transaction.type === 'credit' ? -transaction.amount : transaction.amount;
     await accountsContainer.updateOne(
       { id: transaction.accountId, userId },
-      { 
+      {
         $inc: { balance: balanceChange },
-        $set: { updatedAt: new Date() }
+        $set: { updatedAt: new Date() },
       }
     );
 
     // Decrement tag usage counts
     if (transaction.tags && transaction.tags.length > 0) {
       for (const tagName of transaction.tags) {
-        await tagsContainer.updateOne(
-          { userId, name: tagName },
-          { $inc: { usageCount: -1 } }
-        );
+        await tagsContainer.updateOne({ userId, name: tagName }, { $inc: { usageCount: -1 } });
       }
     }
 
@@ -575,13 +581,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
     res.json({
       success: true,
-      message: 'Transaction deleted successfully'
+      message: 'Transaction deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting transaction:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting transaction'
+      message: 'Error deleting transaction',
     });
   }
 });
@@ -595,7 +601,7 @@ router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!Array.isArray(transactions) || transactions.length === 0) {
       res.status(400).json({
         success: false,
-        message: 'Transactions array is required'
+        message: 'Transactions array is required',
       });
       return;
     }
@@ -626,14 +632,15 @@ router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
         merchantName: txn.merchantName,
         reviewStatus: txn.reviewStatus || 'approved',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       newTransactions.push(newTransaction);
 
       // Track balance changes
-      const balanceChange = newTransaction.type === 'credit' ? newTransaction.amount : -newTransaction.amount;
-      accountBalanceChanges[newTransaction.accountId] = 
+      const balanceChange =
+        newTransaction.type === 'credit' ? newTransaction.amount : -newTransaction.amount;
+      accountBalanceChanges[newTransaction.accountId] =
         (accountBalanceChanges[newTransaction.accountId] || 0) + balanceChange;
 
       // Track tag usage
@@ -651,9 +658,9 @@ router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
     for (const [accountId, change] of Object.entries(accountBalanceChanges)) {
       await accountsContainer.updateOne(
         { id: accountId, userId },
-        { 
+        {
           $inc: { balance: change },
-          $set: { updatedAt: new Date() }
+          $set: { updatedAt: new Date() },
         }
       );
     }
@@ -662,9 +669,9 @@ router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
     for (const [tagName, count] of Object.entries(tagUpdates)) {
       await tagsContainer.updateOne(
         { userId, name: tagName },
-        { 
+        {
           $inc: { usageCount: count },
-          $set: { updatedAt: new Date() }
+          $set: { updatedAt: new Date() },
         },
         { upsert: true }
       );
@@ -673,13 +680,13 @@ router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(201).json({
       success: true,
       message: `${newTransactions.length} transactions created successfully`,
-      transactions: newTransactions
+      transactions: newTransactions,
     });
   } catch (error) {
     console.error('Error bulk creating transactions:', error);
     res.status(500).json({
       success: false,
-      message: 'Error bulk creating transactions'
+      message: 'Error bulk creating transactions',
     });
   }
 });
@@ -693,7 +700,7 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({
         success: false,
-        message: 'Transaction IDs array is required'
+        message: 'Transaction IDs array is required',
       });
       return;
     }
@@ -703,14 +710,14 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
     const tagsContainer = await cosmosDBService.getTagsContainer();
 
     // Get all transactions to delete
-    const transactions = await transactionsContainer
+    const transactions = (await transactionsContainer
       .find({ id: { $in: ids }, userId })
-      .toArray() as unknown as Transaction[];
+      .toArray()) as unknown as Transaction[];
 
     if (transactions.length === 0) {
       res.status(404).json({
         success: false,
-        message: 'No transactions found'
+        message: 'No transactions found',
       });
       return;
     }
@@ -721,7 +728,8 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
     // Calculate reverse changes
     for (const txn of transactions) {
       const balanceChange = txn.type === 'credit' ? -txn.amount : txn.amount;
-      accountBalanceChanges[txn.accountId] = (accountBalanceChanges[txn.accountId] || 0) + balanceChange;
+      accountBalanceChanges[txn.accountId] =
+        (accountBalanceChanges[txn.accountId] || 0) + balanceChange;
 
       if (txn.tags) {
         for (const tag of txn.tags) {
@@ -737,30 +745,27 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
     for (const [accountId, change] of Object.entries(accountBalanceChanges)) {
       await accountsContainer.updateOne(
         { id: accountId, userId },
-        { 
+        {
           $inc: { balance: change },
-          $set: { updatedAt: new Date() }
+          $set: { updatedAt: new Date() },
         }
       );
     }
 
     // Update tag usage counts
     for (const [tagName, count] of Object.entries(tagUpdates)) {
-      await tagsContainer.updateOne(
-        { userId, name: tagName },
-        { $inc: { usageCount: count } }
-      );
+      await tagsContainer.updateOne({ userId, name: tagName }, { $inc: { usageCount: count } });
     }
 
     res.json({
       success: true,
-      message: `${transactions.length} transactions deleted successfully`
+      message: `${transactions.length} transactions deleted successfully`,
     });
   } catch (error) {
     console.error('Error bulk deleting transactions:', error);
     res.status(500).json({
       success: false,
-      message: 'Error bulk deleting transactions'
+      message: 'Error bulk deleting transactions',
     });
   }
 });
@@ -770,10 +775,10 @@ router.get('/pending/count', async (req: AuthRequest, res: Response): Promise<vo
   try {
     const userId = req.userId!;
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    
+
     const count = await transactionsContainer.countDocuments({
       userId,
-      reviewStatus: 'pending'
+      reviewStatus: 'pending',
     });
 
     res.json({ count });
@@ -791,9 +796,9 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response): Promise<vo
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
 
     // Find the transaction
-    const existingTransaction = (await transactionsContainer.findOne({ 
-      id, 
-      userId 
+    const existingTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
     })) as unknown as Transaction | null;
 
     if (!existingTransaction) {
@@ -813,14 +818,14 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response): Promise<vo
         $set: {
           reviewStatus: 'approved',
           reviewedAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
 
-    const updatedTransaction = (await transactionsContainer.findOne({ 
-      id, 
-      userId 
+    const updatedTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
     })) as unknown as Transaction;
 
     res.json(decryptTransaction(updatedTransaction));
@@ -839,9 +844,9 @@ router.patch('/:id/reject', async (req: AuthRequest, res: Response): Promise<voi
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
 
     // Find the transaction
-    const existingTransaction = (await transactionsContainer.findOne({ 
-      id, 
-      userId 
+    const existingTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
     })) as unknown as Transaction | null;
 
     if (!existingTransaction) {
@@ -862,14 +867,14 @@ router.patch('/:id/reject', async (req: AuthRequest, res: Response): Promise<voi
           reviewStatus: 'rejected',
           reviewedAt: new Date(),
           rejectionReason: reason || 'Rejected by user',
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
 
-    const updatedTransaction = (await transactionsContainer.findOne({ 
-      id, 
-      userId 
+    const updatedTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
     })) as unknown as Transaction;
 
     res.json(decryptTransaction(updatedTransaction));
@@ -897,21 +902,21 @@ router.post('/bulk-approve', async (req: AuthRequest, res: Response): Promise<vo
       {
         id: { $in: transactionIds },
         userId,
-        reviewStatus: 'pending'
+        reviewStatus: 'pending',
       },
       {
         $set: {
           reviewStatus: 'approved',
           reviewedAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
 
     res.json({
       success: true,
       message: `${result.modifiedCount} transactions approved`,
-      approvedCount: result.modifiedCount
+      approvedCount: result.modifiedCount,
     });
   } catch (error) {
     console.error('Error bulk approving transactions:', error);
@@ -937,22 +942,22 @@ router.post('/bulk-reject', async (req: AuthRequest, res: Response): Promise<voi
       {
         id: { $in: transactionIds },
         userId,
-        reviewStatus: 'pending'
+        reviewStatus: 'pending',
       },
       {
         $set: {
           reviewStatus: 'rejected',
           reviewedAt: new Date(),
           rejectionReason: reason || 'Bulk rejected by user',
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
 
     res.json({
       success: true,
       message: `${result.modifiedCount} transactions rejected`,
-      rejectedCount: result.modifiedCount
+      rejectedCount: result.modifiedCount,
     });
   } catch (error) {
     console.error('Error bulk rejecting transactions:', error);

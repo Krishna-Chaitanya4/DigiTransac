@@ -57,7 +57,7 @@ const Categories: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [parentForNew, setParentForNew] = useState<Category | null>(null);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     isFolder: false,
@@ -94,11 +94,11 @@ const Categories: React.FC = () => {
 
   const buildTree = () => {
     const nodeMap = new Map<string, CategoryNode>();
-    
+
     categories.forEach((cat) => {
       nodeMap.set(cat.id, { ...cat, children: [], level: cat.path.length });
     });
-    
+
     const roots: CategoryNode[] = [];
     categories.forEach((cat) => {
       const node = nodeMap.get(cat.id)!;
@@ -109,31 +109,31 @@ const Categories: React.FC = () => {
         roots.push(node);
       }
     });
-    
+
     // Sort: folders first, then alphabetically
     const sortNodes = (nodes: CategoryNode[]) => {
       nodes.sort((a, b) => {
         if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
         return a.name.localeCompare(b.name);
       });
-      nodes.forEach(node => {
+      nodes.forEach((node) => {
         if (node.children.length > 0) sortNodes(node.children);
       });
     };
-    
+
     sortNodes(roots);
     setTreeData(roots);
-    
+
     // Auto-expand all folders initially
     const allFolderIds = new Set<string>();
-    categories.forEach(cat => {
+    categories.forEach((cat) => {
       if (cat.isFolder) allFolderIds.add(cat.id);
     });
     setExpandedNodes(allFolderIds);
   };
 
   const toggleNode = (nodeId: string) => {
-    setExpandedNodes(prev => {
+    setExpandedNodes((prev) => {
       const next = new Set(prev);
       if (next.has(nodeId)) {
         next.delete(nodeId);
@@ -180,10 +180,10 @@ const Categories: React.FC = () => {
       if (editingCategory) {
         await axios.put(
           `/api/categories/${editingCategory.id}`,
-          { 
-            name: formData.name, 
+          {
+            name: formData.name,
             color: formData.color,
-            parentId: formData.parentId 
+            parentId: formData.parentId,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -207,7 +207,7 @@ const Categories: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete "${category.name}"?`)) {
       return;
     }
-    
+
     try {
       await axios.delete(`/api/categories/${category.id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -238,11 +238,7 @@ const Categories: React.FC = () => {
         >
           {/* Expand/Collapse Button */}
           {node.isFolder && (
-            <IconButton
-              size="small"
-              onClick={() => toggleNode(node.id)}
-              sx={{ mr: 0.5 }}
-            >
+            <IconButton size="small" onClick={() => toggleNode(node.id)} sx={{ mr: 0.5 }}>
               <ExpandMoreIcon
                 fontSize="small"
                 sx={{
@@ -252,7 +248,7 @@ const Categories: React.FC = () => {
               />
             </IconButton>
           )}
-          
+
           {/* Icon */}
           <Box sx={{ mr: 1.5, display: 'flex', alignItems: 'center', ml: !node.isFolder ? 4 : 0 }}>
             {node.isFolder ? (
@@ -376,9 +372,7 @@ const Categories: React.FC = () => {
       <Box
         sx={{
           background: (theme) =>
-            theme.palette.mode === 'light'
-              ? 'rgba(255, 255, 255, 0.9)'
-              : 'rgba(30, 30, 30, 0.9)',
+            theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 30, 30, 0.9)',
           backdropFilter: 'blur(10px)',
           borderRadius: 2,
           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
@@ -399,7 +393,8 @@ const Categories: React.FC = () => {
               No categories yet
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={3} textAlign="center">
-              Create folders and categories to organize your expenses.<br />
+              Create folders and categories to organize your expenses.
+              <br />
               Folders can contain subcategories for better hierarchy.
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
@@ -424,20 +419,18 @@ const Categories: React.FC = () => {
             </Box>
           </Box>
         ) : (
-          <Box sx={{ py: 1 }}>
-            {renderTree(treeData)}
-          </Box>
+          <Box sx={{ py: 1 }}>{renderTree(treeData)}</Box>
         )}
       </Box>
 
       {/* Create/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingCategory 
-            ? 'Edit Category' 
-            : parentForNew 
-            ? `Add to "${parentForNew.name}"` 
-            : 'Create New Category'}
+          {editingCategory
+            ? 'Edit Category'
+            : parentForNew
+              ? `Add to "${parentForNew.name}"`
+              : 'Create New Category'}
         </DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -446,7 +439,7 @@ const Categories: React.FC = () => {
                 Creating subcategory under <strong>{parentForNew.name}</strong>
               </Alert>
             )}
-            
+
             <TextField
               label="Name"
               fullWidth
@@ -454,14 +447,18 @@ const Categories: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               autoFocus
             />
-            
+
             <TextField
               select
               label="Parent Folder"
               fullWidth
               value={formData.parentId || ''}
               onChange={(e) => setFormData({ ...formData, parentId: e.target.value || null })}
-              helperText={editingCategory ? "Change parent to reorganize category hierarchy" : "Select a parent folder or leave empty for root level"}
+              helperText={
+                editingCategory
+                  ? 'Change parent to reorganize category hierarchy'
+                  : 'Select a parent folder or leave empty for root level'
+              }
             >
               <MenuItem value="">
                 <em>Root Level (No Parent)</em>
@@ -483,7 +480,7 @@ const Categories: React.FC = () => {
                   </MenuItem>
                 ))}
             </TextField>
-            
+
             {!editingCategory && (
               <FormControlLabel
                 control={
@@ -525,11 +522,7 @@ const Categories: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={!formData.name}
-          >
+          <Button onClick={handleSubmit} variant="contained" disabled={!formData.name}>
             {editingCategory ? 'Update' : 'Create'}
           </Button>
         </DialogActions>

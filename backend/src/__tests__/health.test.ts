@@ -6,7 +6,7 @@ describe('Health Check Endpoints', () => {
 
   beforeAll(() => {
     app = express();
-    
+
     app.get('/ping', (_req, res) => {
       res.json({ status: 'alive' });
     });
@@ -17,7 +17,7 @@ describe('Health Check Endpoints', () => {
         timestamp: new Date().toISOString(),
         database: 'initialized',
         uptime: process.uptime(),
-        environment: 'test'
+        environment: 'test',
       });
     });
   });

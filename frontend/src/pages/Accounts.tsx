@@ -116,7 +116,7 @@ const Accounts: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      
+
       const response = await axios.get(`/api/accounts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -193,18 +193,14 @@ const Accounts: React.FC = () => {
       };
 
       if (editingAccount) {
-        await axios.put(
-          `/api/accounts/${editingAccount.id}`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.put(`/api/accounts/${editingAccount.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setSuccess('Account updated successfully');
       } else {
-        await axios.post(
-          `/api/accounts`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.post(`/api/accounts`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setSuccess('Account created successfully');
       }
 
@@ -226,7 +222,7 @@ const Accounts: React.FC = () => {
     try {
       setError('');
       setSuccess('');
-      
+
       await axios.delete(`/api/accounts/${accountToDelete.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -289,7 +285,7 @@ const Accounts: React.FC = () => {
       const categoriesRes = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       let adjustmentCategory = categoriesRes.data.categories?.find(
         (cat: any) => cat.name === 'Balance Adjustment'
       );
@@ -319,7 +315,9 @@ const Accounts: React.FC = () => {
           accountId: adjustingAccount.id,
           categoryId: adjustmentCategory.id,
           description: 'Balance Adjustment',
-          notes: adjustmentNotes || `Adjusted to match actual balance: ${formatCurrency(newBalance, adjustingAccount.currency)}`,
+          notes:
+            adjustmentNotes ||
+            `Adjusted to match actual balance: ${formatCurrency(newBalance, adjustingAccount.currency)}`,
           tags: ['balance-adjustment'],
           date: new Date().toISOString(),
           isRecurring: false,
@@ -328,7 +326,9 @@ const Accounts: React.FC = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setSuccess(`Balance adjusted successfully by ${formatCurrency(Math.abs(difference), adjustingAccount.currency)}`);
+      setSuccess(
+        `Balance adjusted successfully by ${formatCurrency(Math.abs(difference), adjustingAccount.currency)}`
+      );
       setAdjustBalanceOpen(false);
       setAdjustingAccount(null);
       setActualBalance('');
@@ -378,11 +378,7 @@ const Accounts: React.FC = () => {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
             Add Account
           </Button>
         </Box>
@@ -412,7 +408,8 @@ const Accounts: React.FC = () => {
                 {formatCurrency(totalBalance)}
               </Typography>
               <Typography variant="body2" color="rgba(255,255,255,0.8)" mt={1}>
-                Across {accounts.filter((a) => a.isActive && a.type !== 'loan').length} active accounts
+                Across {accounts.filter((a) => a.isActive && a.type !== 'loan').length} active
+                accounts
               </Typography>
             </CardContent>
           </Card>
@@ -593,12 +590,7 @@ const Accounts: React.FC = () => {
                       )}
 
                       {!account.isActive && (
-                        <Chip
-                          label="Inactive"
-                          size="small"
-                          color="default"
-                          sx={{ mt: 2 }}
-                        />
+                        <Chip label="Inactive" size="small" color="default" sx={{ mt: 2 }} />
                       )}
                     </Box>
                   </CardContent>
@@ -745,9 +737,8 @@ const Accounts: React.FC = () => {
             Are you sure you want to delete "{accountToDelete?.name}"?
             {accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount ? (
               <Alert severity="warning" sx={{ mt: 2 }}>
-                This account has{' '}
-                {accountBalances.get(accountToDelete.id)?.transactionCount} transactions and
-                cannot be deleted.
+                This account has {accountBalances.get(accountToDelete.id)?.transactionCount}{' '}
+                transactions and cannot be deleted.
               </Alert>
             ) : (
               <Typography color="text.secondary" sx={{ mt: 1 }}>
@@ -763,10 +754,7 @@ const Accounts: React.FC = () => {
             color="error"
             variant="contained"
             disabled={
-              !!(
-                accountToDelete &&
-                accountBalances.get(accountToDelete.id)?.transactionCount
-              )
+              !!(accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount)
             }
           >
             Delete
@@ -775,8 +763,8 @@ const Accounts: React.FC = () => {
       </Dialog>
 
       {/* Balance Adjustment Dialog */}
-      <Dialog 
-        open={adjustBalanceOpen} 
+      <Dialog
+        open={adjustBalanceOpen}
         onClose={() => setAdjustBalanceOpen(false)}
         maxWidth="sm"
         fullWidth
@@ -793,7 +781,8 @@ const Accounts: React.FC = () => {
                   <Typography variant="body2">
                     <strong>Current Calculated Balance:</strong>{' '}
                     {formatCurrency(
-                      accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance,
+                      accountBalances.get(adjustingAccount.id)?.calculatedBalance ||
+                        adjustingAccount.balance,
                       adjustingAccount.currency
                     )}
                   </Typography>
@@ -833,9 +822,12 @@ const Accounts: React.FC = () => {
                 />
 
                 {actualBalance && (
-                  <Alert 
+                  <Alert
                     severity={
-                      parseFloat(actualBalance) - (accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance) >= 0
+                      parseFloat(actualBalance) -
+                        (accountBalances.get(adjustingAccount.id)?.calculatedBalance ||
+                          adjustingAccount.balance) >=
+                      0
                         ? 'success'
                         : 'warning'
                     }
@@ -844,16 +836,20 @@ const Accounts: React.FC = () => {
                       <strong>Adjustment Amount:</strong>{' '}
                       {formatCurrency(
                         Math.abs(
-                          parseFloat(actualBalance) - 
-                          (accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance)
+                          parseFloat(actualBalance) -
+                            (accountBalances.get(adjustingAccount.id)?.calculatedBalance ||
+                              adjustingAccount.balance)
                         ),
                         adjustingAccount.currency
-                      )}
-                      {' '}
-                      ({parseFloat(actualBalance) - (accountBalances.get(adjustingAccount.id)?.calculatedBalance || adjustingAccount.balance) >= 0 
-                        ? 'Credit' 
-                        : 'Debit'
-                      })
+                      )}{' '}
+                      (
+                      {parseFloat(actualBalance) -
+                        (accountBalances.get(adjustingAccount.id)?.calculatedBalance ||
+                          adjustingAccount.balance) >=
+                      0
+                        ? 'Credit'
+                        : 'Debit'}
+                      )
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       A balance adjustment transaction will be created
@@ -866,10 +862,16 @@ const Accounts: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAdjustBalanceOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleSaveAdjustment} 
-            variant="contained" 
-            disabled={!actualBalance || parseFloat(actualBalance) === (accountBalances.get(adjustingAccount?.id || '')?.calculatedBalance || adjustingAccount?.balance || 0)}
+          <Button
+            onClick={handleSaveAdjustment}
+            variant="contained"
+            disabled={
+              !actualBalance ||
+              parseFloat(actualBalance) ===
+                (accountBalances.get(adjustingAccount?.id || '')?.calculatedBalance ||
+                  adjustingAccount?.balance ||
+                  0)
+            }
           >
             Adjust Balance
           </Button>

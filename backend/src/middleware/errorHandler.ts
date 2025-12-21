@@ -6,39 +6,37 @@ export interface ApiError extends Error {
   isOperational?: boolean;
 }
 
-export const errorHandler = (
-  err: ApiError,
-  req: Request,
-  res: Response,
-  _next: NextFunction
-) => {
+export const errorHandler = (err: ApiError, req: Request, res: Response, _next: NextFunction) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestWithId = req as any;
 
   // Log error with full context
-  logger.error({
-    error: {
-      message: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-      statusCode
+  logger.error(
+    {
+      error: {
+        message: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        statusCode,
+      },
+      request: {
+        id: requestWithId.id,
+        method: req.method,
+        url: req.url,
+        userId: requestWithId.userId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      },
     },
-    request: {
-      id: requestWithId.id,
-      method: req.method,
-      url: req.url,
-      userId: requestWithId.userId,
-      ip: req.ip,
-      userAgent: req.get('user-agent')
-    }
-  }, 'Error occurred');
+    'Error occurred'
+  );
 
   res.status(statusCode).json({
     success: false,
     error: message,
     requestId: requestWithId.id,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 

@@ -8,7 +8,8 @@ const options = {
     info: {
       title: 'DigiTransac API',
       version: '1.1.0',
-      description: 'A comprehensive transaction management API with budget tracking, analytics, and Gmail integration',
+      description:
+        'A comprehensive transaction management API with budget tracking, analytics, and Gmail integration',
       contact: {
         name: 'API Support',
         email: 'support@digitransac.com',
@@ -220,11 +221,15 @@ const swaggerSpec = swaggerJsdoc(options);
 
 export function setupSwagger(app: Application) {
   // Swagger UI
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    explorer: true,
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'DigiTransac API Docs',
-  }));
+  app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      explorer: true,
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'DigiTransac API Docs',
+    })
+  );
 
   // Swagger JSON
   app.get('/api-docs.json', (_req, res) => {

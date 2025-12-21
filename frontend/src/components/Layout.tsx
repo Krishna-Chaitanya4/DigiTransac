@@ -204,7 +204,8 @@ const Layout: React.FC = () => {
                     px: 1.5,
                     py: 0.5,
                     borderRadius: 10,
-                    backgroundColor: location.pathname === item.path ? 'rgba(255,255,255,0.3)' : 'error.main',
+                    backgroundColor:
+                      location.pathname === item.path ? 'rgba(255,255,255,0.3)' : 'error.main',
                     color: 'white',
                     fontSize: '0.75rem',
                     fontWeight: 700,
@@ -228,9 +229,7 @@ const Layout: React.FC = () => {
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
           background: (theme) =>
-            theme.palette.mode === 'light'
-              ? 'rgba(255, 255, 255, 0.8)'
-              : 'rgba(30, 30, 30, 0.8)',
+            theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(30, 30, 30, 0.8)',
           backdropFilter: 'blur(20px)',
           boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
           borderBottom: (theme) =>
@@ -250,7 +249,7 @@ const Layout: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
             {menuItems.find((item) => item.path === location.pathname)?.text || 'Dashboard'}
           </Typography>
@@ -326,10 +325,7 @@ const Layout: React.FC = () => {
         </Toolbar>
       </AppBar>
 
-      <Box
-        component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
-      >
+      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
         <Drawer
           variant="temporary"
           open={mobileOpen}

@@ -6,20 +6,20 @@ export interface User {
   lastName: string;
   currency: string;
   emailIntegration?: EmailIntegration;
-  
+
   // FUTURE: Multi-user settings (optional, for future expansion)
   upiId?: string; // For UPI payments between users
   phoneNumber?: string; // For notifications and UPI
-  
+
   // FUTURE: Location tracking preferences (optional, for geo features)
   locationSettings?: {
-    enabled: boolean;                           // Master toggle
-    captureMode: 'always' | 'ask' | 'never';   // When to capture
-    precision: 'exact' | 'approximate';         // Privacy level (exact GPS or rounded)
-    saveHistory: boolean;                       // Whether to store location data
+    enabled: boolean; // Master toggle
+    captureMode: 'always' | 'ask' | 'never'; // When to capture
+    precision: 'exact' | 'approximate'; // Privacy level (exact GPS or rounded)
+    saveHistory: boolean; // Whether to store location data
     sharePrecision?: 'exact' | 'city' | 'none'; // For future group features
   };
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -170,72 +170,72 @@ export interface Account {
 export interface Transaction {
   id: string;
   userId: string;
-  
+
   // CORE FIELDS
   type: 'credit' | 'debit'; // Money IN or OUT
   amount: number; // Always positive (total amount - sum of all splits)
   accountId: string; // Which account this affects
-  
+
   // CLASSIFICATION (DEPRECATED - use splits instead, kept for backwards compatibility)
   categoryId?: string; // @deprecated Use splits[0].categoryId instead
   tags?: string[]; // @deprecated Use splits[].tags instead
-  
+
   description: string;
-  
+
   // TRANSACTION DETAILS
   date: Date;
   notes?: string;
-  
+
   // RECURRENCE
   isRecurring: boolean;
   recurrencePattern?: RecurrencePattern;
-  
+
   // SOURCE & PARSING
   source?: 'manual' | 'email' | 'sms' | 'api';
   sourceEmailId?: string;
   merchantName?: string;
   parsedData?: ParsedTransactionData;
-  
+
   // REVIEW & APPROVAL
   reviewStatus: 'pending' | 'approved' | 'rejected';
   reviewedAt?: Date; // When transaction was approved/rejected
   rejectionReason?: string; // Why transaction was rejected
   confidence?: number; // 0-100, parser confidence score
   originalContent?: string; // Original email/SMS content for reference
-  
+
   // LINKED TRANSACTIONS (for transfers)
   linkedTransactionId?: string; // If this is part of a transfer, links to the other side
-  
+
   // FUTURE: MULTI-USER & COLLABORATION (Optional fields for future expansion)
   organizationId?: string; // For shared expenses in organizations/groups
   paidBy?: string; // userId who actually paid (defaults to userId for single-user mode)
   sharedWith?: string[]; // Array of userIds this transaction is shared with
-  
+
   // FUTURE: PAYMENT INTEGRATION (Optional fields for future UPI/payment tracking)
   paymentMethodType?: 'upi' | 'card' | 'bank' | 'cash' | 'other';
   upiTransactionId?: string; // UPI transaction reference ID
   paymentStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  
+
   // FUTURE: INTER-USER TRANSACTIONS (Optional fields for send/receive between users)
   counterpartyUserId?: string; // The other user in a send/receive transaction
   settlementStatus?: 'pending_approval' | 'approved' | 'rejected' | 'settled';
   settlementProof?: string; // URL to payment proof/receipt
-  
+
   // FUTURE: LOCATION TRACKING (Optional fields for geo-based analytics)
   location?: {
     latitude: number;
     longitude: number;
-    address?: string;           // Full address
-    placeName?: string;         // Merchant/place name (e.g., "Starbucks")
+    address?: string; // Full address
+    placeName?: string; // Merchant/place name (e.g., "Starbucks")
     city?: string;
     state?: string;
     country?: string;
     postalCode?: string;
-    accuracy?: number;          // GPS accuracy in meters
-    source?: 'gps' | 'manual' | 'ip' | 'email';  // How location was obtained
+    accuracy?: number; // GPS accuracy in meters
+    source?: 'gps' | 'manual' | 'ip' | 'email'; // How location was obtained
   };
-  locationCapturedAt?: Date;    // Timestamp when location was captured
-  
+  locationCapturedAt?: Date; // Timestamp when location was captured
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -245,18 +245,18 @@ export interface TransactionSplit {
   id: string;
   transactionId: string; // References Transaction.id
   userId: string; // Denormalized for faster queries
-  
+
   // CLASSIFICATION
   categoryId: string; // Each split has its own category
   amount: number; // Amount for this split (must be positive)
-  
+
   // TAGS - Each split can have its own tags
   tags: string[]; // Flexible labels per split
-  
+
   // OPTIONAL
   notes?: string; // Split-specific notes
   order: number; // Display order (1, 2, 3...)
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -322,16 +322,20 @@ export interface Settlement {
 export interface PendingAction {
   id: string;
   userId: string; // Who needs to take action
-  type: 'transaction_approval' | 'settlement_request' | 'organization_invite' | 'split_expense_invite';
+  type:
+    | 'transaction_approval'
+    | 'settlement_request'
+    | 'organization_invite'
+    | 'split_expense_invite';
   status: 'pending' | 'approved' | 'rejected' | 'expired';
   priority: 'low' | 'medium' | 'high';
-  
+
   // Related entities
   relatedTransactionId?: string;
   relatedSettlementId?: string;
   relatedOrganizationId?: string;
   fromUserId?: string; // Who initiated this action
-  
+
   data: any; // Flexible payload for action-specific data
   expiresAt?: Date;
   actionTakenAt?: Date;

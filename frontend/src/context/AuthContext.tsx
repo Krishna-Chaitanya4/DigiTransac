@@ -69,15 +69,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const initAuth = async () => {
       // Load runtime configuration first
       await configService.fetchConfig();
-      
+
       // Configure axios with runtime API URL
       const apiUrl = configService.getApiUrl();
       axios.defaults.baseURL = apiUrl;
       console.log('🔧 Axios baseURL configured:', axios.defaults.baseURL);
-      
+
       const savedToken = localStorage.getItem('auth-token');
       const savedUser = localStorage.getItem('auth-user');
-      
+
       if (savedToken && savedUser) {
         try {
           setToken(savedToken);
@@ -122,17 +122,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post<AuthResponse>('/api/auth/login', { 
-        email, 
-        password 
+      const response = await axios.post<AuthResponse>('/api/auth/login', {
+        email,
+        password,
       });
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Login failed');
       }
 
       const { token: newToken, user: userData } = response.data;
-      
+
       setToken(newToken);
       setUser(userData);
       localStorage.setItem('auth-token', newToken);
@@ -147,13 +147,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (data: RegisterData) => {
     try {
       const response = await axios.post<AuthResponse>('/api/auth/register', data);
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Registration failed');
       }
 
       const { token: newToken, user: userData } = response.data;
-      
+
       setToken(newToken);
       setUser(userData);
       localStorage.setItem('auth-token', newToken);

@@ -8,10 +8,10 @@ import { RequestWithId } from './requestId';
  */
 export const httpLogger = pinoHttp({
   logger,
-  
+
   // Custom request ID field
   genReqId: (req: RequestWithId) => req.id || '',
-  
+
   // Custom log message
   customLogLevel: (_req, res, err) => {
     if (res.statusCode >= 500 || err) return 'error';
@@ -35,7 +35,7 @@ export const httpLogger = pinoHttp({
     req: 'request',
     res: 'response',
     err: 'error',
-    responseTime: 'responseTime'
+    responseTime: 'responseTime',
   },
 
   // Serialize request/response
@@ -51,24 +51,27 @@ export const httpLogger = pinoHttp({
       headers: {
         host: req.headers.host,
         'user-agent': req.headers['user-agent'],
-        'content-type': req.headers['content-type']
+        'content-type': req.headers['content-type'],
       },
       remoteAddress: req.remoteAddress,
-      remotePort: req.remotePort
+      remotePort: req.remotePort,
     }),
     res: (res) => ({
       statusCode: res.statusCode,
-      headers: typeof res.getHeader === 'function' ? {
-        'content-type': res.getHeader('content-type'),
-        'content-length': res.getHeader('content-length')
-      } : {}
-    })
+      headers:
+        typeof res.getHeader === 'function'
+          ? {
+              'content-type': res.getHeader('content-type'),
+              'content-length': res.getHeader('content-length'),
+            }
+          : {},
+    }),
   },
 
   // Don't log health check endpoints
   autoLogging: {
     ignore: (req) => {
       return req.url === '/health' || req.url === '/ping';
-    }
-  }
+    },
+  },
 });

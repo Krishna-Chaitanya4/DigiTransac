@@ -20,9 +20,7 @@ interface EnvConfig {
 
 const envSchema = Joi.object({
   PORT: Joi.number().default(5000),
-  NODE_ENV: Joi.string()
-    .valid('development', 'production', 'test')
-    .default('development'),
+  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   COSMOS_ENDPOINT: Joi.string().uri().required(),
   COSMOS_KEY: Joi.string().required(),
   COSMOS_DATABASE_NAME: Joi.string().required(),

@@ -16,12 +16,12 @@ export const requestIdMiddleware = (
 ): void => {
   // Use existing X-Request-ID from client, or generate new one
   const requestId = (req.headers['x-request-id'] as string) || uuidv4();
-  
+
   // Attach to request object
   req.id = requestId;
-  
+
   // Send back in response headers for client-side tracing
   res.setHeader('X-Request-ID', requestId);
-  
+
   next();
 };

@@ -25,7 +25,7 @@ class GmailPollingService {
       });
 
       const { credentials } = await oauth2Client.refreshAccessToken();
-      
+
       // Update tokens in database
       const userContainer = await cosmosDBService.getUsersContainer();
       await userContainer.updateOne(
@@ -73,9 +73,7 @@ class GmailPollingService {
       }
 
       // Create new payment method
-      const paymentMethodName = cardLast4
-        ? `${bankName} ••••${cardLast4}`
-        : bankName;
+      const paymentMethodName = cardLast4 ? `${bankName} ••••${cardLast4}` : bankName;
 
       const newPaymentMethod: PaymentMethod = {
         id: randomUUID(),
@@ -102,9 +100,7 @@ class GmailPollingService {
   /**
    * Find existing "Uncategorized" category or create new one
    */
-  private async getOrCreateUncategorizedCategory(
-    userId: string
-  ): Promise<string> {
+  private async getOrCreateUncategorizedCategory(userId: string): Promise<string> {
     try {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
@@ -162,27 +158,27 @@ class GmailPollingService {
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
       const lastHistoryId = user.emailIntegration?.lastHistoryId;
-      
+
       // First-time setup: Get initial historyId
       if (!lastHistoryId) {
         console.log(`🆕 First-time setup for user ${user.id} - Getting initial historyId`);
         const profile = await gmail.users.getProfile({ userId: 'me' });
         const initialHistoryId = profile.data.historyId;
-        
+
         // Store initial historyId
         const userContainer = await cosmosDBService.getUsersContainer();
         await userContainer.updateOne(
           { id: user.id },
           { $set: { 'emailIntegration.lastHistoryId': initialHistoryId } }
         );
-        
+
         console.log(`✅ Stored initial historyId: ${initialHistoryId}`);
         console.log(`📭 No emails to process on first setup - will start tracking from now`);
         return 0;
       }
-      
+
       console.log(`🔄 Fetching changes since historyId: ${lastHistoryId}`);
-      
+
       // Fetch history changes (only new emails added to INBOX)
       let history: any;
       try {
@@ -197,28 +193,28 @@ class GmailPollingService {
           console.warn(`⚠️ HistoryId ${lastHistoryId} expired. Getting fresh historyId.`);
           const profile = await gmail.users.getProfile({ userId: 'me' });
           const freshHistoryId = profile.data.historyId;
-          
+
           const userContainer = await cosmosDBService.getUsersContainer();
           await userContainer.updateOne(
             { id: user.id },
             { $set: { 'emailIntegration.lastHistoryId': freshHistoryId } }
           );
-          
+
           console.log(`✅ Reset to fresh historyId: ${freshHistoryId}`);
           return 0;
         }
         throw error;
       }
-      
+
       const historyRecords = history.data.history || [];
-      
+
       if (historyRecords.length === 0) {
         console.log(`📭 No new changes since last check`);
         return 0;
       }
-      
+
       console.log(`📬 Found ${historyRecords.length} history record(s) with changes`);
-      
+
       // Extract new message IDs from history
       const newMessageIds: string[] = [];
       for (const record of historyRecords) {
@@ -229,9 +225,9 @@ class GmailPollingService {
           }
         }
       }
-      
+
       console.log(`📨 Extracted ${newMessageIds.length} new message ID(s)`);
-      
+
       if (newMessageIds.length === 0) {
         // Update historyId even if no messages to process
         const newHistoryId = history.data.historyId;
@@ -242,15 +238,32 @@ class GmailPollingService {
         );
         return 0;
       }
-      
+
       // Bank sender filters
       const bankSenders = [
-        'HDFCBK', 'HDFC', 'ICICIB', 'ICICI', 'SBIIN', 'SBI',
-        'AXISBK', 'AXIS', 'KOTAKB', 'KOTAK', 'PNBSMS', 'PNB',
-        'BOBIN', 'BOB', 'CANBNK', 'CANARA', 'UBOI', 'UNION',
-        'IDBIBN', 'IDBI', 'perugukrishna8@gmail.com', // Test email
+        'HDFCBK',
+        'HDFC',
+        'ICICIB',
+        'ICICI',
+        'SBIIN',
+        'SBI',
+        'AXISBK',
+        'AXIS',
+        'KOTAKB',
+        'KOTAK',
+        'PNBSMS',
+        'PNB',
+        'BOBIN',
+        'BOB',
+        'CANBNK',
+        'CANARA',
+        'UBOI',
+        'UNION',
+        'IDBIBN',
+        'IDBI',
+        'perugukrishna8@gmail.com', // Test email
       ];
-      
+
       let processedCount = 0;
 
       // Process each new message
@@ -265,35 +278,35 @@ class GmailPollingService {
 
           // Extract email content
           const headers = msg.data.payload?.headers || [];
-          const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from');
-          
+          const fromHeader = headers.find((h) => h.name?.toLowerCase() === 'from');
+
           const from = fromHeader?.value || '';
-          
+
           // Check if email is from a bank sender
-          const isFromBank = bankSenders.some(sender => from.includes(sender));
+          const isFromBank = bankSenders.some((sender) => from.includes(sender));
           if (!isFromBank) {
             console.log(`⏭️ Skipping non-bank email from: ${from}`);
             continue;
           }
-          
+
           // Get email body
           let body = '';
           if (msg.data.payload?.body?.data) {
             body = Buffer.from(msg.data.payload.body.data, 'base64').toString('utf-8');
           } else if (msg.data.payload?.parts) {
             // Try text/plain first
-            let textPart = msg.data.payload.parts.find(p => p.mimeType === 'text/plain');
+            let textPart = msg.data.payload.parts.find((p) => p.mimeType === 'text/plain');
             if (!textPart) {
               // Fall back to text/html if no plain text
-              textPart = msg.data.payload.parts.find(p => p.mimeType === 'text/html');
+              textPart = msg.data.payload.parts.find((p) => p.mimeType === 'text/html');
             }
             // Check nested parts (multipart/alternative)
             if (!textPart && msg.data.payload.parts.length > 0) {
               for (const part of msg.data.payload.parts) {
                 if (part.parts) {
-                  textPart = part.parts.find(p => p.mimeType === 'text/plain');
+                  textPart = part.parts.find((p) => p.mimeType === 'text/plain');
                   if (!textPart) {
-                    textPart = part.parts.find(p => p.mimeType === 'text/html');
+                    textPart = part.parts.find((p) => p.mimeType === 'text/html');
                   }
                   if (textPart) break;
                 }
@@ -303,7 +316,10 @@ class GmailPollingService {
               body = Buffer.from(textPart.body.data, 'base64').toString('utf-8');
               // Strip HTML tags if it's HTML
               if (textPart.mimeType === 'text/html') {
-                body = body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                body = body
+                  .replace(/<[^>]*>/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
               }
             }
           }
@@ -359,7 +375,7 @@ class GmailPollingService {
 
           // Create pending expense
           const expenseContainer = await cosmosDBService.getExpensesContainer();
-          
+
           const newExpense: Expense = {
             id: randomUUID(),
             userId: user.id,
@@ -388,7 +404,6 @@ class GmailPollingService {
           await expenseContainer.insertOne(newExpense);
           processedCount++;
           console.log(`💰 Created expense ${newExpense.id} from email ${messageId}`);
-
         } catch (error) {
           console.error(`❌ Error processing message ${messageId}:`, error);
           // Continue processing other emails even if one fails
@@ -398,25 +413,26 @@ class GmailPollingService {
       // Update historyId to the latest from Gmail (critical for delta sync)
       const newHistoryId = history.data.historyId;
       const userContainer = await cosmosDBService.getUsersContainer();
-      
+
       await userContainer.updateOne(
         { id: user.id },
         {
           $set: {
             'emailIntegration.lastHistoryId': newHistoryId,
             'emailIntegration.lastProcessedAt': new Date(),
-            'emailIntegration.totalEmailsProcessed': 
+            'emailIntegration.totalEmailsProcessed':
               (user.emailIntegration.totalEmailsProcessed || 0) + processedCount,
           },
         }
       );
-      
-      console.log(`✅ Successfully processed ${processedCount} expense(s) from ${newMessageIds.length} new email(s)`);
+
+      console.log(
+        `✅ Successfully processed ${processedCount} expense(s) from ${newMessageIds.length} new email(s)`
+      );
       console.log(`📌 Updated historyId: ${lastHistoryId} → ${newHistoryId}`);
       console.log(`🚀 Delta sync complete - only fetched changes, not full inbox!`);
-      
-      return processedCount;
 
+      return processedCount;
     } catch (error: any) {
       console.error(`Error processing emails for user ${user.id}:`, error);
       return 0;
@@ -429,13 +445,15 @@ class GmailPollingService {
   async pollAllUsers(): Promise<void> {
     try {
       console.log('Starting email polling job...');
-      
+
       const userContainer = await cosmosDBService.getUsersContainer();
-      
+
       // Find all users with email integration enabled
-      const users = await userContainer.find({
-        'emailIntegration.enabled': true,
-      }).toArray();
+      const users = await userContainer
+        .find({
+          'emailIntegration.enabled': true,
+        })
+        .toArray();
 
       console.log(`Found ${users.length} users with email integration enabled`);
 
@@ -448,7 +466,6 @@ class GmailPollingService {
       }
 
       console.log(`Email polling completed. Processed ${totalProcessed} emails total.`);
-
     } catch (error) {
       console.error('Error in email polling job:', error);
     }

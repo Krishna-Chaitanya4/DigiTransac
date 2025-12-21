@@ -152,13 +152,15 @@ const Transactions: React.FC = () => {
     categoryId: '', // Used for quick add (single split)
     description: '',
     tags: [] as string[], // Used for quick add (single split)
-    splits: [{
-      categoryId: '',
-      amount: 0,
-      tags: [] as string[],
-      notes: '',
-      order: 1
-    }] as TransactionSplit[],
+    splits: [
+      {
+        categoryId: '',
+        amount: 0,
+        tags: [] as string[],
+        notes: '',
+        order: 1,
+      },
+    ] as TransactionSplit[],
     date: dayjs().format('YYYY-MM-DD'),
     notes: '',
     merchantName: '',
@@ -172,11 +174,7 @@ const Transactions: React.FC = () => {
     const initializeData = async () => {
       try {
         setLoading(true);
-        await Promise.all([
-          fetchAccounts(),
-          fetchCategories(),
-          fetchTags(),
-        ]);
+        await Promise.all([fetchAccounts(), fetchCategories(), fetchTags()]);
         await fetchTransactions();
       } catch (err) {
         console.error('Error initializing transactions page:', err);
@@ -185,7 +183,7 @@ const Transactions: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     initializeData();
   }, []);
 
@@ -260,20 +258,23 @@ const Transactions: React.FC = () => {
     if (transaction) {
       setEditingTransaction(transaction);
       // Initialize splits from transaction data
-      const splits = transaction.splits && transaction.splits.length > 0
-        ? transaction.splits
-        : [{
-            categoryId: transaction.categoryId || '',
-            amount: transaction.amount,
-            tags: transaction.tags || [],
-            notes: '',
-            order: 1
-          }];
-      
+      const splits =
+        transaction.splits && transaction.splits.length > 0
+          ? transaction.splits
+          : [
+              {
+                categoryId: transaction.categoryId || '',
+                amount: transaction.amount,
+                tags: transaction.tags || [],
+                notes: '',
+                order: 1,
+              },
+            ];
+
       // Determine if we should use split mode
       const shouldUseSplitMode = splits.length > 1;
       setUseSplitMode(shouldUseSplitMode);
-      
+
       setFormData({
         type: transaction.type,
         amount: transaction.amount.toString(),
@@ -297,17 +298,19 @@ const Transactions: React.FC = () => {
       setFormData({
         type: 'debit',
         amount: '',
-        accountId: accounts.find(a => a.isDefault)?.id || '',
+        accountId: accounts.find((a) => a.isDefault)?.id || '',
         categoryId: '',
         description: '',
         tags: [defaultTag],
-        splits: [{
-          categoryId: '',
-          amount: 0,
-          tags: [defaultTag],
-          notes: '',
-          order: 1
-        }],
+        splits: [
+          {
+            categoryId: '',
+            amount: 0,
+            tags: [defaultTag],
+            notes: '',
+            order: 1,
+          },
+        ],
         date: dayjs().format('YYYY-MM-DD'),
         notes: '',
         merchantName: '',
@@ -328,11 +331,11 @@ const Transactions: React.FC = () => {
   const handleTypeChange = (newType: 'credit' | 'debit') => {
     const oldTag = formData.type === 'debit' ? 'expense' : 'income';
     const newTag = newType === 'debit' ? 'expense' : 'income';
-    
+
     // Remove old auto-tag and add new one
-    const updatedTags = formData.tags.filter(tag => tag !== oldTag && tag !== newTag);
+    const updatedTags = formData.tags.filter((tag) => tag !== oldTag && tag !== newTag);
     updatedTags.push(newTag);
-    
+
     setFormData({
       ...formData,
       type: newType,
@@ -346,14 +349,14 @@ const Transactions: React.FC = () => {
       setSuccess('');
 
       const amount = parseFloat(formData.amount);
-      
+
       // Prepare splits for submission
       let splits = formData.splits.map((split, index) => ({
         categoryId: split.categoryId,
         amount: split.amount,
         tags: split.tags,
         notes: split.notes || '',
-        order: index + 1
+        order: index + 1,
       }));
 
       // In quick add mode, ensure the single split amount matches total
@@ -393,18 +396,14 @@ const Transactions: React.FC = () => {
       }
 
       if (editingTransaction) {
-        await axios.put(
-          `/api/transactions/${editingTransaction.id}`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.put(`/api/transactions/${editingTransaction.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setSuccess('Transaction updated successfully');
       } else {
-        await axios.post(
-          `/api/transactions`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.post(`/api/transactions`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setSuccess('Transaction created successfully');
       }
 
@@ -422,7 +421,7 @@ const Transactions: React.FC = () => {
     try {
       setError('');
       setSuccess('');
-      
+
       await axios.delete(`/api/transactions/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -442,11 +441,11 @@ const Transactions: React.FC = () => {
       amount: 0,
       tags: [],
       notes: '',
-      order: formData.splits.length + 1
+      order: formData.splits.length + 1,
     };
     setFormData({
       ...formData,
-      splits: [...formData.splits, newSplit]
+      splits: [...formData.splits, newSplit],
     });
   };
 
@@ -455,7 +454,7 @@ const Transactions: React.FC = () => {
     const newSplits = formData.splits.filter((_, i) => i !== index);
     setFormData({
       ...formData,
-      splits: newSplits
+      splits: newSplits,
     });
   };
 
@@ -464,7 +463,7 @@ const Transactions: React.FC = () => {
     newSplits[index] = { ...newSplits[index], [field]: value };
     setFormData({
       ...formData,
-      splits: newSplits
+      splits: newSplits,
     });
   };
 
@@ -512,9 +511,18 @@ const Transactions: React.FC = () => {
 
   const handleExportCSV = () => {
     const filteredTransactions = getFilteredTransactions();
-    
-    const headers = ['Date', 'Type', 'Account', 'Category', 'Description', 'Amount', 'Tags', 'Status'];
-    const rows = filteredTransactions.map(t => [
+
+    const headers = [
+      'Date',
+      'Type',
+      'Account',
+      'Category',
+      'Description',
+      'Amount',
+      'Tags',
+      'Status',
+    ];
+    const rows = filteredTransactions.map((t) => [
       dayjs(t.date).format('YYYY-MM-DD'),
       t.type.toUpperCase(),
       getAccountName(t.accountId),
@@ -525,7 +533,9 @@ const Transactions: React.FC = () => {
       t.reviewStatus,
     ]);
 
-    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -539,7 +549,7 @@ const Transactions: React.FC = () => {
     if (selectAll) {
       setSelectedTransactions(new Set());
     } else {
-      setSelectedTransactions(new Set(getFilteredTransactions().map(t => t.id)));
+      setSelectedTransactions(new Set(getFilteredTransactions().map((t) => t.id)));
     }
     setSelectAll(!selectAll);
   };
@@ -556,8 +566,9 @@ const Transactions: React.FC = () => {
   };
 
   const getFilteredTransactions = () => {
-    return transactions.filter(transaction => {
-      const matchesSearch = searchQuery === '' || 
+    return transactions.filter((transaction) => {
+      const matchesSearch =
+        searchQuery === '' ||
         transaction.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         transaction.merchantName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         transaction.notes?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -578,21 +589,21 @@ const Transactions: React.FC = () => {
   };
 
   const getAccountName = (accountId: string) => {
-    return accounts.find(a => a.id === accountId)?.name || 'Unknown';
+    return accounts.find((a) => a.id === accountId)?.name || 'Unknown';
   };
 
   const getCategoryName = (categoryId?: string) => {
     if (!categoryId) return 'Uncategorized';
-    return categories.find(c => c.id === categoryId)?.name || 'Unknown';
+    return categories.find((c) => c.id === categoryId)?.name || 'Unknown';
   };
 
   const getCategoryColor = (categoryId?: string) => {
     if (!categoryId) return '#999999';
-    return categories.find(c => c.id === categoryId)?.color || '#667eea';
+    return categories.find((c) => c.id === categoryId)?.color || '#667eea';
   };
 
   const formatCurrency = (amount: number, accountId: string) => {
-    const account = accounts.find(a => a.id === accountId);
+    const account = accounts.find((a) => a.id === accountId);
     const currency = account?.currency || user?.currency || 'USD';
     return formatCurrencyUtil(amount, currency);
   };
@@ -611,10 +622,10 @@ const Transactions: React.FC = () => {
 
   const filteredTransactions = getFilteredTransactions();
   const totalCredits = filteredTransactions
-    .filter(t => t.type === 'credit')
+    .filter((t) => t.type === 'credit')
     .reduce((sum, t) => sum + t.amount, 0);
   const totalDebits = filteredTransactions
-    .filter(t => t.type === 'debit')
+    .filter((t) => t.type === 'debit')
     .reduce((sum, t) => sum + t.amount, 0);
   const netAmount = totalCredits - totalDebits;
 
@@ -639,11 +650,7 @@ const Transactions: React.FC = () => {
             >
               Export CSV
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-            >
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
               Add Transaction
             </Button>
           </Box>
@@ -688,11 +695,14 @@ const Transactions: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} md={4}>
-            <Card sx={{ 
-              background: netAmount >= 0 
-                ? 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)'
-                : 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)'
-            }}>
+            <Card
+              sx={{
+                background:
+                  netAmount >= 0
+                    ? 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)'
+                    : 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
+              }}
+            >
               <CardContent>
                 <Typography variant="body2" color="white" gutterBottom>
                   Net Amount
@@ -752,8 +762,12 @@ const Transactions: React.FC = () => {
                   Filters
                 </Button>
 
-                {(searchQuery || selectedType !== 'all' || selectedAccount || selectedCategory || 
-                  selectedTags.length > 0 || reviewStatus !== 'all') && (
+                {(searchQuery ||
+                  selectedType !== 'all' ||
+                  selectedAccount ||
+                  selectedCategory ||
+                  selectedTags.length > 0 ||
+                  reviewStatus !== 'all') && (
                   <Chip
                     label="Clear Filters"
                     onDelete={clearFilters}
@@ -799,7 +813,7 @@ const Transactions: React.FC = () => {
                     size="small"
                   >
                     <MenuItem value="">All Accounts</MenuItem>
-                    {accounts.map(account => (
+                    {accounts.map((account) => (
                       <MenuItem key={account.id} value={account.id}>
                         {account.name}
                       </MenuItem>
@@ -817,7 +831,7 @@ const Transactions: React.FC = () => {
                     size="small"
                   >
                     <MenuItem value="">All Categories</MenuItem>
-                    {categories.map(category => (
+                    {categories.map((category) => (
                       <MenuItem key={category.id} value={category.id}>
                         {category.name}
                       </MenuItem>
@@ -846,19 +860,13 @@ const Transactions: React.FC = () => {
                 <Grid item xs={12} md={6}>
                   <Autocomplete
                     multiple
-                    options={tags.map(t => t.name)}
+                    options={tags.map((t) => t.name)}
                     value={selectedTags}
                     onChange={(_, value) => setSelectedTags(value)}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Tags" size="small" />
-                    )}
+                    renderInput={(params) => <TextField {...params} label="Tags" size="small" />}
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
-                        <Chip
-                          label={option}
-                          size="small"
-                          {...getTagProps({ index })}
-                        />
+                        <Chip label={option} size="small" {...getTagProps({ index })} />
                       ))
                     }
                   />
@@ -942,13 +950,15 @@ const Transactions: React.FC = () => {
                     .map((transaction) => {
                       const isExpanded = expandedRows.has(transaction.id);
                       const hasSplits = transaction.splits && transaction.splits.length > 1;
-                      
+
                       return (
                         <React.Fragment key={transaction.id}>
                           <TableRow
                             hover
                             selected={selectedTransactions.has(transaction.id)}
-                            sx={{ '& > *': { borderBottom: isExpanded ? 'none !important' : undefined } }}
+                            sx={{
+                              '& > *': { borderBottom: isExpanded ? 'none !important' : undefined },
+                            }}
                           >
                             <TableCell padding="checkbox" sx={{ width: 50 }}>
                               <Checkbox
@@ -958,20 +968,30 @@ const Transactions: React.FC = () => {
                             </TableCell>
                             <TableCell padding="none" sx={{ width: 48 }}>
                               {hasSplits && (
-                                <Tooltip title={isExpanded ? "Hide split details" : "Show split details"}>
+                                <Tooltip
+                                  title={isExpanded ? 'Hide split details' : 'Show split details'}
+                                >
                                   <IconButton
                                     size="small"
                                     onClick={() => toggleRowExpansion(transaction.id)}
                                   >
-                                    {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+                                    {isExpanded ? (
+                                      <ExpandMoreIcon fontSize="small" />
+                                    ) : (
+                                      <ChevronRightIcon fontSize="small" />
+                                    )}
                                   </IconButton>
                                 </Tooltip>
                               )}
                             </TableCell>
-                            <TableCell sx={{ width: 120 }}>{dayjs(transaction.date).format('MMM DD, YYYY')}</TableCell>
+                            <TableCell sx={{ width: 120 }}>
+                              {dayjs(transaction.date).format('MMM DD, YYYY')}
+                            </TableCell>
                             <TableCell sx={{ width: 100 }}>
                               <Chip
-                                icon={transaction.type === 'credit' ? <CreditIcon /> : <DebitIcon />}
+                                icon={
+                                  transaction.type === 'credit' ? <CreditIcon /> : <DebitIcon />
+                                }
                                 label={transaction.type === 'credit' ? 'Credit' : 'Debit'}
                                 color={transaction.type === 'credit' ? 'success' : 'error'}
                                 size="small"
@@ -987,7 +1007,11 @@ const Transactions: React.FC = () => {
                                     {transaction.merchantName}
                                   </Typography>
                                 )}
-                                <Typography variant="caption" color="text.secondary" display="block">
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  display="block"
+                                >
                                   {getAccountName(transaction.accountId)}
                                 </Typography>
                               </Box>
@@ -1016,36 +1040,65 @@ const Transactions: React.FC = () => {
                                 </Box>
                               ) : (
                                 <Chip
-                                  label={getCategoryName(transaction.splits?.[0]?.categoryId || transaction.categoryId)}
+                                  label={getCategoryName(
+                                    transaction.splits?.[0]?.categoryId || transaction.categoryId
+                                  )}
                                   size="small"
                                   sx={{
                                     backgroundColor: `${getCategoryColor(transaction.splits?.[0]?.categoryId || transaction.categoryId)}20`,
-                                    color: getCategoryColor(transaction.splits?.[0]?.categoryId || transaction.categoryId),
+                                    color: getCategoryColor(
+                                      transaction.splits?.[0]?.categoryId || transaction.categoryId
+                                    ),
                                   }}
                                 />
                               )}
                             </TableCell>
                             <TableCell sx={{ minWidth: 180, maxWidth: 280 }}>
                               <Box display="flex" gap={0.5} flexWrap="wrap">
-                                {transaction.splits && transaction.splits.length > 0 ? (
-                                  Array.from(new Set(transaction.splits.flatMap(s => s.tags || []))).slice(0, 3).map((tag, idx) => (
-                                    <Chip key={idx} label={tag} size="small" variant="outlined" icon={<TagIcon />} />
-                                  ))
-                                ) : (
-                                  transaction.tags?.slice(0, 3).map((tag, idx) => (
-                                    <Chip key={idx} label={tag} size="small" variant="outlined" icon={<TagIcon />} />
-                                  ))
-                                )}
-                                {transaction.splits && Array.from(new Set(transaction.splits.flatMap(s => s.tags || []))).length > 3 && (
-                                  <Chip label={`+${Array.from(new Set(transaction.splits.flatMap(s => s.tags || []))).length - 3}`} size="small" variant="outlined" />
-                                )}
+                                {transaction.splits && transaction.splits.length > 0
+                                  ? Array.from(
+                                      new Set(transaction.splits.flatMap((s) => s.tags || []))
+                                    )
+                                      .slice(0, 3)
+                                      .map((tag, idx) => (
+                                        <Chip
+                                          key={idx}
+                                          label={tag}
+                                          size="small"
+                                          variant="outlined"
+                                          icon={<TagIcon />}
+                                        />
+                                      ))
+                                  : transaction.tags
+                                      ?.slice(0, 3)
+                                      .map((tag, idx) => (
+                                        <Chip
+                                          key={idx}
+                                          label={tag}
+                                          size="small"
+                                          variant="outlined"
+                                          icon={<TagIcon />}
+                                        />
+                                      ))}
+                                {transaction.splits &&
+                                  Array.from(
+                                    new Set(transaction.splits.flatMap((s) => s.tags || []))
+                                  ).length > 3 && (
+                                    <Chip
+                                      label={`+${Array.from(new Set(transaction.splits.flatMap((s) => s.tags || []))).length - 3}`}
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  )}
                               </Box>
                             </TableCell>
                             <TableCell align="right" sx={{ width: 130 }}>
                               <Typography
                                 variant="body2"
                                 fontWeight="bold"
-                                color={transaction.type === 'credit' ? 'success.main' : 'error.main'}
+                                color={
+                                  transaction.type === 'credit' ? 'success.main' : 'error.main'
+                                }
                               >
                                 {transaction.type === 'credit' ? '+' : '-'}
                                 {formatCurrency(transaction.amount, transaction.accountId)}
@@ -1073,21 +1126,31 @@ const Transactions: React.FC = () => {
                               </Box>
                             </TableCell>
                           </TableRow>
-                          
+
                           {/* Expanded Row for Split Details */}
                           {hasSplits && isExpanded && (
                             <TableRow>
                               <TableCell colSpan={9} sx={{ py: 0, bgcolor: 'action.hover' }}>
                                 <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                                   <Box sx={{ py: 2, px: 6 }}>
-                                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight="bold"
+                                      gutterBottom
+                                      sx={{ mb: 2 }}
+                                    >
                                       Split Breakdown
                                     </Typography>
                                     <Grid container spacing={2}>
                                       {(transaction.splits || []).map((split, idx) => (
                                         <Grid item xs={12} sm={6} md={4} key={idx}>
                                           <Card variant="outlined" sx={{ p: 2 }}>
-                                            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                            <Box
+                                              display="flex"
+                                              justifyContent="space-between"
+                                              alignItems="flex-start"
+                                              mb={1}
+                                            >
                                               <Chip
                                                 label={getCategoryName(split.categoryId)}
                                                 size="small"
@@ -1097,19 +1160,47 @@ const Transactions: React.FC = () => {
                                                   fontWeight: 'bold',
                                                 }}
                                               />
-                                              <Typography variant="body1" fontWeight="bold" color={transaction.type === 'credit' ? 'success.main' : 'error.main'}>
-                                                {formatCurrency(split.amount, transaction.accountId)}
+                                              <Typography
+                                                variant="body1"
+                                                fontWeight="bold"
+                                                color={
+                                                  transaction.type === 'credit'
+                                                    ? 'success.main'
+                                                    : 'error.main'
+                                                }
+                                              >
+                                                {formatCurrency(
+                                                  split.amount,
+                                                  transaction.accountId
+                                                )}
                                               </Typography>
                                             </Box>
                                             {split.tags && split.tags.length > 0 && (
-                                              <Box display="flex" gap={0.5} flexWrap="wrap" mt={1.5}>
+                                              <Box
+                                                display="flex"
+                                                gap={0.5}
+                                                flexWrap="wrap"
+                                                mt={1.5}
+                                              >
                                                 {split.tags.map((tag, tagIdx) => (
-                                                  <Chip key={tagIdx} label={tag} size="small" variant="outlined" icon={<TagIcon />} />
+                                                  <Chip
+                                                    key={tagIdx}
+                                                    label={tag}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    icon={<TagIcon />}
+                                                  />
                                                 ))}
                                               </Box>
                                             )}
                                             {split.notes && (
-                                              <Typography variant="caption" color="text.secondary" display="block" mt={1.5} sx={{ fontStyle: 'italic' }}>
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                display="block"
+                                                mt={1.5}
+                                                sx={{ fontStyle: 'italic' }}
+                                              >
                                                 Note: {split.notes}
                                               </Typography>
                                             )}
@@ -1129,7 +1220,7 @@ const Transactions: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
-          
+
           <TablePagination
             rowsPerPageOptions={[10, 25, 50, 100]}
             component="div"
@@ -1146,9 +1237,7 @@ const Transactions: React.FC = () => {
 
         {/* Add/Edit Dialog */}
         <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-          <DialogTitle>
-            {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
-          </DialogTitle>
+          <DialogTitle>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <ToggleButtonGroup
@@ -1182,14 +1271,22 @@ const Transactions: React.FC = () => {
                           {formData.accountId
                             ? new Intl.NumberFormat('en-US', {
                                 style: 'currency',
-                                currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                                currency:
+                                  accounts.find((a) => a.id === formData.accountId)?.currency ||
+                                  user?.currency ||
+                                  'USD',
                               })
                                 .format(0)
                                 .replace(/[\d.,]/g, '')
-                            : user?.currency === 'USD' ? '$' : 
-                              user?.currency === 'EUR' ? '€' : 
-                              user?.currency === 'GBP' ? '£' : 
-                              user?.currency === 'INR' ? '₹' : '$'}
+                            : user?.currency === 'USD'
+                              ? '$'
+                              : user?.currency === 'EUR'
+                                ? '€'
+                                : user?.currency === 'GBP'
+                                  ? '£'
+                                  : user?.currency === 'INR'
+                                    ? '₹'
+                                    : '$'}
                         </InputAdornment>
                       ),
                     }}
@@ -1217,7 +1314,7 @@ const Transactions: React.FC = () => {
                     fullWidth
                     required
                   >
-                    {accounts.map(account => (
+                    {accounts.map((account) => (
                       <MenuItem key={account.id} value={account.id}>
                         {account.name} ({account.type})
                       </MenuItem>
@@ -1237,7 +1334,16 @@ const Transactions: React.FC = () => {
 
                 {/* Split Mode Toggle */}
                 <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      p: 2,
+                      bgcolor: 'action.hover',
+                      borderRadius: 1,
+                    }}
+                  >
                     <Typography variant="body2" fontWeight="medium">
                       Transaction Mode:
                     </Typography>
@@ -1252,26 +1358,30 @@ const Transactions: React.FC = () => {
                             const amount = parseFloat(formData.amount) || 0;
                             setFormData({
                               ...formData,
-                              splits: [{
-                                categoryId: formData.categoryId,
-                                amount: amount,
-                                tags: formData.tags,
-                                notes: '',
-                                order: 1
-                              }]
+                              splits: [
+                                {
+                                  categoryId: formData.categoryId,
+                                  amount: amount,
+                                  tags: formData.tags,
+                                  notes: '',
+                                  order: 1,
+                                },
+                              ],
                             });
                           } else {
                             // Split mode - ensure splits array has at least one entry
                             if (formData.splits.length === 0) {
                               setFormData({
                                 ...formData,
-                                splits: [{
-                                  categoryId: '',
-                                  amount: 0,
-                                  tags: [],
-                                  notes: '',
-                                  order: 1
-                                }]
+                                splits: [
+                                  {
+                                    categoryId: '',
+                                    amount: 0,
+                                    tags: [],
+                                    notes: '',
+                                    order: 1,
+                                  },
+                                ],
                               });
                             }
                           }
@@ -1279,12 +1389,8 @@ const Transactions: React.FC = () => {
                       }}
                       size="small"
                     >
-                      <ToggleButton value={false}>
-                        Quick Add (Single Category)
-                      </ToggleButton>
-                      <ToggleButton value={true}>
-                        Split (Multiple Categories)
-                      </ToggleButton>
+                      <ToggleButton value={false}>Quick Add (Single Category)</ToggleButton>
+                      <ToggleButton value={true}>Split (Multiple Categories)</ToggleButton>
                     </ToggleButtonGroup>
                     {useSplitMode && (
                       <Typography variant="caption" color="text.secondary">
@@ -1308,13 +1414,17 @@ const Transactions: React.FC = () => {
                           if (formData.splits.length > 0) {
                             const newSplits = [...formData.splits];
                             newSplits[0] = { ...newSplits[0], categoryId: e.target.value };
-                            setFormData({ ...formData, categoryId: e.target.value, splits: newSplits });
+                            setFormData({
+                              ...formData,
+                              categoryId: e.target.value,
+                              splits: newSplits,
+                            });
                           }
                         }}
                         fullWidth
                         required
                       >
-                        {categories.map(category => (
+                        {categories.map((category) => (
                           <MenuItem key={category.id} value={category.id}>
                             {category.name}
                           </MenuItem>
@@ -1326,7 +1436,7 @@ const Transactions: React.FC = () => {
                       <Autocomplete
                         multiple
                         freeSolo
-                        options={tags.map(t => t.name)}
+                        options={tags.map((t) => t.name)}
                         value={formData.tags}
                         onChange={(_, value) => {
                           setFormData({ ...formData, tags: value });
@@ -1338,11 +1448,7 @@ const Transactions: React.FC = () => {
                           }
                         }}
                         renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="Tags"
-                            placeholder="Add tags..."
-                          />
+                          <TextField {...params} label="Tags" placeholder="Add tags..." />
                         )}
                         renderTags={(value, getTagProps) =>
                           value.map((option, index) => (
@@ -1363,22 +1469,35 @@ const Transactions: React.FC = () => {
                 {useSplitMode && (
                   <Grid item xs={12}>
                     <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          mb: 2,
+                        }}
+                      >
                         <Typography variant="subtitle2" fontWeight="bold">
                           Split Details
                         </Typography>
-                        <Button
-                          size="small"
-                          startIcon={<AddIcon />}
-                          onClick={addSplit}
-                        >
+                        <Button size="small" startIcon={<AddIcon />} onClick={addSplit}>
                           Add Split
                         </Button>
                       </Box>
 
                       {formData.splits.map((split, index) => (
-                        <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Box
+                          key={index}
+                          sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              mb: 1,
+                            }}
+                          >
                             <Typography variant="caption" color="text.secondary">
                               Split {index + 1}
                             </Typography>
@@ -1404,7 +1523,7 @@ const Transactions: React.FC = () => {
                                 required
                                 size="small"
                               >
-                                {categories.map(category => (
+                                {categories.map((category) => (
                                   <MenuItem key={category.id} value={category.id}>
                                     {category.name}
                                   </MenuItem>
@@ -1417,7 +1536,9 @@ const Transactions: React.FC = () => {
                                 label="Amount"
                                 type="number"
                                 value={split.amount || ''}
-                                onChange={(e) => updateSplit(index, 'amount', parseFloat(e.target.value) || 0)}
+                                onChange={(e) =>
+                                  updateSplit(index, 'amount', parseFloat(e.target.value) || 0)
+                                }
                                 fullWidth
                                 required
                                 size="small"
@@ -1427,14 +1548,23 @@ const Transactions: React.FC = () => {
                                       {formData.accountId
                                         ? new Intl.NumberFormat('en-US', {
                                             style: 'currency',
-                                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                                            currency:
+                                              accounts.find((a) => a.id === formData.accountId)
+                                                ?.currency ||
+                                              user?.currency ||
+                                              'USD',
                                           })
                                             .format(0)
                                             .replace(/[\d.,]/g, '')
-                                        : user?.currency === 'USD' ? '$' : 
-                                          user?.currency === 'EUR' ? '€' : 
-                                          user?.currency === 'GBP' ? '£' : 
-                                          user?.currency === 'INR' ? '₹' : '$'}
+                                        : user?.currency === 'USD'
+                                          ? '$'
+                                          : user?.currency === 'EUR'
+                                            ? '€'
+                                            : user?.currency === 'GBP'
+                                              ? '£'
+                                              : user?.currency === 'INR'
+                                                ? '₹'
+                                                : '$'}
                                     </InputAdornment>
                                   ),
                                 }}
@@ -1445,15 +1575,11 @@ const Transactions: React.FC = () => {
                               <Autocomplete
                                 multiple
                                 freeSolo
-                                options={tags.map(t => t.name)}
+                                options={tags.map((t) => t.name)}
                                 value={split.tags}
                                 onChange={(_, value) => updateSplit(index, 'tags', value)}
                                 renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    label="Tags"
-                                    size="small"
-                                  />
+                                  <TextField {...params} label="Tags" size="small" />
                                 )}
                                 size="small"
                               />
@@ -1475,23 +1601,46 @@ const Transactions: React.FC = () => {
                       ))}
 
                       {/* Split Summary */}
-                      <Box sx={{ mt: 2, p: 2, bgcolor: getRemainingAmount() !== 0 ? 'error.lighter' : 'success.lighter', borderRadius: 1 }}>
+                      <Box
+                        sx={{
+                          mt: 2,
+                          p: 2,
+                          bgcolor: getRemainingAmount() !== 0 ? 'error.lighter' : 'success.lighter',
+                          borderRadius: 1,
+                        }}
+                      >
                         <Typography variant="body2" fontWeight="bold">
-                          Total Amount: {new Intl.NumberFormat('en-US', {
+                          Total Amount:{' '}
+                          {new Intl.NumberFormat('en-US', {
                             style: 'currency',
-                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                            currency:
+                              accounts.find((a) => a.id === formData.accountId)?.currency ||
+                              user?.currency ||
+                              'USD',
                           }).format(parseFloat(formData.amount) || 0)}
                         </Typography>
                         <Typography variant="body2">
-                          Split Total: {new Intl.NumberFormat('en-US', {
+                          Split Total:{' '}
+                          {new Intl.NumberFormat('en-US', {
                             style: 'currency',
-                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                            currency:
+                              accounts.find((a) => a.id === formData.accountId)?.currency ||
+                              user?.currency ||
+                              'USD',
                           }).format(getSplitTotal())}
                         </Typography>
-                        <Typography variant="body2" color={getRemainingAmount() !== 0 ? 'error' : 'success.main'} fontWeight="bold">
-                          Remaining: {new Intl.NumberFormat('en-US', {
+                        <Typography
+                          variant="body2"
+                          color={getRemainingAmount() !== 0 ? 'error' : 'success.main'}
+                          fontWeight="bold"
+                        >
+                          Remaining:{' '}
+                          {new Intl.NumberFormat('en-US', {
                             style: 'currency',
-                            currency: accounts.find(a => a.id === formData.accountId)?.currency || user?.currency || 'USD',
+                            currency:
+                              accounts.find((a) => a.id === formData.accountId)?.currency ||
+                              user?.currency ||
+                              'USD',
                           }).format(getRemainingAmount())}
                         </Typography>
                       </Box>
@@ -1526,9 +1675,11 @@ const Transactions: React.FC = () => {
                         checked={formData.isRecurring}
                         onChange={(e) => {
                           const isRecurring = e.target.checked;
-                          const updatedTags = isRecurring 
-                            ? [...formData.tags, 'recurring'].filter((tag, index, self) => self.indexOf(tag) === index) // Add and dedupe
-                            : formData.tags.filter(tag => tag !== 'recurring'); // Remove tag
+                          const updatedTags = isRecurring
+                            ? [...formData.tags, 'recurring'].filter(
+                                (tag, index, self) => self.indexOf(tag) === index
+                              ) // Add and dedupe
+                            : formData.tags.filter((tag) => tag !== 'recurring'); // Remove tag
                           setFormData({ ...formData, isRecurring, tags: updatedTags });
                         }}
                       />
@@ -1544,7 +1695,9 @@ const Transactions: React.FC = () => {
                         select
                         label="Recurrence Frequency"
                         value={formData.recurrencePattern}
-                        onChange={(e) => setFormData({ ...formData, recurrencePattern: e.target.value as any })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, recurrencePattern: e.target.value as any })
+                        }
                         fullWidth
                         required
                       >
@@ -1560,11 +1713,16 @@ const Transactions: React.FC = () => {
                         label="Day of Month (for monthly/yearly)"
                         type="number"
                         value={formData.recurrenceDay}
-                        onChange={(e) => setFormData({ ...formData, recurrenceDay: parseInt(e.target.value) || 1 })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, recurrenceDay: parseInt(e.target.value) || 1 })
+                        }
                         fullWidth
                         InputProps={{ inputProps: { min: 1, max: 31 } }}
                         helperText="Day when transaction should repeat"
-                        disabled={formData.recurrencePattern === 'daily' || formData.recurrencePattern === 'weekly'}
+                        disabled={
+                          formData.recurrencePattern === 'daily' ||
+                          formData.recurrencePattern === 'weekly'
+                        }
                       />
                     </Grid>
 
@@ -1573,7 +1731,9 @@ const Transactions: React.FC = () => {
                         label="End Date (Optional)"
                         type="date"
                         value={formData.recurrenceEndDate}
-                        onChange={(e) => setFormData({ ...formData, recurrenceEndDate: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, recurrenceEndDate: e.target.value })
+                        }
                         fullWidth
                         InputLabelProps={{ shrink: true }}
                         helperText="Leave empty for indefinite recurrence"
@@ -1590,13 +1750,13 @@ const Transactions: React.FC = () => {
               onClick={handleSubmit}
               variant="contained"
               disabled={
-                !formData.amount || 
-                !formData.accountId || 
+                !formData.amount ||
+                !formData.accountId ||
                 !formData.description ||
-                (useSplitMode 
-                  ? formData.splits.length === 0 || formData.splits.some(s => !s.categoryId || !s.amount)
-                  : !formData.categoryId
-                )
+                (useSplitMode
+                  ? formData.splits.length === 0 ||
+                    formData.splits.some((s) => !s.categoryId || !s.amount)
+                  : !formData.categoryId)
               }
             >
               {editingTransaction ? 'Update' : 'Create'}

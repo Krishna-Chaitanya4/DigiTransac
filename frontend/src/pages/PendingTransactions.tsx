@@ -94,11 +94,11 @@ const PendingTransactions: React.FC = () => {
             sortBy: sortBy,
             sortOrder: 'desc',
             limit: 100,
-            includeSplits: 'true'
-          }
+            includeSplits: 'true',
+          },
         }),
         axios.get('/api/accounts'),
-        axios.get('/api/categories')
+        axios.get('/api/categories'),
       ]);
 
       // Backend returns { success: true, transactions: [...], pagination: {...} }
@@ -112,7 +112,9 @@ const PendingTransactions: React.FC = () => {
       setCategories(categoriesRes.data);
     } catch (error: any) {
       console.error('Error fetching pending transactions:', error);
-      setError(error.response?.data?.error || error.message || 'Failed to load pending transactions');
+      setError(
+        error.response?.data?.error || error.message || 'Failed to load pending transactions'
+      );
     } finally {
       setLoading(false);
     }
@@ -121,8 +123,8 @@ const PendingTransactions: React.FC = () => {
   const handleApprove = async (id: string) => {
     try {
       await axios.patch(`/api/transactions/${id}/approve`);
-      setTransactions(prev => prev.filter(t => t.id !== id));
-      setSelectedIds(prev => {
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      setSelectedIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(id);
         return newSet;
@@ -136,8 +138,8 @@ const PendingTransactions: React.FC = () => {
   const handleReject = async (id: string, reason?: string) => {
     try {
       await axios.patch(`/api/transactions/${id}/reject`, { reason });
-      setTransactions(prev => prev.filter(t => t.id !== id));
-      setSelectedIds(prev => {
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      setSelectedIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(id);
         return newSet;
@@ -150,12 +152,12 @@ const PendingTransactions: React.FC = () => {
 
   const handleBulkApprove = async () => {
     if (selectedIds.size === 0) return;
-    
+
     try {
       await axios.post('/api/transactions/bulk-approve', {
-        transactionIds: Array.from(selectedIds)
+        transactionIds: Array.from(selectedIds),
       });
-      setTransactions(prev => prev.filter(t => !selectedIds.has(t.id)));
+      setTransactions((prev) => prev.filter((t) => !selectedIds.has(t.id)));
       setSelectedIds(new Set());
     } catch (error) {
       console.error('Error bulk approving:', error);
@@ -165,15 +167,15 @@ const PendingTransactions: React.FC = () => {
 
   const handleBulkReject = async () => {
     if (selectedIds.size === 0) return;
-    
+
     const reason = prompt('Reason for rejection (optional):');
-    
+
     try {
       await axios.post('/api/transactions/bulk-reject', {
         transactionIds: Array.from(selectedIds),
-        reason
+        reason,
       });
-      setTransactions(prev => prev.filter(t => !selectedIds.has(t.id)));
+      setTransactions((prev) => prev.filter((t) => !selectedIds.has(t.id)));
       setSelectedIds(new Set());
     } catch (error) {
       console.error('Error bulk rejecting:', error);
@@ -182,7 +184,7 @@ const PendingTransactions: React.FC = () => {
   };
 
   const toggleSelection = (id: string) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
         newSet.delete(id);
@@ -194,21 +196,21 @@ const PendingTransactions: React.FC = () => {
   };
 
   const getAccountName = (accountId: string) => {
-    return accounts.find(a => a.id === accountId)?.name || 'Unknown Account';
+    return accounts.find((a) => a.id === accountId)?.name || 'Unknown Account';
   };
 
   const getCategoryName = (categoryId?: string) => {
     if (!categoryId) return 'Uncategorized';
-    const category = categories.find(c => c.id === categoryId);
+    const category = categories.find((c) => c.id === categoryId);
     return category ? category.path.join(' > ') : 'Unknown';
   };
 
   const getConfidenceBadge = (confidence?: number) => {
     if (!confidence) return null;
-    
+
     let color: 'success' | 'warning' | 'error' = 'default' as any;
     let label = 'Unknown';
-    
+
     if (confidence >= 80) {
       color = 'success';
       label = 'High';
@@ -219,28 +221,22 @@ const PendingTransactions: React.FC = () => {
       color = 'error';
       label = 'Low';
     }
-    
-    return (
-      <Chip
-        label={`${label} (${confidence}%)`}
-        color={color}
-        size="small"
-      />
-    );
+
+    return <Chip label={`${label} (${confidence}%)`} color={color} size="small" />;
   };
 
   const getSourceBadge = (source?: string) => {
     if (!source || source === 'manual') return null;
-    
+
     const colors: Record<string, 'info' | 'secondary'> = {
       email: 'info',
       sms: 'secondary',
     };
-    
+
     return (
       <Chip
         label={source.toUpperCase()}
-        color={colors[source] || 'default' as any}
+        color={colors[source] || ('default' as any)}
         size="small"
       />
     );
@@ -282,7 +278,12 @@ const PendingTransactions: React.FC = () => {
 
       {/* Filters and Actions */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          alignItems="center"
+          justifyContent="space-between"
+        >
           <Stack direction="row" spacing={1}>
             <Button
               variant={filter === 'all' ? 'contained' : 'outlined'}
@@ -348,7 +349,9 @@ const PendingTransactions: React.FC = () => {
       {/* Transactions List */}
       {transactions.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
-          <Typography variant="h3" sx={{ mb: 2 }}>✅</Typography>
+          <Typography variant="h3" sx={{ mb: 2 }}>
+            ✅
+          </Typography>
           <Typography variant="h5" gutterBottom fontWeight={600}>
             All Caught Up!
           </Typography>
@@ -368,13 +371,19 @@ const PendingTransactions: React.FC = () => {
                   />
 
                   <Box flex={1}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      mb={1}
+                    >
                       <Box>
                         <Typography variant="h6" gutterBottom>
                           {transaction.merchantName || transaction.description}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {getAccountName(transaction.accountId)} • {new Date(transaction.date).toLocaleDateString()}
+                          {getAccountName(transaction.accountId)} •{' '}
+                          {new Date(transaction.date).toLocaleDateString()}
                         </Typography>
                       </Box>
 
@@ -392,9 +401,10 @@ const PendingTransactions: React.FC = () => {
                       {getSourceBadge(transaction.source)}
                       {getConfidenceBadge(transaction.confidence)}
                       <Chip label={getCategoryName(transaction.categoryId)} size="small" />
-                      {transaction.tags && transaction.tags.map(tag => (
-                        <Chip key={tag} label={tag} size="small" variant="outlined" />
-                      ))}
+                      {transaction.tags &&
+                        transaction.tags.map((tag) => (
+                          <Chip key={tag} label={tag} size="small" variant="outlined" />
+                        ))}
                     </Stack>
 
                     {transaction.notes && (
@@ -407,14 +417,22 @@ const PendingTransactions: React.FC = () => {
                       <Box mb={2}>
                         <Button
                           size="small"
-                          onClick={() => setExpandedId(expandedId === transaction.id ? null : transaction.id)}
-                          endIcon={expandedId === transaction.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                          onClick={() =>
+                            setExpandedId(expandedId === transaction.id ? null : transaction.id)
+                          }
+                          endIcon={
+                            expandedId === transaction.id ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                          }
                         >
                           Original Content
                         </Button>
                         <Collapse in={expandedId === transaction.id}>
                           <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
-                            <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
+                            <Typography
+                              variant="body2"
+                              component="pre"
+                              sx={{ whiteSpace: 'pre-wrap' }}
+                            >
                               {transaction.originalContent}
                             </Typography>
                           </Paper>
@@ -428,8 +446,14 @@ const PendingTransactions: React.FC = () => {
                           Split Details:
                         </Typography>
                         {transaction.splits.map((split) => (
-                          <Typography key={split.id} variant="body2" color="text.secondary" sx={{ pl: 2 }}>
-                            • {getCategoryName(split.categoryId)}: {formatCurrency(split.amount, user?.currency || 'USD')}
+                          <Typography
+                            key={split.id}
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ pl: 2 }}
+                          >
+                            • {getCategoryName(split.categoryId)}:{' '}
+                            {formatCurrency(split.amount, user?.currency || 'USD')}
                             {split.tags.length > 0 && ` (${split.tags.join(', ')})`}
                           </Typography>
                         ))}
@@ -455,11 +479,7 @@ const PendingTransactions: React.FC = () => {
                       >
                         Reject
                       </Button>
-                      <Button
-                        variant="outlined"
-                        startIcon={<EditIcon />}
-                        size="small"
-                      >
+                      <Button variant="outlined" startIcon={<EditIcon />} size="small">
                         Edit & Approve
                       </Button>
                     </Stack>

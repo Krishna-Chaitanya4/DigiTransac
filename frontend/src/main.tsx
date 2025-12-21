@@ -13,7 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <SnackbarProvider 
+          <SnackbarProvider
             maxSnack={3}
             anchorOrigin={{
               vertical: 'top',

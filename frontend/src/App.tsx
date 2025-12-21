@@ -45,7 +45,7 @@ const App: React.FC = () => {
             path="/register"
             element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />}
           />
-          
+
           <Route
             path="/"
             element={

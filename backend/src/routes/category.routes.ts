@@ -12,20 +12,20 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    
+
     const categories = (await categoriesContainer
       .find({ userId })
       .toArray()) as unknown as Category[];
 
     res.json({
       success: true,
-      categories
+      categories,
     });
   } catch (error) {
     console.error('Error fetching categories:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching categories'
+      message: 'Error fetching categories',
     });
   }
 });
@@ -40,7 +40,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!name) {
       res.status(400).json({
         success: false,
-        message: 'Category name is required'
+        message: 'Category name is required',
       });
       return;
     }
@@ -50,24 +50,27 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // Build path array
     let path: string[] = [];
     if (parentId) {
-      const parent = await categoriesContainer.findOne({ id: parentId, userId }) as Category | null;
+      const parent = (await categoriesContainer.findOne({
+        id: parentId,
+        userId,
+      })) as Category | null;
       if (!parent) {
         res.status(404).json({
           success: false,
-          message: 'Parent category not found'
+          message: 'Parent category not found',
         });
         return;
       }
-      
+
       // Cannot create category under a non-folder parent
       if (!parent.isFolder) {
         res.status(400).json({
           success: false,
-          message: 'Cannot create subcategory under a category. Parent must be a folder.'
+          message: 'Cannot create subcategory under a category. Parent must be a folder.',
         });
         return;
       }
-      
+
       path = [...parent.path, parent.id];
     }
 
@@ -81,7 +84,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       color: color || '#667eea',
       path,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await categoriesContainer.insertOne(newCategory);
@@ -89,13 +92,13 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(201).json({
       success: true,
       message: 'Category created successfully',
-      category: newCategory
+      category: newCategory,
     });
   } catch (error) {
     console.error('Error creating category:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating category'
+      message: 'Error creating category',
     });
   }
 });
@@ -108,12 +111,12 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const { name, icon, color, parentId } = req.body;
 
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    
-    const category = await categoriesContainer.findOne({ id, userId }) as Category | null;
+
+    const category = (await categoriesContainer.findOne({ id, userId })) as Category | null;
     if (!category) {
       res.status(404).json({
         success: false,
-        message: 'Category not found'
+        message: 'Category not found',
       });
       return;
     }
@@ -124,18 +127,21 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       if (parentId === id) {
         res.status(400).json({
           success: false,
-          message: 'Category cannot be its own parent'
+          message: 'Category cannot be its own parent',
         });
         return;
       }
 
       // If setting a parent (not null)
       if (parentId) {
-        const newParent = await categoriesContainer.findOne({ id: parentId, userId }) as Category | null;
+        const newParent = (await categoriesContainer.findOne({
+          id: parentId,
+          userId,
+        })) as Category | null;
         if (!newParent) {
           res.status(404).json({
             success: false,
-            message: 'Parent category not found'
+            message: 'Parent category not found',
           });
           return;
         }
@@ -144,7 +150,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         if (!newParent.isFolder) {
           res.status(400).json({
             success: false,
-            message: 'Parent must be a folder'
+            message: 'Parent must be a folder',
           });
           return;
         }
@@ -155,7 +161,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
           if (isDescendant) {
             res.status(400).json({
               success: false,
-              message: 'Cannot move category under its own descendant (circular reference)'
+              message: 'Cannot move category under its own descendant (circular reference)',
             });
             return;
           }
@@ -164,7 +170,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     const updateData: any = {
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     if (name) updateData.name = name;
@@ -178,7 +184,10 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       // Recalculate path
       let newPath: string[] = [];
       if (parentId) {
-        const parent = await categoriesContainer.findOne({ id: parentId, userId }) as Category | null;
+        const parent = (await categoriesContainer.findOne({
+          id: parentId,
+          userId,
+        })) as Category | null;
         if (parent) {
           newPath = [...parent.path, parent.id];
         }
@@ -186,10 +195,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       updateData.path = newPath;
 
       // Update this category
-      await categoriesContainer.updateOne(
-        { id, userId },
-        { $set: updateData }
-      );
+      await categoriesContainer.updateOne({ id, userId }, { $set: updateData });
 
       // If this is a folder, recursively update all descendants' paths
       if (category.isFolder) {
@@ -197,10 +203,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       }
     } else {
       // No parent change, just update other fields
-      await categoriesContainer.updateOne(
-        { id, userId },
-        { $set: updateData }
-      );
+      await categoriesContainer.updateOne({ id, userId }, { $set: updateData });
     }
 
     const updatedCategory = await categoriesContainer.findOne({ id, userId });
@@ -208,13 +211,13 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     res.json({
       success: true,
       message: 'Category updated successfully',
-      category: updatedCategory
+      category: updatedCategory,
     });
   } catch (error) {
     console.error('Error updating category:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating category'
+      message: 'Error updating category',
     });
   }
 });
@@ -228,7 +231,7 @@ async function checkIfDescendant(
   categoryId: string,
   targetId: string
 ): Promise<boolean> {
-  const target = await container.findOne({ id: targetId, userId }) as Category | null;
+  const target = (await container.findOne({ id: targetId, userId })) as Category | null;
   if (!target) return false;
 
   // Check if categoryId is in the target's path
@@ -245,7 +248,7 @@ async function updateDescendantPaths(
   newParentPath: string[]
 ): Promise<void> {
   // Get all direct children
-  const children = await container.find({ parentId: folderId, userId }).toArray() as Category[];
+  const children = (await container.find({ parentId: folderId, userId }).toArray()) as Category[];
 
   for (const child of children) {
     // New path for this child
@@ -270,12 +273,12 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const { id } = req.params;
 
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    
-    const category = await categoriesContainer.findOne({ id, userId }) as Category | null;
+
+    const category = (await categoriesContainer.findOne({ id, userId })) as Category | null;
     if (!category) {
       res.status(404).json({
         success: false,
-        message: 'Category not found'
+        message: 'Category not found',
       });
       return;
     }
@@ -286,7 +289,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
       if (children > 0) {
         res.status(400).json({
           success: false,
-          message: 'Cannot delete folder with subcategories. Delete or move them first.'
+          message: 'Cannot delete folder with subcategories. Delete or move them first.',
         });
         return;
       }
@@ -298,7 +301,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     if (expenseCount > 0) {
       res.status(400).json({
         success: false,
-        message: `Cannot delete category with ${expenseCount} expense(s). Reassign or delete them first.`
+        message: `Cannot delete category with ${expenseCount} expense(s). Reassign or delete them first.`,
       });
       return;
     }
@@ -307,13 +310,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
     res.json({
       success: true,
-      message: 'Category deleted successfully'
+      message: 'Category deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting category:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting category'
+      message: 'Error deleting category',
     });
   }
 });
@@ -326,12 +329,12 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
     const { newParentId } = req.body;
 
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    
-    const category = await categoriesContainer.findOne({ id, userId }) as Category | null;
+
+    const category = (await categoriesContainer.findOne({ id, userId })) as Category | null;
     if (!category) {
       res.status(404).json({
         success: false,
-        message: 'Category not found'
+        message: 'Category not found',
       });
       return;
     }
@@ -339,11 +342,14 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
     // Build new path
     let newPath: string[] = [];
     if (newParentId) {
-      const newParent = await categoriesContainer.findOne({ id: newParentId, userId }) as Category | null;
+      const newParent = (await categoriesContainer.findOne({
+        id: newParentId,
+        userId,
+      })) as Category | null;
       if (!newParent) {
         res.status(404).json({
           success: false,
-          message: 'New parent category not found'
+          message: 'New parent category not found',
         });
         return;
       }
@@ -351,7 +357,7 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
       if (!newParent.isFolder) {
         res.status(400).json({
           success: false,
-          message: 'New parent must be a folder'
+          message: 'New parent must be a folder',
         });
         return;
       }
@@ -360,7 +366,7 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
       if (newParent.path.includes(id)) {
         res.status(400).json({
           success: false,
-          message: 'Cannot move folder into its own subfolder'
+          message: 'Cannot move folder into its own subfolder',
         });
         return;
       }
@@ -375,8 +381,8 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
         $set: {
           parentId: newParentId || null,
           path: newPath,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
 
@@ -385,21 +391,21 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
       const descendants = (await categoriesContainer
         .find({
           userId,
-          path: { $elemMatch: { $eq: id } }
+          path: { $elemMatch: { $eq: id } },
         })
         .toArray()) as unknown as Category[];
 
       for (const desc of descendants) {
         const oldPathIndex = desc.path.indexOf(id);
         const updatedPath = [...newPath, id, ...desc.path.slice(oldPathIndex + 1)];
-        
+
         await categoriesContainer.updateOne(
           { id: desc.id, userId },
           {
             $set: {
               path: updatedPath,
-              updatedAt: new Date()
-            }
+              updatedAt: new Date(),
+            },
           }
         );
       }
@@ -410,13 +416,13 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
     res.json({
       success: true,
       message: 'Category moved successfully',
-      category: updatedCategory
+      category: updatedCategory,
     });
   } catch (error) {
     console.error('Error moving category:', error);
     res.status(500).json({
       success: false,
-      message: 'Error moving category'
+      message: 'Error moving category',
     });
   }
 });

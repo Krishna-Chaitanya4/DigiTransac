@@ -32,14 +32,11 @@ export const authenticate = async (
     }
 
     // Verify JWT token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'fallback-secret'
-    ) as JWTPayload;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as JWTPayload;
 
     // Attach userId to request
     req.userId = decoded.userId;
-    
+
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
