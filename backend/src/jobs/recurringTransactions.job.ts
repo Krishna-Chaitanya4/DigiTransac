@@ -1,6 +1,7 @@
 import { cosmosDBService } from '../config/cosmosdb';
 import { Transaction, RecurrencePattern } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../utils/logger';
 
 /**
  * Process recurring transactions and create new instances
@@ -8,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export async function processRecurringTransactions(): Promise<number> {
   try {
-    console.log('🔄 Processing recurring transactions...');
+    logger.info('🔄 Processing recurring transactions...');
     
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     
@@ -17,7 +18,7 @@ export async function processRecurringTransactions(): Promise<number> {
       .find({ isRecurring: true })
       .toArray()) as unknown as Transaction[];
 
-    console.log(`Found ${recurringTransactions.length} recurring transactions`);
+    logger.info(`Found ${recurringTransactions.length} recurring transactions`);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Start of today
@@ -64,14 +65,14 @@ export async function processRecurringTransactions(): Promise<number> {
         );
 
         created++;
-        console.log(`✅ Created recurring transaction: ${recurringTxn.description}`);
+        logger.info(`✅ Created recurring transaction: ${recurringTxn.description}`);
       }
     }
 
-    console.log(`✅ Created ${created} recurring transactions`);
+    logger.info(`✅ Created ${created} recurring transactions`);
     return created;
   } catch (error) {
-    console.error('❌ Error processing recurring transactions:', error);
+    logger.error({ error }, '❌ Error processing recurring transactions');
     return 0;
   }
 }

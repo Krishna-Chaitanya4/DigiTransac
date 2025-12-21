@@ -1,5 +1,6 @@
 import { MongoClient, Db, Collection } from 'mongodb';
 import dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
 dotenv.config();
 
@@ -34,8 +35,8 @@ class CosmosDBService {
       // Format: mongodb://localhost:<key>@localhost:10255/?ssl=true
       const emulatorKey = key || 'C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEclP9qNdxzYg==';
       connectionString = `mongodb://localhost:${encodeURIComponent(emulatorKey)}@localhost:10255/?ssl=true&retrywrites=false`;
-      console.log('🔧 Using Cosmos DB Emulator');
-      console.log(`📁 Database: ${dbName}`);
+      logger.info('🔧 Using Cosmos DB Emulator');
+      logger.info(`📁 Database: ${dbName}`);
     } else {
       // Azure Cosmos DB connection string
       if (!key) {
@@ -45,7 +46,7 @@ class CosmosDBService {
       // Extract account name from endpoint
       const accountName = endpoint.match(/https:\/\/([^.]+)/)?.[1] || '';
       connectionString = `mongodb://${accountName}:${encodeURIComponent(key)}@${accountName}.mongo.cosmos.azure.com:10255/${dbName}?ssl=true&retrywrites=false&maxIdleTimeMS=120000&appName=@${accountName}@`;
-      console.log('🌍 Using Azure Cosmos DB');
+      logger.info('🌍 Using Azure Cosmos DB');
     }
     
     this.client = new MongoClient(connectionString, {
@@ -61,14 +62,14 @@ class CosmosDBService {
       // Connect to Cosmos DB via MongoDB API
       await this.client.connect();
       this.db = this.client.db(databaseName);
-      console.log(`✅ Database "${databaseName}" connected`);
+      logger.info(`✅ Database "${databaseName}" connected`);
 
       // Initialize collections
       await this.createCollections();
       
-      console.log('✅ All Cosmos DB collections are ready');
+      logger.info('✅ All Cosmos DB collections are ready');
     } catch (error) {
-      console.error('❌ Error initializing Cosmos DB:', error);
+      logger.error({ error }, '❌ Error initializing Cosmos DB');
       throw error;
     }
   }
@@ -195,7 +196,7 @@ class CosmosDBService {
 
   async close(): Promise<void> {
     await this.client.close();
-    console.log('✅ Cosmos DB connection closed');
+    logger.info('✅ Cosmos DB connection closed');
   }
 }
 

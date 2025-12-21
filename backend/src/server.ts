@@ -1,10 +1,15 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import compression from 'compression';
+import mongoSanitize from 'express-mongo-sanitize';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
+import { logger } from './utils/logger';
+import { requestIdMiddleware } from './middleware/requestId';
+import { httpLogger } from './middleware/httpLogger';
+import { globalLimiter, authLimiter } from './middleware/rateLimiter';
+import { validateConfig } from './utils/configValidator';
 import { cosmosDBService } from './config/cosmosdb';
 import { encryptionService } from './services/encryption.service';
 import authRoutes from './routes/auth.routes';
@@ -27,6 +32,12 @@ dotenv.config();
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
+// Validate configuration on startup
+validateConfig();
+
+// Trust proxy - required for rate limiting and secure headers behind reverse proxy
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet());
 
@@ -37,7 +48,11 @@ const allowedOrigins = process.env.CORS_ORIGIN
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
+    // In production, reject requests without origin
+    if (!origin && process.env.NODE_ENV === 'production') {
+      return callback(new Error('Not allowed by CORS'));
+    }
+    // Allow requests with no origin in development (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.includes(origin)) {
@@ -52,21 +67,28 @@ app.use(cors({
 }));
 
 app.use(compression());
-app.use(morgan('dev'));
+app.use(requestIdMiddleware as any);
+app.use(httpLogger as any);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(mongoSanitize());
+app.use(globalLimiter);
 
-// Health check endpoint - Enhanced for production monitoring
+// Liveness probe - instant response
+app.get('/ping', (_req, res) => {
+  res.json({ status: 'alive' });
+});
+
+// Readiness probe - checks if DB is initialized
 app.get('/health', async (_req, res) => {
   try {
-    // Check database connectivity
-    const usersContainer = await cosmosDBService.getUsersContainer();
-    await usersContainer.findOne({}, { projection: { _id: 1 } });
+   // Simple check: just verify DB service is initialized
+    const isInitialized = cosmosDBService.usersContainer !== null;
     
-    res.status(200).json({ 
-      status: 'healthy', 
+    res.status(isInitialized ? 200 : 503).json({ 
+      status: isInitialized ? 'healthy' : 'unhealthy', 
       timestamp: new Date().toISOString(),
-      database: 'connected',
+      database: isInitialized ? 'initialized' : 'not initialized',
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development'
     });
@@ -74,20 +96,15 @@ app.get('/health', async (_req, res) => {
     res.status(503).json({ 
       status: 'unhealthy', 
       timestamp: new Date().toISOString(),
-      database: 'disconnected',
-      error: 'Database connection failed'
+      database: 'error',
+      error: 'Health check failed'
     });
   }
 });
 
-// Simple liveness probe (no DB check)
-app.get('/ping', (_req, res) => {
-  res.status(200).send('pong');
-});
-
 // API Routes
 app.use('/api/config', configRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/budgets', budgetRoutes);
@@ -118,12 +135,12 @@ const startServer = async () => {
     
     // Start server
     app.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-      console.log(`✅ Cosmos DB connected and ready`);
+      logger.info(`🚀 Server is running on port ${PORT}`);
+      logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
+      logger.info(`✅ Cosmos DB connected and ready`);
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error({ error }, '❌ Failed to start server');
     process.exit(1);
   }
 };
