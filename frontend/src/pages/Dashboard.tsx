@@ -15,9 +15,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Menu,
-  TextField,
-  InputAdornment,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -27,19 +24,16 @@ import {
   Warning as WarningIcon,
   Add as AddIcon,
   Lightbulb as LightbulbIcon,
-  Repeat as RepeatIcon,
-  FilterList as FilterListIcon,
-  Close as CloseIcon,
-  Check as CheckIcon,
-  Search as SearchIcon,
   AccountBalance,
   CreditCard,
   Savings,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
+import { FilterBar, FilterValues } from '../components/FilterBar';
 import {
   LineChart,
   Line,
@@ -117,12 +111,6 @@ interface AccountBalance {
   currency: string;
 }
 
-interface Tag {
-  id: string;
-  name: string;
-  color?: string;
-}
-
 const Dashboard: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -137,71 +125,105 @@ const Dashboard: React.FC = () => {
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
 
-  // Tag filtering states
-  const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [includeTags, setIncludeTags] = useState<string[]>(['expense', 'income']); // Include by default
-  const [excludeTags, setExcludeTags] = useState<string[]>([]);
-  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
-  const [tagSearchQuery, setTagSearchQuery] = useState('');
+  // Filter states
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [tags, setTags] = useState<any[]>([]);
+  
+  const [filters, setFilters] = useState<FilterValues>({
+    dateRange: {
+      start: dayjs().startOf('month'),
+      end: dayjs().endOf('month'),
+      preset: 'thisMonth',
+    },
+    accounts: [],
+    categories: [],
+    tags: [],
+    transactionType: 'all',
+  });
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [includeTags, excludeTags]); // Re-fetch when filters change
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (accounts.length > 0 && categories.length > 0 && tags.length > 0) {
+      fetchDashboardData();
+    }
+  }, [filters]);
+
+  const fetchInitialData = async () => {
+    try {
+      const [accountsRes, categoriesRes, tagsRes] = await Promise.all([
+        axios.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/tags', { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      setAccounts(accountsRes.data.accounts || []);
+      setCategories(categoriesRes.data.categories || []);
+      setTags(tagsRes.data.tags || []);
+    } catch (err) {
+      console.error('Failed to fetch initial data:', err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const params = new URLSearchParams({
-        startDate: startOfMonth.toISOString().split('T')[0],
-        endDate: now.toISOString().split('T')[0],
+      const startDate = filters.dateRange.start.toISOString();
+      const endDate = filters.dateRange.end.toISOString();
+      
+      // Build query params for transactions API
+      const txnParams = new URLSearchParams({
+        startDate,
+        endDate,
+        sortBy: 'date',
+        sortOrder: 'desc',
       });
+      
+      // Add account filters if specified
+      if (filters.accounts.length > 0) {
+        filters.accounts.forEach(accountId => txnParams.append('accountIds', accountId));
+      }
 
-      const [overviewRes, transactionsRes, budgetsRes, accountsRes, tagsRes] = await Promise.all([
-        axios.get(`/api/analytics/overview?${params}`, {
+      const [transactionsRes, budgetsRes, accountsRes] = await Promise.all([
+        axios.get(`/api/transactions?${txnParams}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(
-          `/api/transactions?sortBy=date&sortOrder=desc&startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        ),
         axios.get(`/api/budgets`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`/api/accounts`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`/api/tags`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
       ]);
 
-      // Store all tags
-      const tags = tagsRes.data.tags || [];
-      setAllTags(tags);
-
-      const overview = overviewRes.data.overview;
       let transactions = transactionsRes.data.transactions || [];
 
-      // Apply tag filtering
+      // Apply client-side filtering for categories and tags
       transactions = transactions.filter((t: any) => {
-        const txnTags = t.tags || [];
-
-        // If include tags specified, transaction must have at least one
-        if (includeTags.length > 0) {
-          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
-          if (!hasIncluded) return false;
+        // Filter by transaction type
+        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
+          return false;
         }
-
-        // If exclude tags specified, transaction must not have any
-        if (excludeTags.length > 0) {
-          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
-          if (hasExcluded) return false;
+        
+        // Filter by categories (check splits)
+        if (filters.categories.length > 0) {
+          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
+          const hasMatchingCategory = txnCategories.some((catId: string) => 
+            filters.categories.includes(catId)
+          );
+          if (!hasMatchingCategory) return false;
         }
-
+        
+        // Filter by tags
+        if (filters.tags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasMatchingTag = txnTags.some((tag: string) => filters.tags.includes(tag));
+          if (!hasMatchingTag) return false;
+        }
+        
         return true;
       });
 
@@ -211,75 +233,86 @@ const Dashboard: React.FC = () => {
       const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const netSavings = totalIncome - totalSpent;
 
-      // Get last month data for comparison
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      const lastMonthRes = await axios.get(
-        `/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
+      // Calculate previous period for comparison (same duration as current period)
+      const currentStart = filters.dateRange.start.toDate();
+      const currentEnd = filters.dateRange.end.toDate();
+      const periodDuration = currentEnd.getTime() - currentStart.getTime();
+      const prevEnd = new Date(currentStart.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - periodDuration);
+      
+      const prevParams = new URLSearchParams({
+        startDate: prevStart.toISOString(),
+        endDate: prevEnd.toISOString(),
+      });
+      if (filters.accounts.length > 0) {
+        filters.accounts.forEach(accountId => prevParams.append('accountIds', accountId));
+      }
+      
+      const prevRes = await axios.get(`/api/transactions?${prevParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      let prevTransactions = prevRes.data.transactions || [];
+
+      // Apply same client-side filtering to previous period
+      prevTransactions = prevTransactions.filter((t: any) => {
+        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
+          return false;
         }
-      );
-      let lastMonthTxns = lastMonthRes.data.transactions || [];
-
-      // Apply tag filtering to last month data
-      lastMonthTxns = lastMonthTxns.filter((t: any) => {
-        const txnTags = t.tags || [];
-
-        if (includeTags.length > 0) {
-          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
-          if (!hasIncluded) return false;
+        if (filters.categories.length > 0) {
+          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
+          const hasMatchingCategory = txnCategories.some((catId: string) => 
+            filters.categories.includes(catId)
+          );
+          if (!hasMatchingCategory) return false;
         }
-
-        if (excludeTags.length > 0) {
-          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
-          if (hasExcluded) return false;
+        if (filters.tags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasMatchingTag = txnTags.some((tag: string) => filters.tags.includes(tag));
+          if (!hasMatchingTag) return false;
         }
-
         return true;
       });
 
-      const lastMonthSpent = lastMonthTxns
+      const prevSpent = prevTransactions
         .filter((t: any) => t.type === 'debit')
         .reduce((sum: number, t: any) => sum + t.amount, 0);
-      const lastMonthIncome = lastMonthTxns
+      const prevIncome = prevTransactions
         .filter((t: any) => t.type === 'credit')
         .reduce((sum: number, t: any) => sum + t.amount, 0);
 
-      // Calculate percentage changes for stat cards
+      // Calculate percentage changes
       let spentChange = 0;
-      if (lastMonthSpent > 0) {
-        spentChange = Math.round(((totalSpent - lastMonthSpent) / lastMonthSpent) * 100);
+      if (prevSpent > 0) {
+        spentChange = Math.round(((totalSpent - prevSpent) / prevSpent) * 100);
       } else if (totalSpent > 0) {
         spentChange = 100;
       }
 
       let incomeChange = 0;
-      if (lastMonthIncome > 0) {
-        incomeChange = Math.round(((totalIncome - lastMonthIncome) / lastMonthIncome) * 100);
+      if (prevIncome > 0) {
+        incomeChange = Math.round(((totalIncome - prevIncome) / prevIncome) * 100);
       } else if (totalIncome > 0) {
         incomeChange = 100;
       }
+      
+      // Calculate days in current period for average daily spending
+      const daysInPeriod = Math.ceil(periodDuration / (1000 * 60 * 60 * 24)) || 1;
 
       setStats({
         totalSpent,
         monthSpent: totalSpent,
         monthIncome: totalIncome,
         netSavings,
-        budgetLeft: overview.totalBudget - totalSpent,
+        budgetLeft: 0, // Will be calculated from budgets
         categoryCount: new Set(debits.map((t: any) => t.categoryId)).size,
         expenseCount: debits.length,
         incomeCount: credits.length,
-        avgDailySpending: totalSpent / new Date().getDate(),
+        avgDailySpending: totalSpent / daysInPeriod,
         percentChange: spentChange,
         incomePercentChange: incomeChange,
       });
 
       // Process recent transactions (both credits and debits)
-      const categoriesRes = await axios.get(`/api/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const categories = categoriesRes.data.categories || [];
       const categoryMap = new Map<string, { name: string; color: string }>(
         categories.map((c: any) => [c.id, { name: c.name, color: c.color }])
       );
@@ -299,17 +332,15 @@ const Dashboard: React.FC = () => {
         })
       );
 
-      // Process budget status (should use unfiltered transactions)
+      // Process budget status
       const budgets = budgetsRes.data.budgets || [];
       const budgetStatuses: BudgetStatus[] = [];
-
-      // Use unfiltered transactions for budget calculation
-      const allMonthTransactions = transactionsRes.data.transactions || [];
-      const unfilteredDebits = allMonthTransactions.filter((t: any) => t.type === 'debit');
+      let totalBudget = 0;
 
       for (const budget of budgets) {
+        totalBudget += budget.amount;
         const category = categoryMap.get(budget.categoryId);
-        const categoryDebits = unfilteredDebits.filter(
+        const categoryDebits = debits.filter(
           (t: any) => t.categoryId === budget.categoryId
         );
         const spent = categoryDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
@@ -325,6 +356,9 @@ const Dashboard: React.FC = () => {
           isOver: spent > budget.amount,
         });
       }
+      
+      // Update budget left in stats
+      setStats(prev => prev ? { ...prev, budgetLeft: totalBudget - totalSpent } : null);
 
       setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
 
@@ -341,33 +375,43 @@ const Dashboard: React.FC = () => {
       );
 
       // Calculate spending trends (last 6 months)
+      const now = new Date();
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const trendParams = new URLSearchParams({
+        startDate: sixMonthsAgo.toISOString(),
+        endDate: now.toISOString(),
+      });
+      if (filters.accounts.length > 0) {
+        filters.accounts.forEach(accountId => trendParams.append('accountIds', accountId));
+      }
 
       const trendsRes = await axios.get(
-        `/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`,
+        `/api/transactions?${trendParams}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       let allTransactions = trendsRes.data.transactions || [];
 
-      // Apply tag filtering to spending trends
+      // Apply same client-side filtering
       allTransactions = allTransactions.filter((t: any) => {
-        const txnTags = t.tags || [];
-
-        // If include tags specified, transaction must have at least one
-        if (includeTags.length > 0) {
-          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
-          if (!hasIncluded) return false;
+        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
+          return false;
         }
-
-        // If exclude tags specified, transaction must not have any
-        if (excludeTags.length > 0) {
-          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
-          if (hasExcluded) return false;
+        if (filters.categories.length > 0) {
+          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
+          const hasMatchingCategory = txnCategories.some((catId: string) => 
+            filters.categories.includes(catId)
+          );
+          if (!hasMatchingCategory) return false;
         }
-
+        if (filters.tags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasMatchingTag = txnTags.some((tag: string) => filters.tags.includes(tag));
+          if (!hasMatchingTag) return false;
+        }
         return true;
       });
 
@@ -518,44 +562,7 @@ const Dashboard: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const handleClearFilters = () => {
-    setIncludeTags([]);
-    setExcludeTags([]);
-  };
 
-  const handleToggleIncludeTag = (tagName: string) => {
-    const isIncluded = includeTags.includes(tagName);
-    const isExcluded = excludeTags.includes(tagName);
-
-    // If already included, remove it (go to neutral)
-    if (isIncluded) {
-      setIncludeTags((prev) => prev.filter((t) => t !== tagName));
-    } else {
-      // If excluded, remove from excluded first
-      if (isExcluded) {
-        setExcludeTags((prev) => prev.filter((t) => t !== tagName));
-      }
-      // Add to included
-      setIncludeTags((prev) => [...prev, tagName]);
-    }
-  };
-
-  const handleToggleExcludeTag = (tagName: string) => {
-    const isIncluded = includeTags.includes(tagName);
-    const isExcluded = excludeTags.includes(tagName);
-
-    // If already excluded, remove it (go to neutral)
-    if (isExcluded) {
-      setExcludeTags((prev) => prev.filter((t) => t !== tagName));
-    } else {
-      // If included, remove from included first
-      if (isIncluded) {
-        setIncludeTags((prev) => prev.filter((t) => t !== tagName));
-      }
-      // Add to excluded
-      setExcludeTags((prev) => [...prev, tagName]);
-    }
-  };
 
   if (loading) {
     return (
@@ -624,169 +631,6 @@ const Dashboard: React.FC = () => {
         </Box>
         <Box display="flex" gap={2}>
           <Button
-            variant="outlined"
-            startIcon={<FilterListIcon />}
-            onClick={(e) => setFilterMenuAnchor(e.currentTarget)}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-              ...((includeTags.length > 0 || excludeTags.length > 0) && {
-                borderColor: 'primary.main',
-                bgcolor: 'primary.main',
-                color: 'white',
-                '&:hover': {
-                  borderColor: 'primary.dark',
-                  bgcolor: 'primary.dark',
-                },
-              }),
-            }}
-          >
-            Filter by Tags
-          </Button>
-          <Menu
-            anchorEl={filterMenuAnchor}
-            open={Boolean(filterMenuAnchor)}
-            onClose={() => {
-              setFilterMenuAnchor(null);
-              setTagSearchQuery('');
-            }}
-            PaperProps={{
-              sx: {
-                mt: 1,
-                minWidth: 280,
-                maxHeight: 500,
-                borderRadius: 2,
-              },
-            }}
-          >
-            <Box sx={{ p: 2, pb: 1 }}>
-              <Typography variant="subtitle2" fontWeight={600} mb={1.5}>
-                Filter transactions by tags
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search tags..."
-                value={tagSearchQuery}
-                onChange={(e) => setTagSearchQuery(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 1.5 }}
-              />
-            </Box>
-            <Box sx={{ maxHeight: 300, overflowY: 'auto', px: 2, pb: 2 }}>
-              <Box display="flex" flexDirection="column" gap={1}>
-                {allTags
-                  .filter((tag) => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()))
-                  .map((tag) => {
-                    const isIncluded = includeTags.includes(tag.name);
-                    const isExcluded = excludeTags.includes(tag.name);
-                    const chipColor = isIncluded ? 'success' : isExcluded ? 'error' : 'default';
-
-                    return (
-                      <Chip
-                        key={tag.id}
-                        label={tag.name}
-                        size="small"
-                        color={chipColor}
-                        variant={isIncluded || isExcluded ? 'filled' : 'outlined'}
-                        sx={{
-                          justifyContent: 'space-between',
-                          bgcolor: isIncluded
-                            ? 'success.main'
-                            : isExcluded
-                              ? 'error.main'
-                              : undefined,
-                          borderColor: undefined,
-                          color: isIncluded || isExcluded ? 'white' : undefined,
-                          pr: 0.5,
-                        }}
-                        deleteIcon={
-                          <Box display="flex" gap={0.25} alignItems="center">
-                            <Box
-                              component="span"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleIncludeTag(tag.name);
-                              }}
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 20,
-                                height: 20,
-                                borderRadius: '50%',
-                                cursor: 'pointer',
-                                bgcolor: isIncluded ? 'rgba(255,255,255,0.3)' : 'transparent',
-                                '&:hover': {
-                                  bgcolor: isIncluded ? 'rgba(255,255,255,0.4)' : 'success.light',
-                                },
-                              }}
-                            >
-                              <CheckIcon
-                                sx={{ fontSize: 16, color: isIncluded ? 'white' : 'inherit' }}
-                              />
-                            </Box>
-                            <Box
-                              component="span"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleExcludeTag(tag.name);
-                              }}
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 20,
-                                height: 20,
-                                borderRadius: '50%',
-                                cursor: 'pointer',
-                                bgcolor: isExcluded ? 'rgba(255,255,255,0.3)' : 'transparent',
-                                '&:hover': {
-                                  bgcolor: isExcluded ? 'rgba(255,255,255,0.4)' : 'error.light',
-                                },
-                              }}
-                            >
-                              <CloseIcon
-                                sx={{ fontSize: 16, color: isExcluded ? 'white' : 'inherit' }}
-                              />
-                            </Box>
-                          </Box>
-                        }
-                        onDelete={() => {}}
-                      />
-                    );
-                  })}
-                {allTags.filter((tag) =>
-                  tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase())
-                ).length === 0 && (
-                  <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
-                    {tagSearchQuery ? 'No tags match your search' : 'No tags available'}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-            {(includeTags.length > 0 || excludeTags.length > 0) && (
-              <Box sx={{ p: 2, pt: 0, borderTop: 1, borderColor: 'divider' }}>
-                <Button
-                  fullWidth
-                  size="small"
-                  onClick={handleClearFilters}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Clear All Filters
-                </Button>
-              </Box>
-            )}
-          </Menu>
-          <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => navigate('/transactions')}
@@ -825,6 +669,17 @@ const Dashboard: React.FC = () => {
             Analytics
           </Button>
         </Box>
+      </Box>
+
+      {/* FilterBar Component */}
+      <Box sx={{ mb: 3 }}>
+        <FilterBar
+          accounts={accounts}
+          categories={categories}
+          tags={tags}
+          filters={filters}
+          onFiltersChange={setFilters}
+        />
       </Box>
 
       {error && (
@@ -1502,7 +1357,7 @@ const Dashboard: React.FC = () => {
             }}
           >
             <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <RepeatIcon color="primary" />
+              <Receipt color="primary" />
               <Typography variant="h5" fontWeight={700}>
                 Upcoming Recurring
               </Typography>
