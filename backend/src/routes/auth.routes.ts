@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cosmosDBService } from '../config/cosmosdb';
 import { User } from '../models/types';
+import { validate, schemas } from '../middleware/validation';
+import { authenticate } from '../middleware/auth';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -20,37 +23,9 @@ interface LoginBody {
 }
 
 // POST /api/auth/register
-router.post('/register', async (req: Request<{}, {}, RegisterBody>, res: Response): Promise<void> => {
+router.post('/register', validate(schemas.register), async (req: Request<{}, {}, RegisterBody>, res: Response): Promise<void> => {
   try {
     const { email, password, firstName, lastName, currency } = req.body;
-
-    // Validate required fields
-    if (!email || !password || !firstName || !lastName || !currency) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'All fields are required' 
-      });
-      return;
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'Invalid email format' 
-      });
-      return;
-    }
-
-    // Validate password length
-    if (password.length < 6) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'Password must be at least 6 characters' 
-      });
-      return;
-    }
 
     const usersContainer = await cosmosDBService.getUsersContainer();
 
@@ -100,7 +75,7 @@ router.post('/register', async (req: Request<{}, {}, RegisterBody>, res: Respons
       user: userWithoutPassword
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error({ error }, 'Registration error');
     res.status(500).json({ 
       success: false, 
       message: 'Error registering user' 
@@ -109,18 +84,9 @@ router.post('/register', async (req: Request<{}, {}, RegisterBody>, res: Respons
 });
 
 // POST /api/auth/login
-router.post('/login', async (req: Request<{}, {}, LoginBody>, res: Response): Promise<void> => {
+router.post('/login', validate(schemas.login), async (req: Request<{}, {}, LoginBody>, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
-
-    // Validate required fields
-    if (!email || !password) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'Email and password are required' 
-      });
-      return;
-    }
 
     const usersContainer = await cosmosDBService.getUsersContainer();
 
@@ -155,6 +121,8 @@ router.post('/login', async (req: Request<{}, {}, LoginBody>, res: Response): Pr
     // Return user without password
     const { password: _, ...userWithoutPassword } = user;
 
+    logger.info(`User logged in successfully: ${user.email}`);
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -162,7 +130,7 @@ router.post('/login', async (req: Request<{}, {}, LoginBody>, res: Response): Pr
       user: userWithoutPassword
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error({ error }, 'Login error');
     res.status(500).json({ 
       success: false, 
       message: 'Error logging in' 
@@ -170,10 +138,34 @@ router.post('/login', async (req: Request<{}, {}, LoginBody>, res: Response): Pr
   }
 });
 
-// POST /api/auth/refresh
-router.post('/refresh', async (_req, res) => {
-  // TODO: Implement token refresh
-  res.json({ message: 'Refresh endpoint' });
+// POST /api/auth/refresh - Generate new JWT token
+router.post('/refresh', authenticate, async (req: any, res: Response): Promise<void> => {
+  try {
+    // User is already authenticated via middleware
+    const userId = req.userId;
+    const email = req.user?.email;
+
+    // Generate new JWT token
+    const token = jwt.sign(
+      { userId, email },
+      (process.env.JWT_SECRET as jwt.Secret),
+      { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
+    );
+
+    logger.info(`Token refreshed for user: ${email}`);
+
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      token
+    });
+  } catch (error) {
+    logger.error({ error }, 'Token refresh error');
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error refreshing token' 
+    });
+  }
 });
 
 export default router;
