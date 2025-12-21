@@ -13,17 +13,18 @@ on:
     - cron: '0 9 * * 1'
 
 jobs:
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Dependency Review
-      uses: actions/dependency-review-action@v4
+  # dependency-review:
+  #   name: Dependency Review
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'pull_request'
+  #   
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #   
+  #   - name: Dependency Review
+  #     uses: actions/dependency-review-action@v4
+  #     # Requires GitHub Advanced Security - disabled for now
 
   npm-audit:
     name: NPM Audit
