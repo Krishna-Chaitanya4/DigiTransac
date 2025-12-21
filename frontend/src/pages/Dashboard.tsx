@@ -378,39 +378,7 @@ const Dashboard: React.FC = () => {
         })
       );
 
-      // Process budget status
-      const budgets = budgetsRes.data.budgets || [];
-      const budgetStatuses: BudgetStatus[] = [];
-      let totalBudget = 0;
-
-      for (const budget of budgets) {
-        totalBudget += budget.amount;
-        const category = categoryMap.get(budget.categoryId);
-        const categoryDebits = debits.filter(
-          (t: any) => t.categoryId === budget.categoryId
-        );
-        const spent = categoryDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
-        const percentage = Math.round((spent / budget.amount) * 100);
-
-        budgetStatuses.push({
-          categoryName: category?.name || 'Unknown',
-          categoryId: budget.categoryId,
-          categoryColor: category?.color || '#667eea',
-          spent,
-          budget: budget.amount,
-          percentage,
-          isOver: spent > budget.amount,
-        });
-      }
-      
-      // Update budget left in stats
-      // Only calculate budget left if there are budgets configured
-      const budgetLeft = budgets.length > 0 ? totalBudget - totalSpent : 0;
-      setStats(prev => prev ? { ...prev, budgetLeft } : null);
-
-      setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
-
-      // Process account balances
+      // Process account balances first (needed for budget display)
       const accounts = accountsRes.data.accounts || [];
       setAccountBalances(
         accounts.map((acc: any) => ({
@@ -421,6 +389,75 @@ const Dashboard: React.FC = () => {
           currency: acc.currency || user?.currency || 'USD',
         }))
       );
+
+      // Process budget status
+      const budgets = budgetsRes.data.budgets || [];
+      const budgetStatuses: BudgetStatus[] = [];
+      let totalBudget = 0;
+
+      for (const budget of budgets) {
+        // Use effective budget (includes rollover)
+        const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
+        totalBudget += effectiveBudget;
+        
+        // Use spent amount calculated by backend (handles all budget types correctly)
+        const spent = budget.spent || 0;
+        const percentage = Math.round((spent / effectiveBudget) * 100);
+
+        // Get display name based on budget type
+        let displayName = 'Unknown';
+        let displayColor = '#667eea';
+        
+        if (budget.scopeType === 'category' && budget.categoryId) {
+          const category = categoryMap.get(budget.categoryId);
+          displayName = category?.name || 'Unknown Category';
+          displayColor = category?.color || '#667eea';
+        } else if (budget.scopeType === 'tag') {
+          // For tag budgets, show tag names
+          const includeTagNames = (budget.includeTagIds || [])
+            .map((id: string) => {
+              const tag = tags.find((t: any) => t.id === id);
+              return tag?.name || id;
+            })
+            .join(', ');
+          const excludeTagNames = (budget.excludeTagIds || [])
+            .map((id: string) => {
+              const tag = tags.find((t: any) => t.id === id);
+              return tag?.name || id;
+            })
+            .join(', ');
+          
+          if (includeTagNames && excludeTagNames) {
+            displayName = `${includeTagNames} (excl: ${excludeTagNames})`;
+          } else if (includeTagNames) {
+            displayName = includeTagNames;
+          } else {
+            displayName = `Excl: ${excludeTagNames}`;
+          }
+          displayColor = '#ff6b6b';
+        } else if (budget.scopeType === 'account' && budget.accountId) {
+          const account = accounts.find((a: any) => a.id === budget.accountId);
+          displayName = account?.name || 'Unknown Account';
+          displayColor = account?.color || '#4caf50';
+        }
+
+        budgetStatuses.push({
+          categoryName: displayName,
+          categoryId: budget.categoryId || budget.accountId || 'tag-budget',
+          categoryColor: displayColor,
+          spent,
+          budget: effectiveBudget,
+          percentage,
+          isOver: spent > effectiveBudget,
+        });
+      }
+      
+      // Update budget left in stats
+      // Only calculate budget left if there are budgets configured
+      const budgetLeft = budgets.length > 0 ? totalBudget - totalSpent : 0;
+      setStats(prev => prev ? { ...prev, budgetLeft } : null);
+
+      setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
 
       // Calculate spending trends (last 6 months)
       const now = new Date();
