@@ -35,6 +35,7 @@ import {
   ExpandLess as ExpandLessIcon,
   UnfoldMore as UnfoldMoreIcon,
   UnfoldLess as UnfoldLessIcon,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -522,6 +523,77 @@ const Analytics: React.FC = () => {
     });
   };
 
+  // Export to CSV
+  const exportToCSV = () => {
+    if (!overview) return;
+
+    const rows: string[][] = [];
+    
+    // Overview section
+    rows.push(['Analytics Export']);
+    rows.push(['Period', `${filters.dateRange.start.format('YYYY-MM-DD')} to ${filters.dateRange.end.format('YYYY-MM-DD')}`]);
+    rows.push(['']);
+    rows.push(['Overview']);
+    rows.push(['Total Spent', overview.totalSpent.toString()]);
+    rows.push(['Total Budget', overview.totalBudget.toString()]);
+    rows.push(['Budget Used %', overview.budgetUsedPercent.toString()]);
+    rows.push(['Expense Count', overview.expenseCount.toString()]);
+    rows.push(['Average Expense', overview.avgExpense.toString()]);
+    if (overview.comparison) {
+      rows.push(['Previous Period Spent', overview.comparison.previousSpent.toString()]);
+      rows.push(['Change Amount', overview.comparison.changeAmount.toString()]);
+      rows.push(['Change %', overview.comparison.changePercent.toString()]);
+    }
+    rows.push(['']);
+
+    // Category Breakdown
+    rows.push(['Category Breakdown']);
+    rows.push(['Category', 'Amount', 'Count', 'Percentage']);
+    categoryBreakdown.forEach(cat => {
+      rows.push([cat.categoryName, cat.amount.toString(), cat.count.toString(), cat.percentage.toFixed(2) + '%']);
+    });
+    rows.push(['']);
+
+    // Budget Comparison
+    if (budgetComparison.length > 0) {
+      rows.push(['Budget Comparison']);
+      rows.push(['Category', 'Budget', 'Spent', 'Difference', 'Status']);
+      budgetComparison.forEach(budget => {
+        rows.push([
+          budget.categoryName,
+          budget.budgetAmount.toString(),
+          budget.actualSpent.toString(),
+          budget.difference.toString(),
+          budget.isOverBudget ? 'Over Budget' : 'On Track'
+        ]);
+      });
+      rows.push(['']);
+    }
+
+    // Top Expenses
+    if (topExpenses.length > 0) {
+      rows.push(['Top Expenses']);
+      rows.push(['Description', 'Amount', 'Category', 'Date']);
+      topExpenses.slice(0, 20).forEach(exp => {
+        rows.push([exp.description, exp.amount.toString(), exp.categoryName, exp.date]);
+      });
+    }
+
+    // Convert to CSV string
+    const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `analytics_${filters.dateRange.start.format('YYYY-MM-DD')}_to_${filters.dateRange.end.format('YYYY-MM-DD')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Tree view helper functions
   const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => {
@@ -629,6 +701,14 @@ const Analytics: React.FC = () => {
           <Typography variant="h4" fontWeight={700}>
             📊 Analytics
           </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<FileDownloadIcon />}
+            onClick={exportToCSV}
+            disabled={!overview}
+          >
+            Export CSV
+          </Button>
         </Box>
 
         {error && (
@@ -1913,26 +1993,585 @@ const Analytics: React.FC = () => {
 
         {/* Tab 1: Trends & Patterns */}
         {currentTab === 1 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Spending Trends & Patterns
-            </Typography>
-            <Typography color="textSecondary">
-              Coming soon: Detailed trend analysis, day-of-week patterns, and seasonal insights
-            </Typography>
-          </Box>
+          <Grid container spacing={3}>
+            {/* Spending Trend Line Chart */}
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Typography variant="h6" fontWeight={600}>
+                      Spending Trend Over Time
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={trendGroupBy}
+                      exclusive
+                      onChange={(_, value) => value && setTrendGroupBy(value)}
+                      size="small"
+                    >
+                      <ToggleButton value="day">Daily</ToggleButton>
+                      <ToggleButton value="week">Weekly</ToggleButton>
+                      <ToggleButton value="month">Monthly</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+                  {trends.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={trends}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={(date) => formatDate(date)}
+                          style={{ fontSize: '12px' }}
+                        />
+                        <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                        <RechartsTooltip
+                          formatter={(value: any) => [formatCurrency(value), 'Amount']}
+                          labelFormatter={(label) => formatDate(label)}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="amount"
+                          stroke="#667eea"
+                          strokeWidth={2}
+                          dot={{ fill: '#667eea', r: 4 }}
+                          name="Spending"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Box textAlign="center" py={6}>
+                      <Typography color="textSecondary">No trend data available</Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Day of Week Analysis */}
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} mb={2}>
+                    Spending by Day of Week
+                  </Typography>
+                  {(() => {
+                    // Calculate day of week spending
+                    const dayOfWeekData = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                      (day, index) => {
+                        const dayTransactions = topExpenses.filter((exp) => {
+                          const expDate = new Date(exp.date);
+                          return expDate.getDay() === index;
+                        });
+                        const total = dayTransactions.reduce((sum, exp) => sum + exp.amount, 0);
+                        return { day, amount: total, count: dayTransactions.length };
+                      }
+                    );
+
+                    return dayOfWeekData.some((d) => d.amount > 0) ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={dayOfWeekData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="day" />
+                          <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                          <RechartsTooltip
+                            formatter={(value: any) => [formatCurrency(value), 'Amount']}
+                          />
+                          <Bar dataKey="amount" fill="#667eea" radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Box textAlign="center" py={4}>
+                        <Typography color="textSecondary">
+                          Not enough data for day of week analysis
+                        </Typography>
+                      </Box>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Category Trend */}
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} mb={2}>
+                    Top Category Growth
+                  </Typography>
+                  {categoryBreakdown.length > 0 ? (
+                    <Box>
+                      {categoryBreakdown.slice(0, 5).map((cat, index) => (
+                        <Box
+                          key={cat.categoryId}
+                          mb={2}
+                          pb={index < 4 ? 2 : 0}
+                          borderBottom={index < 4 ? '1px solid' : 'none'}
+                          borderColor="divider"
+                        >
+                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Box
+                                width={12}
+                                height={12}
+                                borderRadius="50%"
+                                bgcolor={cat.categoryColor}
+                              />
+                              <Typography variant="body2" fontWeight={500}>
+                                {cat.categoryName}
+                              </Typography>
+                            </Box>
+                            <Typography variant="body2" fontWeight={700}>
+                              {formatCurrency(cat.amount)}
+                            </Typography>
+                          </Box>
+                          <Box mt={1}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={cat.percentage}
+                              sx={{
+                                height: 6,
+                                borderRadius: 3,
+                                '& .MuiLinearProgress-bar': {
+                                  backgroundColor: cat.categoryColor,
+                                },
+                              }}
+                            />
+                            <Typography variant="caption" color="textSecondary" mt={0.5}>
+                              {cat.percentage.toFixed(1)}% of total · {cat.count} transactions
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Box textAlign="center" py={4}>
+                      <Typography color="textSecondary">No category data available</Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Average Daily Spending */}
+            <Grid item xs={12} md={4}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" variant="body2" mb={1}>
+                    Average Daily Spending
+                  </Typography>
+                  <Typography variant="h4" fontWeight={700} color="primary">
+                    {overview
+                      ? formatCurrency(
+                          overview.totalSpent /
+                            Math.max(
+                              1,
+                              filters.dateRange.end.diff(filters.dateRange.start, 'days') + 1
+                            )
+                        )
+                      : formatCurrency(0)}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary" mt={1}>
+                    Based on {filters.dateRange.end.diff(filters.dateRange.start, 'days') + 1} days
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Highest Spending Day */}
+            <Grid item xs={12} md={4}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" variant="body2" mb={1}>
+                    Highest Spending Day
+                  </Typography>
+                  {trends.length > 0 ? (
+                    <>
+                      <Typography variant="h4" fontWeight={700} color="error">
+                        {formatCurrency(Math.max(...trends.map((t) => t.amount)))}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary" mt={1}>
+                        {formatDate(
+                          trends.find((t) => t.amount === Math.max(...trends.map((d) => d.amount)))
+                            ?.date || ''
+                        )}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      No data
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Most Active Category */}
+            <Grid item xs={12} md={4}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" variant="body2" mb={1}>
+                    Most Active Category
+                  </Typography>
+                  {categoryBreakdown.length > 0 ? (
+                    <>
+                      <Typography variant="h6" fontWeight={700} noWrap>
+                        {categoryBreakdown[0].categoryName}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary" mt={1}>
+                        {categoryBreakdown[0].count} transactions ·{' '}
+                        {categoryBreakdown[0].percentage.toFixed(1)}%
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      No data
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
         )}
 
         {/* Tab 2: Budgets & Goals */}
         {currentTab === 2 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Budget Performance & Goals
-            </Typography>
-            <Typography color="textSecondary">
-              Coming soon: Budget vs actual comparisons and goal tracking
-            </Typography>
-          </Box>
+          <Grid container spacing={3}>
+            {/* Budget Overview Summary */}
+            <Grid item xs={12}>
+              <Card
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                }}
+              >
+                <CardContent>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Total Budget
+                      </Typography>
+                      <Typography variant="h4" fontWeight={700}>
+                        {overview ? formatCurrency(overview.totalBudget) : formatCurrency(0)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Total Spent
+                      </Typography>
+                      <Typography variant="h4" fontWeight={700}>
+                        {overview ? formatCurrency(overview.totalSpent) : formatCurrency(0)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Remaining
+                      </Typography>
+                      <Typography variant="h4" fontWeight={700}>
+                        {overview
+                          ? formatCurrency(overview.totalBudget - overview.totalSpent)
+                          : formatCurrency(0)}
+                      </Typography>
+                      <LinearProgress
+                        variant="determinate"
+                        value={overview ? Math.min(overview.budgetUsedPercent, 100) : 0}
+                        sx={{
+                          mt: 1,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: 'rgba(255,255,255,0.3)',
+                          '& .MuiLinearProgress-bar': {
+                            backgroundColor: 'white',
+                          },
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Budget vs Actual Comparison */}
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} mb={3}>
+                    Budget vs Actual by Category
+                  </Typography>
+                  {budgetComparison.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={400}>
+                      <BarChart
+                        data={budgetComparison}
+                        layout="horizontal"
+                        margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
+                        <YAxis type="category" dataKey="categoryName" width={90} />
+                        <RechartsTooltip
+                          formatter={(value: any) => [formatCurrency(value), '']}
+                          contentStyle={{ fontSize: '14px' }}
+                        />
+                        <Legend />
+                        <Bar
+                          dataKey="budgetAmount"
+                          fill="#90caf9"
+                          name="Budget"
+                          radius={[0, 4, 4, 0]}
+                        />
+                        <Bar dataKey="spent" fill="#667eea" name="Spent" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Box textAlign="center" py={6}>
+                      <Typography color="textSecondary">
+                        No budgets configured. Create budgets to see comparisons.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        sx={{ mt: 2 }}
+                        onClick={() => navigate('/budgets')}
+                      >
+                        Create Budget
+                      </Button>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Budget Status Cards */}
+            {budgetComparison.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="h6" fontWeight={600} mb={2}>
+                  Budget Status Details
+                </Typography>
+                <Grid container spacing={2}>
+                  {budgetComparison.map((budget) => {
+                    const percentUsed = budget.percentUsed;
+                    const isOverBudget = budget.isOverBudget;
+                    const isNearLimit = percentUsed > 80 && percentUsed <= 100;
+
+                    return (
+                      <Grid item xs={12} sm={6} md={4} key={budget.categoryId}>
+                        <Card
+                          sx={{
+                            borderLeft: '4px solid',
+                            borderColor: isOverBudget
+                              ? 'error.main'
+                              : isNearLimit
+                              ? 'warning.main'
+                              : 'success.main',
+                          }}
+                        >
+                          <CardContent>
+                            <Box display="flex" alignItems="center" gap={1} mb={1}>
+                              <Box
+                                width={12}
+                                height={12}
+                                borderRadius="50%"
+                                bgcolor={budget.categoryColor || '#667eea'}
+                              />
+                              <Typography variant="body2" fontWeight={600} noWrap>
+                                {budget.categoryName}
+                              </Typography>
+                            </Box>
+                            <Typography variant="h6" fontWeight={700}>
+                              {formatCurrency(budget.actualSpent)}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              of {formatCurrency(budget.budgetAmount)}
+                            </Typography>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.min(percentUsed, 100)}
+                              color={isOverBudget ? 'error' : isNearLimit ? 'warning' : 'success'}
+                              sx={{ mt: 1, mb: 1, height: 6, borderRadius: 3 }}
+                            />
+                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                              <Typography variant="caption" fontWeight={600}>
+                                {percentUsed.toFixed(1)}% used
+                              </Typography>
+                              {isOverBudget && (
+                                <Chip
+                                  label="Over Budget"
+                                  size="small"
+                                  color="error"
+                                  sx={{ height: 20 }}
+                                />
+                              )}
+                              {isNearLimit && !isOverBudget && (
+                                <Chip
+                                  label="Near Limit"
+                                  size="small"
+                                  color="warning"
+                                  sx={{ height: 20 }}
+                                />
+                              )}
+                            </Box>
+                            {budget.difference < 0 ? (
+                              <Typography variant="caption" color="error.main" mt={1}>
+                                Over by {formatCurrency(Math.abs(budget.difference))}
+                              </Typography>
+                            ) : (
+                              <Typography variant="caption" color="success.main" mt={1}>
+                                {formatCurrency(budget.difference)} remaining
+                              </Typography>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Grid>
+            )}
+
+            {/* Budget Performance Insights */}
+            {budgetComparison.length > 0 && (
+              <Grid item xs={12}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} mb={2}>
+                      Budget Performance Insights
+                    </Typography>
+                    <Grid container spacing={2}>
+                      {/* Categories Over Budget */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2}>
+                          <Typography variant="h3" fontWeight={700} color="error">
+                            {budgetComparison.filter((b) => b.isOverBudget).length}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            Over Budget
+                          </Typography>
+                        </Box>
+                      </Grid>
+
+                      {/* Categories On Track */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2}>
+                          <Typography variant="h3" fontWeight={700} color="success">
+                            {
+                              budgetComparison.filter(
+                                (b) => !b.isOverBudget && b.percentUsed >= 80
+                              ).length
+                            }
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            On Track
+                          </Typography>
+                        </Box>
+                      </Grid>
+
+                      {/* Categories Under Budget */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2}>
+                          <Typography variant="h3" fontWeight={700} color="primary">
+                            {budgetComparison.filter((b) => b.percentUsed < 80).length}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            Under Budget
+                          </Typography>
+                        </Box>
+                      </Grid>
+
+                      {/* Total Savings */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2}>
+                          <Typography variant="h3" fontWeight={700} color="success.main">
+                            {formatCurrency(
+                              budgetComparison
+                                .filter((b) => b.difference > 0)
+                                .reduce((sum, b) => sum + b.difference, 0)
+                            )}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            Total Savings
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Budget Forecast */}
+            {budgetComparison.length > 0 && overview && (
+              <Grid item xs={12}>
+                <Card>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
+                      <LightbulbIcon color="primary" />
+                      <Typography variant="h6" fontWeight={600}>
+                        Budget Forecast
+                      </Typography>
+                    </Box>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Based on your current spending rate, here's a projection for the rest of the
+                      period
+                    </Alert>
+                    <Grid container spacing={2}>
+                      {budgetComparison.slice(0, 3).map((budget) => {
+                        const daysInPeriod =
+                          filters.dateRange.end.diff(filters.dateRange.start, 'days') + 1;
+                        const daysElapsed =
+                          dayjs().diff(filters.dateRange.start, 'days') + 1;
+                        const daysRemaining = Math.max(0, daysInPeriod - daysElapsed);
+                        const dailyRate = budget.actualSpent / Math.max(1, daysElapsed);
+                        const projectedTotal = budget.actualSpent + dailyRate * daysRemaining;
+                        const willExceed = projectedTotal > budget.budgetAmount;
+
+                        return (
+                          <Grid item xs={12} md={4} key={budget.categoryId}>
+                            <Card variant="outlined">
+                              <CardContent>
+                                <Typography variant="body2" fontWeight={600} gutterBottom>
+                                  {budget.categoryName}
+                                </Typography>
+                                <Typography variant="caption" color="textSecondary">
+                                  Daily average: {formatCurrency(dailyRate)}
+                                </Typography>
+                                <Box mt={2}>
+                                  <Typography variant="body2" color="textSecondary">
+                                    Projected total:
+                                  </Typography>
+                                  <Typography
+                                    variant="h6"
+                                    fontWeight={700}
+                                    color={willExceed ? 'error' : 'success.main'}
+                                  >
+                                    {formatCurrency(projectedTotal)}
+                                  </Typography>
+                                  {willExceed ? (
+                                    <Chip
+                                      label={`May exceed by ${formatCurrency(
+                                        projectedTotal - budget.budgetAmount
+                                      )}`}
+                                      size="small"
+                                      color="error"
+                                      sx={{ mt: 1 }}
+                                    />
+                                  ) : (
+                                    <Chip
+                                      label="On track"
+                                      size="small"
+                                      color="success"
+                                      sx={{ mt: 1 }}
+                                    />
+                                  )}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
         )}
       </Box>
     </LocalizationProvider>

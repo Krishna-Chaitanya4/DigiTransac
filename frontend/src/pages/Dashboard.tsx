@@ -27,6 +27,7 @@ import {
   AccountBalance,
   CreditCard,
   Savings,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -124,6 +125,12 @@ const Dashboard: React.FC = () => {
   const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
+  const [smartInsights, setSmartInsights] = useState<{
+    highestCategory: string;
+    unusualSpending: boolean;
+    savingsTrend: 'improving' | 'declining' | 'stable';
+    budgetHealthScore: number;
+  } | null>(null);
 
   // Filter states
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -531,6 +538,23 @@ const Dashboard: React.FC = () => {
       }
       setAlerts(newAlerts);
 
+      // Generate Smart Insights
+      const insights = {
+        highestCategory: topCats.length > 0 ? topCats[0].name : 'N/A',
+        unusualSpending: Math.abs(spentChange) > 30,
+        savingsTrend:
+          netSavings > 0 && incomeChange > spentChange
+            ? ('improving' as const)
+            : netSavings < 0 || spentChange > incomeChange
+            ? ('declining' as const)
+            : ('stable' as const),
+        budgetHealthScore: Math.max(
+          0,
+          Math.min(100, 100 - (overBudget.length / Math.max(1, budgetStatuses.length)) * 100)
+        ),
+      };
+      setSmartInsights(insights);
+
       setError('');
     } catch (err: any) {
       console.error('Dashboard fetch error:', err);
@@ -562,6 +586,88 @@ const Dashboard: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const exportDashboardToCSV = () => {
+    if (!stats) return;
+
+    const rows: string[][] = [];
+    
+    // Header
+    rows.push(['Dashboard Export']);
+    rows.push(['Period', `${filters.dateRange.start.format('YYYY-MM-DD')} to ${filters.dateRange.end.format('YYYY-MM-DD')}`]);
+    rows.push(['']);
+    
+    // Stats Summary
+    rows.push(['Summary Statistics']);
+    rows.push(['Month Spent', stats.monthSpent.toString()]);
+    rows.push(['Month Income', stats.monthIncome.toString()]);
+    rows.push(['Net Savings', stats.netSavings.toString()]);
+    rows.push(['Budget Left', stats.budgetLeft.toString()]);
+    rows.push(['Expense Count', stats.expenseCount.toString()]);
+    rows.push(['Income Count', stats.incomeCount.toString()]);
+    rows.push(['Average Daily Spending', stats.avgDailySpending.toFixed(2)]);
+    rows.push(['Spending Change %', stats.percentChange.toString()]);
+    rows.push(['Income Change %', stats.incomePercentChange.toString()]);
+    rows.push(['']);
+
+    // Recent Transactions
+    if (recentTransactions.length > 0) {
+      rows.push(['Recent Transactions']);
+      rows.push(['Date', 'Description', 'Category', 'Type', 'Amount']);
+      recentTransactions.forEach(txn => {
+        rows.push([txn.date, txn.description, txn.categoryName, txn.type, txn.amount.toString()]);
+      });
+      rows.push(['']);
+    }
+
+    // Budget Status
+    if (budgetStatus.length > 0) {
+      rows.push(['Budget Status']);
+      rows.push(['Category', 'Budget', 'Spent', 'Percentage', 'Status']);
+      budgetStatus.forEach(budget => {
+        rows.push([
+          budget.categoryName,
+          budget.budget.toString(),
+          budget.spent.toString(),
+          budget.percentage.toString() + '%',
+          budget.isOver ? 'Over Budget' : 'On Track'
+        ]);
+      });
+      rows.push(['']);
+    }
+
+    // Top Categories
+    if (topCategories.length > 0) {
+      rows.push(['Top Spending Categories']);
+      rows.push(['Category', 'Amount']);
+      topCategories.forEach(cat => {
+        rows.push([cat.name, cat.value.toString()]);
+      });
+      rows.push(['']);
+    }
+
+    // Account Balances
+    if (accountBalances.length > 0) {
+      rows.push(['Account Balances']);
+      rows.push(['Account', 'Type', 'Balance', 'Currency']);
+      accountBalances.forEach(acc => {
+        rows.push([acc.name, acc.accountType, acc.balance.toString(), acc.currency]);
+      });
+    }
+
+    // Convert to CSV
+    const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `dashboard_${filters.dateRange.start.format('YYYY-MM-DD')}_to_${filters.dateRange.end.format('YYYY-MM-DD')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
 
   if (loading) {
@@ -630,6 +736,20 @@ const Dashboard: React.FC = () => {
           </Typography>
         </Box>
         <Box display="flex" gap={2}>
+          <Button
+            variant="outlined"
+            startIcon={<FileDownloadIcon />}
+            onClick={exportDashboardToCSV}
+            disabled={!stats}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 2,
+              py: 1.5,
+            }}
+          >
+            Export
+          </Button>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -702,6 +822,154 @@ const Dashboard: React.FC = () => {
             </Alert>
           ))}
         </Box>
+      )}
+
+      {/* Smart Insights */}
+      {smartInsights && (
+        <Grid container spacing={2} mb={3}>
+          <Grid item xs={12}>
+            <Card
+              sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                borderRadius: 3,
+              }}
+            >
+              <CardContent>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <LightbulbIcon sx={{ fontSize: 28 }} />
+                  <Typography variant="h6" fontWeight={700}>
+                    Smart Insights
+                  </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  {/* Budget Health Score */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box
+                      sx={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        borderRadius: 2,
+                        p: 2,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                        Budget Health Score
+                      </Typography>
+                      <Box display="flex" alignItems="baseline" gap={1}>
+                        <Typography variant="h3" fontWeight={700}>
+                          {Math.round(smartInsights.budgetHealthScore)}
+                        </Typography>
+                        <Typography variant="h6">/100</Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
+                        {smartInsights.budgetHealthScore >= 80
+                          ? 'Excellent budget management'
+                          : smartInsights.budgetHealthScore >= 60
+                          ? 'Good budget control'
+                          : smartInsights.budgetHealthScore >= 40
+                          ? 'Needs attention'
+                          : 'Critical - Review budgets'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  {/* Top Spending Category */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box
+                      sx={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        borderRadius: 2,
+                        p: 2,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                        Top Spending Category
+                      </Typography>
+                      <Typography variant="h6" fontWeight={700} noWrap>
+                        {smartInsights.highestCategory}
+                      </Typography>
+                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
+                        Largest expense driver
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  {/* Spending Pattern */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box
+                      sx={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        borderRadius: 2,
+                        p: 2,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                        Spending Pattern
+                      </Typography>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        {smartInsights.unusualSpending ? (
+                          <>
+                            <WarningIcon />
+                            <Typography variant="h6" fontWeight={700}>
+                              Unusual
+                            </Typography>
+                          </>
+                        ) : (
+                          <>
+                            <Typography variant="h6" fontWeight={700}>
+                              Normal
+                            </Typography>
+                          </>
+                        )}
+                      </Box>
+                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
+                        {smartInsights.unusualSpending
+                          ? 'Spending significantly differs'
+                          : 'Consistent with previous period'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  {/* Savings Trend */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box
+                      sx={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        borderRadius: 2,
+                        p: 2,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                        Savings Trend
+                      </Typography>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        {smartInsights.savingsTrend === 'improving' ? (
+                          <TrendingUp sx={{ fontSize: 28 }} />
+                        ) : smartInsights.savingsTrend === 'declining' ? (
+                          <TrendingDown sx={{ fontSize: 28 }} />
+                        ) : null}
+                        <Typography variant="h6" fontWeight={700}>
+                          {smartInsights.savingsTrend === 'improving'
+                            ? 'Improving'
+                            : smartInsights.savingsTrend === 'declining'
+                            ? 'Declining'
+                            : 'Stable'}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
+                        {smartInsights.savingsTrend === 'improving'
+                          ? 'Great job saving money!'
+                          : smartInsights.savingsTrend === 'declining'
+                          ? 'Consider reducing expenses'
+                          : 'Maintaining current level'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       )}
 
       {/* Stats Cards */}
