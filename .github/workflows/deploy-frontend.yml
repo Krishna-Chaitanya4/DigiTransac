@@ -1,0 +1,80 @@
+name: Deploy Frontend to Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  REGISTRY: herdswebsiteacr.azurecr.io
+  IMAGE_NAME: digitransac-frontend
+  RESOURCE_GROUP: rg-digitransac
+  CONTAINER_APP: digitransac-frontend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Get version from VERSION file
+      id: version
+      run: |
+        VERSION=$(cat frontend/VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Deploying version: $VERSION"
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Log in to Azure Container Registry
+      run: |
+        az acr login --name herdswebsiteacr
+    
+    - name: Build and push Docker image
+      run: |
+        cd frontend
+        VERSION=${{ steps.version.outputs.VERSION }}
+        docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                     -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${VERSION} \
+                     -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${VERSION}
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+    
+    - name: Deploy to Azure Container App
+      run: |
+        az containerapp update \
+          --name ${{ env.CONTAINER_APP }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ steps.version.outputs.VERSION }}
+    
+    - name: Wait for deployment to complete
+      run: sleep 30
+    
+    - name: Check deployment logs
+      run: |
+        az containerapp logs show \
+          --name ${{ env.CONTAINER_APP }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --tail 50
+    
+    - name: Create deployment summary
+      run: |
+        echo "## 🚀 Frontend Deployment Successful" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version:** v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Container App:** ${{ env.CONTAINER_APP }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **URLs:**" >> $GITHUB_STEP_SUMMARY
+        echo "  - https://digitransac.com" >> $GITHUB_STEP_SUMMARY
+        echo "  - https://www.digitransac.com" >> $GITHUB_STEP_SUMMARY

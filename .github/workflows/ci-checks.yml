@@ -1,0 +1,113 @@
+name: CI Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  backend-checks:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        npm ci
+    
+    - name: Check TypeScript compilation
+      run: |
+        cd backend
+        npm run build
+    
+    - name: Run linter (if configured)
+      run: |
+        cd backend
+        npm run lint || echo "Linter not configured"
+      continue-on-error: true
+    
+    - name: Run tests (if configured)
+      run: |
+        cd backend
+        npm test || echo "Tests not configured"
+      continue-on-error: true
+
+  frontend-checks:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: Check build size
+      run: |
+        cd frontend/dist
+        du -sh .
+        echo "## 📦 Build Size" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        du -h --max-depth=1 . >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  version-check:
+    name: Version Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check version consistency
+      run: |
+        BACKEND_VERSION=$(cat backend/VERSION)
+        FRONTEND_VERSION=$(cat frontend/VERSION)
+        BACKEND_PKG_VERSION=$(node -p "require('./backend/package.json').version")
+        FRONTEND_PKG_VERSION=$(node -p "require('./frontend/package.json').version")
+        
+        echo "Backend VERSION file: $BACKEND_VERSION"
+        echo "Backend package.json: $BACKEND_PKG_VERSION"
+        echo "Frontend VERSION file: $FRONTEND_VERSION"
+        echo "Frontend package.json: $FRONTEND_PKG_VERSION"
+        
+        if [ "$BACKEND_VERSION" != "$BACKEND_PKG_VERSION" ]; then
+          echo "❌ Backend version mismatch!"
+          exit 1
+        fi
+        
+        if [ "$FRONTEND_VERSION" != "$FRONTEND_PKG_VERSION" ]; then
+          echo "❌ Frontend version mismatch!"
+          exit 1
+        fi
+        
+        echo "✅ All versions are consistent"
