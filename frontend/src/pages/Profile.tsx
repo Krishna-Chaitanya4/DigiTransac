@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -12,20 +12,15 @@ import {
   Grid,
   Divider,
   Chip,
-  IconButton,
-  Tooltip,
 } from '@mui/material';
 import {
   Email as EmailIcon,
   CheckCircle as CheckCircleIcon,
   Google as GoogleIcon,
-  Link as LinkIcon,
   LinkOff as LinkOffIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const Profile: React.FC = () => {
   const { user, token } = useAuth();
@@ -60,7 +55,7 @@ const Profile: React.FC = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users/profile`, {
+      const response = await axios.get(`/api/users/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -77,7 +72,7 @@ const Profile: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const response = await axios.get(`${API_URL}/api/gmail/connect`, {
+      const response = await axios.get(`/api/gmail/connect`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -113,7 +108,7 @@ const Profile: React.FC = () => {
       setError('');
 
       await axios.post(
-        `${API_URL}/api/gmail/disconnect`,
+        `/api/gmail/disconnect`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -133,7 +128,7 @@ const Profile: React.FC = () => {
       setError('');
 
       await axios.put(
-        `${API_URL}/api/users/profile`,
+        `/api/users/profile`,
         {
           emailIntegration: {
             ...emailIntegration,

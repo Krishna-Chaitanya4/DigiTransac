@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: expense-tracker-backend
+    container_name: digitransac-backend
     ports:
       - "5000:5000"
     environment:
@@ -21,14 +21,14 @@ services:
       - ./backend/src:/app/src
       - /app/node_modules
     networks:
-      - expense-tracker-network
+      - digitransac-network
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: expense-tracker-frontend
+    container_name: digitransac-frontend
     ports:
       - "3000:80"
     depends_on:
@@ -36,11 +36,11 @@ services:
     environment:
       - VITE_API_URL=http://localhost:5000/api
     networks:
-      - expense-tracker-network
+      - digitransac-network
     restart: unless-stopped
 
 networks:
-  expense-tracker-network:
+  digitransac-network:
     driver: bridge
 
 volumes:

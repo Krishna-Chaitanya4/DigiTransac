@@ -17,7 +17,6 @@ import {
   Collapse,
   List,
   ListItemButton,
-  ListItemText,
   LinearProgress,
   Button,
 } from '@mui/material';
@@ -29,8 +28,6 @@ import {
   RestartAlt as RestartAltIcon,
   Warning as WarningIcon,
   Lightbulb as LightbulbIcon,
-  CheckCircle as CheckCircleIcon,
-  Pending as PendingIcon,
   Folder as FolderIcon,
   Category as CategoryIcon,
   ExpandMore as ExpandMoreIcon,
@@ -60,8 +57,7 @@ import {
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 
 interface Overview {
   totalSpent: number;
@@ -113,10 +109,35 @@ interface TopExpense {
   categoryColor: string;
 }
 
-interface PaymentMethodBreakdown {
-  paymentMethodId: string;
-  paymentMethodName: string;
-  paymentMethodType: string;
+interface AccountBreakdown {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  credits: number;
+  debits: number;
+  netFlow: number;
+  balance: number;
+  transactionCount: number;
+}
+
+interface RecurringInsights {
+  totalRecurringTemplates: number;
+  monthlyRecurringCost: number;
+  upcomingThisMonth: number;
+  recurringVsOneTime: {
+    recurringAmount: number;
+    oneTimeAmount: number;
+    recurringPercentage: number;
+  };
+  byFrequency: Array<{
+    frequency: string;
+    count: number;
+    totalAmount: number;
+  }>;
+}
+
+interface TagBreakdown {
+  tag: string;
   amount: number;
   count: number;
   percentage: number;
@@ -175,20 +196,6 @@ interface SmartInsights {
   };
 }
 
-interface ReviewQueueStats {
-  pending: number;
-  approved: number;
-  rejected: number;
-  approvalRate: number;
-  pendingExpenses: Array<{
-    id: string;
-    description: string;
-    amount: number;
-    date: string;
-    daysSinceParsed: number;
-  }>;
-}
-
 const Analytics: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -205,10 +212,11 @@ const Analytics: React.FC = () => {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [budgetComparison, setBudgetComparison] = useState<BudgetComparison[]>([]);
   const [topExpenses, setTopExpenses] = useState<TopExpense[]>([]);
-  const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<PaymentMethodBreakdown[]>([]);
+  const [accountBreakdown, setAccountBreakdown] = useState<AccountBreakdown[]>([]);
+  const [recurringInsights, setRecurringInsights] = useState<RecurringInsights | null>(null);
+  const [tagBreakdown, setTagBreakdown] = useState<TagBreakdown[]>([]);
   const [topMerchants, setTopMerchants] = useState<MerchantData[]>([]);
   const [smartInsights, setSmartInsights] = useState<SmartInsights | null>(null);
-  const [reviewQueueStats, setReviewQueueStats] = useState<ReviewQueueStats | null>(null);
 
   // Load saved preferences from localStorage or use defaults
   const [startDate, setStartDate] = useState<Dayjs | null>(() => {
@@ -257,38 +265,41 @@ const Analytics: React.FC = () => {
         endDate: endDate.format('YYYY-MM-DD'),
       });
 
-      const [overviewRes, breakdownRes, folderBreakdownRes, trendsRes, comparisonRes, topExpensesRes, paymentMethodRes, merchantsRes, insightsRes, reviewStatsRes, categoriesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/analytics/overview?${params}`, {
+      const [overviewRes, breakdownRes, folderBreakdownRes, trendsRes, comparisonRes, topExpensesRes, accountsRes, recurringRes, tagsRes, merchantsRes, insightsRes, categoriesRes] = await Promise.all([
+        axios.get(`/api/analytics/overview?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/category-breakdown?${params}`, {
+        axios.get(`/api/analytics/category-breakdown?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/folder-breakdown?${params}`, {
+        axios.get(`/api/analytics/folder-breakdown?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/trends?${params}&groupBy=${trendGroupBy}`, {
+        axios.get(`/api/analytics/trends?${params}&groupBy=${trendGroupBy}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/budget-comparison?${params}`, {
+        axios.get(`/api/analytics/budget-comparison?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/top-expenses?${params}&limit=5`, {
+        axios.get(`/api/analytics/top-expenses?${params}&limit=5`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/payment-method-breakdown?${params}`, {
+        axios.get(`/api/accounts`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/top-merchants?${params}&limit=10`, {
+        axios.get(`/api/transactions?isRecurring=true`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/smart-insights?${params}`, {
+        axios.get(`/api/tags`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/analytics/review-queue-stats`, {
+        axios.get(`/api/analytics/top-merchants?${params}&limit=10`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/api/categories`, {
+        axios.get(`/api/analytics/smart-insights?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`/api/categories`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -304,10 +315,134 @@ const Analytics: React.FC = () => {
       setTrends(trendsRes.data.trends || []);
       setBudgetComparison(comparisonRes.data.comparisons || []);
       setTopExpenses(topExpensesRes.data.expenses || []);
-      setPaymentMethodBreakdown(paymentMethodRes.data.breakdown || []);
+      
+      // Process account breakdown
+      const accounts = accountsRes.data.accounts || [];
+      const transactionsRes = await axios.get(`/api/transactions?startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const transactions = transactionsRes.data.transactions || [];
+      
+      const accountStats = accounts.map((account: any) => {
+        const accountTxns = transactions.filter((t: any) => t.accountId === account.id);
+        const credits = accountTxns.filter((t: any) => t.type === 'credit').reduce((sum: number, t: any) => sum + t.amount, 0);
+        const debits = accountTxns.filter((t: any) => t.type === 'debit').reduce((sum: number, t: any) => sum + t.amount, 0);
+        
+        return {
+          accountId: account.id,
+          accountName: account.name,
+          accountType: account.accountType,
+          credits,
+          debits,
+          netFlow: credits - debits,
+          balance: account.balance,
+          transactionCount: accountTxns.length,
+        };
+      });
+      setAccountBreakdown(accountStats);
+      
+      // Process recurring insights
+      const recurringTxns = recurringRes.data.transactions || [];
+      const recurringTemplates = recurringTxns.filter((t: any) => !t.linkedTransactionId);
+      
+      const frequencyMap = new Map<string, { count: number; amount: number }>();
+      let totalRecurringCost = 0;
+      
+      recurringTemplates.forEach((t: any) => {
+        const freq = t.recurrencePattern?.frequency || 'unknown';
+        const existing = frequencyMap.get(freq) || { count: 0, amount: 0 };
+        
+        // Annualize to monthly cost
+        let monthlyCost = t.amount;
+        if (freq === 'daily') monthlyCost = t.amount * 30;
+        else if (freq === 'weekly') monthlyCost = t.amount * 4;
+        else if (freq === 'yearly') monthlyCost = t.amount / 12;
+        
+        frequencyMap.set(freq, {
+          count: existing.count + 1,
+          amount: existing.amount + (t.type === 'debit' ? monthlyCost : 0),
+        });
+        
+        totalRecurringCost += (t.type === 'debit' ? monthlyCost : 0);
+      });
+      
+      const oneTimeDebits = transactions.filter((t: any) => t.type === 'debit' && !t.isRecurring && !t.linkedTransactionId);
+      const oneTimeAmount = oneTimeDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
+      const recurringDebits = transactions.filter((t: any) => t.type === 'debit' && (t.isRecurring || t.linkedTransactionId));
+      const recurringAmount = recurringDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
+      
+      const upcomingThisMonth = recurringTemplates.filter((t: any) => {
+        if (!t.recurrencePattern) return false;
+        const lastCreated = t.recurrencePattern.lastCreated ? new Date(t.recurrencePattern.lastCreated) : new Date(t.date);
+        const now = new Date();
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        
+        let nextDate = new Date(lastCreated);
+        const freq = t.recurrencePattern.frequency;
+        
+        if (freq === 'daily') nextDate.setDate(nextDate.getDate() + 1);
+        else if (freq === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+        else if (freq === 'monthly') {
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          if (t.recurrencePattern.day) nextDate.setDate(t.recurrencePattern.day);
+        }
+        else if (freq === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1);
+        
+        return nextDate >= now && nextDate <= endOfMonth;
+      }).length;
+      
+      setRecurringInsights({
+        totalRecurringTemplates: recurringTemplates.length,
+        monthlyRecurringCost: totalRecurringCost,
+        upcomingThisMonth,
+        recurringVsOneTime: {
+          recurringAmount,
+          oneTimeAmount,
+          recurringPercentage: recurringAmount + oneTimeAmount > 0 
+            ? Math.round((recurringAmount / (recurringAmount + oneTimeAmount)) * 100)
+            : 0,
+        },
+        byFrequency: Array.from(frequencyMap.entries()).map(([freq, data]) => ({
+          frequency: freq,
+          count: data.count,
+          totalAmount: data.amount,
+        })),
+      });
+      
+      // Process tag breakdown
+      const allTags = tagsRes.data.tags || [];
+      const tagMap = new Map<string, { amount: number; count: number }>();
+      
+      transactions.forEach((t: any) => {
+        if (t.type === 'debit' && t.tags && Array.isArray(t.tags)) {
+          t.tags.forEach((tagId: string) => {
+            const existing = tagMap.get(tagId) || { amount: 0, count: 0 };
+            tagMap.set(tagId, {
+              amount: existing.amount + t.amount,
+              count: existing.count + 1,
+            });
+          });
+        }
+      });
+      
+      const totalTaggedAmount = Array.from(tagMap.values()).reduce((sum, data) => sum + data.amount, 0);
+      const tagStats = Array.from(tagMap.entries())
+        .map(([tagId, data]) => {
+          const tag = allTags.find((t: any) => t.id === tagId);
+          return {
+            tag: tag?.name || 'Unknown',
+            amount: data.amount,
+            count: data.count,
+            percentage: totalTaggedAmount > 0 ? Math.round((data.amount / totalTaggedAmount) * 100) : 0,
+          };
+        })
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
+      
+      setTagBreakdown(tagStats);
+      
       setTopMerchants(merchantsRes.data.merchants || []);
       setSmartInsights(insightsRes.data.insights || null);
-      setReviewQueueStats(reviewStatsRes.data.stats || null);
 
       // Auto-expand top 3 spending folders
       const top3Folders = folders
@@ -324,12 +459,7 @@ const Analytics: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: user?.currency || 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
   };
 
   const formatDate = (dateString: string) => {
@@ -552,28 +682,6 @@ const Analytics: React.FC = () => {
               </Grid>
             )}
 
-            {/* Review Queue Stats */}
-            {reviewQueueStats && reviewQueueStats.pending > 0 && (
-              <Grid item xs={12} md={6}>
-                <Card sx={{ borderLeft: '4px solid', borderColor: 'warning.main' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
-                      <PendingIcon color="warning" />
-                      <Typography variant="h6" fontWeight={600}>
-                        Pending Reviews ({reviewQueueStats.pending})
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" mb={1}>
-                      Approval Rate: <strong>{reviewQueueStats.approvalRate}%</strong>
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {reviewQueueStats.pendingExpenses.length} expenses waiting for review
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
             {/* Category Trends */}
             {smartInsights.categoryTrends && smartInsights.categoryTrends.length > 0 && (
               <Grid item xs={12}>
@@ -694,7 +802,7 @@ const Analytics: React.FC = () => {
               <Grid item xs={12}>
                 <Card sx={{ borderLeft: '4px solid', borderColor: 'warning.main' }}>
                   <CardContent>
-                    <Box display="flex" alignments="center" gap={1} mb={2}>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
                       <WarningIcon color="warning" />
                       <Typography variant="h6" fontWeight={600}>
                         Unusual Expenses
@@ -840,7 +948,7 @@ const Analytics: React.FC = () => {
                 <ToggleButtonGroup
                   value={viewMode}
                   exclusive
-                  onChange={(e, newMode) => {
+                  onChange={(_, newMode) => {
                     if (newMode !== null) {
                       setViewMode(newMode);
                     }
@@ -1199,93 +1307,59 @@ const Analytics: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Payment Method Breakdown */}
+        {/* Account Cash Flow Breakdown */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight={600} mb={3}>
-                Payment Method Breakdown
+                Account Cash Flow
               </Typography>
-              {paymentMethodBreakdown.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={paymentMethodBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ percentage }) => `${percentage}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="amount"
-                        nameKey="paymentMethodName"
-                      >
-                        {paymentMethodBreakdown.map((_entry, index) => {
-                          const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0', '#a8edea'];
-                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                        })}
-                      </Pie>
-                      <RechartsTooltip 
-                        formatter={(value: any) => formatCurrency(value)}
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          padding: '8px',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <Box mt={2}>
-                    {paymentMethodBreakdown.map((pm, index) => {
-                      const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0', '#a8edea'];
-                      return (
-                        <Box
-                          key={pm.paymentMethodId}
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          py={1}
-                          borderBottom={index < paymentMethodBreakdown.length - 1 ? '1px solid' : 'none'}
-                          borderColor="divider"
+              {accountBreakdown.length > 0 ? (
+                <Box>
+                  {accountBreakdown.map((account, index) => (
+                    <Box
+                      key={account.accountId}
+                      py={2}
+                      borderBottom={index < accountBreakdown.length - 1 ? '1px solid' : 'none'}
+                      borderColor="divider"
+                    >
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                        <Typography variant="body1" fontWeight={600}>
+                          {account.accountName}
+                        </Typography>
+                        <Chip
+                          label={account.accountType}
+                          size="small"
+                          sx={{ textTransform: 'capitalize' }}
+                        />
+                      </Box>
+                      <Box display="flex" justifyContent="space-between" mb={1}>
+                        <Typography variant="body2" color="success.main">
+                          ↑ Credits: {formatCurrency(account.credits)}
+                        </Typography>
+                        <Typography variant="body2" color="error.main">
+                          ↓ Debits: {formatCurrency(account.debits)}
+                        </Typography>
+                      </Box>
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="caption" color="text.secondary">
+                          {account.transactionCount} transactions
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          fontWeight={700}
+                          color={account.netFlow >= 0 ? 'success.main' : 'error.main'}
                         >
-                          <Box display="flex" alignItems="center" gap={1} minWidth={0} flex={1}>
-                            <Box
-                              width={12}
-                              height={12}
-                              borderRadius="50%"
-                              bgcolor={colors[index % colors.length]}
-                              flexShrink={0}
-                            />
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
-                                overflow: 'hidden', 
-                                textOverflow: 'ellipsis', 
-                                whiteSpace: 'nowrap' 
-                              }}
-                            >
-                              {pm.paymentMethodName}
-                            </Typography>
-                          </Box>
-                          <Box textAlign="right" flexShrink={0}>
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                              {formatCurrency(pm.amount)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {pm.count} transactions
-                            </Typography>
-                          </Box>
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                </>
+                          Net: {account.netFlow >= 0 ? '+' : ''}{formatCurrency(account.netFlow)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
               ) : (
                 <Box textAlign="center" py={6}>
                   <Typography color="text.secondary">
-                    No payment method data available
+                    No account data available
                   </Typography>
                 </Box>
               )}
@@ -1293,6 +1367,183 @@ const Analytics: React.FC = () => {
           </Card>
         </Grid>
 
+        {/* Recurring Transaction Insights */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={3}>
+                Recurring Transaction Insights
+              </Typography>
+              {recurringInsights ? (
+                <Grid container spacing={3}>
+                  {/* Overview Cards */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box textAlign="center" p={2} bgcolor="rgba(102, 126, 234, 0.08)" borderRadius={2}>
+                      <Typography variant="h4" fontWeight={700} color="primary">
+                        {recurringInsights.totalRecurringTemplates}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mt={1}>
+                        Active Templates
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box textAlign="center" p={2} bgcolor="rgba(244, 67, 54, 0.08)" borderRadius={2}>
+                      <Typography variant="h4" fontWeight={700} color="error.main">
+                        {formatCurrency(recurringInsights.monthlyRecurringCost)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mt={1}>
+                        Monthly Cost
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box textAlign="center" p={2} bgcolor="rgba(76, 175, 80, 0.08)" borderRadius={2}>
+                      <Typography variant="h4" fontWeight={700} color="success.main">
+                        {recurringInsights.upcomingThisMonth}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mt={1}>
+                        Due This Month
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box textAlign="center" p={2} bgcolor="rgba(255, 152, 0, 0.08)" borderRadius={2}>
+                      <Typography variant="h4" fontWeight={700} color="warning.main">
+                        {recurringInsights.recurringVsOneTime.recurringPercentage}%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mt={1}>
+                        Recurring Ratio
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  {/* Frequency Breakdown */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" fontWeight={600} mb={2}>
+                      By Frequency
+                    </Typography>
+                    {recurringInsights.byFrequency.map((freq, idx) => (
+                      <Box
+                        key={idx}
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        py={1.5}
+                        borderBottom={idx < recurringInsights.byFrequency.length - 1 ? '1px solid' : 'none'}
+                        borderColor="divider"
+                      >
+                        <Box>
+                          <Typography variant="body2" fontWeight={600} sx={{ textTransform: 'capitalize' }}>
+                            {freq.frequency}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {freq.count} {freq.count === 1 ? 'transaction' : 'transactions'}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" fontWeight={700}>
+                          {formatCurrency(freq.totalAmount)}/mo
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Grid>
+
+                  {/* Recurring vs One-Time */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" fontWeight={600} mb={2}>
+                      Spending Composition
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Recurring', value: recurringInsights.recurringVsOneTime.recurringAmount, color: '#667eea' },
+                            { name: 'One-Time', value: recurringInsights.recurringVsOneTime.oneTimeAmount, color: '#43e97b' },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          dataKey="value"
+                        >
+                          <Cell fill="#667eea" />
+                          <Cell fill="#43e97b" />
+                        </Pie>
+                        <RechartsTooltip formatter={(value: any) => formatCurrency(value)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Grid>
+                </Grid>
+              ) : (
+                <Box textAlign="center" py={6}>
+                  <Typography color="text.secondary">
+                    No recurring transaction data available
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Tag-Based Analytics */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={3}>
+                Spending by Tags
+              </Typography>
+              {tagBreakdown.length > 0 ? (
+                <Box>
+                  {tagBreakdown.map((tag, index) => (
+                    <Box
+                      key={index}
+                      py={1.5}
+                      borderBottom={index < tagBreakdown.length - 1 ? '1px solid' : 'none'}
+                      borderColor="divider"
+                    >
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                        <Typography variant="body2" fontWeight={600}>
+                          #{tag.tag}
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700}>
+                          {formatCurrency(tag.amount)}
+                        </Typography>
+                      </Box>
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <LinearProgress
+                          variant="determinate"
+                          value={tag.percentage}
+                          sx={{
+                            width: '70%',
+                            height: 6,
+                            borderRadius: 1,
+                            bgcolor: 'rgba(0,0,0,0.05)',
+                            '& .MuiLinearProgress-bar': {
+                              borderRadius: 1,
+                              bgcolor: '#667eea',
+                            },
+                          }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {tag.count} txns · {tag.percentage}%
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <Box textAlign="center" py={6}>
+                  <Typography color="text.secondary">
+                    No tagged transactions
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Payment Method Breakdown - REMOVED */}
         {/* Top Merchants */}
         <Grid item xs={12} md={6}>
           <Card>

@@ -6,13 +6,13 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Expenses from './pages/Expenses';
 import Categories from './pages/Categories';
 import Budgets from './pages/Budgets';
 import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
-import ReviewQueue from './pages/ReviewQueue';
-import PaymentMethods from './pages/PaymentMethods';
+import Accounts from './pages/Accounts';
+import Transactions from './pages/Transactions';
+import PendingTransactions from './pages/PendingTransactions';
 import Loading from './components/Loading';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -54,10 +54,10 @@ const App: React.FC = () => {
         >
           <Route index element={<Navigate to="/dashboard" />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="expenses" element={<Expenses />} />
-          <Route path="review" element={<ReviewQueue />} />
+          <Route path="transactions" element={<Transactions />} />
+          <Route path="pending" element={<PendingTransactions />} />
           <Route path="categories" element={<Categories />} />
-          <Route path="payment-methods" element={<PaymentMethods />} />
+          <Route path="accounts" element={<Accounts />} />
           <Route path="budgets" element={<Budgets />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="profile" element={<Profile />} />

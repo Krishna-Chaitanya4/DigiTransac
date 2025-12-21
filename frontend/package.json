@@ -1,6 +1,6 @@
 {
-  "name": "expense-tracker-frontend",
-  "version": "1.0.0",
+  "name": "digitransac-frontend",
+  "version": "1.0.15",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.11.1",

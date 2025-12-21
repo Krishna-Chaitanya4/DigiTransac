@@ -1,6 +1,6 @@
-# Expense Tracker
+# DigiTransac
 
-A modern, full-stack expense tracking application built with React, Node.js, and Azure Cosmos DB.
+A modern, full-stack transaction management application built with React, Node.js, and Azure Cosmos DB.
 
 ## 🚀 Features
 
@@ -47,7 +47,7 @@ A modern, full-stack expense tracking application built with React, Node.js, and
 ## 📁 Project Structure
 
 ```
-ExpenseTracker/
+DigiTransac/
 ├── backend/
 │   ├── src/
 │   │   ├── config/
@@ -111,7 +111,7 @@ ExpenseTracker/
 1. **Clone the repository**
    ```bash
    git clone <your-repo-url>
-   cd ExpenseTracker
+   cd DigiTransac
    ```
 
 2. **Setup Backend**
@@ -149,7 +149,7 @@ PORT=5000
 NODE_ENV=development
 COSMOS_ENDPOINT=https://your-account.documents.azure.com:443/
 COSMOS_KEY=your-cosmos-key
-COSMOS_DATABASE_NAME=ExpenseTrackerDB
+COSMOS_DATABASE_NAME=DigiTransacDB
 JWT_SECRET=your-secret-key
 JWT_EXPIRE=7d
 CORS_ORIGIN=http://localhost:3000

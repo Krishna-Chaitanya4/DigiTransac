@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -27,8 +27,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 
 interface Category {
   id: string;
@@ -81,7 +80,7 @@ const Budgets: React.FC = () => {
   const fetchBudgets = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/budgets`, {
+      const response = await axios.get(`/api/budgets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setBudgets(response.data.budgets || []);
@@ -95,7 +94,7 @@ const Budgets: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/categories`, {
+      const response = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const allCategories = response.data.categories || [];
@@ -160,13 +159,13 @@ const Budgets: React.FC = () => {
 
       if (editingBudget) {
         await axios.put(
-          `${API_URL}/api/budgets/${editingBudget.id}`,
+          `/api/budgets/${editingBudget.id}`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         await axios.post(
-          `${API_URL}/api/budgets`,
+          `/api/budgets`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -186,7 +185,7 @@ const Budgets: React.FC = () => {
     }
     
     try {
-      await axios.delete(`${API_URL}/api/budgets/${budget.id}`, {
+      await axios.delete(`/api/budgets/${budget.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchBudgets();
@@ -196,10 +195,7 @@ const Budgets: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: user?.currency || 'USD',
-    }).format(amount);
+    return formatCurrencyUtil(amount, user?.currency || 'USD');
   };
 
   const formatDate = (dateString: string) => {

@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
   Button,
-  Card,
   IconButton,
   Dialog,
   DialogTitle,
@@ -16,24 +15,19 @@ import {
   CircularProgress,
   Collapse,
   Tooltip,
-  Divider,
   MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,
   Label as LabelIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon,
   CreateNewFolder as CreateNewFolderIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 interface Category {
   id: string;
@@ -86,7 +80,7 @@ const Categories: React.FC = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/categories`, {
+      const response = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCategories(response.data.categories || []);
@@ -185,7 +179,7 @@ const Categories: React.FC = () => {
     try {
       if (editingCategory) {
         await axios.put(
-          `${API_URL}/api/categories/${editingCategory.id}`,
+          `/api/categories/${editingCategory.id}`,
           { 
             name: formData.name, 
             color: formData.color,
@@ -195,7 +189,7 @@ const Categories: React.FC = () => {
         );
       } else {
         await axios.post(
-          `${API_URL}/api/categories`,
+          `/api/categories`,
           { ...formData, parentId: formData.parentId },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -215,7 +209,7 @@ const Categories: React.FC = () => {
     }
     
     try {
-      await axios.delete(`${API_URL}/api/categories/${category.id}`, {
+      await axios.delete(`/api/categories/${category.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchCategories();
@@ -342,7 +336,7 @@ const Categories: React.FC = () => {
             variant="outlined"
             startIcon={<FolderOpenIcon />}
             onClick={() => {
-              setFormData({ name: '', color: '#667eea', isFolder: true });
+              setFormData({ name: '', color: '#667eea', isFolder: true, parentId: null });
               setParentForNew(null);
               setOpenDialog(true);
             }}
@@ -413,7 +407,7 @@ const Categories: React.FC = () => {
                 variant="outlined"
                 startIcon={<FolderOpenIcon />}
                 onClick={() => {
-                  setFormData({ name: '', color: '#667eea', isFolder: true });
+                  setFormData({ name: '', color: '#667eea', isFolder: true, parentId: null });
                   setParentForNew(null);
                   setOpenDialog(true);
                 }}
