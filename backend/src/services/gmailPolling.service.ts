@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { cosmosDBService } from '../config/cosmosdb';
 import { emailParserService } from './emailParser.service';
-import { Expense, PaymentMethod, Category } from '../models/types';
+import { Transaction, TransactionSplit, PaymentMethod, Category } from '../models/types';
 import { randomUUID } from 'crypto';
 
 class GmailPollingService {
@@ -373,14 +373,19 @@ class GmailPollingService {
             parsedTransaction.cardLast4
           );
 
-          // Create pending expense
-          const expenseContainer = await cosmosDBService.getExpensesContainer();
+          // Create pending transaction
+          const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+          const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
 
-          const newExpense: Expense = {
-            id: randomUUID(),
+          const transactionId = randomUUID();
+          const splitId = randomUUID();
+
+          const newTransaction: Transaction = {
+            id: transactionId,
             userId: user.id,
-            categoryId: categoryId,
-            paymentMethodId: paymentMethodId,
+            accountId: '', // Will be assigned during review
+            type: 'debit',
+            paymentMethodType: 'card', // Store as type, not ID
             amount: parsedTransaction.amount,
             description: `${parsedTransaction.merchant} - ${parsedTransaction.bankName}`,
             date: parsedTransaction.date,
@@ -396,14 +401,27 @@ class GmailPollingService {
               confidence: parsedTransaction.confidence,
             },
             reviewStatus: 'pending',
-            notes: '',
+            notes: `Payment Method: ${paymentMethodId}`,
             createdAt: new Date(),
             updatedAt: new Date(),
           };
 
-          await expenseContainer.insertOne(newExpense);
+          const newSplit: TransactionSplit = {
+            id: splitId,
+            transactionId: transactionId,
+            userId: user.id,
+            categoryId: categoryId,
+            amount: parsedTransaction.amount,
+            tags: [],
+            order: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          await transactionsContainer.insertOne(newTransaction);
+          await splitsContainer.insertOne(newSplit);
           processedCount++;
-          console.log(`💰 Created expense ${newExpense.id} from email ${messageId}`);
+          console.log(`💰 Created transaction ${newTransaction.id} from email ${messageId}`);
         } catch (error) {
           console.error(`❌ Error processing message ${messageId}:`, error);
           // Continue processing other emails even if one fails

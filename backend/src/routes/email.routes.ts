@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { emailParserService } from '../services/emailParser.service';
 import { cosmosDBService } from '../config/cosmosdb';
 import { randomUUID } from 'crypto';
-import { Expense } from '../models/types';
+import { Transaction, TransactionSplit } from '../models/types';
 
 const router = express.Router();
 
@@ -61,13 +61,18 @@ router.post('/inbound', async (req: Request, res: Response) => {
       user.emailIntegration?.merchantMappings
     );
 
-    // Create pending expense
-    const expenseContainer = await cosmosDBService.getExpensesContainer();
+    // Create pending transaction
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
 
-    const newExpense: Expense = {
-      id: randomUUID(),
+    const transactionId = randomUUID();
+    const splitId = randomUUID();
+
+    const newTransaction: Transaction = {
+      id: transactionId,
       userId: userId,
-      categoryId: suggestedCategory || '', // Empty if no category found
+      accountId: '', // Will be assigned during review
+      type: 'debit',
       amount: parsedTransaction.amount,
       description: `${parsedTransaction.merchant} - ${parsedTransaction.bankName}`,
       date: parsedTransaction.date,
@@ -88,7 +93,20 @@ router.post('/inbound', async (req: Request, res: Response) => {
       updatedAt: new Date(),
     };
 
-    await expenseContainer.insertOne(newExpense);
+    const newSplit: TransactionSplit = {
+      id: splitId,
+      transactionId: transactionId,
+      userId: userId,
+      categoryId: suggestedCategory || '', // Empty if no category found
+      amount: parsedTransaction.amount,
+      tags: [],
+      order: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await transactionsContainer.insertOne(newTransaction);
+    await splitsContainer.insertOne(newSplit);
 
     // Update user's email integration stats
     await userContainer.updateOne(
@@ -102,13 +120,13 @@ router.post('/inbound', async (req: Request, res: Response) => {
       }
     );
 
-    console.log('Created pending expense:', newExpense.id);
+    console.log('Created pending transaction:', newTransaction.id);
 
     return res.status(200).json({
       message: 'Transaction processed successfully',
       expense: {
-        id: newExpense.id,
-        amount: newExpense.amount,
+        id: newTransaction.id,
+        amount: newTransaction.amount,
         merchant: parsedTransaction.merchant,
         status: 'pending',
       },

@@ -295,9 +295,9 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
       }
     }
 
-    // Check if category has expenses
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenseCount = await expensesContainer.countDocuments({ categoryId: id, userId });
+    // Check if category has expenses (transaction splits)
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const expenseCount = await splitsContainer.countDocuments({ categoryId: id, userId });
     if (expenseCount > 0) {
       res.status(400).json({
         success: false,

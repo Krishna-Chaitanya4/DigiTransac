@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { Budget, Category } from '../models/types';
+import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 
 const router = Router();
 
@@ -20,8 +21,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    // Fetch all categories and expenses once
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
+    // Fetch all categories once
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
     const categories = (await categoriesContainer
@@ -53,15 +53,14 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // Pre-compute descendants for all categories
     categories.forEach((cat) => buildDescendants(cat.id));
 
-    // Fetch ALL relevant expenses in ONE query
+    // Fetch ALL relevant expenses in ONE query using helper
     const minStartDate = new Date(Math.min(...budgets.map((b) => new Date(b.startDate).getTime())));
-    const allExpenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: minStartDate },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const allExpenses = await getExpensesFromTransactions(
+      userId,
+      minStartDate,
+      new Date(),
+      'approved'
+    );
 
     // Group expenses by category for fast lookup
     const expensesByCategory = new Map<string, any[]>();
@@ -303,7 +302,6 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
     if (budgets.length === 0) {
@@ -340,14 +338,14 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
 
     categories.forEach((cat) => buildDescendants(cat.id));
 
-    // Fetch ALL relevant expenses in ONE query
+    // Fetch ALL relevant expenses in ONE query using helper
     const minStartDate = new Date(Math.min(...budgets.map((b) => new Date(b.startDate).getTime())));
-    const allExpenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: minStartDate },
-      })
-      .toArray();
+    const allExpenses = await getExpensesFromTransactions(
+      userId,
+      minStartDate,
+      new Date()
+      // Don't filter by reviewStatus for alerts - show all spending
+    );
 
     // Group expenses by category
     const expensesByCategory = new Map<string, any[]>();

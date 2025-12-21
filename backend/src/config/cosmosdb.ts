@@ -10,7 +10,6 @@ class CosmosDBService {
 
   public usersContainer: Collection | null = null;
   public categoriesContainer: Collection | null = null;
-  public expensesContainer: Collection | null = null;
   public budgetsContainer: Collection | null = null;
   public paymentMethodsContainer: Collection | null = null;
   public transactionsContainer: Collection | null = null;
@@ -85,9 +84,6 @@ class CosmosDBService {
     // Categories collection
     this.categoriesContainer = this.db.collection('categories');
 
-    // Expenses collection
-    this.expensesContainer = this.db.collection('expenses');
-
     // Budgets collection
     this.budgetsContainer = this.db.collection('budgets');
 
@@ -109,9 +105,6 @@ class CosmosDBService {
     // Create indexes for better query performance
     await this.usersContainer.createIndex({ email: 1 }, { unique: true });
     await this.categoriesContainer.createIndex({ userId: 1 });
-    await this.expensesContainer.createIndex({ userId: 1 });
-    await this.expensesContainer.createIndex({ categoryId: 1 });
-    await this.expensesContainer.createIndex({ paymentMethodId: 1 });
     await this.budgetsContainer.createIndex({ userId: 1 });
     await this.paymentMethodsContainer.createIndex({ userId: 1 });
 
@@ -158,13 +151,6 @@ class CosmosDBService {
       throw new Error('Cosmos DB not initialized. Call initialize() first.');
     }
     return this.categoriesContainer;
-  }
-
-  async getExpensesContainer(): Promise<Collection> {
-    if (!this.expensesContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
-    }
-    return this.expensesContainer;
   }
 
   async getBudgetsContainer(): Promise<Collection> {

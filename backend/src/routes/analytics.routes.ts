@@ -1,6 +1,7 @@
 ﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
+import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 
 const router = Router();
 
@@ -186,14 +187,7 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
       ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
       : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const expenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
     // Get all categories
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
@@ -292,14 +286,7 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
       ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
       : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const expenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
     // Group by time period
     const trendsMap = new Map<string, number>();
@@ -374,7 +361,6 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
     const categories = await categoriesContainer.find({ userId }).toArray();
@@ -401,13 +387,7 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
     budgets.forEach((budget: any) => getAllDescendantCategoryIds(budget.categoryId));
 
     // Fetch ALL relevant expenses in ONE query
-    const allExpenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const allExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
     // Group expenses by category
     const expensesByCategory = new Map<string, any[]>();
@@ -483,14 +463,7 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
       ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
       : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const expenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
     // Sort by amount and take top N
     const topExpenses = expenses
@@ -537,14 +510,7 @@ router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response):
       ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
       : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const expenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
     // Aggregate by payment method
     const paymentMethodMap = new Map<string, { amount: number; count: number }>();
@@ -609,15 +575,9 @@ router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<vo
       : new Date(new Date().setHours(23, 59, 59, 999));
     const topLimit = limit ? parseInt(limit as string) : 10;
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
-    const expenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: start, $lte: end },
-        merchantName: { $exists: true, $ne: null },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    // Get all expenses first, then filter by merchantName (splits don't have merchantName)
+    const allExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
+    const expenses = allExpenses.filter((exp: any) => exp.merchantName);
 
     // Aggregate by merchant
     const merchantMap = new Map<string, { amount: number; count: number }>();
@@ -668,18 +628,11 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const end = endDate ? new Date(endDate as string) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
 
     // Get current period expenses (approved only)
-    const currentExpenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const currentExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
     // Get previous period for comparison
     const periodDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -688,13 +641,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const prevEnd = new Date(end);
     prevEnd.setDate(prevEnd.getDate() - periodDays);
 
-    const previousExpenses = await expensesContainer
-      .find({
-        userId,
-        date: { $gte: prevStart, $lte: prevEnd },
-        reviewStatus: 'approved',
-      })
-      .toArray();
+    const previousExpenses = await getExpensesFromTransactions(userId, prevStart, prevEnd, 'approved');
 
     const currentTotal = currentExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
     const previousTotal = previousExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
@@ -892,15 +839,15 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
   try {
     const userId = req.userId!;
 
-    const expensesContainer = await cosmosDBService.getExpensesContainer();
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
 
     // Use aggregation to count by status efficiently
-    const [pending, approved, rejected, pendingExpenses] = await Promise.all([
-      expensesContainer.countDocuments({ userId, reviewStatus: 'pending' }),
-      expensesContainer.countDocuments({ userId, reviewStatus: 'approved' }),
-      expensesContainer.countDocuments({ userId, reviewStatus: 'rejected' }),
-      expensesContainer
-        .find({ userId, reviewStatus: 'pending' })
+    const [pending, approved, rejected, pendingTransactions] = await Promise.all([
+      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'pending' }),
+      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'approved' }),
+      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'rejected' }),
+      transactionsContainer
+        .find({ userId, type: 'debit', reviewStatus: 'pending' })
         .sort({ date: -1 })
         .limit(5)
         .toArray(),
@@ -910,13 +857,13 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
     // Get pending expenses details
-    const pendingExpensesFormatted = pendingExpenses.map((exp: any) => ({
-      id: exp.id,
-      description: exp.description,
-      amount: exp.amount,
-      date: exp.date,
+    const pendingExpensesFormatted = pendingTransactions.map((tx: any) => ({
+      id: tx.id,
+      description: tx.description,
+      amount: tx.amount,
+      date: tx.date,
       daysSinceParsed: Math.floor(
-        (Date.now() - new Date(exp.createdAt || exp.date).getTime()) / (1000 * 60 * 60 * 24)
+        (Date.now() - new Date(tx.createdAt || tx.date).getTime()) / (1000 * 60 * 60 * 24)
       ),
     }));
 
