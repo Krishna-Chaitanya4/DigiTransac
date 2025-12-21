@@ -7,7 +7,6 @@ import {
   CardContent,
   Grid,
   IconButton,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -41,6 +40,8 @@ import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 import { BudgetCardSkeleton, GridSkeleton } from '../components/Skeletons';
+import ResponsiveDialog from '../components/ResponsiveDialog';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface Category {
   id: string;
@@ -106,6 +107,7 @@ interface Budget {
 const Budgets: React.FC = () => {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { isMobile } = useResponsive();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -353,7 +355,7 @@ const Budgets: React.FC = () => {
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4">Budgets</Typography>
         </Box>
-        <GridSkeleton count={4} component={BudgetCardSkeleton} />
+        <GridSkeleton count={isMobile ? 2 : 4} component={BudgetCardSkeleton} />
       </Box>
     );
   }
@@ -611,7 +613,7 @@ const Budgets: React.FC = () => {
       )}
 
       {/* Create/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      <ResponsiveDialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>{editingBudget ? 'Edit Budget' : 'Create New Budget'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -961,7 +963,7 @@ const Budgets: React.FC = () => {
             {editingBudget ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </ResponsiveDialog>
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

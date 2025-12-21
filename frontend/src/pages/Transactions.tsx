@@ -12,7 +12,6 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -52,6 +51,9 @@ import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 import { TableSkeleton } from '../components/Skeletons';
+import TransactionCard from '../components/TransactionCard';
+import ResponsiveDialog from '../components/ResponsiveDialog';
+import { useResponsive } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -120,6 +122,7 @@ interface Tag {
 const Transactions: React.FC = () => {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { isMobile } = useResponsive();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -909,8 +912,54 @@ const Transactions: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Transactions Table */}
-        <Card>
+        {/* Transactions - Table for desktop, Cards for mobile */}
+        {isMobile ? (
+          // Mobile Card View
+          <Box>
+            {filteredTransactions.length === 0 ? (
+              <EmptyState
+                icon={<ReceiptIcon />}
+                title="No transactions found"
+                description="Start tracking your finances by adding your first transaction"
+                actionLabel="Add Transaction"
+                onAction={() => handleOpenDialog()}
+              />
+            ) : (
+              <>
+                {filteredTransactions
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((transaction) => (
+                    <TransactionCard
+                      key={transaction.id}
+                      transaction={transaction}
+                      onEdit={() => handleOpenDialog(transaction)}
+                      onDelete={() => handleDeleteClick(transaction.id)}
+                      formatCurrency={(amount) => formatCurrency(amount, transaction.accountId)}
+                      getCategoryName={getCategoryName}
+                      getCategoryColor={getCategoryColor}
+                      getAccountName={getAccountName}
+                      isExpanded={expandedRows.has(transaction.id)}
+                      onToggleExpand={() => toggleRowExpansion(transaction.id)}
+                    />
+                  ))}
+                <TablePagination
+                  component="div"
+                  count={filteredTransactions.length}
+                  page={page}
+                  onPageChange={(_, newPage) => setPage(newPage)}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setRowsPerPage(parseInt(e.target.value, 10));
+                    setPage(0);
+                  }}
+                  rowsPerPageOptions={[10, 25, 50, 100]}
+                />
+              </>
+            )}
+          </Box>
+        ) : (
+          // Desktop Table View
+          <Card>
           <TableContainer>
             <Table>
               <TableHead>
@@ -1235,9 +1284,10 @@ const Transactions: React.FC = () => {
             }}
           />
         </Card>
+        )}
 
         {/* Add/Edit Dialog */}
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <ResponsiveDialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
           <DialogTitle>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1763,7 +1813,7 @@ const Transactions: React.FC = () => {
               {editingTransaction ? 'Update' : 'Create'}
             </Button>
           </DialogActions>
-        </Dialog>
+        </ResponsiveDialog>
 
         {/* Confirmation Dialog */}
         <ConfirmDialog

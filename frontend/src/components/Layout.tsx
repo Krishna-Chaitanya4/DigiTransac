@@ -38,6 +38,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';
+import MobileBottomNav from './MobileBottomNav';
 import axios from 'axios';
 
 const drawerWidth = 240;
@@ -365,12 +366,16 @@ const Layout: React.FC = () => {
           p: 3,
           width: { md: `calc(100% - ${drawerWidth}px)` },
           mt: 8,
+          mb: { xs: 8, md: 0 }, // Add bottom margin on mobile for bottom nav
           minHeight: '100vh',
           backgroundColor: 'background.default',
         }}
       >
         <Outlet />
       </Box>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
     </Box>
   );
 };
