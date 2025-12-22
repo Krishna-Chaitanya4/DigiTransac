@@ -44,6 +44,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
   ReceiptLong as ReceiptIcon,
+  Sms as SmsIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useToast } from '../components/Toast';
@@ -55,6 +56,7 @@ import TransactionCard from '../components/TransactionCard';
 import SwipeableTransactionCard from '../components/SwipeableTransactionCard';
 import ResponsiveDialog from '../components/ResponsiveDialog';
 import PullToRefresh from '../components/PullToRefresh';
+import SMSImportModal from '../components/SMSImportModal';
 import { useResponsive } from '../hooks/useResponsive';
 import { useIsTouchDevice } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
@@ -157,6 +159,7 @@ const Transactions: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [smsImportOpen, setSmsImportOpen] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -658,6 +661,15 @@ const Transactions: React.FC = () => {
             </Typography>
           </Box>
           <Box display="flex" gap={1} flexWrap="wrap">
+            <Button
+              variant="outlined"
+              startIcon={<SmsIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
+              onClick={() => setSmsImportOpen(true)}
+              size="small"
+              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
+            >
+              {isMobile ? 'SMS' : 'Import SMS'}
+            </Button>
             <Button
               variant="outlined"
               startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
@@ -1846,6 +1858,17 @@ const Transactions: React.FC = () => {
 
         {/* Quick Add FAB */}
         <QuickAddFab onClick={() => handleOpenDialog()} tooltip="Quick Add Transaction" />
+
+        {/* SMS Import Modal */}
+        <SMSImportModal
+          open={smsImportOpen}
+          onClose={() => setSmsImportOpen(false)}
+          onImportComplete={() => {
+            fetchTransactions();
+            fetchCategories();
+            fetchAccounts();
+          }}
+        />
       </Box>
     </LocalizationProvider>
   );

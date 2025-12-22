@@ -19,6 +19,11 @@ import {
   CardContent,
   Collapse,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 import {
   CheckCircle as ApproveIcon,
@@ -30,28 +35,39 @@ import {
 
 interface Transaction {
   id: string;
+  userId: string;
   type: 'credit' | 'debit';
   amount: number;
   accountId: string;
+  categoryId?: string;
   description: string;
+  tags?: string[];
   date: string;
   notes?: string;
-  source?: 'manual' | 'email' | 'sms' | 'api';
+  isRecurring: boolean;
+  recurrencePattern?: string;
+  source?: string;
   merchantName?: string;
   reviewStatus: 'pending' | 'approved' | 'rejected';
+  linkedTransactionId?: string;
+  splits?: TransactionSplit[];
+  createdAt: string;
+  updatedAt: string;
   confidence?: number;
   originalContent?: string;
-  categoryId?: string;
-  tags?: string[];
-  splits?: TransactionSplit[];
 }
 
 interface TransactionSplit {
-  id: string;
+  id?: string;
+  transactionId?: string;
+  userId?: string;
   categoryId: string;
   amount: number;
   tags: string[];
   notes?: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface Account {
@@ -65,6 +81,7 @@ interface Category {
   id: string;
   name: string;
   path: string[];
+  isFolder?: boolean;
 }
 
 const PendingTransactions: React.FC = () => {
@@ -78,6 +95,13 @@ const PendingTransactions: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'email' | 'sms'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'confidence'>('date');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editForm, setEditForm] = useState({
+    description: '',
+    amount: 0,
+    categoryId: '',
+    notes: '',
+  });
 
   useEffect(() => {
     fetchData();
@@ -108,13 +132,22 @@ const PendingTransactions: React.FC = () => {
       }
 
       setTransactions(filteredTransactions);
-      setAccounts(accountsRes.data);
-      setCategories(categoriesRes.data);
+      
+      // Ensure accounts and categories are arrays
+      const accountsData = accountsRes.data?.accounts || accountsRes.data || [];
+      const categoriesData = categoriesRes.data?.categories || categoriesRes.data || [];
+      
+      setAccounts(Array.isArray(accountsData) ? accountsData : []);
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
     } catch (error: any) {
       console.error('Error fetching pending transactions:', error);
       setError(
         error.response?.data?.error || error.message || 'Failed to load pending transactions'
       );
+      // Ensure arrays are never undefined/null on error
+      setAccounts((prev) => Array.isArray(prev) ? prev : []);
+      setCategories((prev) => Array.isArray(prev) ? prev : []);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -147,6 +180,42 @@ const PendingTransactions: React.FC = () => {
     } catch (error) {
       console.error('Error rejecting transaction:', error);
       alert('Failed to reject transaction');
+    }
+  };
+
+  const handleEditClick = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setEditForm({
+      description: transaction.description,
+      amount: Math.abs(transaction.amount),
+      categoryId: transaction.categoryId || '',
+      notes: transaction.notes || '',
+    });
+  };
+
+  const handleEditClose = () => {
+    setEditingTransaction(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingTransaction) return;
+
+    try {
+      // Update the transaction
+      await axios.put(`/api/transactions/${editingTransaction.id}`, {
+        ...editForm,
+        amount: editingTransaction.type === 'debit' ? -Math.abs(editForm.amount) : Math.abs(editForm.amount),
+      });
+
+      // Approve it
+      await axios.patch(`/api/transactions/${editingTransaction.id}/approve`);
+
+      // Remove from pending list
+      setTransactions((prev) => prev.filter((t) => t.id !== editingTransaction.id));
+      setEditingTransaction(null);
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      alert('Failed to update transaction');
     }
   };
 
@@ -196,11 +265,13 @@ const PendingTransactions: React.FC = () => {
   };
 
   const getAccountName = (accountId: string) => {
+    if (!Array.isArray(accounts)) return 'Unknown Account';
     return accounts.find((a) => a.id === accountId)?.name || 'Unknown Account';
   };
 
   const getCategoryName = (categoryId?: string) => {
     if (!categoryId) return 'Uncategorized';
+    if (!Array.isArray(categories)) return 'Unknown';
     const category = categories.find((c) => c.id === categoryId);
     return category ? category.path.join(' > ') : 'Unknown';
   };
@@ -479,7 +550,12 @@ const PendingTransactions: React.FC = () => {
                       >
                         Reject
                       </Button>
-                      <Button variant="outlined" startIcon={<EditIcon />} size="small">
+                      <Button
+                        variant="outlined"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleEditClick(transaction)}
+                        size="small"
+                      >
                         Edit & Approve
                       </Button>
                     </Stack>
@@ -490,6 +566,62 @@ const PendingTransactions: React.FC = () => {
           ))}
         </Stack>
       )}
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={!!editingTransaction} onClose={handleEditClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit & Approve Transaction</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Description"
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="Amount"
+              type="number"
+              value={editForm.amount}
+              onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) })}
+              fullWidth
+            />
+            <FormControl fullWidth>
+              <InputLabel>Category</InputLabel>
+              <Select
+                value={editForm.categoryId}
+                onChange={(e) => setEditForm({ ...editForm, categoryId: e.target.value })}
+                label="Category"
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {Array.isArray(categories) &&
+                  categories
+                    .filter((c) => !c.isFolder)
+                    .map((category) => (
+                      <MenuItem key={category.id} value={category.id}>
+                        {category.path.join(' > ')}
+                      </MenuItem>
+                    ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Notes"
+              value={editForm.notes}
+              onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+              multiline
+              rows={3}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditClose}>Cancel</Button>
+          <Button onClick={handleEditSave} variant="contained" color="success">
+            Save & Approve
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

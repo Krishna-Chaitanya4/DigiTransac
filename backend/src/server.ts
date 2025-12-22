@@ -25,6 +25,7 @@ import accountRoutes from './routes/account.routes';
 import tagRoutes from './routes/tag.routes';
 import transactionRoutes from './routes/transaction.routes';
 import configRoutes from './routes/config.routes';
+import smsRoutes from './routes/sms.routes';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
 import { startRecurringTransactionsJob } from './jobs/recurringTransactions.job';
 
@@ -150,6 +151,7 @@ app.use('/api/gmail', gmailRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/sms', smsRoutes);
 
 // Error handling
 app.use(errorHandler);
