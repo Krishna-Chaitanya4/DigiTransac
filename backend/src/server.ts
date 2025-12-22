@@ -63,7 +63,10 @@ app.use(
         return callback(new Error('Not allowed by CORS'));
       }
       // Allow requests with no origin in development (like mobile apps or curl)
-      if (!origin) return callback(null, true);
+      if (!origin) {
+        console.log('✅ No origin - allowing (development mode)');
+        return callback(null, true);
+      }
 
       if (allowedOrigins.includes(origin)) {
         console.log('✅ Origin allowed:', origin);
@@ -76,6 +79,9 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
   })
 );
 
@@ -84,6 +90,18 @@ app.use(compression());
 app.use(requestIdMiddleware as any);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use(httpLogger as any);
+
+// Log all OPTIONS requests for debugging
+app.options('*', (req, res) => {
+  console.log('🔍 OPTIONS preflight request received:', {
+    url: req.url,
+    origin: req.headers.origin,
+    method: req.method,
+    headers: req.headers
+  });
+  res.status(204).end();
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());

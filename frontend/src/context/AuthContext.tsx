@@ -91,10 +91,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Load runtime configuration first
       await configService.fetchConfig();
 
-      // Configure axios with runtime API URL
-      const apiUrl = configService.getApiUrl();
-      axios.defaults.baseURL = apiUrl;
-      console.log('🔧 Axios baseURL configured:', axios.defaults.baseURL);
+      // Don't set axios baseURL in development - use relative URLs for Vite proxy
+      // In production, the config service will provide the correct API URL
+      const isDevelopment = window.location.hostname === 'localhost' || 
+                           window.location.hostname.startsWith('192.168.') ||
+                           window.location.hostname.startsWith('10.') ||
+                           window.location.hostname.startsWith('172.');
+      
+      if (!isDevelopment) {
+        const apiUrl = configService.getApiUrl();
+        axios.defaults.baseURL = apiUrl;
+        console.log('🔧 Axios baseURL configured:', axios.defaults.baseURL);
+      } else {
+        console.log('🔧 Development mode: Using relative URLs (Vite proxy)');
+      }
 
       const savedToken = localStorage.getItem('auth-token');
       const savedUser = localStorage.getItem('auth-user');
@@ -142,25 +152,56 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
+    console.log('🔐 Login attempt started');
+    console.log('📧 Email:', email);
+    
     try {
-      const response = await axios.post<AuthResponse>('/api/auth/login', {
-        email,
-        password,
+      // Use relative URL to let Vite proxy handle it
+      const loginUrl = '/api/auth/login';
+      console.log('📤 Sending POST request to:', loginUrl);
+      console.log('📦 Request body:', JSON.stringify({ email, password: '***' }));
+      
+      // Try fetch with relative path (uses Vite proxy)
+      const fetchResponse = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      }).catch((fetchError) => {
+        console.error('❌ Fetch failed immediately:', fetchError);
+        throw new Error(`Network request failed: ${fetchError.message}`);
       });
 
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Login failed');
+      console.log('✅ Fetch response received:', fetchResponse.status);
+      
+      if (!fetchResponse.ok) {
+        const errorData = await fetchResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${fetchResponse.status}`);
       }
 
-      const { token: newToken, user: userData } = response.data;
+      const data = await fetchResponse.json();
+      console.log('📦 Response data:', data);
+
+      if (!data.success) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      const { token: newToken, user: userData } = data;
 
       setToken(newToken);
       setUser(userData);
       localStorage.setItem('auth-token', newToken);
       localStorage.setItem('auth-user', JSON.stringify(userData));
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      
+      console.log('✅ Login successful');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      console.error('❌ Login error:', error);
+      console.error('❌ Error name:', error.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      const errorMessage = error.message || 'Login failed';
       throw new Error(errorMessage);
     }
   };
