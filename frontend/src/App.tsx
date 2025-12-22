@@ -4,6 +4,7 @@ import { Box } from '@mui/material';
 import { useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import { InstallPrompt } from './components/InstallPrompt';
+import OfflineIndicator from './components/OfflineIndicator';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <ToastProvider>
         <InstallPrompt />
+        <OfflineIndicator />
         <Box sx={{ minHeight: '100vh' }}>
           <Routes>
             <Route

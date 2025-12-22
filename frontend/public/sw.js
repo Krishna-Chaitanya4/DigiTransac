@@ -112,3 +112,20 @@ self.addEventListener('message', (event) => {
     );
   }
 });
+
+// Background sync event - sync offline changes
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-transactions') {
+    event.waitUntil(
+      // Notify clients to start sync
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({
+            type: 'BACKGROUND_SYNC',
+            action: 'START_SYNC',
+          });
+        });
+      })
+    );
+  }
+});

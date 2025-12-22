@@ -12,6 +12,9 @@ A modern, full-stack transaction management application built with React, Node.j
 - **Export Data**: CSV and PDF export capabilities
 - **Dark Mode**: Eye-friendly theme switching
 - **Responsive Design**: Perfect on desktop, tablet, and mobile
+- **🆕 Offline Support**: Work without internet - changes sync automatically
+- **🆕 PWA Install**: Install as native app on mobile and desktop
+- **🆕 Background Sync**: Automatic sync when connection restored
 
 ## 🏗️ Architecture
 

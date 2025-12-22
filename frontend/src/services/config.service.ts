@@ -93,3 +93,8 @@ class ConfigService {
 }
 
 export const configService = new ConfigService();
+
+// Helper function for convenient API URL access
+export const getApiUrl = (): string => {
+  return configService.getApiUrl();
+};

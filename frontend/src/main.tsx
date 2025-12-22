@@ -7,7 +7,18 @@ import App from './App';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { registerServiceWorker } from './utils/pwa';
+import { offlineDB } from './utils/offline/db';
+import { syncManager } from './utils/offline/sync';
 import './index.css';
+
+// Initialize offline support
+offlineDB.init().then(() => {
+  console.log('Offline database initialized');
+  // Start auto-sync
+  syncManager.startAutoSync();
+}).catch(error => {
+  console.error('Failed to initialize offline database:', error);
+});
 
 // Register service worker for PWA (always enabled for testing)
 registerServiceWorker();
