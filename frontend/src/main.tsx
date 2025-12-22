@@ -9,10 +9,8 @@ import { AuthProvider } from './context/AuthContext';
 import { registerServiceWorker } from './utils/pwa';
 import './index.css';
 
-// Register service worker for PWA
-if (import.meta.env.PROD) {
-  registerServiceWorker();
-}
+// Register service worker for PWA (always enabled for testing)
+registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
