@@ -705,18 +705,24 @@ const Analytics: React.FC = () => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box sx={{ 
+        width: '100%', 
+        overflow: 'hidden',
+        mx: { xs: -3, sm: -3, md: 0 },
+        px: { xs: 2, sm: 3, md: 0 }
+      }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
           <Typography variant="h4" fontWeight={700}>
             📊 Analytics
           </Typography>
           <Button
             variant="outlined"
-            startIcon={<FileDownloadIcon />}
+            startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
             onClick={exportToCSV}
             disabled={!overview}
+            size="small"
           >
-            Export CSV
+            Export
           </Button>
         </Box>
 
@@ -737,7 +743,13 @@ const Analytics: React.FC = () => {
 
         {/* Tabs for different views */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs value={currentTab} onChange={(_, newValue) => setCurrentTab(newValue)}>
+          <Tabs 
+            value={currentTab} 
+            onChange={(_, newValue) => setCurrentTab(newValue)}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+          >
             <Tab label="Overview" />
             <Tab label="Trends & Patterns" />
             <Tab label="Budgets & Goals" />
@@ -746,7 +758,7 @@ const Analytics: React.FC = () => {
 
         {/* Overview Statistics with Comparison */}
         {overview && overview.comparison && (
-          <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 3 }}>
             <Grid item xs={12} sm={6} md={3}>
               <Card>
                 <CardContent>
@@ -840,7 +852,7 @@ const Analytics: React.FC = () => {
           <>
             {/* Smart Insights Section */}
             {smartInsights && (
-          <Grid container spacing={2} mb={3}>
+              <Grid container spacing={2} mb={3}>
             {/* Overall Trend Alert */}
             {smartInsights.overallTrend && (
               <Grid item xs={12}>
@@ -1173,7 +1185,7 @@ const Analytics: React.FC = () => {
         </Grid>
 
         {/* Charts */}
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, sm: 3 }}>
           {/* Category Breakdown Pie Chart */}
           <Grid item xs={12} md={6}>
             <Card
@@ -1207,7 +1219,7 @@ const Analytics: React.FC = () => {
                       <Tooltip title="View by individual categories">
                         <Box display="flex" alignItems="center" gap={0.5}>
                           <CategoryIcon fontSize="small" />
-                          <Typography variant="caption">Categories</Typography>
+                          <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'inline' } }}>Categories</Typography>
                         </Box>
                       </Tooltip>
                     </ToggleButton>
@@ -1215,7 +1227,7 @@ const Analytics: React.FC = () => {
                       <Tooltip title="View grouped by folders">
                         <Box display="flex" alignItems="center" gap={0.5}>
                           <FolderIcon fontSize="small" />
-                          <Typography variant="caption">Folders</Typography>
+                          <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'inline' } }}>Folders</Typography>
                         </Box>
                       </Tooltip>
                     </ToggleButton>
@@ -1270,7 +1282,7 @@ const Analytics: React.FC = () => {
                             }
                             borderColor="divider"
                           >
-                            <Box display="flex" alignItems="center" gap={1} minWidth={0} flex={1}>
+                            <Box display="flex" alignItems="center" gap={1} minWidth={0} flex={1} sx={{ overflow: 'hidden' }}>
                               <Box
                                 width={12}
                                 height={12}

@@ -647,27 +647,35 @@ const Transactions: React.FC = () => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box sx={{ width: '100%', overflow: 'hidden' }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
           <Box>
             <Typography variant="h4" gutterBottom>
               Transactions
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               Track all your income and expenses
             </Typography>
           </Box>
-          <Box display="flex" gap={2}>
+          <Box display="flex" gap={1} flexWrap="wrap">
             <Button
               variant="outlined"
-              startIcon={<FileDownloadIcon />}
+              startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
               onClick={handleExportCSV}
               disabled={filteredTransactions.length === 0}
+              size="small"
+              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
             >
-              Export CSV
+              Export
             </Button>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
-              Add Transaction
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />} 
+              onClick={() => handleOpenDialog()}
+              size="small"
+              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
+            >
+              Add
             </Button>
           </Box>
         </Box>

@@ -1,4 +1,5 @@
 import { cosmosDBService } from '../config/cosmosdb';
+import { decryptTransaction } from './transactionEncryption';
 
 /**
  * Helper functions to work with the new transaction/splits model
@@ -46,9 +47,12 @@ export async function getExpensesFromTransactions(
   
   if (transactions.length === 0) return [];
   
+  // Decrypt transactions
+  const decryptedTransactions = transactions.map((t: any) => decryptTransaction(t));
+  
   // Get splits for these transactions
   const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-  const transactionIds = transactions.map((t: any) => t.id);
+  const transactionIds = decryptedTransactions.map((t: any) => t.id);
   
   const splits = await splitsContainer
     .find({ transactionId: { $in: transactionIds } })
@@ -56,7 +60,7 @@ export async function getExpensesFromTransactions(
   
   // Create expense-like objects from splits with transaction data
   const expenses: ExpenseFromSplit[] = splits.map((split: any) => {
-    const transaction = transactions.find((t: any) => t.id === split.transactionId);
+    const transaction = decryptedTransactions.find((t: any) => t.id === split.transactionId);
     return {
       id: split.id,
       userId: split.userId,
@@ -90,19 +94,22 @@ export async function getExpenseById(userId: string, expenseId: string): Promise
   
   if (!transaction) return null;
   
+  // Decrypt transaction
+  const decryptedTransaction = decryptTransaction(transaction as any);
+  
   return {
     id: split.id,
     userId: split.userId,
     amount: split.amount,
     categoryId: split.categoryId,
-    date: transaction.date,
-    description: transaction.description,
-    reviewStatus: transaction.reviewStatus,
-    createdAt: transaction.createdAt,
-    accountId: transaction.accountId,
+    date: decryptedTransaction.date,
+    description: decryptedTransaction.description,
+    reviewStatus: decryptedTransaction.reviewStatus,
+    createdAt: decryptedTransaction.createdAt,
+    accountId: decryptedTransaction.accountId,
     transactionId: split.transactionId,
     tags: split.tags || [], // Include tags from the split
-    type: transaction.type, // Include transaction type
+    type: decryptedTransaction.type, // Include transaction type
   };
 }
 
