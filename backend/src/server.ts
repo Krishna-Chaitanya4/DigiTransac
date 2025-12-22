@@ -35,7 +35,7 @@ dotenv.config();
 validateEnv();
 
 const app: Application = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 // Validate configuration on startup
 validateConfig();
@@ -51,9 +51,13 @@ const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
   : ['http://localhost:3000'];
 
+console.log('🔒 CORS allowed origins:', allowedOrigins);
+
 app.use(
   cors({
     origin: (origin, callback) => {
+      console.log('📡 CORS request from origin:', origin);
+      
       // In production, reject requests without origin
       if (!origin && process.env.NODE_ENV === 'production') {
         return callback(new Error('Not allowed by CORS'));
@@ -62,8 +66,10 @@ app.use(
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
+        console.log('✅ Origin allowed:', origin);
         callback(null, true);
       } else {
+        console.log('❌ Origin blocked:', origin);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -145,11 +151,12 @@ const startServer = async () => {
     // Start recurring transactions cron job
     startRecurringTransactionsJob();
 
-    // Start server
-    app.listen(PORT, () => {
+    // Start server - listen on all network interfaces for mobile testing
+    app.listen(PORT, '0.0.0.0', () => {
       logger.info(`🚀 Server is running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
       logger.info(`✅ Cosmos DB connected and ready`);
+      logger.info(`📱 Network: http://192.168.0.11:${PORT}`);
     });
   } catch (error) {
     logger.error({ error }, '❌ Failed to start server');
