@@ -21,6 +21,7 @@ import {
   Button,
   Tabs,
   Tab,
+  Skeleton,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -214,6 +215,7 @@ const Analytics: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [loadingCharts, setLoadingCharts] = useState(true);
   const [error, setError] = useState('');
   const [currentTab, setCurrentTab] = useState(0);
 
@@ -282,6 +284,7 @@ const Analytics: React.FC = () => {
 
     try {
       setLoading(true);
+      setLoadingCharts(true);
       const params = new URLSearchParams({
         startDate: filters.dateRange.start.startOf('day').format('YYYY-MM-DD'),
         endDate: filters.dateRange.end.endOf('day').format('YYYY-MM-DD'),
@@ -300,23 +303,39 @@ const Analytics: React.FC = () => {
       // Note: Backend analytics doesn't support excludeTags yet, 
       // only include filtering for now (matches old behavior)
 
+      // PHASE 1: Load critical overview data first (fast)
+      const [overviewRes, accountsRes, categoriesRes, tagsRes] = await Promise.all([
+        axios.get(`/api/analytics/overview?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`/api/accounts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`/api/categories`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`/api/tags`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      setOverview(overviewRes.data.overview);
+      setAccounts(accountsRes.data.accounts || []);
+      setCategories(categoriesRes.data.categories || []);
+      setTags(tagsRes.data.tags || []);
+      setLoading(false); // Show overview stats immediately
+
+      // PHASE 2: Load detailed analytics and charts (slower, in background)
       const [
-        overviewRes,
         breakdownRes,
         folderBreakdownRes,
         trendsRes,
         comparisonRes,
         topExpensesRes,
-        accountsRes,
         recurringRes,
-        tagsRes,
         merchantsRes,
         insightsRes,
-        categoriesRes,
       ] = await Promise.all([
-        axios.get(`/api/analytics/overview?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
         axios.get(`/api/analytics/category-breakdown?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -332,13 +351,7 @@ const Analytics: React.FC = () => {
         axios.get(`/api/analytics/top-expenses?${params}&limit=5`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`/api/accounts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
         axios.get(`/api/transactions?isRecurring=true`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/tags`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`/api/analytics/top-merchants?${params}&limit=10`, {
@@ -347,19 +360,13 @@ const Analytics: React.FC = () => {
         axios.get(`/api/analytics/smart-insights?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`/api/categories`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
       ]);
 
       const breakdown = breakdownRes.data.breakdown || [];
       const folders = folderBreakdownRes.data.breakdown || [];
-      const allCategories = categoriesRes.data.categories || [];
 
-      setOverview(overviewRes.data.overview);
       setCategoryBreakdown(breakdown);
       setFolderBreakdown(folders);
-      setCategories(allCategories);
       setTrends(trendsRes.data.trends || []);
       setBudgetComparison(comparisonRes.data.comparisons || []);
       setTopExpenses(topExpensesRes.data.expenses || []);
@@ -514,11 +521,13 @@ const Analytics: React.FC = () => {
       const top3Folders = folders.slice(0, 3).map((f: any) => f.categoryId);
       setExpandedFolders(new Set(top3Folders));
 
+      setLoadingCharts(false);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch analytics');
     } finally {
       setLoading(false);
+      setLoadingCharts(false);
     }
   };
 
@@ -865,7 +874,25 @@ const Analytics: React.FC = () => {
         {currentTab === 0 && (
           <>
             {/* Smart Insights Section */}
-            {smartInsights && (
+            {loadingCharts ? (
+              <Box sx={{ mb: 3 }}>
+                <Card>
+                  <CardContent>
+                    <Skeleton variant="text" width="30%" height={32} sx={{ mb: 2 }} />
+                    <Skeleton variant="rectangular" height={80} sx={{ mb: 2, borderRadius: 1 }} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <Skeleton variant="rectangular" height={150} sx={{ borderRadius: 1 }} />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Skeleton variant="rectangular" height={150} sx={{ borderRadius: 1 }} />
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Box>
+            ) : (
+            smartInsights && (
               <Grid container spacing={2} mb={3}>
             {/* Overall Trend Alert */}
             {smartInsights.overallTrend && (
@@ -1101,6 +1128,7 @@ const Analytics: React.FC = () => {
               </Grid>
             )}
           </Grid>
+            )
         )}
 
         {/* Overview Stats */}
@@ -1197,6 +1225,79 @@ const Analytics: React.FC = () => {
             </Card>
           </Grid>
         </Grid>
+
+        {/* Spending Heatmap */}
+        {!loadingCharts && topExpenses.length > 0 && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={1}>
+                📅 Daily Spending Activity
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+                Visualize your spending patterns across the selected period
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                {(() => {
+                  const daysData = new Map<string, number>();
+                  topExpenses.forEach((exp) => {
+                    const key = dayjs(exp.date).format('YYYY-MM-DD');
+                    daysData.set(key, (daysData.get(key) || 0) + exp.amount);
+                  });
+                  
+                  const maxAmount = Math.max(...Array.from(daysData.values()), 1);
+                  const start = filters.dateRange.start;
+                  const end = filters.dateRange.end;
+                  const days = end.diff(start, 'day') + 1;
+                  const weeks: Array<Array<{ date: dayjs.Dayjs; amount: number; bgColor: string; key: string }>> = [];
+                  
+                  for (let i = 0; i < days; i++) {
+                    const date = start.add(i, 'day');
+                    const key = date.format('YYYY-MM-DD');
+                    const amount = daysData.get(key) || 0;
+                    const intensity = amount / maxAmount;
+                    
+                    let bgColor = '#ebedf0';
+                    if (intensity > 0.75) bgColor = '#d32f2f';
+                    else if (intensity > 0.5) bgColor = '#f57c00';
+                    else if (intensity > 0.25) bgColor = '#fbc02d';
+                    else if (intensity > 0) bgColor = '#9e9e9e';
+                    
+                    const weekIndex = Math.floor(i / 7);
+                    if (!weeks[weekIndex]) weeks[weekIndex] = [];
+                    weeks[weekIndex].push({ date, amount, bgColor, key });
+                  }
+                  
+                  return weeks.map((week, wIdx) => (
+                    <Box key={wIdx} display="flex" gap={0.5}>
+                      {week.map((day) => (
+                        <Tooltip key={day.key} title={`${day.date.format('MMM D')}: ${formatCurrency(day.amount)}`} arrow>
+                          <Box
+                            sx={{
+                              width: 'calc((100% - 24px) / 7)',
+                              aspectRatio: '1',
+                              bgcolor: day.bgColor,
+                              borderRadius: 0.5,
+                              cursor: 'pointer',
+                              transition: 'transform 0.2s',
+                              '&:hover': { transform: 'scale(1.15)', boxShadow: 1 },
+                            }}
+                          />
+                        </Tooltip>
+                      ))}
+                    </Box>
+                  ));
+                })()}
+              </Box>
+              <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1} mt={2}>
+                <Typography variant="caption" color="text.secondary">Less</Typography>
+                {['#ebedf0', '#9e9e9e', '#fbc02d', '#f57c00', '#d32f2f'].map((color, idx) => (
+                  <Box key={idx} sx={{ width: 16, height: 16, bgcolor: color, borderRadius: 0.5 }} />
+                ))}
+                <Typography variant="caption" color="text.secondary">More</Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Charts */}
         <Grid container spacing={{ xs: 2, sm: 3 }}>
