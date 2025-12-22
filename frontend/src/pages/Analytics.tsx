@@ -60,6 +60,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { FilterBar, FilterValues } from '../components/FilterBar';
+import PullToRefresh from '../components/PullToRefresh';
 
 interface Overview {
   totalSpent: number;
@@ -704,6 +705,7 @@ const Analytics: React.FC = () => {
   }
 
   return (
+    <PullToRefresh onRefresh={fetchAnalytics}>
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ 
         width: '100%', 
@@ -740,6 +742,18 @@ const Analytics: React.FC = () => {
           tags={tags}
           showTransactionType={false}
         />
+
+        {/* Quick Date Filters */}
+        <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+            Quick:
+          </Typography>
+          <Chip label="This Week" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().startOf('week'), end: dayjs().endOf('week'), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
+          <Chip label="This Month" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().startOf('month'), end: dayjs().endOf('month'), preset: 'thisMonth' } })} sx={{ cursor: 'pointer' }} />
+          <Chip label="Last 30 Days" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().subtract(30, 'days'), end: dayjs(), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
+          <Chip label="Last 3 Months" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().subtract(3, 'months'), end: dayjs(), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
+          <Chip label="This Year" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().startOf('year'), end: dayjs().endOf('year'), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
+        </Box>
 
         {/* Tabs for different views */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
@@ -2596,6 +2610,7 @@ const Analytics: React.FC = () => {
         )}
       </Box>
     </LocalizationProvider>
+    </PullToRefresh>
   );
 
   // Render tree node recursively
