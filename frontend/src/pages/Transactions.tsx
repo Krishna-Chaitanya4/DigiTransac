@@ -52,6 +52,9 @@ import {
   Cancel as RejectIcon,
   Email as EmailIcon,
   CloudUpload as ImportIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  UnfoldMore as UnfoldMoreIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useToast } from '../components/Toast';
@@ -153,8 +156,9 @@ const Transactions: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().subtract(3, 'months').startOf('month'));
+  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('month'));
+  const [activeDateFilter, setActiveDateFilter] = useState<string>('thisMonth'); // Track active quick filter
   const [reviewStatus, setReviewStatus] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<string>('date');
@@ -168,7 +172,7 @@ const Transactions: React.FC = () => {
   const [smsImportOpen, setSmsImportOpen] = useState(false);
   const [emailImportOpen, setEmailImportOpen] = useState(false);
   const [importMenuAnchor, setImportMenuAnchor] = useState<null | HTMLElement>(null);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0); // Total records from API
 
   // Form states
   const [formData, setFormData] = useState({
@@ -201,7 +205,6 @@ const Transactions: React.FC = () => {
         setLoading(true);
         await Promise.all([fetchAccounts(), fetchCategories(), fetchTags()]);
         await fetchTransactions();
-        await fetchPendingCount();
       } catch (err) {
         console.error('Error initializing transactions page:', err);
         toast.error('Failed to load data');
@@ -213,13 +216,35 @@ const Transactions: React.FC = () => {
     initializeData();
   }, []);
 
+  // Reset to first page when filters change (industry standard: API filtering)
+  useEffect(() => {
+    if (token) {
+      setPage(0);
+    }
+  }, [selectedType, selectedAccount, selectedCategory, selectedTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+
+  // Fetch transactions when page, rowsPerPage, or any filter changes
+  useEffect(() => {
+    if (!token) return;
+    
+    // Debounce only for search query to avoid excessive API calls while typing
+    const debounceTimer = setTimeout(() => {
+      fetchTransactions();
+    }, searchQuery ? 500 : 0); // Debounce search, immediate for other filters
+
+    return () => clearTimeout(debounceTimer);
+  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategory, selectedTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+
   const fetchTransactions = async () => {
     try {
       const params: any = {
         sortBy,
         sortOrder,
+        limit: rowsPerPage.toString(),
+        skip: (page * rowsPerPage).toString(),
       };
 
+      if (searchQuery) params.search = searchQuery;
       if (selectedType !== 'all') params.type = selectedType;
       if (selectedAccount) params.accountId = selectedAccount;
       if (selectedCategory) params.categoryId = selectedCategory;
@@ -235,6 +260,7 @@ const Transactions: React.FC = () => {
       });
 
       setTransactions(response.data.transactions || []);
+      setTotalCount(response.data.pagination?.total || 0);
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
       toast.error(err.response?.data?.message || 'Failed to fetch transactions');
@@ -278,18 +304,6 @@ const Transactions: React.FC = () => {
     }
   };
 
-  const fetchPendingCount = async () => {
-    try {
-      const response = await axios.get(`/api/transactions/pending/count`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setPendingCount(response.data.count || 0);
-    } catch (err: any) {
-      console.error('Failed to fetch pending count:', err);
-      setPendingCount(0);
-    }
-  };
-
   const handleApprove = async (id: string) => {
     try {
       await axios.patch(`/api/transactions/${id}/approve`, {}, {
@@ -297,7 +311,7 @@ const Transactions: React.FC = () => {
       });
       toast.success('Transaction approved');
       await fetchTransactions();
-      await fetchPendingCount();
+      
     } catch (error: any) {
       console.error('Error approving transaction:', error);
       toast.error(error.response?.data?.message || 'Failed to approve transaction');
@@ -311,7 +325,7 @@ const Transactions: React.FC = () => {
       });
       toast.success('Transaction rejected');
       await fetchTransactions();
-      await fetchPendingCount();
+      
     } catch (error: any) {
       console.error('Error rejecting transaction:', error);
       toast.error(error.response?.data?.message || 'Failed to reject transaction');
@@ -333,7 +347,7 @@ const Transactions: React.FC = () => {
       toast.success(`${selectedTransactions.size} transactions approved`);
       setSelectedTransactions(new Set());
       await fetchTransactions();
-      await fetchPendingCount();
+      
     } catch (error: any) {
       console.error('Error bulk approving:', error);
       toast.error(error.response?.data?.message || 'Failed to approve transactions');
@@ -360,7 +374,7 @@ const Transactions: React.FC = () => {
 
   const handleImportSuccess = async () => {
     await fetchTransactions();
-    await fetchPendingCount();
+    
     toast.success('Transactions imported successfully');
   };
 
@@ -618,8 +632,6 @@ const Transactions: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const filteredTransactions = getFilteredTransactions();
-
     const headers = [
       'Date',
       'Type',
@@ -630,7 +642,7 @@ const Transactions: React.FC = () => {
       'Tags',
       'Status',
     ];
-    const rows = filteredTransactions.map((t) => [
+    const rows = transactions.map((t) => [
       dayjs(t.date).format('YYYY-MM-DD'),
       t.type.toUpperCase(),
       getAccountName(t.accountId),
@@ -657,7 +669,7 @@ const Transactions: React.FC = () => {
     if (selectAll) {
       setSelectedTransactions(new Set());
     } else {
-      setSelectedTransactions(new Set(getFilteredTransactions().map((t) => t.id)));
+      setSelectedTransactions(new Set(transactions.map((t) => t.id)));
     }
     setSelectAll(!selectAll);
   };
@@ -670,18 +682,7 @@ const Transactions: React.FC = () => {
       newSelected.add(id);
     }
     setSelectedTransactions(newSelected);
-    setSelectAll(newSelected.size === getFilteredTransactions().length);
-  };
-
-  const getFilteredTransactions = () => {
-    return transactions.filter((transaction) => {
-      const matchesSearch =
-        searchQuery === '' ||
-        transaction.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        transaction.merchantName?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      return matchesSearch;
-    });
+    setSelectAll(newSelected.size === transactions.length);
   };
 
   const clearFilters = () => {
@@ -691,8 +692,10 @@ const Transactions: React.FC = () => {
     setSelectedCategory('');
     setSelectedTags([]);
     setStartDate(dayjs().startOf('month'));
-    setEndDate(dayjs());
+    setEndDate(dayjs().endOf('month'));
+    setActiveDateFilter('thisMonth');
     setReviewStatus('all');
+    setPage(0); // Reset to first page
   };
 
   const getAccountName = (accountId: string) => {
@@ -730,11 +733,10 @@ const Transactions: React.FC = () => {
     );
   }
 
-  const filteredTransactions = getFilteredTransactions();
-  const totalCredits = filteredTransactions
+  const totalCredits = transactions
     .filter((t) => t.type === 'credit')
     .reduce((sum, t) => sum + t.amount, 0);
-  const totalDebits = filteredTransactions
+  const totalDebits = transactions
     .filter((t) => t.type === 'debit')
     .reduce((sum, t) => sum + t.amount, 0);
   const netAmount = totalCredits - totalDebits;
@@ -779,7 +781,7 @@ const Transactions: React.FC = () => {
               variant="outlined"
               startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
               onClick={handleExportCSV}
-              disabled={filteredTransactions.length === 0}
+              disabled={transactions.length === 0}
               size="small"
               sx={{ minWidth: { xs: 80, sm: 'auto' } }}
             >
@@ -893,14 +895,6 @@ const Transactions: React.FC = () => {
                   </ToggleButton>
                   <ToggleButton value="pending">
                     Pending
-                    {pendingCount > 0 && (
-                      <Chip 
-                        label={pendingCount} 
-                        size="small" 
-                        color="warning" 
-                        sx={{ ml: 1, height: 20, minWidth: 20 }} 
-                      />
-                    )}
                   </ToggleButton>
                   <ToggleButton value="approved">
                     Approved
@@ -1011,7 +1005,10 @@ const Transactions: React.FC = () => {
                   <DatePicker
                     label="Start Date"
                     value={startDate}
-                    onChange={(date) => setStartDate(date)}
+                    onChange={(date) => {
+                      setStartDate(date);
+                      setActiveDateFilter(''); // Clear active filter on manual change
+                    }}
                     slotProps={{ textField: { size: 'small', fullWidth: true } }}
                   />
                 </Grid>
@@ -1020,9 +1017,77 @@ const Transactions: React.FC = () => {
                   <DatePicker
                     label="End Date"
                     value={endDate}
-                    onChange={(date) => setEndDate(date)}
+                    onChange={(date) => {
+                      setEndDate(date);
+                      setActiveDateFilter(''); // Clear active filter on manual change
+                    }}
                     slotProps={{ textField: { size: 'small', fullWidth: true } }}
                   />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Chip
+                      label="Today"
+                      size="small"
+                      variant={activeDateFilter === 'today' ? 'filled' : 'outlined'}
+                      color={activeDateFilter === 'today' ? 'primary' : 'default'}
+                      onClick={() => {
+                        setStartDate(dayjs().startOf('day'));
+                        setEndDate(dayjs().endOf('day'));
+                        setActiveDateFilter('today');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                    <Chip
+                      label="Last 7 Days"
+                      size="small"
+                      variant={activeDateFilter === 'last7' ? 'filled' : 'outlined'}
+                      color={activeDateFilter === 'last7' ? 'primary' : 'default'}
+                      onClick={() => {
+                        setStartDate(dayjs().subtract(7, 'days'));
+                        setEndDate(dayjs());
+                        setActiveDateFilter('last7');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                    <Chip
+                      label="Last 30 Days"
+                      size="small"
+                      variant={activeDateFilter === 'last30' ? 'filled' : 'outlined'}
+                      color={activeDateFilter === 'last30' ? 'primary' : 'default'}
+                      onClick={() => {
+                        setStartDate(dayjs().subtract(30, 'days'));
+                        setEndDate(dayjs());
+                        setActiveDateFilter('last30');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                    <Chip
+                      label="This Month"
+                      size="small"
+                      variant={activeDateFilter === 'thisMonth' ? 'filled' : 'outlined'}
+                      color={activeDateFilter === 'thisMonth' ? 'primary' : 'default'}
+                      onClick={() => {
+                        setStartDate(dayjs().startOf('month'));
+                        setEndDate(dayjs().endOf('month'));
+                        setActiveDateFilter('thisMonth');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                    <Chip
+                      label="Last Month"
+                      size="small"
+                      variant={activeDateFilter === 'lastMonth' ? 'filled' : 'outlined'}
+                      color={activeDateFilter === 'lastMonth' ? 'primary' : 'default'}
+                      onClick={() => {
+                        setStartDate(dayjs().subtract(1, 'month').startOf('month'));
+                        setEndDate(dayjs().subtract(1, 'month').endOf('month'));
+                        setActiveDateFilter('lastMonth');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  </Box>
                 </Grid>
 
                 <Grid item xs={12} md={6}>
@@ -1039,42 +1104,6 @@ const Transactions: React.FC = () => {
                     }
                   />
                 </Grid>
-
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    select
-                    label="Status"
-                    value={reviewStatus}
-                    onChange={(e) => setReviewStatus(e.target.value)}
-                    fullWidth
-                    size="small"
-                  >
-                    <MenuItem value="all">All Status</MenuItem>
-                    <MenuItem value="approved">Approved</MenuItem>
-                    <MenuItem value="pending">Pending</MenuItem>
-                    <MenuItem value="rejected">Rejected</MenuItem>
-                  </TextField>
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    select
-                    label="Sort By"
-                    value={`${sortBy}-${sortOrder}`}
-                    onChange={(e) => {
-                      const [field, order] = e.target.value.split('-');
-                      setSortBy(field);
-                      setSortOrder(order as 'asc' | 'desc');
-                    }}
-                    fullWidth
-                    size="small"
-                  >
-                    <MenuItem value="date-desc">Date (Newest)</MenuItem>
-                    <MenuItem value="date-asc">Date (Oldest)</MenuItem>
-                    <MenuItem value="amount-desc">Amount (High to Low)</MenuItem>
-                    <MenuItem value="amount-asc">Amount (Low to High)</MenuItem>
-                  </TextField>
-                </Grid>
               </Grid>
             </Collapse>
           </CardContent>
@@ -1085,7 +1114,7 @@ const Transactions: React.FC = () => {
           // Mobile Card View with Pull-to-Refresh
           <PullToRefresh onRefresh={async () => await fetchTransactions()}>
             <Box>
-              {filteredTransactions.length === 0 ? (
+              {transactions.length === 0 ? (
                 <EmptyState
                   icon={<ReceiptIcon />}
                   title="No transactions found"
@@ -1095,9 +1124,7 @@ const Transactions: React.FC = () => {
                 />
               ) : (
                 <>
-                  {filteredTransactions
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((transaction) => {
+                  {transactions.map((transaction) => {
                       const CardComponent = isTouchDevice ? SwipeableTransactionCard : TransactionCard;
                       const isPending = transaction.reviewStatus === 'pending';
                       
@@ -1151,7 +1178,7 @@ const Transactions: React.FC = () => {
                     })}
                   <TablePagination
                     component="div"
-                    count={filteredTransactions.length}
+                    count={totalCount}
                     page={page}
                     onPageChange={(_, newPage) => setPage(newPage)}
                     rowsPerPage={rowsPerPage}
@@ -1176,21 +1203,138 @@ const Transactions: React.FC = () => {
                     <Checkbox
                       checked={selectAll}
                       onChange={handleSelectAll}
-                      disabled={filteredTransactions.length === 0}
+                      disabled={transactions.length === 0}
                     />
                   </TableCell>
                   <TableCell></TableCell>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Description</TableCell>
+                  <TableCell 
+                    sx={{ 
+                      cursor: 'pointer', 
+                      userSelect: 'none',
+                      '&:hover .sort-icon': { opacity: 1 }
+                    }}
+                    onClick={() => {
+                      if (sortBy === 'date') {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortBy('date');
+                        setSortOrder('desc');
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Date
+                      {sortBy === 'date' ? (
+                        sortOrder === 'desc' ? 
+                          <ArrowDownwardIcon fontSize="small" /> : 
+                          <ArrowUpwardIcon fontSize="small" />
+                      ) : (
+                        <UnfoldMoreIcon 
+                          fontSize="small" 
+                          className="sort-icon"
+                          sx={{ opacity: 0, color: 'text.secondary' }} 
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell 
+                    sx={{ 
+                      cursor: 'pointer', 
+                      userSelect: 'none',
+                      '&:hover .sort-icon': { opacity: 1 }
+                    }}
+                    onClick={() => {
+                      if (sortBy === 'type') {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortBy('type');
+                        setSortOrder('asc');
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Type
+                      {sortBy === 'type' ? (
+                        sortOrder === 'desc' ? 
+                          <ArrowDownwardIcon fontSize="small" /> : 
+                          <ArrowUpwardIcon fontSize="small" />
+                      ) : (
+                        <UnfoldMoreIcon 
+                          fontSize="small" 
+                          className="sort-icon"
+                          sx={{ opacity: 0, color: 'text.secondary' }} 
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell 
+                    sx={{ 
+                      cursor: 'pointer', 
+                      userSelect: 'none',
+                      '&:hover .sort-icon': { opacity: 1 }
+                    }}
+                    onClick={() => {
+                      if (sortBy === 'description') {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortBy('description');
+                        setSortOrder('asc');
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Description
+                      {sortBy === 'description' ? (
+                        sortOrder === 'desc' ? 
+                          <ArrowDownwardIcon fontSize="small" /> : 
+                          <ArrowUpwardIcon fontSize="small" />
+                      ) : (
+                        <UnfoldMoreIcon 
+                          fontSize="small" 
+                          className="sort-icon"
+                          sx={{ opacity: 0, color: 'text.secondary' }} 
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
                   <TableCell>Category</TableCell>
                   <TableCell>Tags</TableCell>
-                  <TableCell align="right">Amount</TableCell>
+                  <TableCell 
+                    align="right"
+                    sx={{ 
+                      cursor: 'pointer', 
+                      userSelect: 'none',
+                      '&:hover .sort-icon': { opacity: 1 }
+                    }}
+                    onClick={() => {
+                      if (sortBy === 'amount') {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortBy('amount');
+                        setSortOrder('desc');
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                      Amount
+                      {sortBy === 'amount' ? (
+                        sortOrder === 'desc' ? 
+                          <ArrowDownwardIcon fontSize="small" /> : 
+                          <ArrowUpwardIcon fontSize="small" />
+                      ) : (
+                        <UnfoldMoreIcon 
+                          fontSize="small" 
+                          className="sort-icon"
+                          sx={{ opacity: 0, color: 'text.secondary' }} 
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredTransactions.length === 0 ? (
+                {transactions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} sx={{ border: 'none', p: 0 }}>
                       <EmptyState
@@ -1203,9 +1347,7 @@ const Transactions: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTransactions
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((transaction) => {
+                  transactions.map((transaction) => {
                       const isExpanded = expandedRows.has(transaction.id);
                       const hasSplits = transaction.splits && transaction.splits.length > 1;
 
@@ -1504,7 +1646,7 @@ const Transactions: React.FC = () => {
           <TablePagination
             rowsPerPageOptions={[10, 25, 50, 100]}
             component="div"
-            count={filteredTransactions.length}
+            count={totalCount}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={(_, newPage) => setPage(newPage)}

@@ -31,6 +31,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       startDate,
       endDate,
       reviewStatus,
+      search,
       limit = '100',
       skip = '0',
       sortBy = 'date',
@@ -49,6 +50,14 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // For backwards compatibility, also check transaction.categoryId
     if (type) filter.type = type;
     if (reviewStatus) filter.reviewStatus = reviewStatus;
+
+    // Search in description and merchantName
+    if (search) {
+      filter.$or = [
+        { description: { $regex: search, $options: 'i' } },
+        { merchantName: { $regex: search, $options: 'i' } },
+      ];
+    }
 
     if (startDate || endDate) {
       filter.date = {};
