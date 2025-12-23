@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -19,7 +19,6 @@ import {
   useMediaQuery,
   useTheme,
   Tooltip,
-  Badge,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -34,12 +33,10 @@ import {
   AccountBalance,
   AccountBalanceWallet as AccountsIcon,
   SwapHoriz as TransactionsIcon,
-  HourglassEmpty as PendingIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';
 import MobileBottomNav from './MobileBottomNav';
-import axios from 'axios';
 
 const drawerWidth = 240;
 
@@ -52,7 +49,6 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Transactions', icon: <TransactionsIcon />, path: '/transactions' },
-  { text: 'Review Queue', icon: <PendingIcon />, path: '/pending' },
   { text: 'Accounts', icon: <AccountsIcon />, path: '/accounts' },
   { text: 'Categories', icon: <CategoryIcon />, path: '/categories' },
   { text: 'Budgets', icon: <BudgetIcon />, path: '/budgets' },
@@ -64,29 +60,10 @@ const Layout: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const { mode, toggleTheme } = useThemeContext();
-
-  // Fetch pending count on mount and location change
-  useEffect(() => {
-    fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 60000); // Refresh every minute
-    return () => clearInterval(interval);
-  }, [location.pathname]);
-
-  const fetchPendingCount = async () => {
-    try {
-      const response = await axios.get('/api/transactions/pending/count');
-      setPendingCount(response.data.count || 0);
-    } catch (error) {
-      console.error('Error fetching pending count:', error);
-      // Silently fail - don't break the UI
-      setPendingCount(0);
-    }
-  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -184,13 +161,7 @@ const Layout: React.FC = () => {
                   minWidth: 40,
                 }}
               >
-                {item.path === '/pending' && pendingCount > 0 ? (
-                  <Badge badgeContent={pendingCount} color="error">
-                    {item.icon}
-                  </Badge>
-                ) : (
-                  item.icon
-                )}
+                {item.icon}
               </ListItemIcon>
               <ListItemText
                 primary={item.text}
@@ -198,23 +169,6 @@ const Layout: React.FC = () => {
                   fontWeight: location.pathname === item.path ? 700 : 500,
                 }}
               />
-              {item.path === '/pending' && pendingCount > 0 && (
-                <Box
-                  sx={{
-                    ml: 'auto',
-                    px: 1.5,
-                    py: 0.5,
-                    borderRadius: 10,
-                    backgroundColor:
-                      location.pathname === item.path ? 'rgba(255,255,255,0.3)' : 'error.main',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                  }}
-                >
-                  {pendingCount}
-                </Box>
-              )}
             </ListItemButton>
           </ListItem>
         ))}

@@ -8,24 +8,14 @@ import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
 import { requestIdMiddleware } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
-import { globalLimiter, authLimiter } from './middleware/rateLimiter';
+import { globalLimiter } from './middleware/rateLimiter';
 import { validateConfig } from './utils/configValidator';
 import { validateEnv } from './utils/envValidator';
 import { setupSwagger } from './config/swagger';
 import { cosmosDBService } from './config/cosmosdb';
 import { encryptionService } from './services/encryption.service';
-import authRoutes from './routes/auth.routes';
-import userRoutes from './routes/user.routes';
-import categoryRoutes from './routes/category.routes';
-import budgetRoutes from './routes/budget.routes';
-import analyticsRoutes from './routes/analytics.routes';
-import emailRoutes from './routes/email.routes';
-import gmailRoutes from './routes/gmail.routes';
-import accountRoutes from './routes/account.routes';
-import tagRoutes from './routes/tag.routes';
-import transactionRoutes from './routes/transaction.routes';
 import configRoutes from './routes/config.routes';
-import smsRoutes from './routes/sms.routes';
+import v1Routes from './routes/v1';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
 import { startRecurringTransactionsJob } from './jobs/recurringTransactions.job';
 
@@ -52,28 +42,29 @@ const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
   : ['http://localhost:3000'];
 
-console.log('🔒 CORS allowed origins:', allowedOrigins);
+logger.info({ allowedOrigins }, '🔒 CORS configuration loaded');
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      console.log('📡 CORS request from origin:', origin);
+      logger.debug({ origin }, '📡 CORS request received');
       
       // In production, reject requests without origin
       if (!origin && process.env.NODE_ENV === 'production') {
+        logger.warn('CORS request rejected - no origin in production');
         return callback(new Error('Not allowed by CORS'));
       }
       // Allow requests with no origin in development (like mobile apps or curl)
       if (!origin) {
-        console.log('✅ No origin - allowing (development mode)');
+        logger.debug('No origin - allowing (development mode)');
         return callback(null, true);
       }
 
       if (allowedOrigins.includes(origin)) {
-        console.log('✅ Origin allowed:', origin);
+        logger.debug({ origin }, 'Origin allowed');
         callback(null, true);
       } else {
-        console.log('❌ Origin blocked:', origin);
+        logger.warn({ origin }, 'Origin blocked by CORS policy');
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -87,19 +78,16 @@ app.use(
 );
 
 app.use(compression());
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.use(requestIdMiddleware as any);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.use(httpLogger as any);
+app.use(requestIdMiddleware as express.RequestHandler);
+app.use(httpLogger as express.RequestHandler);
 
 // Log all OPTIONS requests for debugging
 app.options('*', (req, res) => {
-  console.log('🔍 OPTIONS preflight request received:', {
+  logger.debug({
     url: req.url,
     origin: req.headers.origin,
     method: req.method,
-    headers: req.headers
-  });
+  }, '🔍 OPTIONS preflight request received');
   res.status(204).end();
 });
 
@@ -115,10 +103,20 @@ app.get('/ping', (_req, res) => {
 
 // Readiness probe - checks if DB is initialized
 app.get('/health', async (_req, res) => {
+  const healthCheckTimeout = setTimeout(() => {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'timeout',
+      error: 'Health check timeout',
+    });
+  }, 5000); // 5 second timeout
+
   try {
     // Simple check: just verify DB service is initialized
     const isInitialized = cosmosDBService.usersContainer !== null;
 
+    clearTimeout(healthCheckTimeout);
     res.status(isInitialized ? 200 : 503).json({
       status: isInitialized ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -127,6 +125,7 @@ app.get('/health', async (_req, res) => {
       environment: process.env.NODE_ENV || 'development',
     });
   } catch (error) {
+    clearTimeout(healthCheckTimeout);
     res.status(503).json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -140,18 +139,24 @@ app.get('/health', async (_req, res) => {
 setupSwagger(app);
 
 // API Routes
+// Config route (unversioned for now)
 app.use('/api/config', configRoutes);
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/budgets', budgetRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/email', emailRoutes);
-app.use('/api/gmail', gmailRoutes);
-app.use('/api/accounts', accountRoutes);
-app.use('/api/tags', tagRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/sms', smsRoutes);
+
+// v1 API Routes
+app.use('/api/v1', v1Routes);
+
+// Legacy routes (backward compatibility) - redirect to v1
+app.use('/api/auth', (req, res) => res.redirect(308, `/api/v1/auth${req.url}`));
+app.use('/api/users', (req, res) => res.redirect(308, `/api/v1/users${req.url}`));
+app.use('/api/categories', (req, res) => res.redirect(308, `/api/v1/categories${req.url}`));
+app.use('/api/budgets', (req, res) => res.redirect(308, `/api/v1/budgets${req.url}`));
+app.use('/api/analytics', (req, res) => res.redirect(308, `/api/v1/analytics${req.url}`));
+app.use('/api/email', (req, res) => res.redirect(308, `/api/v1/email${req.url}`));
+app.use('/api/gmail', (req, res) => res.redirect(308, `/api/v1/gmail${req.url}`));
+app.use('/api/accounts', (req, res) => res.redirect(308, `/api/v1/accounts${req.url}`));
+app.use('/api/tags', (req, res) => res.redirect(308, `/api/v1/tags${req.url}`));
+app.use('/api/transactions', (req, res) => res.redirect(308, `/api/v1/transactions${req.url}`));
+app.use('/api/sms', (req, res) => res.redirect(308, `/api/v1/sms${req.url}`));
 
 // Error handling
 app.use(errorHandler);
@@ -185,5 +190,24 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal: string) => {
+  logger.info(`${signal} signal received: closing HTTP server`);
+  
+  try {
+    // Close database connection
+    await cosmosDBService.close();
+    
+    logger.info('✅ Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    logger.error({ error }, '❌ Error during graceful shutdown');
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;

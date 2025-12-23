@@ -3,6 +3,7 @@ import axios from 'axios';
 import { configService } from '../services/config.service';
 import { syncFromAPI, setupAutoSync, isOnline } from '../utils/offlineSync';
 import { initDB } from '../utils/indexedDB';
+import { isDevelopmentEnvironment } from '../utils/environment';
 
 interface User {
   id: string;
@@ -93,10 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Don't set axios baseURL in development - use relative URLs for Vite proxy
       // In production, the config service will provide the correct API URL
-      const isDevelopment = window.location.hostname === 'localhost' || 
-                           window.location.hostname.startsWith('192.168.') ||
-                           window.location.hostname.startsWith('10.') ||
-                           window.location.hostname.startsWith('172.');
+      const isDevelopment = isDevelopmentEnvironment();
       
       if (!isDevelopment) {
         const apiUrl = configService.getApiUrl();

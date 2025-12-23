@@ -1,3 +1,5 @@
+import { getBackendUrl, getEnvironment, logEnvironmentInfo } from '../utils/environment';
+
 // Runtime configuration service
 class ConfigService {
   private config: {
@@ -8,23 +10,7 @@ class ConfigService {
 
   async fetchConfig(): Promise<void> {
     try {
-      // Detect environment - check for local network IPs too
-      const hostname = window.location.hostname;
-      const isDevelopment =
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1' ||
-        hostname.startsWith('192.168.') ||
-        hostname.startsWith('10.') ||
-        hostname.startsWith('172.');
-
-      // Use environment-specific backend URL
-      // For local network access, use the current hostname with backend port
-      const backendUrl = isDevelopment
-        ? import.meta.env.VITE_API_URL ||
-          (hostname === 'localhost' || hostname === '127.0.0.1'
-            ? 'http://localhost:5000'
-            : `http://${hostname}:5000`)
-        : 'https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io';
+      const backendUrl = getBackendUrl();
 
       const response = await fetch(`${backendUrl}/api/config`, {
         method: 'GET',
@@ -41,38 +27,20 @@ class ConfigService {
 
       this.config = await response.json();
       console.log('✅ Configuration loaded:', this.config);
-      console.log(`🌍 Environment: ${isDevelopment ? 'Local Development' : 'Production'}`);
-      if (this.config) {
-        console.log(`🔗 API URL: ${this.config.apiUrl}`);
-        console.log(`📍 Hostname: ${hostname}`);
-      }
+      logEnvironmentInfo();
     } catch (error) {
       console.error('❌ Failed to load configuration:', error);
 
-      // Environment-aware fallback with local network support
-      const hostname = window.location.hostname;
-      const isDevelopment =
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1' ||
-        hostname.startsWith('192.168.') ||
-        hostname.startsWith('10.') ||
-        hostname.startsWith('172.');
-
-      const fallbackApiUrl = isDevelopment
-        ? import.meta.env.VITE_API_URL ||
-          (hostname === 'localhost' || hostname === '127.0.0.1'
-            ? 'http://localhost:5000'
-            : `http://${hostname}:5000`)
-        : 'https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io';
+      // Use environment-aware fallback
+      const fallbackApiUrl = getBackendUrl();
 
       this.config = {
         apiUrl: fallbackApiUrl,
-        environment: isDevelopment ? 'development' : 'production',
+        environment: getEnvironment(),
         version: '1.0.0',
       };
       console.log('⚠️ Using fallback configuration:', this.config);
-      console.log(`🔗 Fallback API URL: ${fallbackApiUrl}`);
-      console.log(`📍 Hostname: ${hostname}`);
+      logEnvironmentInfo();
     }
   }
 

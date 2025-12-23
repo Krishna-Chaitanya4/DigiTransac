@@ -15,7 +15,6 @@ import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
 import Accounts from './pages/Accounts';
 import Transactions from './pages/Transactions';
-import PendingTransactions from './pages/PendingTransactions';
 import Loading from './components/Loading';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -63,7 +62,6 @@ const App: React.FC = () => {
               <Route index element={<Navigate to="/dashboard" />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="transactions" element={<Transactions />} />
-              <Route path="pending" element={<PendingTransactions />} />
               <Route path="categories" element={<Categories />} />
               <Route path="accounts" element={<Accounts />} />
               <Route path="budgets" element={<Budgets />} />

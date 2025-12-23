@@ -27,14 +27,12 @@ import {
   AccountBalance,
   CreditCard,
   Savings,
-  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
-import { FilterBar, FilterValues } from '../components/FilterBar';
 import PullToRefresh from '../components/PullToRefresh';
 import ResponsiveChart from '../components/ResponsiveChart';
 import { useResponsive } from '../hooks/useResponsive';
@@ -137,24 +135,24 @@ const Dashboard: React.FC = () => {
     budgetHealthScore: number;
   } | null>(null);
 
-  // Filter states
-  const [accounts, setAccounts] = useState<any[]>([]);
+  // Filter states - Dashboard is locked to "This Month"
   const [categories, setCategories] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
-  const [filters, setFilters] = useState<FilterValues>({
+  // Dashboard always shows "This Month" - no user filtering
+  const filters = {
     dateRange: {
       start: dayjs().startOf('month'),
       end: dayjs().endOf('month'),
       preset: 'thisMonth',
     },
-    accounts: [],
-    categories: [],
-    includeTags: [],
-    excludeTags: [],
-    transactionType: 'all',
-  });
+    accounts: [] as string[],
+    categories: [] as string[],
+    includeTags: [] as string[],
+    excludeTags: [] as string[],
+    transactionType: 'all' as const,
+  };
 
   useEffect(() => {
     fetchInitialData();
@@ -171,26 +169,26 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     // Only fetch dashboard data once initial data is loaded
+    // Dashboard is locked to "This Month" - no filter dependencies needed
     if (initialDataLoaded) {
       fetchDashboardData();
     }
-  }, [filters, initialDataLoaded]);
+  }, [initialDataLoaded]);
 
   const fetchInitialData = async () => {
     try {
-      const [accountsRes, categoriesRes, tagsRes] = await Promise.all([
-        axios.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } }),
+      const [, categoriesRes, tagsRes] = await Promise.all([
+        axios.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } }), // Still fetch but don't store
         axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/tags', { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
-      setAccounts(accountsRes.data.accounts || []);
+      // We don't store accounts in state anymore since we removed filtering
       setCategories(categoriesRes.data.categories || []);
       setTags(tagsRes.data.tags || []);
     } catch (err) {
       console.error('Failed to fetch initial data:', err);
       // Set empty arrays on error to unblock dashboard loading
-      setAccounts([]);
       setCategories([]);
       setTags([]);
     } finally {
@@ -677,90 +675,6 @@ const Dashboard: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const exportDashboardToCSV = () => {
-    if (!stats) return;
-
-    const rows: string[][] = [];
-    
-    // Header
-    rows.push(['Dashboard Export']);
-    rows.push(['Period', `${filters.dateRange.start.format('YYYY-MM-DD')} to ${filters.dateRange.end.format('YYYY-MM-DD')}`]);
-    rows.push(['']);
-    
-    // Stats Summary
-    rows.push(['Summary Statistics']);
-    rows.push(['Month Spent', stats.monthSpent.toString()]);
-    rows.push(['Month Income', stats.monthIncome.toString()]);
-    rows.push(['Net Savings', stats.netSavings.toString()]);
-    rows.push(['Budget Left', stats.budgetLeft.toString()]);
-    rows.push(['Expense Count', stats.expenseCount.toString()]);
-    rows.push(['Income Count', stats.incomeCount.toString()]);
-    rows.push(['Average Daily Spending', stats.avgDailySpending.toFixed(2)]);
-    rows.push(['Spending Change %', stats.percentChange.toString()]);
-    rows.push(['Income Change %', stats.incomePercentChange.toString()]);
-    rows.push(['']);
-
-    // Recent Transactions
-    if (recentTransactions.length > 0) {
-      rows.push(['Recent Transactions']);
-      rows.push(['Date', 'Description', 'Category', 'Type', 'Amount']);
-      recentTransactions.forEach(txn => {
-        rows.push([txn.date, txn.description, txn.categoryName, txn.type, txn.amount.toString()]);
-      });
-      rows.push(['']);
-    }
-
-    // Budget Status
-    if (budgetStatus.length > 0) {
-      rows.push(['Budget Status']);
-      rows.push(['Category', 'Budget', 'Spent', 'Percentage', 'Status']);
-      budgetStatus.forEach(budget => {
-        rows.push([
-          budget.categoryName,
-          budget.budget.toString(),
-          budget.spent.toString(),
-          budget.percentage.toString() + '%',
-          budget.isOver ? 'Over Budget' : 'On Track'
-        ]);
-      });
-      rows.push(['']);
-    }
-
-    // Top Categories
-    if (topCategories.length > 0) {
-      rows.push(['Top Spending Categories']);
-      rows.push(['Category', 'Amount']);
-      topCategories.forEach(cat => {
-        rows.push([cat.name, cat.value.toString()]);
-      });
-      rows.push(['']);
-    }
-
-    // Account Balances
-    if (accountBalances.length > 0) {
-      rows.push(['Account Balances']);
-      rows.push(['Account', 'Type', 'Balance', 'Currency']);
-      accountBalances.forEach(acc => {
-        rows.push([acc.name, acc.accountType, acc.balance.toString(), acc.currency]);
-      });
-    }
-
-    // Convert to CSV
-    const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-    
-    // Download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `dashboard_${filters.dateRange.start.format('YYYY-MM-DD')}_to_${filters.dateRange.end.format('YYYY-MM-DD')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -826,76 +740,20 @@ const Dashboard: React.FC = () => {
             Welcome back, {user?.firstName || user?.email || 'User'}! Here's your expense overview.
           </Typography>
         </Box>
-        <Box display="flex" gap={2} flexWrap="wrap">
-          <Button
-            variant="outlined"
-            startIcon={<FileDownloadIcon />}
-            onClick={exportDashboardToCSV}
-            disabled={!stats}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 2,
-              py: 1.5,
-              display: { xs: 'none', sm: 'inline-flex' },
-            }}
-          >
-            Export
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/transactions')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            }}
-          >
-            {isMobile ? 'New' : 'New Transaction'}
-          </Button>
-          {!isMobile && (
-            <>
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/accounts')}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  px: 3,
-                  py: 1.5,
-                }}
-              >
-                Accounts
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/analytics')}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  px: 3,
-                  py: 1.5,
-                }}
-              >
-                Analytics
-              </Button>
-            </>
-          )}
-        </Box>
-      </Box>
-
-      {/* FilterBar Component */}
-      <Box sx={{ mb: 3 }}>
-        <FilterBar
-          accounts={accounts}
-          categories={categories}
-          tags={tags}
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => navigate('/transactions')}
+          sx={{
+            borderRadius: 2,
+            textTransform: 'none',
+            px: 3,
+            py: 1.5,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          }}
+        >
+          {isMobile ? 'New' : 'New Transaction'}
+        </Button>
       </Box>
 
       {error && (
@@ -1065,6 +923,21 @@ const Dashboard: React.FC = () => {
                     </Box>
                   </Grid>
                 </Grid>
+                <Box sx={{ mt: 3, textAlign: 'center' }}>
+                  <Button
+                    variant="text"
+                    onClick={() => navigate('/analytics')}
+                    sx={{
+                      color: 'white',
+                      textTransform: 'none',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      },
+                    }}
+                  >
+                    View Detailed Analytics →
+                  </Button>
+                </Box>
               </CardContent>
             </Card>
           </Grid>

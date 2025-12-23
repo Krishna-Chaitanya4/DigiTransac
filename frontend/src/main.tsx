@@ -9,7 +9,11 @@ import { AuthProvider } from './context/AuthContext';
 import { registerServiceWorker } from './utils/pwa';
 import { offlineDB } from './utils/offline/db';
 import { syncManager } from './utils/offline/sync';
+import { setupAxiosInterceptors } from './utils/axiosConfig';
 import './index.css';
+
+// Setup axios interceptors
+setupAxiosInterceptors();
 
 // Initialize offline support
 offlineDB.init().then(() => {

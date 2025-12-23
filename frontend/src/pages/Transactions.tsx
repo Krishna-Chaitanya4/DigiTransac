@@ -12,11 +12,13 @@ import {
   TableHead,
   TableRow,
   IconButton,
+  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
   MenuItem,
+  Menu,
   Chip,
   InputAdornment,
   Grid,
@@ -30,6 +32,7 @@ import {
   Switch,
   TablePagination,
   Tooltip,
+  Alert,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -45,6 +48,10 @@ import {
   ChevronRight as ChevronRightIcon,
   ReceiptLong as ReceiptIcon,
   Sms as SmsIcon,
+  CheckCircle as ApproveIcon,
+  Cancel as RejectIcon,
+  Email as EmailIcon,
+  CloudUpload as ImportIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useToast } from '../components/Toast';
@@ -160,6 +167,9 @@ const Transactions: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [smsImportOpen, setSmsImportOpen] = useState(false);
+  const [emailImportOpen, setEmailImportOpen] = useState(false);
+  const [importMenuAnchor, setImportMenuAnchor] = useState<null | HTMLElement>(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -193,6 +203,7 @@ const Transactions: React.FC = () => {
         setLoading(true);
         await Promise.all([fetchAccounts(), fetchCategories(), fetchTags()]);
         await fetchTransactions();
+        await fetchPendingCount();
       } catch (err) {
         console.error('Error initializing transactions page:', err);
         toast.error('Failed to load data');
@@ -267,6 +278,92 @@ const Transactions: React.FC = () => {
       console.error('Failed to fetch tags:', err);
       setTags([]); // Set empty array on error to prevent white screen
     }
+  };
+
+  const fetchPendingCount = async () => {
+    try {
+      const response = await axios.get(`/api/transactions/pending/count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPendingCount(response.data.count || 0);
+    } catch (err: any) {
+      console.error('Failed to fetch pending count:', err);
+      setPendingCount(0);
+    }
+  };
+
+  const handleApprove = async (id: string) => {
+    try {
+      await axios.patch(`/api/transactions/${id}/approve`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Transaction approved');
+      await fetchTransactions();
+      await fetchPendingCount();
+    } catch (error: any) {
+      console.error('Error approving transaction:', error);
+      toast.error(error.response?.data?.message || 'Failed to approve transaction');
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      await axios.patch(`/api/transactions/${id}/reject`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Transaction rejected');
+      await fetchTransactions();
+      await fetchPendingCount();
+    } catch (error: any) {
+      console.error('Error rejecting transaction:', error);
+      toast.error(error.response?.data?.message || 'Failed to reject transaction');
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedTransactions.size === 0) {
+      toast.error('No transactions selected');
+      return;
+    }
+
+    try {
+      await axios.post('/api/transactions/bulk-approve', {
+        transactionIds: Array.from(selectedTransactions),
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(`${selectedTransactions.size} transactions approved`);
+      setSelectedTransactions(new Set());
+      await fetchTransactions();
+      await fetchPendingCount();
+    } catch (error: any) {
+      console.error('Error bulk approving:', error);
+      toast.error(error.response?.data?.message || 'Failed to approve transactions');
+    }
+  };
+
+  const handleImportMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setImportMenuAnchor(event.currentTarget);
+  };
+
+  const handleImportMenuClose = () => {
+    setImportMenuAnchor(null);
+  };
+
+  const handleSMSImport = () => {
+    handleImportMenuClose();
+    setSmsImportOpen(true);
+  };
+
+  const handleEmailImport = () => {
+    handleImportMenuClose();
+    setEmailImportOpen(true);
+  };
+
+  const handleImportSuccess = async () => {
+    await fetchTransactions();
+    await fetchPendingCount();
+    toast.success('Transactions imported successfully');
   };
 
   const handleOpenDialog = (transaction?: Transaction) => {
@@ -663,13 +760,27 @@ const Transactions: React.FC = () => {
           <Box display="flex" gap={1} flexWrap="wrap">
             <Button
               variant="outlined"
-              startIcon={<SmsIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
-              onClick={() => setSmsImportOpen(true)}
+              startIcon={<ImportIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
+              onClick={handleImportMenuOpen}
               size="small"
               sx={{ minWidth: { xs: 80, sm: 'auto' } }}
             >
-              {isMobile ? 'SMS' : 'Import SMS'}
+              {isMobile ? 'Import' : 'Import'}
             </Button>
+            <Menu
+              anchorEl={importMenuAnchor}
+              open={Boolean(importMenuAnchor)}
+              onClose={handleImportMenuClose}
+            >
+              <MenuItem onClick={handleSMSImport}>
+                <SmsIcon fontSize="small" sx={{ mr: 1 }} />
+                Import from SMS
+              </MenuItem>
+              <MenuItem onClick={handleEmailImport}>
+                <EmailIcon fontSize="small" sx={{ mr: 1 }} />
+                Import from Email
+              </MenuItem>
+            </Menu>
             <Button
               variant="outlined"
               startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
@@ -777,6 +888,34 @@ const Transactions: React.FC = () => {
                   </ToggleButton>
                 </ToggleButtonGroup>
 
+                <ToggleButtonGroup
+                  value={reviewStatus}
+                  exclusive
+                  onChange={(_, value) => value && setReviewStatus(value)}
+                  size="small"
+                >
+                  <ToggleButton value="all">
+                    All
+                  </ToggleButton>
+                  <ToggleButton value="pending">
+                    Pending
+                    {pendingCount > 0 && (
+                      <Chip 
+                        label={pendingCount} 
+                        size="small" 
+                        color="warning" 
+                        sx={{ ml: 1, height: 20, minWidth: 20 }} 
+                      />
+                    )}
+                  </ToggleButton>
+                  <ToggleButton value="approved">
+                    Approved
+                  </ToggleButton>
+                  <ToggleButton value="rejected">
+                    Rejected
+                  </ToggleButton>
+                </ToggleButtonGroup>
+
                 <Button
                   variant={showFilters ? 'contained' : 'outlined'}
                   startIcon={<FilterListIcon />}
@@ -811,6 +950,17 @@ const Transactions: React.FC = () => {
                       setSelectAll(false);
                     }}
                   />
+                  {reviewStatus === 'pending' && (
+                    <Button
+                      size="small"
+                      color="success"
+                      variant="contained"
+                      startIcon={<ApproveIcon />}
+                      onClick={handleBulkApprove}
+                    >
+                      Approve Selected
+                    </Button>
+                  )}
                   <Button
                     size="small"
                     color="error"
@@ -955,19 +1105,54 @@ const Transactions: React.FC = () => {
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((transaction) => {
                       const CardComponent = isTouchDevice ? SwipeableTransactionCard : TransactionCard;
+                      const isPending = transaction.reviewStatus === 'pending';
+                      
                       return (
-                        <CardComponent
-                          key={transaction.id}
-                          transaction={transaction}
-                          onEdit={() => handleOpenDialog(transaction)}
-                          onDelete={() => handleDeleteClick(transaction.id)}
-                          formatCurrency={(amount) => formatCurrency(amount, transaction.accountId)}
-                          getCategoryName={getCategoryName}
-                          getCategoryColor={getCategoryColor}
-                          getAccountName={getAccountName}
-                          isExpanded={expandedRows.has(transaction.id)}
-                          onToggleExpand={() => toggleRowExpansion(transaction.id)}
-                        />
+                        <Box key={transaction.id} sx={{ position: 'relative' }}>
+                          <CardComponent
+                            transaction={transaction}
+                            onEdit={() => handleOpenDialog(transaction)}
+                            onDelete={() => handleDeleteClick(transaction.id)}
+                            formatCurrency={(amount) => formatCurrency(amount, transaction.accountId)}
+                            getCategoryName={getCategoryName}
+                            getCategoryColor={getCategoryColor}
+                            getAccountName={getAccountName}
+                            isExpanded={expandedRows.has(transaction.id)}
+                            onToggleExpand={() => toggleRowExpansion(transaction.id)}
+                          />
+                          {isPending && (
+                            <Box 
+                              sx={{ 
+                                display: 'flex', 
+                                gap: 1, 
+                                mt: 1, 
+                                px: 2, 
+                                pb: 2 
+                              }}
+                            >
+                              <Button
+                                variant="contained"
+                                color="success"
+                                size="small"
+                                startIcon={<ApproveIcon />}
+                                onClick={() => handleApprove(transaction.id)}
+                                fullWidth
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                color="error"
+                                size="small"
+                                startIcon={<RejectIcon />}
+                                onClick={() => handleReject(transaction.id)}
+                                fullWidth
+                              >
+                                Reject
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
                       );
                     })}
                   <TablePagination
@@ -1185,6 +1370,28 @@ const Transactions: React.FC = () => {
                             </TableCell>
                             <TableCell align="right" sx={{ width: 100 }}>
                               <Box display="flex" gap={0.5} justifyContent="flex-end">
+                                {transaction.reviewStatus === 'pending' && (
+                                  <>
+                                    <Tooltip title="Approve">
+                                      <IconButton
+                                        size="small"
+                                        color="success"
+                                        onClick={() => handleApprove(transaction.id)}
+                                      >
+                                        <ApproveIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Reject">
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => handleReject(transaction.id)}
+                                      >
+                                        <RejectIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                )}
                                 <Tooltip title="Edit">
                                   <IconButton
                                     size="small"
@@ -1863,12 +2070,45 @@ const Transactions: React.FC = () => {
         <SMSImportModal
           open={smsImportOpen}
           onClose={() => setSmsImportOpen(false)}
-          onImportComplete={() => {
-            fetchTransactions();
-            fetchCategories();
-            fetchAccounts();
-          }}
+          onImportComplete={handleImportSuccess}
         />
+
+        {/* Email Import Info Dialog */}
+        <Dialog
+          open={emailImportOpen}
+          onClose={() => setEmailImportOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Email Import</DialogTitle>
+          <DialogContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Email import works through Gmail integration. Transactions from bank notification emails 
+              are automatically imported when you connect your Gmail account.
+            </Alert>
+            <Typography variant="body2" gutterBottom>
+              To enable email import:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mt: 1 }}>
+              1. Go to Profile Settings<br />
+              2. Connect your Gmail account<br />
+              3. Grant required permissions<br />
+              4. Transactions will be automatically imported from bank emails
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEmailImportOpen(false)}>Close</Button>
+            <Button
+              onClick={() => {
+                setEmailImportOpen(false);
+                window.location.href = '/profile';
+              }}
+              variant="contained"
+            >
+              Go to Profile
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </LocalizationProvider>
   );

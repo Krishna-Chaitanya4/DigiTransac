@@ -68,6 +68,7 @@ const OfflineIndicator: React.FC = () => {
       }, 5000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isOnline, showBanner, dismissed]);
 
   const handleClose = () => {

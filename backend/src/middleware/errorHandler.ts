@@ -36,7 +36,7 @@ export const errorHandler = (err: ApiError, req: Request, res: Response, _next: 
     success: false,
     error: message,
     requestId: requestWithId.id,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(process.env.NODE_ENV === 'development' && err.stack && { stack: err.stack }),
   });
 };
 

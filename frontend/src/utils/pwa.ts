@@ -35,9 +35,11 @@ export const registerServiceWorker = async () => {
       return registration;
     } catch (error) {
       console.error('Service Worker registration failed:', error);
+      return undefined;
     }
   } else {
     console.log('Service Worker not supported');
+    return undefined;
   }
 };
 

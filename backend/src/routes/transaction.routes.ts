@@ -3,6 +3,12 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { Transaction, TransactionSplit, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
+
+// Extended Transaction type with splits
+interface TransactionWithSplits extends Transaction {
+  splits?: TransactionSplit[];
+}
+
 import {
   encryptTransaction,
   decryptTransaction,
@@ -79,7 +85,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
           if (!acc[split.transactionId]) {
             acc[split.transactionId] = [];
           }
-          acc[split.transactionId].push(split);
+          acc[split.transactionId]!.push(split);
           return acc;
         },
         {} as Record<string, TransactionSplit[]>
@@ -89,13 +95,13 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       transactions = transactions.map((txn) => ({
         ...txn,
         splits: splitsByTransaction[txn.id] || [],
-      })) as any;
+      })) as TransactionWithSplits[];
     }
 
     // Apply category and tag filtering AFTER fetching splits (if needed)
     if (categoryId || tags) {
-      transactions = transactions.filter((txn: any) => {
-        const txnSplits = txn.splits || [];
+      transactions = transactions.filter((txn) => {
+        const txnSplits = (txn as TransactionWithSplits).splits || [];
 
         if (categoryId) {
           // Check if any split has this category (or check backwards compat categoryId)

@@ -32,7 +32,12 @@ export const authenticate = async (
     }
 
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as JWTPayload;
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new AppError('JWT_SECRET not configured', 500);
+    }
+    
+    const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
 
     // Attach userId to request
     req.userId = decoded.userId;
