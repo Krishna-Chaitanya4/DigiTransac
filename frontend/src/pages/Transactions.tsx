@@ -173,6 +173,7 @@ const Transactions: React.FC = () => {
   const [emailImportOpen, setEmailImportOpen] = useState(false);
   const [importMenuAnchor, setImportMenuAnchor] = useState<null | HTMLElement>(null);
   const [totalCount, setTotalCount] = useState(0); // Total records from API
+  const [pendingCount, setPendingCount] = useState(0); // All-time pending count
 
   // Form states
   const [formData, setFormData] = useState({
@@ -205,6 +206,7 @@ const Transactions: React.FC = () => {
         setLoading(true);
         await Promise.all([fetchAccounts(), fetchCategories(), fetchTags()]);
         await fetchTransactions();
+        await fetchPendingCount();
       } catch (err) {
         console.error('Error initializing transactions page:', err);
         toast.error('Failed to load data');
@@ -253,6 +255,9 @@ const Transactions: React.FC = () => {
       if (endDate) params.endDate = endDate.endOf('day').toISOString();
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
       params.includeSplits = 'true'; // Always fetch splits
+
+      console.log('Fetching transactions with params:', params);
+      console.log('Current reviewStatus state:', reviewStatus);
 
       const response = await axios.get(`/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -304,6 +309,18 @@ const Transactions: React.FC = () => {
     }
   };
 
+  const fetchPendingCount = async () => {
+    try {
+      const response = await axios.get(`/api/transactions/pending/count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPendingCount(response.data.count || 0);
+    } catch (err: any) {
+      console.error('Failed to fetch pending count:', err);
+      setPendingCount(0);
+    }
+  };
+
   const handleApprove = async (id: string) => {
     try {
       await axios.patch(`/api/transactions/${id}/approve`, {}, {
@@ -311,6 +328,7 @@ const Transactions: React.FC = () => {
       });
       toast.success('Transaction approved');
       await fetchTransactions();
+      await fetchPendingCount();
       
     } catch (error: any) {
       console.error('Error approving transaction:', error);
@@ -325,6 +343,7 @@ const Transactions: React.FC = () => {
       });
       toast.success('Transaction rejected');
       await fetchTransactions();
+      await fetchPendingCount();
       
     } catch (error: any) {
       console.error('Error rejecting transaction:', error);
@@ -347,6 +366,7 @@ const Transactions: React.FC = () => {
       toast.success(`${selectedTransactions.size} transactions approved`);
       setSelectedTransactions(new Set());
       await fetchTransactions();
+      await fetchPendingCount();
       
     } catch (error: any) {
       console.error('Error bulk approving:', error);
@@ -504,7 +524,7 @@ const Transactions: React.FC = () => {
         date: formData.date,
         merchantName: formData.merchantName,
         isRecurring: formData.isRecurring,
-        reviewStatus: 'approved' as const,
+        reviewStatus: editingTransaction ? editingTransaction.reviewStatus : 'approved',
         splits: splits,
       };
 
@@ -636,22 +656,35 @@ const Transactions: React.FC = () => {
       'Date',
       'Type',
       'Account',
-      'Category',
       'Description',
-      'Amount',
+      'Category',
+      'Split Amount',
       'Tags',
       'Status',
+      'Total Amount',
     ];
-    const rows = transactions.map((t) => [
-      dayjs(t.date).format('YYYY-MM-DD'),
-      t.type.toUpperCase(),
-      getAccountName(t.accountId),
-      getCategoryName(t.categoryId),
-      t.description,
-      t.amount.toFixed(2),
-      t.tags?.join('; ') || '',
-      t.reviewStatus,
-    ]);
+    
+    // Each split becomes a separate row (industry standard)
+    const rows: string[][] = [];
+    transactions.forEach((t) => {
+      const splits = t.splits && t.splits.length > 0 ? t.splits : [
+        { categoryId: t.categoryId || '', amount: t.amount, tags: t.tags || [] }
+      ];
+      
+      splits.forEach((split) => {
+        rows.push([
+          dayjs(t.date).format('YYYY-MM-DD'),
+          t.type.toUpperCase(),
+          getAccountName(t.accountId),
+          t.description,
+          getCategoryName(split.categoryId),
+          split.amount.toFixed(2),
+          split.tags?.join('; ') || '',
+          t.reviewStatus,
+          t.amount.toFixed(2),
+        ]);
+      });
+    });
 
     const csv = [headers, ...rows]
       .map((row) => row.map((cell) => `"${cell}"`).join(','))
@@ -895,6 +928,21 @@ const Transactions: React.FC = () => {
                   </ToggleButton>
                   <ToggleButton value="pending">
                     Pending
+                    {pendingCount > 0 && (
+                      <Chip 
+                        label={pendingCount} 
+                        size="small" 
+                        color="warning" 
+                        sx={{ ml: 1, height: 20, minWidth: 20, cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent toggle button click
+                          setReviewStatus('pending');
+                          setStartDate(null);
+                          setEndDate(null);
+                          setActiveDateFilter('');
+                        }}
+                      />
+                    )}
                   </ToggleButton>
                   <ToggleButton value="approved">
                     Approved
@@ -1299,6 +1347,7 @@ const Transactions: React.FC = () => {
                   </TableCell>
                   <TableCell>Category</TableCell>
                   <TableCell>Tags</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell 
                     align="right"
                     sx={{ 
@@ -1491,6 +1540,24 @@ const Transactions: React.FC = () => {
                                     />
                                   )}
                               </Box>
+                            </TableCell>
+                            <TableCell sx={{ width: 110 }}>
+                              <Chip
+                                label={
+                                  transaction.reviewStatus 
+                                    ? transaction.reviewStatus.charAt(0).toUpperCase() + transaction.reviewStatus.slice(1)
+                                    : 'Pending'
+                                }
+                                size="small"
+                                color={
+                                  transaction.reviewStatus === 'pending' || !transaction.reviewStatus
+                                    ? 'warning'
+                                    : transaction.reviewStatus === 'approved'
+                                    ? 'success'
+                                    : 'error'
+                                }
+                                variant="outlined"
+                              />
                             </TableCell>
                             <TableCell align="right" sx={{ width: 130 }}>
                               <Typography
