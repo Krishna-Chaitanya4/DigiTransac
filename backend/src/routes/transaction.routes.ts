@@ -205,22 +205,11 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       description,
       splits, // Array of splits
       date,
-      notes,
       isRecurring,
       recurrencePattern,
       source,
       merchantName,
       reviewStatus,
-      // Future fields (optional, for forward compatibility)
-      organizationId,
-      paidBy,
-      sharedWith,
-      paymentMethodType,
-      upiTransactionId,
-      paymentStatus,
-      counterpartyUserId,
-      settlementStatus,
-      settlementProof,
     } = req.body;
 
     // Validation
@@ -299,7 +288,6 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // Encrypt sensitive fields before storing
     const encryptedData = encryptTransaction({
       description,
-      notes,
       amount,
     });
 
@@ -311,22 +299,11 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       accountId,
       description: encryptedData.description || description,
       date: date ? new Date(date) : new Date(),
-      notes: encryptedData.notes,
       isRecurring: isRecurring || false,
       recurrencePattern,
       source: source || 'manual',
       merchantName,
       reviewStatus: reviewStatus || 'approved',
-      // Future fields (optional, store if provided)
-      ...(organizationId && { organizationId }),
-      ...(paidBy && { paidBy }),
-      ...(sharedWith && { sharedWith }),
-      ...(paymentMethodType && { paymentMethodType }),
-      ...(upiTransactionId && { upiTransactionId }),
-      ...(paymentStatus && { paymentStatus }),
-      ...(counterpartyUserId && { counterpartyUserId }),
-      ...(settlementStatus && { settlementStatus }),
-      ...(settlementProof && { settlementProof }),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -415,7 +392,6 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       tags,
       paymentMethodId,
       date,
-      notes,
       isRecurring,
       recurrencePattern,
       merchantName,
@@ -494,7 +470,6 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Encrypt sensitive fields if they're being updated
     const encryptedData = encryptTransaction({
       ...(description && { description }),
-      ...(notes !== undefined && { notes }),
       ...(amount !== undefined && { amount }),
     });
 
@@ -507,7 +482,6 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       ...(tags !== undefined && { tags }),
       ...(paymentMethodId !== undefined && { paymentMethodId }),
       ...(date && { date: new Date(date) }),
-      ...(notes !== undefined && { notes: encryptedData.notes }),
       ...(isRecurring !== undefined && { isRecurring }),
       ...(recurrencePattern !== undefined && { recurrencePattern }),
       ...(merchantName !== undefined && { merchantName }),
@@ -623,7 +597,6 @@ router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
         description: txn.description,
         tags: txn.tags || [],
         date: txn.date ? new Date(txn.date) : new Date(),
-        notes: txn.notes,
         isRecurring: txn.isRecurring || false,
         recurrencePattern: txn.recurrencePattern,
         source: txn.source || 'manual',

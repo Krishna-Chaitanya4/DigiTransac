@@ -7,19 +7,6 @@ export interface User {
   currency: string;
   emailIntegration?: EmailIntegration;
 
-  // FUTURE: Multi-user settings (optional, for future expansion)
-  upiId?: string; // For UPI payments between users
-  phoneNumber?: string; // For notifications and UPI
-
-  // FUTURE: Location tracking preferences (optional, for geo features)
-  locationSettings?: {
-    enabled: boolean; // Master toggle
-    captureMode: 'always' | 'ask' | 'never'; // When to capture
-    precision: 'exact' | 'approximate'; // Privacy level (exact GPS or rounded)
-    saveHistory: boolean; // Whether to store location data
-    sharePrecision?: 'exact' | 'city' | 'none'; // For future group features
-  };
-
   createdAt: Date;
   updatedAt: Date;
 }
@@ -201,16 +188,13 @@ export interface Transaction {
   tags?: string[]; // @deprecated Use splits[].tags instead
 
   description: string;
-
-  // TRANSACTION DETAILS
   date: Date;
-  notes?: string;
 
   // RECURRENCE
   isRecurring: boolean;
   recurrencePattern?: RecurrencePattern;
 
-  // SOURCE & PARSING
+  // SOURCE & PARSING (for email/SMS imports)
   source?: 'manual' | 'email' | 'sms' | 'api';
   sourceEmailId?: string;
   merchantName?: string;
@@ -218,43 +202,13 @@ export interface Transaction {
 
   // REVIEW & APPROVAL
   reviewStatus: 'pending' | 'approved' | 'rejected';
-  reviewedAt?: Date; // When transaction was approved/rejected
-  rejectionReason?: string; // Why transaction was rejected
-  confidence?: number; // 0-100, parser confidence score
-  originalContent?: string; // Original email/SMS content for reference
+  reviewedAt?: Date;
+  rejectionReason?: string;
+  confidence?: number; // Parser confidence score (0-100)
+  originalContent?: string; // Original email/SMS for reference
 
-  // LINKED TRANSACTIONS (for transfers)
-  linkedTransactionId?: string; // If this is part of a transfer, links to the other side
-
-  // FUTURE: MULTI-USER & COLLABORATION (Optional fields for future expansion)
-  organizationId?: string; // For shared expenses in organizations/groups
-  paidBy?: string; // userId who actually paid (defaults to userId for single-user mode)
-  sharedWith?: string[]; // Array of userIds this transaction is shared with
-
-  // FUTURE: PAYMENT INTEGRATION (Optional fields for future UPI/payment tracking)
-  paymentMethodType?: 'upi' | 'card' | 'bank' | 'cash' | 'other';
-  upiTransactionId?: string; // UPI transaction reference ID
-  paymentStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-
-  // FUTURE: INTER-USER TRANSACTIONS (Optional fields for send/receive between users)
-  counterpartyUserId?: string; // The other user in a send/receive transaction
-  settlementStatus?: 'pending_approval' | 'approved' | 'rejected' | 'settled';
-  settlementProof?: string; // URL to payment proof/receipt
-
-  // FUTURE: LOCATION TRACKING (Optional fields for geo-based analytics)
-  location?: {
-    latitude: number;
-    longitude: number;
-    address?: string; // Full address
-    placeName?: string; // Merchant/place name (e.g., "Starbucks")
-    city?: string;
-    state?: string;
-    country?: string;
-    postalCode?: string;
-    accuracy?: number; // GPS accuracy in meters
-    source?: 'gps' | 'manual' | 'ip' | 'email'; // How location was obtained
-  };
-  locationCapturedAt?: Date; // Timestamp when location was captured
+  // LINKED TRANSACTIONS (for transfers between accounts)
+  linkedTransactionId?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -288,77 +242,6 @@ export interface Tag {
   name: string;
   color?: string;
   usageCount: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// FUTURE: Organization/Group support (for multi-user features)
-// These interfaces are ready but not yet implemented in the API
-export interface Organization {
-  id: string;
-  name: string;
-  ownerId: string; // User who created the organization
-  memberCount: number;
-  plan: 'free' | 'premium' | 'enterprise';
-  settings: {
-    allowMemberInvites: boolean;
-    requireApprovalForExpenses: boolean;
-    currency: string;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface OrganizationMember {
-  id: string;
-  organizationId: string;
-  userId: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  permissions: string[];
-  invitedBy?: string;
-  joinedAt: Date;
-}
-
-// FUTURE: Settlement tracking (for split expenses between users)
-export interface Settlement {
-  id: string;
-  transactionId: string; // Original transaction being settled
-  fromUserId: string; // Who owes money
-  toUserId: string; // Who is owed money
-  amount: number;
-  currency: string;
-  status: 'pending_approval' | 'approved' | 'rejected' | 'completed';
-  paymentMethod?: 'upi' | 'bank_transfer' | 'cash' | 'other';
-  upiTransactionId?: string;
-  proofUrl?: string; // Receipt/screenshot URL
-  notes?: string;
-  dueDate?: Date;
-  completedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// FUTURE: Pending actions/notifications queue
-export interface PendingAction {
-  id: string;
-  userId: string; // Who needs to take action
-  type:
-    | 'transaction_approval'
-    | 'settlement_request'
-    | 'organization_invite'
-    | 'split_expense_invite';
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
-  priority: 'low' | 'medium' | 'high';
-
-  // Related entities
-  relatedTransactionId?: string;
-  relatedSettlementId?: string;
-  relatedOrganizationId?: string;
-  fromUserId?: string; // Who initiated this action
-
-  data: any; // Flexible payload for action-specific data
-  expiresAt?: Date;
-  actionTakenAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

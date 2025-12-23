@@ -46,7 +46,7 @@ export async function processRecurringTransactions(): Promise<number> {
           recurrencePattern: undefined,
           linkedTransactionId: recurringTxn.id, // Link back to recurring template
           tags: [...(recurringTxn.tags || []), 'recurring-auto'], // Add auto-generated tag
-          notes: `${recurringTxn.notes || ''}\n[Auto-created from recurring transaction]`.trim(),
+
           createdAt: new Date(),
           updatedAt: new Date(),
         };

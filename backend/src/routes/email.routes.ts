@@ -88,7 +88,6 @@ router.post('/inbound', async (req: Request, res: Response) => {
         confidence: parsedTransaction.confidence,
       },
       reviewStatus: 'pending',
-      notes: '',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

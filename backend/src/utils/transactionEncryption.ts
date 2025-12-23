@@ -12,11 +12,6 @@ export function encryptTransaction(transaction: Partial<Transaction>): Partial<T
     encrypted.description = encryptionService.encrypt(encrypted.description);
   }
 
-  // Encrypt notes if present
-  if (encrypted.notes) {
-    encrypted.notes = encryptionService.encrypt(encrypted.notes);
-  }
-
   // Encrypt amount (store as encrypted string)
   if (typeof encrypted.amount === 'number') {
     (encrypted as any).encryptedAmount = encryptionService.encryptNumber(encrypted.amount);
@@ -35,11 +30,6 @@ export function decryptTransaction(transaction: Transaction): Transaction {
   // Decrypt description
   if (decrypted.description && encryptionService.isEncrypted(decrypted.description)) {
     decrypted.description = encryptionService.decrypt(decrypted.description);
-  }
-
-  // Decrypt notes
-  if (decrypted.notes && encryptionService.isEncrypted(decrypted.notes)) {
-    decrypted.notes = encryptionService.decrypt(decrypted.notes);
   }
 
   // Decrypt amount if encryptedAmount exists

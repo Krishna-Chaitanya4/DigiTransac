@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { cosmosDBService } from '../config/cosmosdb';
 import { emailParserService } from './emailParser.service';
-import { Transaction, TransactionSplit, PaymentMethod, Category } from '../models/types';
+import { Transaction, TransactionSplit, Category } from '../models/types';
 import { randomUUID } from 'crypto';
 
 class GmailPollingService {
@@ -42,59 +42,6 @@ class GmailPollingService {
     }
 
     return user.emailIntegration.accessToken;
-  }
-
-  /**
-   * Find existing payment method or create new one
-   */
-  private async getOrCreatePaymentMethod(
-    userId: string,
-    bankName: string,
-    cardLast4?: string
-  ): Promise<string> {
-    try {
-      const paymentMethodsContainer = await cosmosDBService.getPaymentMethodsContainer();
-
-      // Build search criteria
-      const searchCriteria: any = {
-        userId,
-        bankName,
-      };
-
-      if (cardLast4) {
-        searchCriteria.last4 = cardLast4;
-      }
-
-      // Try to find existing payment method
-      const existing = await paymentMethodsContainer.findOne(searchCriteria);
-
-      if (existing) {
-        return existing.id;
-      }
-
-      // Create new payment method
-      const paymentMethodName = cardLast4 ? `${bankName} ••••${cardLast4}` : bankName;
-
-      const newPaymentMethod: PaymentMethod = {
-        id: randomUUID(),
-        userId,
-        name: paymentMethodName,
-        type: cardLast4 ? 'credit_card' : 'bank_account',
-        bankName,
-        last4: cardLast4,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      await paymentMethodsContainer.insertOne(newPaymentMethod);
-      console.log(`💳 Auto-created payment method: ${paymentMethodName}`);
-
-      return newPaymentMethod.id;
-    } catch (error) {
-      console.error('Error getting/creating payment method:', error);
-      // Return empty string if failed, expense will be created without payment method
-      return '';
-    }
   }
 
   /**
@@ -366,13 +313,6 @@ class GmailPollingService {
             console.log('   📂 Category suggested from mapping');
           }
 
-          // Find or create payment method for this bank/card
-          const paymentMethodId = await this.getOrCreatePaymentMethod(
-            user.id,
-            parsedTransaction.bankName,
-            parsedTransaction.cardLast4
-          );
-
           // Create pending transaction
           const transactionsContainer = await cosmosDBService.getTransactionsContainer();
           const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
@@ -385,7 +325,6 @@ class GmailPollingService {
             userId: user.id,
             accountId: '', // Will be assigned during review
             type: 'debit',
-            paymentMethodType: 'card', // Store as type, not ID
             amount: parsedTransaction.amount,
             description: `${parsedTransaction.merchant} - ${parsedTransaction.bankName}`,
             date: parsedTransaction.date,
@@ -401,7 +340,6 @@ class GmailPollingService {
               confidence: parsedTransaction.confidence,
             },
             reviewStatus: 'pending',
-            notes: `Payment Method: ${paymentMethodId}`,
             createdAt: new Date(),
             updatedAt: new Date(),
           };

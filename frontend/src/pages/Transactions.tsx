@@ -83,7 +83,6 @@ interface Transaction {
   description: string;
   tags?: string[]; // @deprecated - use splits instead
   date: string;
-  notes?: string;
   isRecurring: boolean;
   recurrencePattern?: string;
   source?: string;
@@ -189,7 +188,6 @@ const Transactions: React.FC = () => {
       },
     ] as TransactionSplit[],
     date: dayjs().format('YYYY-MM-DD'),
-    notes: '',
     merchantName: '',
     isRecurring: false,
     recurrencePattern: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
@@ -400,7 +398,6 @@ const Transactions: React.FC = () => {
         tags: tags,
         splits: splits,
         date: dayjs(transaction.date).format('YYYY-MM-DD'),
-        notes: transaction.notes || '',
         merchantName: transaction.merchantName || '',
         isRecurring: transaction.isRecurring,
         recurrencePattern: (transaction.recurrencePattern as any)?.frequency || 'monthly',
@@ -428,7 +425,6 @@ const Transactions: React.FC = () => {
           },
         ],
         date: dayjs().format('YYYY-MM-DD'),
-        notes: '',
         merchantName: '',
         isRecurring: false,
         recurrencePattern: 'monthly',
@@ -492,7 +488,6 @@ const Transactions: React.FC = () => {
         accountId: formData.accountId,
         description: formData.description,
         date: formData.date,
-        notes: formData.notes,
         merchantName: formData.merchantName,
         isRecurring: formData.isRecurring,
         reviewStatus: 'approved' as const,
@@ -683,8 +678,7 @@ const Transactions: React.FC = () => {
       const matchesSearch =
         searchQuery === '' ||
         transaction.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        transaction.merchantName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        transaction.notes?.toLowerCase().includes(searchQuery.toLowerCase());
+        transaction.merchantName?.toLowerCase().includes(searchQuery.toLowerCase());
 
       return matchesSearch;
     });
@@ -1940,17 +1934,6 @@ const Transactions: React.FC = () => {
                     label="Merchant Name"
                     value={formData.merchantName}
                     onChange={(e) => setFormData({ ...formData, merchantName: e.target.value })}
-                    fullWidth
-                  />
-                </Grid>
-
-                <Grid item xs={12}>
-                  <TextField
-                    label="Notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    multiline
-                    rows={3}
                     fullWidth
                   />
                 </Grid>
