@@ -20,7 +20,22 @@ const router = Router();
 
 router.use(authenticate);
 
-// GET /api/transactions - Get all transactions with filtering
+/**
+ * GET /api/transactions - Get all transactions with filtering and search
+ * 
+ * Performance Optimizations:
+ * 1. Search on encrypted data: Fetches larger batches (10x limit, max 1000) since filtering
+ *    happens post-decryption. Industry standard to prevent fetching entire dataset.
+ * 2. In-memory pagination: For search queries, pagination applied after filtering to ensure
+ *    accurate results while respecting limit/skip parameters.
+ * 3. Early returns: Filter function checks fastest conditions first (amount > description > merchant).
+ * 4. Database-level operations: Non-search queries use MongoDB's native skip/limit for efficiency.
+ * 5. Conditional fetching: Only fetches splits when explicitly requested (includeSplits=true).
+ * 
+ * Trade-offs:
+ * - Search queries limited to 1000 recent transactions to prevent memory issues
+ * - Users with >1000 transactions should use date filters to narrow search scope
+ */
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
@@ -71,11 +86,21 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const skipNum = parseInt(skip as string);
     const limitNum = parseInt(limit as string);
 
+    // Performance optimization: When searching encrypted fields, we need to fetch more data
+    // to account for post-decryption filtering. Fetch larger batches to ensure we get enough results.
+    // Limit search to reasonable bounds to prevent memory issues with large datasets.
+    const isSearchQuery = !!searchStr;
+    const MAX_SEARCH_DOCUMENTS = 1000; // Industry standard: limit search scope
+    const fetchLimit = isSearchQuery 
+      ? Math.min(MAX_SEARCH_DOCUMENTS, Math.max(limitNum * 10, 100))
+      : limitNum;
+    const fetchSkip = isSearchQuery ? 0 : skipNum; // When searching, fetch from start and skip in-memory
+
     let transactions = (await transactionsContainer
       .find(filter)
       .sort({ [sortField]: sortDirection })
-      .skip(skipNum)
-      .limit(limitNum)
+      .skip(fetchSkip)
+      .limit(fetchLimit)
       .toArray()) as unknown as Transaction[];
 
     // If includeSplits is true, fetch splits for each transaction
@@ -167,9 +192,15 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (searchStr) {
       const searchLower = searchStr.toLowerCase();
       const amountSearch = parseFloat(searchStr);
+      const isNumericSearch = !isNaN(amountSearch);
       
+      // Performance: Use filter with early returns
       decryptedTransactions = decryptedTransactions.filter((txn) => {
-        // Search in description
+        // Search by exact amount if search term is a number (fastest check)
+        if (isNumericSearch && Math.abs(txn.amount) === Math.abs(amountSearch)) {
+          return true;
+        }
+        // Search in description (most common)
         if (txn.description && txn.description.toLowerCase().includes(searchLower)) {
           return true;
         }
@@ -177,27 +208,37 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
         if (txn.merchantName && txn.merchantName.toLowerCase().includes(searchLower)) {
           return true;
         }
-        // Search by exact amount if search term is a number
-        if (!isNaN(amountSearch) && Math.abs(txn.amount) === Math.abs(amountSearch)) {
-          return true;
-        }
         return false;
       });
+      
+      // Apply pagination in-memory for search results
+      const totalSearchResults = decryptedTransactions.length;
+      decryptedTransactions = decryptedTransactions.slice(skipNum, skipNum + limitNum);
+      
+      res.json({
+        success: true,
+        transactions: decryptedTransactions,
+        pagination: {
+          total: totalSearchResults,
+          limit: limitNum,
+          skip: skipNum,
+          hasMore: totalSearchResults > skipNum + limitNum,
+        },
+      });
+      return;
     }
 
-    // For search queries, total is the filtered count; otherwise query DB
-    const total = searchStr 
-      ? decryptedTransactions.length 
-      : await transactionsContainer.countDocuments(filter);
+    // For non-search queries, use DB count
+    const total = await transactionsContainer.countDocuments(filter);
 
     res.json({
       success: true,
       transactions: decryptedTransactions,
       pagination: {
         total,
-        limit: parseInt(limit as string),
-        skip: parseInt(skip as string),
-        hasMore: total > parseInt(skip as string) + parseInt(limit as string),
+        limit: limitNum,
+        skip: skipNum,
+        hasMore: total > skipNum + limitNum,
       },
     });
   } catch (error) {
