@@ -1,3 +1,5 @@
+import { detectTransactionTags } from '../utils/transactionTags';
+
 interface ParsedTransaction {
   amount: number;
   merchant: string;
@@ -7,6 +9,7 @@ interface ParsedTransaction {
   transactionId?: string;
   rawText: string;
   confidence: number;
+  tags?: string[]; // Auto-detected tags
 }
 
 // Top 10 Indian Bank SMS Patterns
@@ -201,6 +204,9 @@ export class EmailParserService {
           // Extract transaction ID if present
           const transactionId = this.extractTransactionId(text);
 
+          // Auto-detect and assign tags (email transactions are typically debits)
+          const tagDetection = detectTransactionTags('debit', text, merchant);
+
           return {
             amount,
             merchant,
@@ -210,6 +216,7 @@ export class EmailParserService {
             transactionId,
             rawText: text,
             confidence: this.calculateConfidence(amount, merchant, bank.name),
+            tags: tagDetection.tags,
           };
         } catch (error) {
           console.error('Error parsing transaction:', error);

@@ -4,6 +4,8 @@
  * Supports major Indian banks with confidence scoring
  */
 
+import { detectTransactionTags } from '../utils/transactionTags';
+
 export interface ParsedTransaction {
   amount: number;
   type: 'debit' | 'credit';
@@ -14,6 +16,7 @@ export interface ParsedTransaction {
   confidence: 'high' | 'medium' | 'low';
   originalText: string;
   bankName?: string;
+  tags?: string[]; // Auto-detected tags
 }
 
 interface BankPattern {
@@ -251,11 +254,20 @@ export class SMSParserService {
         const match = cleanText.match(pattern.regex);
         if (match) {
           const parsed = pattern.extract(match);
+          
+          // Auto-detect and assign tags based on transaction type and content
+          const tagDetection = detectTransactionTags(
+            parsed.type || 'debit',
+            cleanText,
+            parsed.merchant
+          );
+          
           return {
             ...parsed,
             originalText: cleanText,
             // Default to today if no date found
             date: parsed.date || new Date(),
+            tags: tagDetection.tags,
           } as ParsedTransaction;
         }
       }
