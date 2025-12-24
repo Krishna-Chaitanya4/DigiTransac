@@ -839,6 +839,24 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response): Promise<vo
       userId,
     })) as unknown as Transaction;
 
+    // Learn from approval: Save merchant → category/account mapping
+    if (updatedTransaction.merchantName && updatedTransaction.accountId) {
+      // Get the category from the first split or legacy categoryId
+      const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+      const splits = (await splitsContainer.find({ transactionId: id }).toArray()) as unknown as TransactionSplit[];
+      
+      const categoryId = splits.length > 0 ? splits[0].categoryId : updatedTransaction.categoryId;
+      
+      if (categoryId) {
+        await learnFromTransaction(
+          userId,
+          updatedTransaction.merchantName,
+          categoryId,
+          updatedTransaction.accountId
+        );
+      }
+    }
+
     res.json(decryptTransaction(updatedTransaction));
   } catch (error) {
     console.error('Error approving transaction:', error);
