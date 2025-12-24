@@ -39,8 +39,8 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
 
     const userId = req.userId!;
 
-    // Parse all SMS messages
-    const parsedTransactions = smsParserService.parseMultipleSMS(smsTexts);
+    // Parse all SMS messages (pass userId for learning)
+    const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
 
     if (parsedTransactions.length === 0) {
       res.status(400).json({
@@ -94,11 +94,13 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
         userId,
         type: parsed.type === 'debit' ? 'debit' : 'credit', // Use 'debit'/'credit' not 'expense'/'income'
         amount: Math.abs(parsed.amount), // Always positive
-        accountId: '', // Will be set during approval
+        accountId: parsed.learnedAccountId || '', // Auto-filled from learning (will be set during approval if empty)
+        categoryId: parsed.learnedCategoryId || '', // Auto-filled from learning (legacy field)
         description: merchant,
         date: parsed.date || new Date(), // Store as Date object, not string
         source: 'sms',
         merchantName: merchant,
+        tags: parsed.tags || [], // Auto-detected tags
         reviewStatus: 'pending',
         confidence: parsed.confidence,
         originalContent: parsed.originalText, // Store original SMS
@@ -117,9 +119,28 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
 
     // Save to database
     const savedTransactions: any[] = [];
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    
     for (const transaction of pendingTransactions) {
       const result = await transactionsContainer.insertOne(transaction);
       savedTransactions.push({ ...transaction, id: result.insertedId });
+      
+      // If we have a learned category, create a split automatically
+      if (transaction.categoryId) {
+        const splitId = uuidv4();
+        await splitsContainer.insertOne({
+          id: splitId,
+          transactionId: transaction.id,
+          userId: transaction.userId,
+          categoryId: transaction.categoryId,
+          amount: transaction.amount,
+          tags: transaction.tags || [],
+          notes: 'Auto-filled from learning',
+          order: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
     }
 
     // Return summary
@@ -149,13 +170,14 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
 router.post('/preview', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { smsTexts } = req.body;
+    const userId = req.userId!;
 
     if (!smsTexts || !Array.isArray(smsTexts)) {
       res.status(400).json({ error: 'smsTexts array is required' });
       return;
     }
 
-    const parsedTransactions = smsParserService.parseMultipleSMS(smsTexts);
+    const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
 
     const preview = parsedTransactions.map((parsed) => ({
       amount: parsed.amount,

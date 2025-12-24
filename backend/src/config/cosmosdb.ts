@@ -68,6 +68,10 @@ class CosmosDBService {
       // Initialize collections
       await this.createCollections();
 
+      // Initialize merchant learning service
+      const { initializeMerchantLearning } = await import('../services/merchantLearning.service');
+      initializeMerchantLearning(this.db);
+
       logger.info('✅ All Cosmos DB collections are ready');
     } catch (error) {
       logger.error({ error }, '❌ Error initializing Cosmos DB');

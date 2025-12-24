@@ -38,8 +38,8 @@ router.post('/inbound', async (req: Request, res: Response) => {
       return res.status(200).json({ message: 'Not a transaction SMS, ignored' });
     }
 
-    // Parse the transaction
-    const parsedTransaction = emailParserService.parseTransaction(text, from);
+    // Parse the transaction (pass userId for learning)
+    const parsedTransaction = await emailParserService.parseTransaction(text, from, userId);
 
     if (!parsedTransaction) {
       console.log('Could not parse transaction from email');
@@ -55,11 +55,15 @@ router.post('/inbound', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Email integration not enabled' });
     }
 
-    // Suggest category based on merchant
+    // Suggest category based on merchant (legacy, fallback)
     const suggestedCategory = emailParserService.suggestCategory(
       parsedTransaction.merchant,
       user.emailIntegration?.merchantMappings
     );
+
+    // Use learned category/account if available, otherwise use suggested/empty
+    const categoryId = parsedTransaction.learnedCategoryId || suggestedCategory || '';
+    const accountId = parsedTransaction.learnedAccountId || '';
 
     // Create pending transaction
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
@@ -71,7 +75,8 @@ router.post('/inbound', async (req: Request, res: Response) => {
     const newTransaction: Transaction = {
       id: transactionId,
       userId: userId,
-      accountId: '', // Will be assigned during review
+      accountId: accountId, // Auto-filled from learning
+      categoryId: categoryId, // Auto-filled from learning (legacy field)
       type: 'debit',
       amount: parsedTransaction.amount,
       description: `${parsedTransaction.merchant} - ${parsedTransaction.bankName}`,
@@ -80,6 +85,7 @@ router.post('/inbound', async (req: Request, res: Response) => {
       source: 'email',
       sourceEmailId: emailData.messageId,
       merchantName: parsedTransaction.merchant,
+      tags: parsedTransaction.tags || [], // Auto-detected tags
       parsedData: {
         rawText: parsedTransaction.rawText,
         bankName: parsedTransaction.bankName,
@@ -96,9 +102,10 @@ router.post('/inbound', async (req: Request, res: Response) => {
       id: splitId,
       transactionId: transactionId,
       userId: userId,
-      categoryId: suggestedCategory || '', // Empty if no category found
+      categoryId: categoryId, // Auto-filled from learning
       amount: parsedTransaction.amount,
-      tags: [],
+      tags: parsedTransaction.tags || [], // Auto-detected tags
+      notes: categoryId ? 'Auto-filled from learning' : undefined,
       order: 1,
       createdAt: new Date(),
       updatedAt: new Date(),

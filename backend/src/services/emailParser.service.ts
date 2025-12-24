@@ -1,4 +1,5 @@
 import { detectTransactionTags } from '../utils/transactionTags';
+import { getLearnedMapping } from './merchantLearning.service';
 
 interface ParsedTransaction {
   amount: number;
@@ -10,6 +11,8 @@ interface ParsedTransaction {
   rawText: string;
   confidence: number;
   tags?: string[]; // Auto-detected tags
+  learnedCategoryId?: string; // Auto-filled from learning
+  learnedAccountId?: string; // Auto-filled from learning
 }
 
 // Top 10 Indian Bank SMS Patterns
@@ -166,7 +169,7 @@ export class EmailParserService {
   /**
    * Parse transaction SMS/email text
    */
-  public parseTransaction(text: string, sender?: string): ParsedTransaction | null {
+  public async parseTransaction(text: string, sender?: string, userId?: string): Promise<ParsedTransaction | null> {
     // Try to identify bank from sender or text
     const bank = this.identifyBank(text, sender);
 
@@ -207,6 +210,18 @@ export class EmailParserService {
           // Auto-detect and assign tags (email transactions are typically debits)
           const tagDetection = detectTransactionTags('debit', text, merchant);
 
+          // Check if we have learned category/account for this merchant
+          let learnedCategoryId: string | undefined;
+          let learnedAccountId: string | undefined;
+          
+          if (userId && merchant) {
+            const learned = await getLearnedMapping(userId, merchant);
+            if (learned) {
+              learnedCategoryId = learned.categoryId;
+              learnedAccountId = learned.accountId;
+            }
+          }
+
           return {
             amount,
             merchant,
@@ -217,6 +232,8 @@ export class EmailParserService {
             rawText: text,
             confidence: this.calculateConfidence(amount, merchant, bank.name),
             tags: tagDetection.tags,
+            learnedCategoryId,
+            learnedAccountId,
           };
         } catch (error) {
           console.error('Error parsing transaction:', error);

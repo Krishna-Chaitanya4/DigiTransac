@@ -5,6 +5,7 @@
  */
 
 import { detectTransactionTags } from '../utils/transactionTags';
+import { getLearnedMapping } from './merchantLearning.service';
 
 export interface ParsedTransaction {
   amount: number;
@@ -17,6 +18,8 @@ export interface ParsedTransaction {
   originalText: string;
   bankName?: string;
   tags?: string[]; // Auto-detected tags
+  learnedCategoryId?: string; // Auto-filled from learning
+  learnedAccountId?: string; // Auto-filled from learning
 }
 
 interface BankPattern {
@@ -241,7 +244,7 @@ export class SMSParserService {
   /**
    * Parse single SMS message
    */
-  parseSMS(smsText: string): ParsedTransaction | null {
+  async parseSMS(smsText: string, userId?: string): Promise<ParsedTransaction | null> {
     if (!smsText || smsText.trim().length === 0) {
       return null;
     }
@@ -262,12 +265,26 @@ export class SMSParserService {
             parsed.merchant
           );
           
+          // Check if we have learned category/account for this merchant
+          let learnedCategoryId: string | undefined;
+          let learnedAccountId: string | undefined;
+          
+          if (userId && parsed.merchant) {
+            const learned = await getLearnedMapping(userId, parsed.merchant);
+            if (learned) {
+              learnedCategoryId = learned.categoryId;
+              learnedAccountId = learned.accountId;
+            }
+          }
+          
           return {
             ...parsed,
             originalText: cleanText,
             // Default to today if no date found
             date: parsed.date || new Date(),
             tags: tagDetection.tags,
+            learnedCategoryId,
+            learnedAccountId,
           } as ParsedTransaction;
         }
       }
@@ -279,10 +296,11 @@ export class SMSParserService {
   /**
    * Parse multiple SMS messages (batch)
    */
-  parseMultipleSMS(smsTexts: string[]): ParsedTransaction[] {
-    return smsTexts
-      .map((text) => this.parseSMS(text))
-      .filter((parsed): parsed is ParsedTransaction => parsed !== null);
+  async parseMultipleSMS(smsTexts: string[], userId?: string): Promise<ParsedTransaction[]> {
+    const results = await Promise.all(
+      smsTexts.map(text => this.parseSMS(text, userId))
+    );
+    return results.filter((parsed): parsed is ParsedTransaction => parsed !== null);
   }
 
   /**

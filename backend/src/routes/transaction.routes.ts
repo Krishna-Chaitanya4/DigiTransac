@@ -3,6 +3,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { Transaction, TransactionSplit, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
+import { learnFromTransaction } from '../services/merchantLearning.service';
 
 // Extended Transaction type with splits
 interface TransactionWithSplits extends Transaction {
@@ -951,6 +952,24 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response): Promise<voi
       id,
       userId,
     })) as unknown as Transaction;
+
+    // Learn from approval: Save merchant → category/account mapping
+    if (status === 'approved' && updatedTransaction.merchantName && updatedTransaction.accountId) {
+      // Get the category from the first split or legacy categoryId
+      const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+      const splits = (await splitsContainer.find({ transactionId: id }).toArray()) as unknown as TransactionSplit[];
+      
+      const categoryId = splits.length > 0 ? splits[0].categoryId : updatedTransaction.categoryId;
+      
+      if (categoryId) {
+        await learnFromTransaction(
+          userId,
+          updatedTransaction.merchantName,
+          categoryId,
+          updatedTransaction.accountId
+        );
+      }
+    }
 
     res.json(decryptTransaction(updatedTransaction));
   } catch (error) {

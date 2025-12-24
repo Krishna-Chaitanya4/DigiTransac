@@ -245,3 +245,16 @@ export interface Tag {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Merchant Learning - Remembers user's category/account choices for merchants
+export interface MerchantLearning {
+  id: string;
+  userId: string;
+  merchantName: string; // Normalized merchant name (lowercase, trimmed)
+  categoryId: string; // Learned category
+  accountId?: string; // Learned account (optional)
+  usageCount: number; // How many times this mapping was used
+  lastUsedAt: Date; // Most recent usage
+  createdAt: Date;
+  updatedAt: Date;
+}

@@ -285,8 +285,8 @@ class GmailPollingService {
 
           console.log('✅ Detected as transaction SMS');
 
-          // Parse transaction
-          const parsedTransaction = emailParserService.parseTransaction(body, from);
+          // Parse transaction (pass userId for learning)
+          const parsedTransaction = await emailParserService.parseTransaction(body, from, user.id);
 
           if (!parsedTransaction) {
             console.log('❌ Could not parse transaction, skipping');
@@ -299,8 +299,8 @@ class GmailPollingService {
           console.log('   Merchant:', parsedTransaction.merchant);
           console.log('   Bank:', parsedTransaction.bankName);
 
-          // Suggest category based on merchant mappings
-          let categoryId = emailParserService.suggestCategory(
+          // Use learned category/account if available, otherwise use suggested/empty
+          let categoryId = parsedTransaction.learnedCategoryId || emailParserService.suggestCategory(
             parsedTransaction.merchant,
             user.emailIntegration?.merchantMappings
           );
@@ -310,8 +310,10 @@ class GmailPollingService {
             categoryId = await this.getOrCreateUncategorizedCategory(user.id);
             console.log('   📂 No category match - using Uncategorized');
           } else {
-            console.log('   📂 Category suggested from mapping');
+            console.log('   📂 Category suggested from mapping or learning');
           }
+          
+          const accountId = parsedTransaction.learnedAccountId || '';
 
           // Create pending transaction
           const transactionsContainer = await cosmosDBService.getTransactionsContainer();
@@ -323,7 +325,8 @@ class GmailPollingService {
           const newTransaction: Transaction = {
             id: transactionId,
             userId: user.id,
-            accountId: '', // Will be assigned during review
+            accountId: accountId, // Auto-filled from learning
+            categoryId: categoryId, // Legacy field, auto-filled
             type: 'debit',
             amount: parsedTransaction.amount,
             description: `${parsedTransaction.merchant} - ${parsedTransaction.bankName}`,
@@ -332,6 +335,7 @@ class GmailPollingService {
             source: 'email',
             sourceEmailId: messageId,
             merchantName: parsedTransaction.merchant,
+            tags: parsedTransaction.tags || [], // Auto-detected tags
             parsedData: {
               rawText: parsedTransaction.rawText,
               bankName: parsedTransaction.bankName,
@@ -350,7 +354,8 @@ class GmailPollingService {
             userId: user.id,
             categoryId: categoryId,
             amount: parsedTransaction.amount,
-            tags: [],
+            tags: parsedTransaction.tags || [], // Auto-detected tags
+            notes: categoryId && parsedTransaction.learnedCategoryId ? 'Auto-filled from learning' : undefined,
             order: 1,
             createdAt: new Date(),
             updatedAt: new Date(),
