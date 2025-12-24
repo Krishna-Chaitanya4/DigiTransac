@@ -6,6 +6,8 @@
 
 import { detectTransactionTags } from '../utils/transactionTags';
 import { getLearnedMapping } from './merchantLearning.service';
+import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
+import { cosmosDBService } from '../config/cosmosdb';
 
 export interface ParsedTransaction {
   amount: number;
@@ -20,6 +22,7 @@ export interface ParsedTransaction {
   tags?: string[]; // Auto-detected tags
   learnedCategoryId?: string; // Auto-filled from learning
   learnedAccountId?: string; // Auto-filled from learning
+  matchedAccountId?: string; // Auto-matched from SMS account info
 }
 
 interface BankPattern {
@@ -258,33 +261,55 @@ export class SMSParserService {
         if (match) {
           const parsed = pattern.extract(match);
           
+          // Normalize merchant name for consistency
+          const normalizedMerchant = parsed.merchant ? normalizeMerchantName(parsed.merchant) : undefined;
+          
           // Auto-detect and assign tags based on transaction type and content
           const tagDetection = detectTransactionTags(
             parsed.type || 'debit',
             cleanText,
-            parsed.merchant
+            normalizedMerchant
           );
           
           // Check if we have learned category/account for this merchant
           let learnedCategoryId: string | undefined;
           let learnedAccountId: string | undefined;
           
-          if (userId && parsed.merchant) {
-            const learned = await getLearnedMapping(userId, parsed.merchant);
+          if (userId && normalizedMerchant) {
+            const learned = await getLearnedMapping(userId, normalizedMerchant);
             if (learned) {
               learnedCategoryId = learned.categoryId;
               learnedAccountId = learned.accountId;
             }
           }
           
+          // Match SMS account info to user's accounts
+          let matchedAccountId: string | undefined;
+          
+          if (userId && (parsed.bankName || parsed.accountNumber)) {
+            try {
+              const accountsContainer = await cosmosDBService.getAccountsContainer();
+              matchedAccountId = await matchAccount(
+                userId,
+                accountsContainer as any,
+                parsed.bankName,
+                parsed.accountNumber
+              ) || undefined;
+            } catch (error) {
+              // Account matching failed, continue without it
+            }
+          }
+          
           return {
             ...parsed,
+            merchant: normalizedMerchant,
             originalText: cleanText,
             // Default to today if no date found
             date: parsed.date || new Date(),
             tags: tagDetection.tags,
             learnedCategoryId,
             learnedAccountId,
+            matchedAccountId,
           } as ParsedTransaction;
         }
       }

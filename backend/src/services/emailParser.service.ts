@@ -1,5 +1,7 @@
 import { detectTransactionTags } from '../utils/transactionTags';
 import { getLearnedMapping } from './merchantLearning.service';
+import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
+import { cosmosDBService } from '../config/cosmosdb';
 
 interface ParsedTransaction {
   amount: number;
@@ -13,6 +15,7 @@ interface ParsedTransaction {
   tags?: string[]; // Auto-detected tags
   learnedCategoryId?: string; // Auto-filled from learning
   learnedAccountId?: string; // Auto-filled from learning
+  matchedAccountId?: string; // Auto-matched from email account info
 }
 
 // Top 10 Indian Bank SMS Patterns
@@ -195,6 +198,9 @@ export class EmailParserService {
           // Extract merchant
           let merchant = match[pattern.merchantGroup].trim();
           merchant = this.cleanMerchantName(merchant);
+          
+          // Normalize merchant name for consistency
+          const normalizedMerchant = normalizeMerchantName(merchant);
 
           // Extract card last 4 digits
           const cardMatch = text.match(bank.cardPattern);
@@ -208,32 +214,50 @@ export class EmailParserService {
           const transactionId = this.extractTransactionId(text);
 
           // Auto-detect and assign tags (email transactions are typically debits)
-          const tagDetection = detectTransactionTags('debit', text, merchant);
+          const tagDetection = detectTransactionTags('debit', text, normalizedMerchant);
 
           // Check if we have learned category/account for this merchant
           let learnedCategoryId: string | undefined;
           let learnedAccountId: string | undefined;
           
-          if (userId && merchant) {
-            const learned = await getLearnedMapping(userId, merchant);
+          if (userId && normalizedMerchant) {
+            const learned = await getLearnedMapping(userId, normalizedMerchant);
             if (learned) {
               learnedCategoryId = learned.categoryId;
               learnedAccountId = learned.accountId;
             }
           }
+          
+          // Match email account info to user's accounts
+          let matchedAccountId: string | undefined;
+          
+          if (userId && (bank.name || cardLast4)) {
+            try {
+              const accountsContainer = await cosmosDBService.getAccountsContainer();
+              matchedAccountId = await matchAccount(
+                userId,
+                accountsContainer as any,
+                bank.name,
+                cardLast4
+              ) || undefined;
+            } catch (error) {
+              // Account matching failed, continue without it
+            }
+          }
 
           return {
             amount,
-            merchant,
+            merchant: normalizedMerchant,
             date,
             bankName: bank.name,
             cardLast4,
             transactionId,
             rawText: text,
-            confidence: this.calculateConfidence(amount, merchant, bank.name),
+            confidence: this.calculateConfidence(amount, normalizedMerchant, bank.name),
             tags: tagDetection.tags,
             learnedCategoryId,
             learnedAccountId,
+            matchedAccountId,
           };
         } catch (error) {
           console.error('Error parsing transaction:', error);

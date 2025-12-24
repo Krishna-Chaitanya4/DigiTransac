@@ -89,12 +89,16 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
 
       // Create pending transaction with proper structure
       const transactionId = uuidv4();
+      
+      // Priority for account: matched (SMS info) > learned (merchant history) > empty (manual)
+      const finalAccountId = parsed.matchedAccountId || parsed.learnedAccountId || '';
+      
       const pendingTransaction = {
         id: transactionId,
         userId,
         type: parsed.type === 'debit' ? 'debit' : 'credit', // Use 'debit'/'credit' not 'expense'/'income'
         amount: Math.abs(parsed.amount), // Always positive
-        accountId: parsed.learnedAccountId || '', // Auto-filled from learning (will be set during approval if empty)
+        accountId: finalAccountId, // Auto-filled from account matching or learning
         categoryId: parsed.learnedCategoryId || '', // Auto-filled from learning (legacy field)
         description: merchant,
         date: parsed.date || new Date(), // Store as Date object, not string

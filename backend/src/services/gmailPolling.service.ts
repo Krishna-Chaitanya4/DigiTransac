@@ -315,7 +315,8 @@ class GmailPollingService {
             console.log('   📂 Category from MerchantLearning or generic keywords');
           }
           
-          const accountId = parsedTransaction.learnedAccountId || '';
+          // Priority for account: matched (email info) > learned (merchant history) > empty (manual)
+          const accountId = parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
 
           // Create pending transaction
           const transactionsContainer = await cosmosDBService.getTransactionsContainer();
