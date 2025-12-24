@@ -220,6 +220,9 @@ const Transactions: React.FC = () => {
   
   // Undo reject state
   const [undoRejectInfo, setUndoRejectInfo] = useState<{ transactionId: string; timeoutId: number } | null>(null);
+  
+  // Approve mode state
+  const [approveMode, setApproveMode] = useState(false); // Track if we're in "Complete & Approve" mode
 
   // Form states
   const [formData, setFormData] = useState({
@@ -449,6 +452,39 @@ const Transactions: React.FC = () => {
     }
   };
 
+  // Validation: Check if transaction is complete and ready for approval
+  const isTransactionComplete = (transaction: Transaction): { complete: boolean; missing: string[] } => {
+    const missing: string[] = [];
+    
+    // Check account
+    if (!transaction.accountId) {
+      missing.push('Account');
+    }
+    
+    // Check amount
+    if (!transaction.amount || transaction.amount <= 0) {
+      missing.push('Amount');
+    }
+    
+    // Check splits for categories
+    if (transaction.splits && transaction.splits.length > 0) {
+      const incompleteSplits = transaction.splits.filter(s => !s.categoryId);
+      if (incompleteSplits.length > 0) {
+        missing.push(`Category for ${incompleteSplits.length} split(s)`);
+      }
+    } else {
+      // Check legacy categoryId if no splits
+      if (!transaction.categoryId) {
+        missing.push('Category');
+      }
+    }
+    
+    return {
+      complete: missing.length === 0,
+      missing,
+    };
+  };
+
   const changeTransactionStatus = async (id: string, status: 'pending' | 'approved' | 'rejected', reason?: string) => {
     try {
       await axios.patch(`/api/transactions/${id}/status`, 
@@ -465,6 +501,25 @@ const Transactions: React.FC = () => {
 
   const handleApprove = async (id: string) => {
     try {
+      // Find the transaction
+      const transaction = transactions.find(t => t.id === id);
+      if (!transaction) {
+        toast.error('Transaction not found');
+        return;
+      }
+      
+      // Validate if transaction is complete
+      const validation = isTransactionComplete(transaction);
+      
+      if (!validation.complete) {
+        // Open edit dialog with approve mode
+        setApproveMode(true);
+        handleOpenDialog(transaction);
+        toast.warning(`Please complete: ${validation.missing.join(', ')}`);
+        return;
+      }
+      
+      // Transaction is complete, proceed with approval
       await axios.patch(`/api/transactions/${id}/approve`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -513,6 +568,54 @@ const Transactions: React.FC = () => {
       return;
     }
 
+    // Validate selected transactions
+    const selectedTxns = transactions.filter(t => selectedTransactions.has(t.id));
+    const incompleteTransactions = selectedTxns.filter(t => !isTransactionComplete(t).complete);
+    
+    if (incompleteTransactions.length > 0) {
+      const proceed = window.confirm(
+        `${incompleteTransactions.length} of ${selectedTransactions.size} transactions are incomplete and cannot be approved.\n\n` +
+        `Complete transactions: ${selectedTxns.length - incompleteTransactions.length}\n` +
+        `Incomplete transactions: ${incompleteTransactions.length}\n\n` +
+        `Do you want to approve only the complete transactions?`
+      );
+      
+      if (!proceed) {
+        return;
+      }
+      
+      // Filter to only complete transactions
+      const completeTransactionIds = selectedTxns
+        .filter(t => isTransactionComplete(t).complete)
+        .map(t => t.id);
+      
+      if (completeTransactionIds.length === 0) {
+        toast.error('All selected transactions are incomplete. Please complete them first.');
+        return;
+      }
+      
+      try {
+        await axios.post('/api/transactions/bulk-approve', {
+          transactionIds: completeTransactionIds,
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        toast.success(
+          `${completeTransactionIds.length} transactions approved. ` +
+          `${incompleteTransactions.length} skipped (incomplete).`
+        );
+        setSelectedTransactions(new Set());
+        await fetchTransactions();
+        await fetchPendingCount();
+      } catch (error: any) {
+        console.error('Error bulk approving:', error);
+        toast.error(error.response?.data?.message || 'Failed to approve transactions');
+      }
+      
+      return;
+    }
+
+    // All transactions are complete, proceed normally
     try {
       await axios.post('/api/transactions/bulk-approve', {
         transactionIds: Array.from(selectedTransactions),
@@ -628,6 +731,7 @@ const Transactions: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingTransaction(null);
+    setApproveMode(false); // Reset approve mode
   };
 
   const handleTypeChange = (newType: 'credit' | 'debit') => {
@@ -707,7 +811,16 @@ const Transactions: React.FC = () => {
         await axios.put(`/api/transactions/${editingTransaction.id}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        toast.success('Transaction updated successfully');
+        
+        // If in approve mode, also approve the transaction after saving
+        if (approveMode) {
+          await axios.patch(`/api/transactions/${editingTransaction.id}/approve`, {}, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          toast.success('Transaction completed and approved');
+        } else {
+          toast.success('Transaction updated successfully');
+        }
       } else {
         await axios.post(`/api/transactions`, payload, {
           headers: { Authorization: `Bearer ${token}` },
@@ -718,6 +831,7 @@ const Transactions: React.FC = () => {
       handleCloseDialog();
       fetchTransactions();
       fetchAccounts();
+      fetchPendingCount(); // Refresh pending count
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save transaction');
     }
@@ -1632,9 +1746,18 @@ const Transactions: React.FC = () => {
                       const CardComponent = isTouchDevice ? SwipeableTransactionCard : TransactionCard;
                       const isPending = transaction.reviewStatus === 'pending';
                       const isRejected = transaction.reviewStatus === 'rejected';
+                      const validation = isPending ? isTransactionComplete(transaction) : { complete: true, missing: [] };
                       
                       return (
                         <Box key={transaction.id} sx={{ position: 'relative' }}>
+                          {isPending && !validation.complete && (
+                            <Chip
+                              label={`Incomplete: ${validation.missing.join(', ')}`}
+                              color="warning"
+                              size="small"
+                              sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
+                            />
+                          )}
                           <CardComponent
                             transaction={transaction}
                             onEdit={() => handleOpenDialog(transaction)}
@@ -2006,7 +2129,17 @@ const Transactions: React.FC = () => {
                               )}
                             </TableCell>
                             <TableCell sx={{ minWidth: 180, maxWidth: 280 }}>
-                              <Box display="flex" gap={0.5} flexWrap="wrap">
+                              <Box display="flex" gap={0.5} flexWrap="wrap" alignItems="center">
+                                {transaction.reviewStatus === 'pending' && !isTransactionComplete(transaction).complete && (
+                                  <Tooltip title={`Incomplete: ${isTransactionComplete(transaction).missing.join(', ')}`}>
+                                    <Chip
+                                      label="⚠"
+                                      color="warning"
+                                      size="small"
+                                      sx={{ fontSize: '0.7rem', minWidth: 24, height: 20 }}
+                                    />
+                                  </Tooltip>
+                                )}
                                 {transaction.splits && transaction.splits.length > 0
                                   ? Array.from(
                                       new Set(transaction.splits.flatMap((s) => s.tags || []))
@@ -2268,7 +2401,17 @@ const Transactions: React.FC = () => {
         <ResponsiveDialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
           <DialogTitle>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</span>
+              <Box>
+                <span>{approveMode ? 'Complete Transaction to Approve' : (editingTransaction ? 'Edit Transaction' : 'Add Transaction')}</span>
+                {approveMode && (
+                  <Chip 
+                    label="Approval Required" 
+                    color="warning" 
+                    size="small" 
+                    sx={{ ml: 1 }}
+                  />
+                )}
+              </Box>
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'normal' }}>
                 Ctrl+Enter to save • Ctrl+S to toggle mode
               </Typography>
@@ -2874,6 +3017,7 @@ const Transactions: React.FC = () => {
             <Button
               onClick={handleSubmit}
               variant="contained"
+              color={approveMode ? 'success' : 'primary'}
               disabled={
                 !formData.amount ||
                 !formData.accountId ||
@@ -2884,7 +3028,7 @@ const Transactions: React.FC = () => {
                   : !formData.categoryId)
               }
             >
-              {editingTransaction ? 'Update' : 'Create'}
+              {approveMode ? 'Complete & Approve' : (editingTransaction ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </ResponsiveDialog>
