@@ -55,12 +55,24 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (type) filter.type = type;
     if (reviewStatus) filter.reviewStatus = reviewStatus;
 
-    // Search in description and merchantName
+    // Enhanced search: description, merchantName, referenceNumber, and amount
     if (search) {
-      filter.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { merchantName: { $regex: search, $options: 'i' } },
+      const searchStr = search as string;
+      const searchConditions: any[] = [
+        { description: { $regex: searchStr, $options: 'i' } },
+        { merchantName: { $regex: searchStr, $options: 'i' } },
       ];
+      
+      // Search in referenceNumber if exists
+      searchConditions.push({ referenceNumber: { $regex: searchStr, $options: 'i' } });
+      
+      // Search by amount if search term is a number
+      const amountSearch = parseFloat(searchStr);
+      if (!isNaN(amountSearch)) {
+        searchConditions.push({ amount: amountSearch });
+      }
+      
+      filter.$or = searchConditions;
     }
 
     if (startDate || endDate) {

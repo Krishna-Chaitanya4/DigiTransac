@@ -56,6 +56,7 @@ import {
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   UnfoldMore as UnfoldMoreIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useToast } from '../components/Toast';
@@ -1369,7 +1370,7 @@ const Transactions: React.FC = () => {
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Box display="flex" gap={2} alignItems="center" flexWrap="wrap" flex={1}>
                 <TextField
-                  placeholder="Search transactions..."
+                  placeholder="Search by description, merchant, amount..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   size="small"
@@ -1377,6 +1378,18 @@ const Transactions: React.FC = () => {
                     startAdornment: (
                       <InputAdornment position="start">
                         <SearchIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => setSearchQuery('')}
+                          edge="end"
+                          sx={{ mr: -0.5 }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
                       </InputAdornment>
                     ),
                   }}
