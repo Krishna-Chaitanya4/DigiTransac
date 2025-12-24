@@ -50,6 +50,33 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+// Smart tag filtering: exclude these tags from expense/income calculations
+const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
+const INCOME_EXCLUDE_TAGS = ['transfer', 'refund'];
+
+// Helper function to check if transaction should be excluded from calculations
+const shouldExcludeFromExpenses = (transaction: any): boolean => {
+  // Check splits for excluding tags
+  if (transaction.splits && transaction.splits.length > 0) {
+    return transaction.splits.some((split: any) =>
+      split.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase()))
+    );
+  }
+  // Fallback to transaction-level tags
+  return transaction.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+};
+
+const shouldExcludeFromIncome = (transaction: any): boolean => {
+  // Check splits for excluding tags
+  if (transaction.splits && transaction.splits.length > 0) {
+    return transaction.splits.some((split: any) =>
+      split.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase()))
+    );
+  }
+  // Fallback to transaction-level tags
+  return transaction.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+};
+
 interface DashboardStats {
   totalSpent: number;
   monthSpent: number;
@@ -272,8 +299,9 @@ const Dashboard: React.FC = () => {
         return true;
       });
 
-      const debits = transactions.filter((t: any) => t.type === 'debit');
-      const credits = transactions.filter((t: any) => t.type === 'credit');
+      // Filter debits and credits with smart tag exclusion
+      const debits = transactions.filter((t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t));
+      const credits = transactions.filter((t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t));
       const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const netSavings = totalIncome - totalSpent;
@@ -325,10 +353,10 @@ const Dashboard: React.FC = () => {
       });
 
       const prevSpent = prevTransactions
-        .filter((t: any) => t.type === 'debit')
+        .filter((t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t))
         .reduce((sum: number, t: any) => sum + t.amount, 0);
       const prevIncome = prevTransactions
-        .filter((t: any) => t.type === 'credit')
+        .filter((t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t))
         .reduce((sum: number, t: any) => sum + t.amount, 0);
 
       // Calculate percentage changes

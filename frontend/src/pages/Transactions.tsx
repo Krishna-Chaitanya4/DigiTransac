@@ -135,6 +135,43 @@ interface Tag {
   usageCount: number;
 }
 
+// Smart tag mapping: category names (lowercase) to suggested tags
+const CATEGORY_TAG_SUGGESTIONS: Record<string, { suggestedTags: string[]; removeTags: string[] }> = {
+  // Investment categories
+  'stocks': { suggestedTags: ['investment'], removeTags: ['expense'] },
+  'mutual funds': { suggestedTags: ['investment'], removeTags: ['expense'] },
+  'crypto': { suggestedTags: ['investment'], removeTags: ['expense'] },
+  'cryptocurrency': { suggestedTags: ['investment'], removeTags: ['expense'] },
+  'investment': { suggestedTags: ['investment'], removeTags: ['expense'] },
+  'bonds': { suggestedTags: ['investment'], removeTags: ['expense'] },
+  'real estate': { suggestedTags: ['investment'], removeTags: ['expense'] },
+  
+  // Transfer categories
+  'transfer': { suggestedTags: ['transfer'], removeTags: ['expense', 'income'] },
+  'account transfer': { suggestedTags: ['transfer'], removeTags: ['expense', 'income'] },
+  
+  // Savings categories
+  'savings': { suggestedTags: ['savings'], removeTags: ['expense'] },
+  'emergency fund': { suggestedTags: ['savings'], removeTags: ['expense'] },
+  
+  // Loan/Debt categories
+  'loan payment': { suggestedTags: ['loan'], removeTags: ['expense'] },
+  'loan': { suggestedTags: ['loan'], removeTags: ['expense'] },
+  'debt payment': { suggestedTags: ['loan'], removeTags: ['expense'] },
+  'emi': { suggestedTags: ['loan'], removeTags: ['expense'] },
+  
+  // Refund categories
+  'refund': { suggestedTags: ['refund'], removeTags: ['income'] },
+  'cashback': { suggestedTags: ['refund'], removeTags: ['income'] },
+  'return': { suggestedTags: ['refund'], removeTags: ['income'] },
+};
+
+// Tags to exclude from expense calculations in dashboards
+const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
+
+// Tags to exclude from income calculations in dashboards
+const INCOME_EXCLUDE_TAGS = ['transfer', 'refund'];
+
 const Transactions: React.FC = () => {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -177,6 +214,8 @@ const Transactions: React.FC = () => {
   const [importMenuAnchor, setImportMenuAnchor] = useState<null | HTMLElement>(null);
   const [totalCount, setTotalCount] = useState(0); // Total records from API
   const [pendingCount, setPendingCount] = useState(0); // All-time pending count
+  const [merchants, setMerchants] = useState<string[]>([]); // Unique merchant names
+  const [recentCategories, setRecentCategories] = useState<string[]>([]); // Recent category IDs
 
   // Form states
   const [formData, setFormData] = useState({
@@ -210,6 +249,7 @@ const Transactions: React.FC = () => {
         await Promise.all([fetchAccounts(), fetchCategories(), fetchTags()]);
         await fetchTransactions();
         await fetchPendingCount();
+        await fetchMerchantsAndRecentCategories();
       } catch (err) {
         console.error('Error initializing transactions page:', err);
         toast.error('Failed to load data');
@@ -349,6 +389,50 @@ const Transactions: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to fetch pending count:', err);
       setPendingCount(0);
+    }
+  };
+
+  const fetchMerchantsAndRecentCategories = async () => {
+    try {
+      // Fetch unique merchants from transactions
+      const txnResponse = await axios.get(`/api/transactions`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { limit: '1000', sortBy: 'date', sortOrder: 'desc' },
+      });
+      
+      const txns = txnResponse.data.transactions || [];
+      
+      // Extract unique merchants
+      const uniqueMerchants = [...new Set(
+        txns
+          .map((t: Transaction) => t.merchantName)
+          .filter((m: string | undefined) => m && m.trim())
+      )] as string[];
+      setMerchants(uniqueMerchants);
+      
+      // Extract recent categories (most used in last 30 days)
+      const recentTxns = txns.slice(0, 100); // Last 100 transactions
+      const categoryCounts: Record<string, number> = {};
+      
+      recentTxns.forEach((t: Transaction) => {
+        if (t.splits && t.splits.length > 0) {
+          t.splits.forEach((s: TransactionSplit) => {
+            categoryCounts[s.categoryId] = (categoryCounts[s.categoryId] || 0) + 1;
+          });
+        } else if (t.categoryId) {
+          categoryCounts[t.categoryId] = (categoryCounts[t.categoryId] || 0) + 1;
+        }
+      });
+      
+      // Sort by frequency and take top 5
+      const topCategories = Object.entries(categoryCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([catId]) => catId);
+      
+      setRecentCategories(topCategories);
+    } catch (err: any) {
+      console.error('Failed to fetch merchants/recent categories:', err);
     }
   };
 
@@ -509,14 +593,24 @@ const Transactions: React.FC = () => {
     const oldTag = formData.type === 'debit' ? 'expense' : 'income';
     const newTag = newType === 'debit' ? 'expense' : 'income';
 
-    // Remove old auto-tag and add new one
+    // Remove old auto-tag and add new one for Quick Add mode tags
     const updatedTags = formData.tags.filter((tag) => tag !== oldTag && tag !== newTag);
     updatedTags.push(newTag);
+
+    // Update all split tags as well (replace old default tag with new one)
+    const updatedSplits = formData.splits.map((split) => ({
+      ...split,
+      tags: [
+        ...split.tags.filter((tag) => tag !== oldTag && tag !== newTag),
+        newTag,
+      ],
+    }));
 
     setFormData({
       ...formData,
       type: newType,
       tags: updatedTags,
+      splits: updatedSplits,
     });
   };
 
@@ -612,10 +706,13 @@ const Transactions: React.FC = () => {
 
   // Split management functions
   const addSplit = () => {
+    // New splits should inherit the default tag based on transaction type
+    const defaultTag = formData.type === 'debit' ? 'expense' : 'income';
+    
     const newSplit: TransactionSplit = {
       categoryId: '',
       amount: 0,
-      tags: [],
+      tags: [defaultTag], // Auto-add default tag
       notes: '',
       order: formData.splits.length + 1,
     };
@@ -651,6 +748,183 @@ const Transactions: React.FC = () => {
     const total = parseFloat(formData.amount) || 0;
     return total - getSplitTotal();
   };
+
+  // Auto-fill split amounts
+  const distributeEqually = () => {
+    const total = parseFloat(formData.amount) || 0;
+    const splitCount = formData.splits.length;
+    if (splitCount === 0) return;
+    
+    const amountPerSplit = total / splitCount;
+    const newSplits = formData.splits.map((split) => ({
+      ...split,
+      amount: Math.round(amountPerSplit * 100) / 100, // Round to 2 decimals
+    }));
+    
+    // Adjust last split to account for rounding
+    const distributedTotal = newSplits.reduce((sum, s) => sum + s.amount, 0);
+    const diff = total - distributedTotal;
+    if (diff !== 0 && newSplits.length > 0) {
+      newSplits[newSplits.length - 1].amount += diff;
+    }
+    
+    setFormData({ ...formData, splits: newSplits });
+  };
+
+  const fillRemaining = (index: number) => {
+    const remaining = getRemainingAmount();
+    if (remaining <= 0) return;
+    
+    const newSplits = [...formData.splits];
+    newSplits[index] = { ...newSplits[index], amount: (newSplits[index].amount || 0) + remaining };
+    setFormData({ ...formData, splits: newSplits });
+  };
+
+  // Smart date setters
+  const setDateToToday = () => {
+    setFormData({ ...formData, date: dayjs().format('YYYY-MM-DD') });
+  };
+
+  const setDateToYesterday = () => {
+    setFormData({ ...formData, date: dayjs().subtract(1, 'day').format('YYYY-MM-DD') });
+  };
+
+  const setDateToStartOfMonth = () => {
+    setFormData({ ...formData, date: dayjs().startOf('month').format('YYYY-MM-DD') });
+  };
+
+  // Merchant selection with category suggestion
+  const handleMerchantSelect = (merchantName: string) => {
+    // Find most common category for this merchant
+    const merchantTransactions = transactions.filter(
+      (t) => t.merchantName?.toLowerCase() === merchantName.toLowerCase()
+    );
+    
+    if (merchantTransactions.length > 0) {
+      const categoryCounts: Record<string, number> = {};
+      
+      merchantTransactions.forEach((t) => {
+        if (t.splits && t.splits.length > 0) {
+          t.splits.forEach((s) => {
+            categoryCounts[s.categoryId] = (categoryCounts[s.categoryId] || 0) + 1;
+          });
+        } else if (t.categoryId) {
+          categoryCounts[t.categoryId] = (categoryCounts[t.categoryId] || 0) + 1;
+        }
+      });
+      
+      // Get most common category
+      const suggestedCategoryId = Object.entries(categoryCounts)
+        .sort(([, a], [, b]) => b - a)[0]?.[0];
+      
+      if (suggestedCategoryId && !formData.categoryId) {
+        setFormData({
+          ...formData,
+          merchantName,
+          categoryId: suggestedCategoryId,
+          splits: [{
+            ...formData.splits[0],
+            categoryId: suggestedCategoryId,
+          }],
+        });
+        toast.success(`Category suggested based on "${merchantName}" history`);
+      } else {
+        setFormData({ ...formData, merchantName });
+      }
+    } else {
+      setFormData({ ...formData, merchantName });
+    }
+  };
+
+  // Smart tag suggestion based on category
+  const handleCategoryChange = (categoryId: string, splitIndex?: number) => {
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category) return;
+
+    const categoryNameLower = category.name.toLowerCase();
+    const suggestion = CATEGORY_TAG_SUGGESTIONS[categoryNameLower];
+
+    if (suggestion) {
+      // For Quick Add mode (no splitIndex)
+      if (splitIndex === undefined) {
+        const currentTags = formData.tags || [];
+        const updatedTags = [
+          ...currentTags.filter((tag) => !suggestion.removeTags.includes(tag)),
+          ...suggestion.suggestedTags.filter((tag) => !currentTags.includes(tag)),
+        ];
+
+        setFormData({
+          ...formData,
+          categoryId,
+          tags: updatedTags,
+          splits: [{
+            ...formData.splits[0],
+            categoryId,
+            tags: updatedTags,
+          }],
+        });
+
+        if (suggestion.suggestedTags.length > 0) {
+          toast.success(
+            `Added "${suggestion.suggestedTags.join(', ')}" tag${suggestion.suggestedTags.length > 1 ? 's' : ''} for ${category.name}`
+          );
+        }
+      } else {
+        // For Split mode
+        const currentSplit = formData.splits[splitIndex];
+        const currentTags = currentSplit.tags || [];
+        const updatedTags = [
+          ...currentTags.filter((tag) => !suggestion.removeTags.includes(tag)),
+          ...suggestion.suggestedTags.filter((tag) => !currentTags.includes(tag)),
+        ];
+
+        updateSplit(splitIndex, 'categoryId', categoryId);
+        updateSplit(splitIndex, 'tags', updatedTags);
+
+        if (suggestion.suggestedTags.length > 0) {
+          toast.success(
+            `Added "${suggestion.suggestedTags.join(', ')}" tag${suggestion.suggestedTags.length > 1 ? 's' : ''} for ${category.name}`
+          );
+        }
+      }
+    } else {
+      // No suggestion, just update category
+      if (splitIndex === undefined) {
+        setFormData({
+          ...formData,
+          categoryId,
+          splits: [{
+            ...formData.splits[0],
+            categoryId,
+          }],
+        });
+      } else {
+        updateSplit(splitIndex, 'categoryId', categoryId);
+      }
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!openDialog) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Enter or Cmd+Enter to submit
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      }
+      
+      // Ctrl+S or Cmd+S to toggle split mode
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        setUseSplitMode(!useSplitMode);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openDialog, useSplitMode, formData]);
 
   const toggleRowExpansion = (transactionId: string) => {
     const newExpanded = new Set(expandedRows);
@@ -800,11 +1074,31 @@ const Transactions: React.FC = () => {
 
   // Summary cards should ONLY show approved transactions for accurate financial position
   // This follows industry standard: list is flexible, but totals are always accurate
+  // Also exclude investment/transfer/savings tags from totals
+  
+  const shouldExcludeFromExpenses = (t: Transaction): boolean => {
+    if (t.splits && t.splits.length > 0) {
+      return t.splits.some((split) =>
+        split.tags?.some((tag) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase()))
+      );
+    }
+    return t.tags?.some((tag) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+  };
+
+  const shouldExcludeFromIncome = (t: Transaction): boolean => {
+    if (t.splits && t.splits.length > 0) {
+      return t.splits.some((split) =>
+        split.tags?.some((tag) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase()))
+      );
+    }
+    return t.tags?.some((tag) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+  };
+
   const totalCredits = transactions
-    .filter((t) => t.type === 'credit' && t.reviewStatus === 'approved')
+    .filter((t) => t.type === 'credit' && t.reviewStatus === 'approved' && !shouldExcludeFromIncome(t))
     .reduce((sum, t) => sum + t.amount, 0);
   const totalDebits = transactions
-    .filter((t) => t.type === 'debit' && t.reviewStatus === 'approved')
+    .filter((t) => t.type === 'debit' && t.reviewStatus === 'approved' && !shouldExcludeFromExpenses(t))
     .reduce((sum, t) => sum + t.amount, 0);
   const netAmount = totalCredits - totalDebits;
 
@@ -1848,7 +2142,14 @@ const Transactions: React.FC = () => {
 
         {/* Add/Edit Dialog */}
         <ResponsiveDialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-          <DialogTitle>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
+          <DialogTitle>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</span>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'normal' }}>
+                Ctrl+Enter to save • Ctrl+S to toggle mode
+              </Typography>
+            </Box>
+          </DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <ToggleButtonGroup
@@ -1905,15 +2206,43 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    fullWidth
-                    required
-                    InputLabelProps={{ shrink: true }}
-                  />
+                  <Box>
+                    <TextField
+                      label="Date"
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      fullWidth
+                      required
+                      InputLabelProps={{ shrink: true }}
+                    />
+                    <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={setDateToToday}
+                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                      >
+                        Today
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={setDateToYesterday}
+                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                      >
+                        Yesterday
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={setDateToStartOfMonth}
+                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                      >
+                        Month Start
+                      </Button>
+                    </Box>
+                  </Box>
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
@@ -2015,32 +2344,49 @@ const Transactions: React.FC = () => {
                 {!useSplitMode && (
                   <>
                     <Grid item xs={12} sm={6}>
-                      <TextField
-                        select
-                        label="Category"
-                        value={formData.categoryId}
-                        onChange={(e) => {
-                          setFormData({ ...formData, categoryId: e.target.value });
-                          // Update the single split
-                          if (formData.splits.length > 0) {
-                            const newSplits = [...formData.splits];
-                            newSplits[0] = { ...newSplits[0], categoryId: e.target.value };
+                      <Autocomplete
+                        options={[
+                          ...categories.filter((c) => recentCategories.includes(c.id)),
+                          ...categories.filter((c) => !recentCategories.includes(c.id)),
+                        ].filter((c) => !c.isFolder)}
+                        getOptionLabel={(option) => option.name}
+                        value={categories.find((c) => c.id === formData.categoryId) || null}
+                        onChange={(_, newValue) => {
+                          if (newValue) {
+                            handleCategoryChange(newValue.id);
+                          } else {
                             setFormData({
                               ...formData,
-                              categoryId: e.target.value,
-                              splits: newSplits,
+                              categoryId: '',
+                              splits: [{
+                                ...formData.splits[0],
+                                categoryId: '',
+                              }],
                             });
                           }
                         }}
-                        fullWidth
-                        required
-                      >
-                        {categories.map((category) => (
-                          <MenuItem key={category.id} value={category.id}>
-                            {category.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                        groupBy={(option) =>
+                          recentCategories.includes(option.id) ? 'Recent' : 'All Categories'
+                        }
+                        renderInput={(params) => (
+                          <TextField {...params} label="Category" required placeholder="Select category..." />
+                        )}
+                        renderOption={(props, option) => (
+                          <li {...props}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: option.color || '#667eea',
+                                }}
+                              />
+                              {option.name}
+                            </Box>
+                          </li>
+                        )}
+                      />
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
@@ -2086,14 +2432,26 @@ const Transactions: React.FC = () => {
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           mb: 2,
+                          flexWrap: 'wrap',
+                          gap: 1,
                         }}
                       >
                         <Typography variant="subtitle2" fontWeight="bold">
                           Split Details
                         </Typography>
-                        <Button size="small" startIcon={<AddIcon />} onClick={addSplit}>
-                          Add Split
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={distributeEqually}
+                            disabled={!formData.amount || formData.splits.length === 0}
+                          >
+                            Distribute Equally
+                          </Button>
+                          <Button size="small" startIcon={<AddIcon />} onClick={addSplit}>
+                            Add Split
+                          </Button>
+                        </Box>
                       </Box>
 
                       {formData.splits.map((split, index) => (
@@ -2129,12 +2487,13 @@ const Transactions: React.FC = () => {
                                 select
                                 label="Category"
                                 value={split.categoryId}
-                                onChange={(e) => updateSplit(index, 'categoryId', e.target.value)}
+                                onChange={(e) => handleCategoryChange(e.target.value, index)}
                                 fullWidth
                                 required
                                 size="small"
+                                error={Boolean(!split.categoryId && split.amount > 0)}
                               >
-                                {categories.map((category) => (
+                                {categories.filter((c) => !c.isFolder).map((category) => (
                                   <MenuItem key={category.id} value={category.id}>
                                     {category.name}
                                   </MenuItem>
@@ -2143,43 +2502,64 @@ const Transactions: React.FC = () => {
                             </Grid>
 
                             <Grid item xs={12} sm={3}>
-                              <TextField
-                                label="Amount"
-                                type="number"
-                                value={split.amount || ''}
-                                onChange={(e) =>
-                                  updateSplit(index, 'amount', parseFloat(e.target.value) || 0)
-                                }
-                                fullWidth
-                                required
-                                size="small"
-                                InputProps={{
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      {formData.accountId
-                                        ? new Intl.NumberFormat('en-US', {
-                                            style: 'currency',
-                                            currency:
-                                              accounts.find((a) => a.id === formData.accountId)
-                                                ?.currency ||
-                                              user?.currency ||
-                                              'USD',
-                                          })
-                                            .format(0)
-                                            .replace(/[\d.,]/g, '')
-                                        : user?.currency === 'USD'
-                                          ? '$'
-                                          : user?.currency === 'EUR'
-                                            ? '€'
-                                            : user?.currency === 'GBP'
-                                              ? '£'
-                                              : user?.currency === 'INR'
-                                                ? '₹'
-                                                : '$'}
-                                    </InputAdornment>
-                                  ),
-                                }}
-                              />
+                              <Box sx={{ position: 'relative' }}>
+                                <TextField
+                                  label="Amount"
+                                  type="number"
+                                  value={split.amount || ''}
+                                  onChange={(e) =>
+                                    updateSplit(index, 'amount', parseFloat(e.target.value) || 0)
+                                  }
+                                  fullWidth
+                                  required
+                                  size="small"
+                                  error={Boolean(split.categoryId && !split.amount)}
+                                  InputProps={{
+                                    startAdornment: (
+                                      <InputAdornment position="start">
+                                        {formData.accountId
+                                          ? new Intl.NumberFormat('en-US', {
+                                              style: 'currency',
+                                              currency:
+                                                accounts.find((a) => a.id === formData.accountId)
+                                                  ?.currency ||
+                                                user?.currency ||
+                                                'USD',
+                                            })
+                                              .format(0)
+                                              .replace(/[\d.,]/g, '')
+                                          : user?.currency === 'USD'
+                                            ? '$'
+                                            : user?.currency === 'EUR'
+                                              ? '€'
+                                              : user?.currency === 'GBP'
+                                                ? '£'
+                                                : user?.currency === 'INR'
+                                                  ? '₹'
+                                                  : '$'}
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                />
+                                {getRemainingAmount() > 0 && (
+                                  <Button
+                                    size="small"
+                                    variant="text"
+                                    onClick={() => fillRemaining(index)}
+                                    sx={{
+                                      position: 'absolute',
+                                      right: 0,
+                                      top: -24,
+                                      fontSize: '0.7rem',
+                                      minWidth: 'auto',
+                                      px: 0.5,
+                                      py: 0,
+                                    }}
+                                  >
+                                    + Remaining
+                                  </Button>
+                                )}
+                              </Box>
                             </Grid>
 
                             <Grid item xs={12} sm={5}>
@@ -2260,11 +2640,32 @@ const Transactions: React.FC = () => {
                 )}
 
                 <Grid item xs={12}>
-                  <TextField
-                    label="Merchant Name"
+                  <Autocomplete
+                    freeSolo
+                    options={merchants}
                     value={formData.merchantName}
-                    onChange={(e) => setFormData({ ...formData, merchantName: e.target.value })}
-                    fullWidth
+                    onChange={(_, newValue) => {
+                      if (newValue) {
+                        handleMerchantSelect(newValue);
+                      } else {
+                        setFormData({ ...formData, merchantName: '' });
+                      }
+                    }}
+                    onInputChange={(_, newInputValue) => {
+                      setFormData({ ...formData, merchantName: newInputValue });
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Merchant Name"
+                        placeholder="Enter or select merchant..."
+                        helperText={
+                          merchants.length > 0 && formData.merchantName.length >= 2
+                            ? 'Start typing to see suggestions'
+                            : ''
+                        }
+                      />
+                    )}
                   />
                 </Grid>
 
