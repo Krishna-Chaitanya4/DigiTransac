@@ -155,7 +155,8 @@ const Transactions: React.FC = () => {
   const [selectedType, setSelectedType] = useState<'all' | 'credit' | 'debit'>('all');
   const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [includeTags, setIncludeTags] = useState<string[]>([]);
+  const [excludeTags, setExcludeTags] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('month'));
   const [activeDateFilter, setActiveDateFilter] = useState<string>('thisMonth'); // Track active quick filter
@@ -223,7 +224,7 @@ const Transactions: React.FC = () => {
     if (token) {
       setPage(0);
     }
-  }, [selectedType, selectedAccount, selectedCategory, selectedTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+  }, [selectedType, selectedAccount, selectedCategory, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
 
   // Fetch transactions when page, rowsPerPage, or any filter changes
   useEffect(() => {
@@ -235,7 +236,7 @@ const Transactions: React.FC = () => {
     }, searchQuery ? 500 : 0); // Debounce search, immediate for other filters
 
     return () => clearTimeout(debounceTimer);
-  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategory, selectedTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategory, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
 
   const fetchTransactions = async () => {
     try {
@@ -250,7 +251,8 @@ const Transactions: React.FC = () => {
       if (selectedType !== 'all') params.type = selectedType;
       if (selectedAccount) params.accountId = selectedAccount;
       if (selectedCategory) params.categoryId = selectedCategory;
-      if (selectedTags.length > 0) params.tags = selectedTags.join(',');
+      if (includeTags.length > 0) params.includeTags = includeTags.join(',');
+      if (excludeTags.length > 0) params.excludeTags = excludeTags.join(',');
       if (startDate) params.startDate = startDate.startOf('day').toISOString();
       if (endDate) params.endDate = endDate.endOf('day').toISOString();
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
@@ -720,7 +722,8 @@ const Transactions: React.FC = () => {
     setSelectedType('all');
     setSelectedAccount('');
     setSelectedCategory('');
-    setSelectedTags([]);
+    setIncludeTags([]);
+    setExcludeTags([]);
     setStartDate(dayjs().startOf('month'));
     setEndDate(dayjs().endOf('month'));
     setActiveDateFilter('thisMonth');
@@ -964,7 +967,8 @@ const Transactions: React.FC = () => {
                   selectedType !== 'all' ||
                   selectedAccount ||
                   selectedCategory ||
-                  selectedTags.length > 0 ||
+                  includeTags.length > 0 ||
+                  excludeTags.length > 0 ||
                   reviewStatus !== 'all') && (
                   <Chip
                     label="Clear Filters"
@@ -1147,12 +1151,51 @@ const Transactions: React.FC = () => {
                   <Autocomplete
                     multiple
                     options={tags.map((t) => t.name)}
-                    value={selectedTags}
-                    onChange={(_, value) => setSelectedTags(value)}
-                    renderInput={(params) => <TextField {...params} label="Tags" size="small" />}
+                    value={includeTags}
+                    onChange={(_, value) => setIncludeTags(value)}
+                    renderInput={(params) => (
+                      <TextField 
+                        {...params} 
+                        label="Include Tags (show WITH these)" 
+                        size="small"
+                        placeholder="Select tags to include..."
+                      />
+                    )}
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
-                        <Chip label={option} size="small" {...getTagProps({ index })} />
+                        <Chip 
+                          label={option} 
+                          size="small" 
+                          color="success"
+                          {...getTagProps({ index })} 
+                        />
+                      ))
+                    }
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Autocomplete
+                    multiple
+                    options={tags.map((t) => t.name)}
+                    value={excludeTags}
+                    onChange={(_, value) => setExcludeTags(value)}
+                    renderInput={(params) => (
+                      <TextField 
+                        {...params} 
+                        label="Exclude Tags (hide WITH these)" 
+                        size="small"
+                        placeholder="Select tags to exclude..."
+                      />
+                    )}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => (
+                        <Chip 
+                          label={option} 
+                          size="small" 
+                          color="error"
+                          {...getTagProps({ index })} 
+                        />
                       ))
                     }
                   />

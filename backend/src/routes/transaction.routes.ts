@@ -27,7 +27,9 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       accountId,
       categoryId,
       type,
-      tags,
+      tags, // Deprecated: for backwards compatibility
+      includeTags,
+      excludeTags,
       startDate,
       endDate,
       reviewStatus,
@@ -108,7 +110,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     // Apply category and tag filtering AFTER fetching splits (if needed)
-    if (categoryId || tags) {
+    if (categoryId || tags || includeTags || excludeTags) {
       transactions = transactions.filter((txn) => {
         const txnSplits = (txn as TransactionWithSplits).splits || [];
 
@@ -120,9 +122,27 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
           if (!hasCategory) return false;
         }
 
+        // Handle include tags (OR logic: transaction must have at least ONE of these tags)
+        if (includeTags) {
+          const includeArray = (includeTags as string).split(',');
+          const hasIncludedTag =
+            txnSplits.some((s: TransactionSplit) => s.tags.some((t) => includeArray.includes(t))) ||
+            (txn.tags && txn.tags.some((t: string) => includeArray.includes(t)));
+          if (!hasIncludedTag) return false;
+        }
+
+        // Handle exclude tags (OR logic: transaction must NOT have ANY of these tags)
+        if (excludeTags) {
+          const excludeArray = (excludeTags as string).split(',');
+          const hasExcludedTag =
+            txnSplits.some((s: TransactionSplit) => s.tags.some((t) => excludeArray.includes(t))) ||
+            (txn.tags && txn.tags.some((t: string) => excludeArray.includes(t)));
+          if (hasExcludedTag) return false; // Exclude this transaction
+        }
+
+        // Backwards compatibility: old 'tags' parameter (OR logic)
         if (tags) {
           const tagArray = (tags as string).split(',');
-          // Check if any split has any of these tags (or check backwards compat tags)
           const hasTags =
             txnSplits.some((s: TransactionSplit) => s.tags.some((t) => tagArray.includes(t))) ||
             (txn.tags && txn.tags.some((t: string) => tagArray.includes(t)));
