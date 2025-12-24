@@ -55,14 +55,13 @@ router.post('/inbound', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Email integration not enabled' });
     }
 
-    // Suggest category based on merchant (legacy, fallback)
-    const suggestedCategory = emailParserService.suggestCategory(
-      parsedTransaction.merchant,
-      user.emailIntegration?.merchantMappings
-    );
+    // Fallback hierarchy for category suggestion:
+    // 1. MerchantLearning (auto-learned from approvals)
+    // 2. Generic keyword patterns (hardcoded common merchants)
+    // 3. Empty (user will fill during review)
+    const genericCategory = emailParserService.suggestCategory(parsedTransaction.merchant);
 
-    // Use learned category/account if available, otherwise use suggested/empty
-    const categoryId = parsedTransaction.learnedCategoryId || suggestedCategory || '';
+    const categoryId = parsedTransaction.learnedCategoryId || genericCategory || '';
     const accountId = parsedTransaction.learnedAccountId || '';
 
     // Create pending transaction

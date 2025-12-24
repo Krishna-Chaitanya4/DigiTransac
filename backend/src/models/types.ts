@@ -29,14 +29,7 @@ export interface EmailIntegration {
   lastProcessedAt?: Date;
   lastHistoryId?: string; // Gmail History ID for incremental delta sync
   totalEmailsProcessed: number;
-  merchantMappings?: MerchantCategoryMapping[];
   customBankPatterns?: BankPattern[];
-}
-
-export interface MerchantCategoryMapping {
-  merchantKeyword: string;
-  categoryId: string;
-  createdAt: Date;
 }
 
 export interface BankPattern {

@@ -363,24 +363,13 @@ export class EmailParserService {
   }
 
   /**
-   * Suggest category based on merchant name
+   * Suggest category based on merchant name using generic keyword patterns
+   * This is a fallback when MerchantLearning has no data
    */
-  public suggestCategory(
-    merchant: string,
-    userMappings?: { merchantKeyword: string; categoryId: string }[]
-  ): string | null {
+  public suggestCategory(merchant: string): string | null {
     const merchantLower = merchant.toLowerCase();
 
-    // Check user's custom mappings first
-    if (userMappings) {
-      for (const mapping of userMappings) {
-        if (merchantLower.includes(mapping.merchantKeyword.toLowerCase())) {
-          return mapping.categoryId;
-        }
-      }
-    }
-
-    // Default category suggestions based on keywords
+    // Generic category suggestions based on common keywords
     const categoryKeywords: { [key: string]: string[] } = {
       'Food & Dining': [
         'swiggy',

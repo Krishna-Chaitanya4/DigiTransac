@@ -73,7 +73,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
             lastProcessedAt: null,
             lastProcessedEmailId: null,
             totalEmailsProcessed: 0,
-            merchantMappings: [],
+
             customBankPatterns: [],
           },
         },

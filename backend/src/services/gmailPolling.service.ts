@@ -299,10 +299,12 @@ class GmailPollingService {
           console.log('   Merchant:', parsedTransaction.merchant);
           console.log('   Bank:', parsedTransaction.bankName);
 
-          // Use learned category/account if available, otherwise use suggested/empty
+          // Fallback hierarchy for category:
+          // 1. MerchantLearning (auto-learned from approvals)
+          // 2. Generic keyword patterns (hardcoded)
+          // 3. Uncategorized (fallback category)
           let categoryId = parsedTransaction.learnedCategoryId || emailParserService.suggestCategory(
-            parsedTransaction.merchant,
-            user.emailIntegration?.merchantMappings
+            parsedTransaction.merchant
           );
 
           // If no category suggested, use "Uncategorized" as fallback
@@ -310,7 +312,7 @@ class GmailPollingService {
             categoryId = await this.getOrCreateUncategorizedCategory(user.id);
             console.log('   📂 No category match - using Uncategorized');
           } else {
-            console.log('   📂 Category suggested from mapping or learning');
+            console.log('   📂 Category from MerchantLearning or generic keywords');
           }
           
           const accountId = parsedTransaction.learnedAccountId || '';
