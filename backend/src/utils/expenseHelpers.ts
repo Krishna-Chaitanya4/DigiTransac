@@ -1,5 +1,6 @@
 import { cosmosDBService } from '../config/cosmosdb';
 import { decryptTransaction } from './transactionEncryption';
+import { buildExpenseFilter } from './transactionFilters';
 
 /**
  * Helper functions to work with the new transaction/splits model
@@ -33,15 +34,10 @@ export async function getExpensesFromTransactions(
 ): Promise<ExpenseFromSplit[]> {
   const transactionsContainer = await cosmosDBService.getTransactionsContainer();
   
-  const filter: any = {
-    userId,
-    type: 'debit',
-    date: { $gte: startDate, $lte: endDate },
-  };
-  
-  if (reviewStatus) {
-    filter.reviewStatus = reviewStatus;
-  }
+  // Use centralized filter builder - defaults to approved if reviewStatus provided
+  const filter: any = reviewStatus
+    ? buildExpenseFilter(userId, startDate, endDate)
+    : { userId, type: 'debit', date: { $gte: startDate, $lte: endDate } };
   
   const transactions = await transactionsContainer.find(filter).toArray();
   

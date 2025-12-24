@@ -212,9 +212,11 @@ const Dashboard: React.FC = () => {
       const endDate = filters.dateRange.end.endOf('day').toISOString();
       
       // Build query params for transactions API
+      // Only fetch approved transactions for accurate financial calculations
       const txnParams = new URLSearchParams({
         startDate,
         endDate,
+        reviewStatus: 'approved',
         sortBy: 'date',
         sortOrder: 'desc',
       });
@@ -286,6 +288,7 @@ const Dashboard: React.FC = () => {
       const prevParams = new URLSearchParams({
         startDate: prevStart.toISOString(),
         endDate: prevEnd.toISOString(),
+        reviewStatus: 'approved',
       });
       if (filters.accounts.length > 0) {
         filters.accounts.forEach(accountId => prevParams.append('accountIds', accountId));

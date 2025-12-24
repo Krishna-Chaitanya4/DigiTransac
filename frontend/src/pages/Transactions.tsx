@@ -256,9 +256,6 @@ const Transactions: React.FC = () => {
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
       params.includeSplits = 'true'; // Always fetch splits
 
-      console.log('Fetching transactions with params:', params);
-      console.log('Current reviewStatus state:', reviewStatus);
-
       const response = await axios.get(`/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` },
         params,
@@ -766,11 +763,13 @@ const Transactions: React.FC = () => {
     );
   }
 
+  // Summary cards should ONLY show approved transactions for accurate financial position
+  // This follows industry standard: list is flexible, but totals are always accurate
   const totalCredits = transactions
-    .filter((t) => t.type === 'credit')
+    .filter((t) => t.type === 'credit' && t.reviewStatus === 'approved')
     .reduce((sum, t) => sum + t.amount, 0);
   const totalDebits = transactions
-    .filter((t) => t.type === 'debit')
+    .filter((t) => t.type === 'debit' && t.reviewStatus === 'approved')
     .reduce((sum, t) => sum + t.amount, 0);
   const netAmount = totalCredits - totalDebits;
 

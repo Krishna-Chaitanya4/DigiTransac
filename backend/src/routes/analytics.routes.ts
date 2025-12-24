@@ -4,6 +4,7 @@ import { cosmosDBService } from '../config/cosmosdb';
 import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 import { calculateBudgetSpendingInRange } from '../utils/budgetHelpers';
 import { Budget, Category } from '../models/types';
+import { buildExpenseFilter } from '../utils/transactionFilters';
 
 const router = Router();
 
@@ -25,13 +26,8 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
     
-    // Build filter for transactions
-    const txFilter: any = {
-      userId,
-      type: 'debit',
-      date: { $gte: start, $lte: end },
-      reviewStatus: 'approved',
-    };
+    // Build filter for approved debit transactions only
+    const txFilter: any = buildExpenseFilter(userId, start, end);
     
     if (accounts) {
       const accountIds = (accounts as string).split(',');
@@ -154,13 +150,9 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
     
+    // Only include approved transactions in calculations
     const transactions = await transactionsContainer
-      .find({
-        userId,
-        type: 'debit',
-        date: { $gte: start, $lte: end },
-        reviewStatus: 'approved',
-      })
+      .find(buildExpenseFilter(userId, start, end))
       .toArray();
 
     const transactionIds = transactions.map((t: any) => t.id);

@@ -87,25 +87,29 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
         ? smsParserService.extractMerchant(parsed.merchant)
         : 'Unknown';
 
-      // Create pending transaction
+      // Create pending transaction with proper structure
+      const transactionId = uuidv4();
       const pendingTransaction = {
-        id: uuidv4(),
+        id: transactionId,
         userId,
-        amount: parsed.type === 'debit' ? -Math.abs(parsed.amount) : Math.abs(parsed.amount),
-        type: parsed.type === 'debit' ? 'expense' : 'income',
+        type: parsed.type === 'debit' ? 'debit' : 'credit', // Use 'debit'/'credit' not 'expense'/'income'
+        amount: Math.abs(parsed.amount), // Always positive
+        accountId: '', // Will be set during approval
         description: merchant,
-        date: (parsed.date || new Date()).toISOString(),
+        date: parsed.date || new Date(), // Store as Date object, not string
         source: 'sms',
+        merchantName: merchant,
         reviewStatus: 'pending',
-        metadata: {
-          originalSMS: parsed.originalText,
+        confidence: parsed.confidence,
+        originalContent: parsed.originalText, // Store original SMS
+        isRecurring: false,
+        parsedData: {
           accountNumber: parsed.accountNumber,
           bankName: parsed.bankName,
-          confidence: parsed.confidence,
           referenceNumber: parsed.referenceNumber,
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       pendingTransactions.push(pendingTransaction);

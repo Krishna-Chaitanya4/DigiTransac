@@ -3,6 +3,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
 import { Account } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
+import { buildApprovedTransactionsFilter } from '../utils/transactionFilters';
 
 const router = Router();
 
@@ -226,9 +227,9 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    // Get approved transactions
+    // Get approved transactions only for accurate balance calculation
     const transactions = await transactionsContainer
-      .find({ accountId: id, reviewStatus: 'approved' })
+      .find(buildApprovedTransactionsFilter(userId, { accountId: id }))
       .toArray();
 
     const credits = transactions
