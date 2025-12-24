@@ -55,25 +55,9 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (type) filter.type = type;
     if (reviewStatus) filter.reviewStatus = reviewStatus;
 
-    // Enhanced search: description, merchantName, referenceNumber, and amount
-    if (search) {
-      const searchStr = search as string;
-      const searchConditions: any[] = [
-        { description: { $regex: searchStr, $options: 'i' } },
-        { merchantName: { $regex: searchStr, $options: 'i' } },
-      ];
-      
-      // Search in referenceNumber if exists
-      searchConditions.push({ referenceNumber: { $regex: searchStr, $options: 'i' } });
-      
-      // Search by amount if search term is a number
-      const amountSearch = parseFloat(searchStr);
-      if (!isNaN(amountSearch)) {
-        searchConditions.push({ amount: amountSearch });
-      }
-      
-      filter.$or = searchConditions;
-    }
+    // Store search term for in-memory filtering after decryption
+    // (can't search encrypted fields with MongoDB regex)
+    const searchStr = search as string;
 
     if (startDate || endDate) {
       filter.date = {};
@@ -176,10 +160,35 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       });
     }
 
-    const total = await transactionsContainer.countDocuments(filter);
+    // Decrypt transactions before filtering by search (since fields are encrypted)
+    let decryptedTransactions = decryptTransactions(transactions);
 
-    // Decrypt transactions before sending to client
-    const decryptedTransactions = decryptTransactions(transactions);
+    // Apply search filter on decrypted data
+    if (searchStr) {
+      const searchLower = searchStr.toLowerCase();
+      const amountSearch = parseFloat(searchStr);
+      
+      decryptedTransactions = decryptedTransactions.filter((txn) => {
+        // Search in description
+        if (txn.description && txn.description.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+        // Search in merchantName
+        if (txn.merchantName && txn.merchantName.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+        // Search by exact amount if search term is a number
+        if (!isNaN(amountSearch) && Math.abs(txn.amount) === Math.abs(amountSearch)) {
+          return true;
+        }
+        return false;
+      });
+    }
+
+    // For search queries, total is the filtered count; otherwise query DB
+    const total = searchStr 
+      ? decryptedTransactions.length 
+      : await transactionsContainer.countDocuments(filter);
 
     res.json({
       success: true,
