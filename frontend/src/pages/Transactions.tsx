@@ -124,6 +124,8 @@ interface Category {
   name: string;
   color?: string;
   isFolder?: boolean;
+  parentId?: string | null;
+  path?: string[];
 }
 
 interface Tag {
@@ -154,7 +156,7 @@ const Transactions: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'credit' | 'debit'>('all');
   const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [includeTags, setIncludeTags] = useState<string[]>([]);
   const [excludeTags, setExcludeTags] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
@@ -224,7 +226,7 @@ const Transactions: React.FC = () => {
     if (token) {
       setPage(0);
     }
-  }, [selectedType, selectedAccount, selectedCategory, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+  }, [selectedType, selectedAccount, selectedCategories, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
 
   // Fetch transactions when page, rowsPerPage, or any filter changes
   useEffect(() => {
@@ -236,7 +238,7 @@ const Transactions: React.FC = () => {
     }, searchQuery ? 500 : 0); // Debounce search, immediate for other filters
 
     return () => clearTimeout(debounceTimer);
-  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategory, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategories, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
 
   const fetchTransactions = async () => {
     try {
@@ -250,7 +252,36 @@ const Transactions: React.FC = () => {
       if (searchQuery) params.search = searchQuery;
       if (selectedType !== 'all') params.type = selectedType;
       if (selectedAccount) params.accountId = selectedAccount;
-      if (selectedCategory) params.categoryId = selectedCategory;
+      if (selectedCategories.length > 0) {
+        // Expand folders to category IDs before sending to backend
+        const expandedCategoryIds = new Set<string>();
+        
+        const getAllDescendants = (folderId: string): string[] => {
+          const descendants: string[] = [];
+          const children = categories.filter((c) => c.parentId === folderId);
+          
+          children.forEach((child) => {
+            if (child.isFolder) {
+              descendants.push(...getAllDescendants(child.id));
+            } else {
+              descendants.push(child.id);
+            }
+          });
+          
+          return descendants;
+        };
+        
+        selectedCategories.forEach((catId) => {
+          const cat = categories.find((c) => c.id === catId);
+          if (cat?.isFolder) {
+            getAllDescendants(cat.id).forEach((id) => expandedCategoryIds.add(id));
+          } else {
+            expandedCategoryIds.add(catId);
+          }
+        });
+        
+        params.categoryIds = Array.from(expandedCategoryIds).join(',');
+      }
       if (includeTags.length > 0) params.includeTags = includeTags.join(',');
       if (excludeTags.length > 0) params.excludeTags = excludeTags.join(',');
       if (startDate) params.startDate = startDate.startOf('day').toISOString();
@@ -289,7 +320,8 @@ const Transactions: React.FC = () => {
       const response = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setCategories(response.data.categories?.filter((c: Category) => !c.isFolder) || []);
+      // Include both folders and categories for smart folder selection
+      setCategories(response.data.categories || []);
     } catch (err: any) {
       console.error('Failed to fetch categories:', err);
       setCategories([]); // Set empty array on error
@@ -721,7 +753,7 @@ const Transactions: React.FC = () => {
     setSearchQuery('');
     setSelectedType('all');
     setSelectedAccount('');
-    setSelectedCategory('');
+    setSelectedCategories([]);
     setIncludeTags([]);
     setExcludeTags([]);
     setStartDate(dayjs().startOf('month'));
@@ -966,7 +998,7 @@ const Transactions: React.FC = () => {
                 {(searchQuery ||
                   selectedType !== 'all' ||
                   selectedAccount ||
-                  selectedCategory ||
+                  selectedCategories.length > 0 ||
                   includeTags.length > 0 ||
                   excludeTags.length > 0 ||
                   reviewStatus !== 'all') && (
@@ -1035,21 +1067,62 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    select
-                    label="Category"
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    fullWidth
-                    size="small"
-                  >
-                    <MenuItem value="">All Categories</MenuItem>
-                    {categories.map((category) => (
-                      <MenuItem key={category.id} value={category.id}>
-                        {category.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  <Autocomplete
+                    multiple
+                    options={categories}
+                    getOptionLabel={(option) => option.name}
+                    value={categories.filter((c) => selectedCategories.includes(c.id))}
+                    onChange={(_, newValue) => {
+                      // Store folders and categories as-is (no expansion in state)
+                      // Expansion happens only when making API call
+                      setSelectedCategories(newValue.map((cat) => cat.id));
+                    }}
+                    renderInput={(params) => (
+                      <TextField 
+                        {...params} 
+                        label="Categories" 
+                        size="small"
+                        placeholder="Select categories or folders..."
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <li {...props}>
+                        {option.isFolder ? '📁 ' : ''}{option.name}
+                      </li>
+                    )}
+                    renderTags={(value, getTagProps) => {
+                      // Helper to count descendants for folders
+                      const getDescendantCount = (folderId: string): number => {
+                        let count = 0;
+                        const children = categories.filter((c) => c.parentId === folderId);
+                        
+                        children.forEach((child) => {
+                          if (child.isFolder) {
+                            count += getDescendantCount(child.id);
+                          } else {
+                            count++;
+                          }
+                        });
+                        
+                        return count;
+                      };
+
+                      return value.map((option, index) => {
+                        const label = option.isFolder 
+                          ? `📁 ${option.name} (${getDescendantCount(option.id)})`
+                          : option.name;
+                        
+                        return (
+                          <Chip 
+                            label={label}
+                            size="small"
+                            style={{ backgroundColor: option.color || '#667eea', color: '#fff' }}
+                            {...getTagProps({ index })} 
+                          />
+                        );
+                      });
+                    }}
+                  />
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>

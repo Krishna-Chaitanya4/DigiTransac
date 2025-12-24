@@ -25,7 +25,8 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const userId = req.userId!;
     const {
       accountId,
-      categoryId,
+      categoryId, // Deprecated: for backwards compatibility
+      categoryIds, // New: multiple categories
       type,
       tags, // Deprecated: for backwards compatibility
       includeTags,
@@ -110,12 +111,21 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     // Apply category and tag filtering AFTER fetching splits (if needed)
-    if (categoryId || tags || includeTags || excludeTags) {
+    if (categoryId || categoryIds || tags || includeTags || excludeTags) {
       transactions = transactions.filter((txn) => {
         const txnSplits = (txn as TransactionWithSplits).splits || [];
 
+        // Handle multiple categories (OR logic: match any category)
+        if (categoryIds) {
+          const categoryArray = (categoryIds as string).split(',');
+          const hasCategory =
+            txnSplits.some((s: TransactionSplit) => categoryArray.includes(s.categoryId)) ||
+            (txn.categoryId && categoryArray.includes(txn.categoryId));
+          if (!hasCategory) return false;
+        }
+
+        // Backwards compatibility: single categoryId
         if (categoryId) {
-          // Check if any split has this category (or check backwards compat categoryId)
           const hasCategory =
             txnSplits.some((s: TransactionSplit) => s.categoryId === categoryId) ||
             txn.categoryId === categoryId;
