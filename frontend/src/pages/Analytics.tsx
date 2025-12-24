@@ -249,6 +249,11 @@ const Analytics: React.FC = () => {
     includeTags: [],
     excludeTags: [],
     transactionType: 'all',
+    amountRange: {
+      min: '',
+      max: '',
+      quickFilter: 'any',
+    },
   });
 
   const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'week' | 'month'>('day');

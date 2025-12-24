@@ -72,7 +72,7 @@ import SMSImportModal from '../components/SMSImportModal';
 import { useResponsive } from '../hooks/useResponsive';
 import { useIsTouchDevice } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
+import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -178,6 +178,8 @@ const Transactions: React.FC = () => {
   const { token, user } = useAuth();
   const toast = useToast();
   const { isMobile } = useResponsive();
+  const userCurrency = user?.currency || 'USD';
+  const currencySymbol = CURRENCIES[userCurrency]?.symbol || '$';
   const isTouchDevice = useIsTouchDevice();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -198,6 +200,9 @@ const Transactions: React.FC = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [includeTags, setIncludeTags] = useState<string[]>([]);
   const [excludeTags, setExcludeTags] = useState<string[]>([]);
+  const [minAmount, setMinAmount] = useState<string>('');
+  const [maxAmount, setMaxAmount] = useState<string>('');
+  const [amountQuickFilter, setAmountQuickFilter] = useState<string>('any');
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('month'));
   const [activeDateFilter, setActiveDateFilter] = useState<string>('thisMonth'); // Track active quick filter
@@ -295,7 +300,7 @@ const Transactions: React.FC = () => {
     }, searchQuery ? 500 : 0); // Debounce search, immediate for other filters
 
     return () => clearTimeout(debounceTimer);
-  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategories, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategories, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery, minAmount, maxAmount]);
 
   const fetchTransactions = async () => {
     try {
@@ -309,6 +314,8 @@ const Transactions: React.FC = () => {
       if (searchQuery) params.search = searchQuery;
       if (selectedType !== 'all') params.type = selectedType;
       if (selectedAccount) params.accountId = selectedAccount;
+      if (minAmount) params.minAmount = minAmount;
+      if (maxAmount) params.maxAmount = maxAmount;
       if (selectedCategories.length > 0) {
         // Expand folders to category IDs before sending to backend
         const expandedCategoryIds = new Set<string>();
@@ -1186,6 +1193,9 @@ const Transactions: React.FC = () => {
     setSelectedCategories([]);
     setIncludeTags([]);
     setExcludeTags([]);
+    setMinAmount('');
+    setMaxAmount('');
+    setAmountQuickFilter('any');
     setStartDate(dayjs().startOf('month'));
     setEndDate(dayjs().endOf('month'));
     setActiveDateFilter('thisMonth');
@@ -1463,6 +1473,8 @@ const Transactions: React.FC = () => {
                   selectedCategories.length > 0 ||
                   includeTags.length > 0 ||
                   excludeTags.length > 0 ||
+                  minAmount ||
+                  maxAmount ||
                   reviewStatus !== 'all') && (
                   <Chip
                     label="Clear Filters"
@@ -1733,6 +1745,93 @@ const Transactions: React.FC = () => {
                         />
                       ))
                     }
+                  />
+                </Grid>
+
+                {/* Amount Range Filter - Compact Design */}
+                <Grid item xs={12} sm={6} md={2}>
+                  <TextField
+                    select
+                    label="Amount Range"
+                    value={amountQuickFilter}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setAmountQuickFilter(value);
+                      switch (value) {
+                        case 'small':
+                          setMinAmount('0');
+                          setMaxAmount('50');
+                          break;
+                        case 'medium':
+                          setMinAmount('50');
+                          setMaxAmount('200');
+                          break;
+                        case 'large':
+                          setMinAmount('200');
+                          setMaxAmount('1000');
+                          break;
+                        case 'veryLarge':
+                          setMinAmount('1000');
+                          setMaxAmount('');
+                          break;
+                        case 'any':
+                          setMinAmount('');
+                          setMaxAmount('');
+                          break;
+                        case 'custom':
+                          // Keep current values
+                          break;
+                      }
+                    }}
+                    fullWidth
+                    size="small"
+                  >
+                    <MenuItem value="any">Any Amount</MenuItem>
+                    <MenuItem value="small">{currencySymbol}0-{currencySymbol}50</MenuItem>
+                    <MenuItem value="medium">{currencySymbol}50-{currencySymbol}200</MenuItem>
+                    <MenuItem value="large">{currencySymbol}200-{currencySymbol}1K</MenuItem>
+                    <MenuItem value="veryLarge">&gt;{currencySymbol}1K</MenuItem>
+                    <MenuItem value="custom">Custom Range</MenuItem>
+                  </TextField>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2}>
+                  <TextField
+                    label="Min Amount"
+                    type="number"
+                    value={minAmount}
+                    onChange={(e) => {
+                      setMinAmount(e.target.value);
+                      if (e.target.value || maxAmount) {
+                        setAmountQuickFilter('custom');
+                      }
+                    }}
+                    placeholder="0"
+                    fullWidth
+                    size="small"
+                    InputProps={{
+                      startAdornment: <span style={{ marginRight: 4 }}>{currencySymbol}</span>,
+                    }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2}>
+                  <TextField
+                    label="Max Amount"
+                    type="number"
+                    value={maxAmount}
+                    onChange={(e) => {
+                      setMaxAmount(e.target.value);
+                      if (minAmount || e.target.value) {
+                        setAmountQuickFilter('custom');
+                      }
+                    }}
+                    placeholder="No limit"
+                    fullWidth
+                    size="small"
+                    InputProps={{
+                      startAdornment: <span style={{ marginRight: 4 }}>{currencySymbol}</span>,
+                    }}
                   />
                 </Grid>
               </Grid>

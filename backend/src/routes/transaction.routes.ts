@@ -51,6 +51,8 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       endDate,
       reviewStatus,
       search,
+      minAmount,
+      maxAmount,
       limit = '100',
       skip = '0',
       sortBy = 'date',
@@ -70,9 +72,11 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (type) filter.type = type;
     if (reviewStatus) filter.reviewStatus = reviewStatus;
 
-    // Store search term for in-memory filtering after decryption
-    // (can't search encrypted fields with MongoDB regex)
+    // Store search term and amount range for in-memory filtering after decryption
+    // (can't search/filter encrypted fields with MongoDB)
     const searchStr = search as string;
+    const minAmountNum = minAmount ? parseFloat(minAmount as string) : undefined;
+    const maxAmountNum = maxAmount ? parseFloat(maxAmount as string) : undefined;
 
     if (startDate || endDate) {
       filter.date = {};
@@ -210,8 +214,24 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
         }
         return false;
       });
+    }
+
+    // Apply amount range filter on decrypted data
+    if (minAmountNum !== undefined || maxAmountNum !== undefined) {
+      decryptedTransactions = decryptedTransactions.filter((txn) => {
+        const absAmount = Math.abs(txn.amount);
+        if (minAmountNum !== undefined && absAmount < minAmountNum) {
+          return false;
+        }
+        if (maxAmountNum !== undefined && absAmount > maxAmountNum) {
+          return false;
+        }
+        return true;
+      });
+    }
       
-      // Apply pagination in-memory for search results
+    // Apply pagination in-memory for filtered results (search or amount range)
+    if (searchStr || minAmountNum !== undefined || maxAmountNum !== undefined) {
       const totalSearchResults = decryptedTransactions.length;
       decryptedTransactions = decryptedTransactions.slice(skipNum, skipNum + limitNum);
       

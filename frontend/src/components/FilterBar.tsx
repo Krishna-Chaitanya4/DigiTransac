@@ -33,6 +33,11 @@ export interface FilterValues {
   includeTags: string[];
   excludeTags: string[];
   transactionType: 'all' | 'debit' | 'credit';
+  amountRange: {
+    min: string;
+    max: string;
+    quickFilter: 'any' | 'small' | 'medium' | 'large' | 'veryLarge' | 'custom';
+  };
 }
 
 interface FilterBarProps {
@@ -118,6 +123,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       includeTags: [],
       excludeTags: [],
       transactionType: 'all',
+      amountRange: {
+        min: '',
+        max: '',
+        quickFilter: 'any',
+      },
     });
     setDatePreset('thisMonth');
   };
@@ -341,8 +351,110 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               </ToggleButtonGroup>
             </Grid>
           )}
+
+          {/* Amount Range Filters */}
+          <Grid item xs={12}>
+            <Box>
+              <ToggleButtonGroup
+                size="small"
+                value={filters.amountRange.quickFilter}
+                exclusive
+                onChange={(_, newValue) => {
+                  if (newValue !== null) {
+                    let min = '', max = '';
+                    switch (newValue) {
+                      case 'small':
+                        min = '0';
+                        max = '50';
+                        break;
+                      case 'medium':
+                        min = '50';
+                        max = '200';
+                        break;
+                      case 'large':
+                        min = '200';
+                        max = '1000';
+                        break;
+                      case 'veryLarge':
+                        min = '1000';
+                        max = '';
+                        break;
+                      case 'any':
+                      case 'custom':
+                      default:
+                        min = '';
+                        max = '';
+                    }
+                    onFiltersChange({
+                      ...filters,
+                      amountRange: { min, max, quickFilter: newValue },
+                    });
+                  }
+                }}
+                fullWidth
+                sx={{ mb: 2 }}
+              >
+                <ToggleButton value="any">Any Amount</ToggleButton>
+                <ToggleButton value="small">Small ($0-$50)</ToggleButton>
+                <ToggleButton value="medium">Medium ($50-$200)</ToggleButton>
+                <ToggleButton value="large">Large ($200-$1K)</ToggleButton>
+                <ToggleButton value="veryLarge">Very Large (&gt;$1K)</ToggleButton>
+                <ToggleButton value="custom">Custom</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          </Grid>
+
+          {filters.amountRange.quickFilter === 'custom' && (
+            <>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  label="Min Amount"
+                  type="number"
+                  value={filters.amountRange.min}
+                  onChange={(e) => {
+                    onFiltersChange({
+                      ...filters,
+                      amountRange: {
+                        ...filters.amountRange,
+                        min: e.target.value,
+                      },
+                    });
+                  }}
+                  placeholder="0"
+                  fullWidth
+                  size="small"
+                  InputProps={{
+                    startAdornment: <span style={{ marginRight: 4 }}>$</span>,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  label="Max Amount"
+                  type="number"
+                  value={filters.amountRange.max}
+                  onChange={(e) => {
+                    onFiltersChange({
+                      ...filters,
+                      amountRange: {
+                        ...filters.amountRange,
+                        max: e.target.value,
+                      },
+                    });
+                  }}
+                  placeholder="Unlimited"
+                  fullWidth
+                  size="small"
+                  InputProps={{
+                    startAdornment: <span style={{ marginRight: 4 }}>$</span>,
+                  }}
+                />
+              </Grid>
+            </>
+          )}
         </Grid>
       </Collapse>
     </Paper>
   );
 };
+
