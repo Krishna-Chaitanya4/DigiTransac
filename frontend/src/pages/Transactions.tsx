@@ -1056,7 +1056,10 @@ const Transactions: React.FC = () => {
                       setStartDate(date);
                       setActiveDateFilter(''); // Clear active filter on manual change
                     }}
-                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    slotProps={{ 
+                      textField: { size: 'small', fullWidth: true },
+                      field: { clearable: true }
+                    }}
                   />
                 </Grid>
 
@@ -1068,7 +1071,10 @@ const Transactions: React.FC = () => {
                       setEndDate(date);
                       setActiveDateFilter(''); // Clear active filter on manual change
                     }}
-                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    slotProps={{ 
+                      textField: { size: 'small', fullWidth: true },
+                      field: { clearable: true }
+                    }}
                   />
                 </Grid>
 
