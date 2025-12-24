@@ -436,6 +436,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       recurrencePattern,
       merchantName,
       reviewStatus,
+      splits, // Add splits support
     } = req.body;
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
@@ -530,6 +531,32 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     };
 
     await transactionsContainer.updateOne({ id, userId }, { $set: updateData });
+
+    // Update splits if provided
+    if (splits && Array.isArray(splits)) {
+      const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+      
+      // Delete old splits
+      await splitsContainer.deleteMany({ transactionId: id, userId });
+      
+      // Insert new splits
+      const newSplits = splits.map((split: any, index: number) => ({
+        id: uuidv4(),
+        transactionId: id,
+        userId: userId,
+        categoryId: split.categoryId,
+        amount: split.amount,
+        tags: split.tags || [],
+        notes: split.notes || '',
+        order: split.order || index + 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      
+      if (newSplits.length > 0) {
+        await splitsContainer.insertMany(newSplits);
+      }
+    }
 
     const updatedTransaction = await transactionsContainer.findOne({ id, userId });
 
