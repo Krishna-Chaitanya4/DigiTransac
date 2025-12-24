@@ -33,6 +33,7 @@ import {
   TablePagination,
   Tooltip,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -216,6 +217,9 @@ const Transactions: React.FC = () => {
   const [pendingCount, setPendingCount] = useState(0); // All-time pending count
   const [merchants, setMerchants] = useState<string[]>([]); // Unique merchant names
   const [recentCategories, setRecentCategories] = useState<string[]>([]); // Recent category IDs
+  
+  // Undo reject state
+  const [undoRejectInfo, setUndoRejectInfo] = useState<{ transactionId: string; timeoutId: number } | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -260,6 +264,15 @@ const Transactions: React.FC = () => {
 
     initializeData();
   }, []);
+
+  // Cleanup undo timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (undoRejectInfo) {
+        clearTimeout(undoRejectInfo.timeoutId);
+      }
+    };
+  }, [undoRejectInfo]);
 
   // Reset to first page when filters change (industry standard: API filtering)
   useEffect(() => {
@@ -436,6 +449,20 @@ const Transactions: React.FC = () => {
     }
   };
 
+  const changeTransactionStatus = async (id: string, status: 'pending' | 'approved' | 'rejected', reason?: string) => {
+    try {
+      await axios.patch(`/api/transactions/${id}/status`, 
+        { status, reason },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return true;
+    } catch (error: any) {
+      console.error('Error changing transaction status:', error);
+      toast.error(error.response?.data?.message || 'Failed to change transaction status');
+      return false;
+    }
+  };
+
   const handleApprove = async (id: string) => {
     try {
       await axios.patch(`/api/transactions/${id}/approve`, {}, {
@@ -453,12 +480,26 @@ const Transactions: React.FC = () => {
 
   const handleReject = async (id: string) => {
     try {
+      // Clear any existing undo timeout
+      if (undoRejectInfo) {
+        clearTimeout(undoRejectInfo.timeoutId);
+      }
+
       await axios.patch(`/api/transactions/${id}/reject`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      toast.success('Transaction rejected');
+      
       await fetchTransactions();
       await fetchPendingCount();
+      
+      // Show undo toast with 5 second timeout
+      const timeoutId = window.setTimeout(() => {
+        setUndoRejectInfo(null);
+      }, 5000);
+      
+      setUndoRejectInfo({ transactionId: id, timeoutId });
+      
+      // Note: Snackbar with undo button is rendered at the bottom of the component
       
     } catch (error: any) {
       console.error('Error rejecting transaction:', error);
@@ -1590,6 +1631,7 @@ const Transactions: React.FC = () => {
                   {transactions.map((transaction) => {
                       const CardComponent = isTouchDevice ? SwipeableTransactionCard : TransactionCard;
                       const isPending = transaction.reviewStatus === 'pending';
+                      const isRejected = transaction.reviewStatus === 'rejected';
                       
                       return (
                         <Box key={transaction.id} sx={{ position: 'relative' }}>
@@ -1633,6 +1675,52 @@ const Transactions: React.FC = () => {
                                 fullWidth
                               >
                                 Reject
+                              </Button>
+                            </Box>
+                          )}
+                          {isRejected && (
+                            <Box 
+                              sx={{ 
+                                display: 'flex', 
+                                gap: 1, 
+                                mt: 1, 
+                                px: 2, 
+                                pb: 2 
+                              }}
+                            >
+                              <Button
+                                variant="contained"
+                                color="warning"
+                                size="small"
+                                startIcon={<ApproveIcon />}
+                                onClick={async () => {
+                                  const success = await changeTransactionStatus(transaction.id, 'pending');
+                                  if (success) {
+                                    toast.success('Transaction restored to pending');
+                                    await fetchTransactions();
+                                    await fetchPendingCount();
+                                  }
+                                }}
+                                fullWidth
+                              >
+                                Restore to Pending
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                color="success"
+                                size="small"
+                                startIcon={<ApproveIcon />}
+                                onClick={async () => {
+                                  const success = await changeTransactionStatus(transaction.id, 'approved');
+                                  if (success) {
+                                    toast.success('Transaction approved');
+                                    await fetchTransactions();
+                                    await fetchPendingCount();
+                                  }
+                                }}
+                                fullWidth
+                              >
+                                Approve Anyway
                               </Button>
                             </Box>
                           )}
@@ -2006,6 +2094,42 @@ const Transactions: React.FC = () => {
                                         onClick={() => handleReject(transaction.id)}
                                       >
                                         <RejectIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                )}
+                                {transaction.reviewStatus === 'rejected' && (
+                                  <>
+                                    <Tooltip title="Restore to Pending">
+                                      <IconButton
+                                        size="small"
+                                        color="warning"
+                                        onClick={async () => {
+                                          const success = await changeTransactionStatus(transaction.id, 'pending');
+                                          if (success) {
+                                            toast.success('Transaction restored to pending');
+                                            await fetchTransactions();
+                                            await fetchPendingCount();
+                                          }
+                                        }}
+                                      >
+                                        <RejectIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Approve Anyway">
+                                      <IconButton
+                                        size="small"
+                                        color="success"
+                                        onClick={async () => {
+                                          const success = await changeTransactionStatus(transaction.id, 'approved');
+                                          if (success) {
+                                            toast.success('Transaction approved');
+                                            await fetchTransactions();
+                                            await fetchPendingCount();
+                                          }
+                                        }}
+                                      >
+                                        <ApproveIcon fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
                                   </>
@@ -2823,6 +2947,34 @@ const Transactions: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+        
+        {/* Undo Reject Snackbar */}
+        <Snackbar
+          open={!!undoRejectInfo}
+          autoHideDuration={5000}
+          onClose={() => setUndoRejectInfo(null)}
+          message="Transaction rejected"
+          action={
+            <Button
+              color="secondary"
+              size="small"
+              onClick={async () => {
+                if (undoRejectInfo) {
+                  clearTimeout(undoRejectInfo.timeoutId);
+                  const success = await changeTransactionStatus(undoRejectInfo.transactionId, 'pending');
+                  if (success) {
+                    await fetchTransactions();
+                    await fetchPendingCount();
+                    toast.success('Rejection undone');
+                  }
+                  setUndoRejectInfo(null);
+                }
+              }}
+            >
+              UNDO
+            </Button>
+          }
+        />
       </Box>
     </LocalizationProvider>
   );

@@ -894,6 +894,71 @@ router.patch('/:id/reject', async (req: AuthRequest, res: Response): Promise<voi
   }
 });
 
+// PATCH /api/transactions/:id/status - Change transaction review status (flexible endpoint)
+router.patch('/:id/status', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { status, reason } = req.body;
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+
+    // Validate status
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    if (!status || !validStatuses.includes(status)) {
+      res.status(400).json({ error: 'Invalid status. Must be: pending, approved, or rejected' });
+      return;
+    }
+
+    // Find the transaction
+    const existingTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
+    })) as unknown as Transaction | null;
+
+    if (!existingTransaction) {
+      res.status(404).json({ error: 'Transaction not found' });
+      return;
+    }
+
+    // Build update object
+    const updateFields: any = {
+      reviewStatus: status,
+      updatedAt: new Date(),
+    };
+
+    // Set reviewedAt timestamp when moving to approved/rejected
+    if (status === 'approved' || status === 'rejected') {
+      updateFields.reviewedAt = new Date();
+    }
+
+    // Add rejection reason if provided
+    if (status === 'rejected' && reason) {
+      updateFields.rejectionReason = reason;
+    }
+
+    // Clear rejection reason if moving away from rejected
+    if (status !== 'rejected' && existingTransaction.reviewStatus === 'rejected') {
+      updateFields.rejectionReason = null;
+    }
+
+    // Update transaction status
+    await transactionsContainer.updateOne(
+      { id, userId },
+      { $set: updateFields }
+    );
+
+    const updatedTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
+    })) as unknown as Transaction;
+
+    res.json(decryptTransaction(updatedTransaction));
+  } catch (error) {
+    console.error('Error updating transaction status:', error);
+    res.status(500).json({ error: 'Error updating transaction status' });
+  }
+});
+
 // POST /api/transactions/bulk-approve - Approve multiple transactions
 router.post('/bulk-approve', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
