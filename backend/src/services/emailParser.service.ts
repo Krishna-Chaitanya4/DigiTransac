@@ -2,6 +2,7 @@ import { detectTransactionTags } from '../utils/transactionTags';
 import { getLearnedMapping } from './merchantLearning.service';
 import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
 import { cosmosDBService } from '../config/cosmosdb';
+import { logger } from '../utils/logger';
 
 interface ParsedTransaction {
   amount: number;
@@ -181,7 +182,7 @@ export class EmailParserService {
     const bank = this.identifyBank(text, sender);
 
     if (!bank) {
-      console.log('Could not identify bank from text:', text.substring(0, 100));
+      logger.debug({ text: text.substring(0, 100) }, 'Could not identify bank from text');
       return null;
     }
 
@@ -261,13 +262,13 @@ export class EmailParserService {
             matchedAccountId,
           };
         } catch (error) {
-          console.error('Error parsing transaction:', error);
+          logger.error(error, 'Error parsing transaction');
           continue;
         }
       }
     }
 
-    console.log('No pattern matched for bank:', bank.name);
+    logger.debug({ bankName: bank.name }, 'No pattern matched for bank');
     return null;
   }
 

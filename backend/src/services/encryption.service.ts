@@ -1,6 +1,7 @@
 import { SecretClient } from '@azure/keyvault-secrets';
 import { DefaultAzureCredential } from '@azure/identity';
 import crypto, { CipherGCM, DecipherGCM } from 'crypto';
+import { logger } from '../utils/logger';
 
 class EncryptionService {
   private secretClient: SecretClient | null = null;
@@ -20,7 +21,7 @@ class EncryptionService {
       // In development, use environment variable for master key
       if (process.env.NODE_ENV === 'development' && process.env.MASTER_ENCRYPTION_KEY) {
         this.masterKey = process.env.MASTER_ENCRYPTION_KEY;
-        console.log('✅ Using master key from environment variable (development mode)');
+        logger.info('✅ Using master key from environment variable (development mode)');
         return;
       }
 
@@ -31,9 +32,9 @@ class EncryptionService {
       const secret = await this.secretClient.getSecret('master-encryption-key');
       this.masterKey = secret.value!;
 
-      console.log('✅ Master encryption key retrieved from Azure Key Vault');
+      logger.info('✅ Master encryption key retrieved from Azure Key Vault');
     } catch (error) {
-      console.error('❌ Error initializing encryption service:', error);
+      logger.error(error, '❌ Error initializing encryption service');
       throw new Error('Failed to initialize encryption service');
     }
   }
@@ -73,7 +74,7 @@ class EncryptionService {
       // Return format: iv:authTag:encryptedData (all base64 encoded)
       return `${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted}`;
     } catch (error) {
-      console.error('Encryption error:', error);
+      logger.error(error, 'Encryption error');
       throw new Error('Failed to encrypt data');
     }
   }
@@ -122,7 +123,7 @@ class EncryptionService {
 
       return decrypted;
     } catch (error) {
-      console.error('Decryption error:', error);
+      logger.error(error, 'Decryption error');
       // Return original data if decryption fails (backward compatibility)
       return encryptedData;
     }

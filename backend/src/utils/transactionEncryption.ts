@@ -1,5 +1,6 @@
 import { encryptionService } from '../services/encryption.service';
 import { Transaction } from '../models/types';
+import { logger } from './logger';
 
 /**
  * Encrypt sensitive fields in a transaction before storing in database
@@ -40,7 +41,7 @@ export function decryptTransaction(transaction: Transaction): Transaction {
       delete (decrypted as any).encryptedAmount;
     } catch (error) {
       // If decryption fails, use original amount (backward compatibility)
-      console.warn('Failed to decrypt amount, using original value');
+      logger.warn('Failed to decrypt amount, using original value');
     }
   }
 
