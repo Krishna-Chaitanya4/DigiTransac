@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { useAuth } from './context/AuthContext';
@@ -6,17 +6,19 @@ import { ToastProvider } from './components/Toast';
 import { InstallPrompt } from './components/InstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Categories from './pages/Categories';
-import Budgets from './pages/Budgets';
-import Analytics from './pages/Analytics';
-import Profile from './pages/Profile';
-import Accounts from './pages/Accounts';
-import Transactions from './pages/Transactions';
 import Loading from './components/Loading';
 import ErrorBoundary from './components/ErrorBoundary';
+
+// Lazy load pages for better performance and smaller initial bundle
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Categories = lazy(() => import('./pages/Categories'));
+const Budgets = lazy(() => import('./pages/Budgets'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const Transactions = lazy(() => import('./pages/Transactions'));
 
 const PrivateRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -41,15 +43,16 @@ const App: React.FC = () => {
         <InstallPrompt />
         <OfflineIndicator />
         <Box sx={{ minHeight: '100vh' }}>
-          <Routes>
-            <Route
-              path="/login"
-              element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />}
-            />
-            <Route
-              path="/register"
-              element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />}
-            />
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              <Route
+                path="/login"
+                element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />}
+              />
+              <Route
+                path="/register"
+                element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />}
+              />
 
             <Route
               path="/"
@@ -71,6 +74,7 @@ const App: React.FC = () => {
 
             <Route path="*" element={<Navigate to="/dashboard" />} />
           </Routes>
+          </Suspense>
         </Box>
       </ToastProvider>
     </ErrorBoundary>

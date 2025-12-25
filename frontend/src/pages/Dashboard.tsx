@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Grid,
   Card,
@@ -165,6 +165,7 @@ const Dashboard: React.FC = () => {
         console.error('Failed to load dismissed alerts:', e);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -173,9 +174,10 @@ const Dashboard: React.FC = () => {
     if (initialDataLoaded) {
       fetchDashboardData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDataLoaded]);
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = useCallback(async () => {
     try {
       const [, categoriesRes, tagsRes] = await Promise.all([
         axios.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } }), // Still fetch but don't store
@@ -194,15 +196,15 @@ const Dashboard: React.FC = () => {
     } finally {
       setInitialDataLoaded(true);
     }
-  };
+  }, [token]);
 
-  const handleDismissAlert = (alert: string) => {
+  const handleDismissAlert = useCallback((alert: string) => {
     const newDismissed = new Set(dismissedAlerts);
     newDismissed.add(alert);
     setDismissedAlerts(newDismissed);
     // Save to localStorage
     localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
-  };
+  }, [dismissedAlerts]);
 
   const fetchDashboardData = async () => {
     try {
@@ -630,11 +632,11 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = useCallback((amount: number) => {
     return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
-  };
+  }, [user?.currency]);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
     const yesterday = new Date(today);
@@ -647,7 +649,7 @@ const Dashboard: React.FC = () => {
     if (daysAgo < 7) return `${daysAgo} days ago`;
 
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
+  }, []);
 
   if (loading) {
     return (

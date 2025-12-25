@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -158,9 +158,10 @@ const Analytics: React.FC = () => {
     if (startDate && endDate) {
       fetchAnalyticsData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate]);
 
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError('');
@@ -193,7 +194,7 @@ const Analytics: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, startDate, endDate]);
 
   // Create category map for lookups
   const categoryMap = useMemo(() => {
@@ -385,11 +386,11 @@ const Analytics: React.FC = () => {
     return { income, expenses, net, avgDailySpending };
   }, [enrichedTransactions, startDate, endDate]);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = useCallback((amount: number) => {
     return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
-  };
+  }, [user?.currency]);
 
-  const exportData = () => {
+  const exportData = useCallback(() => {
     const csvData = [
       ['Date', 'Description', 'Category', 'Amount', 'Type'],
       ...enrichedTransactions.map((txn) => [
@@ -410,7 +411,7 @@ const Analytics: React.FC = () => {
     a.download = `analytics-${dayjs().format('YYYY-MM-DD')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
+  }, [enrichedTransactions]);
 
   if (loading) {
     return (
