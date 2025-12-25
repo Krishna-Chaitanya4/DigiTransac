@@ -123,6 +123,7 @@ const Budgets: React.FC = () => {
     open: false,
     budgetId: null,
   });
+  const [dateError, setDateError] = useState<string>('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -149,6 +150,74 @@ const Budgets: React.FC = () => {
       fetchAccounts(),
     ]);
   }, []);
+
+  // Memoized utility functions for date calculations (performance optimization)
+  const getMonthDateRange = useCallback(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+    };
+  }, []);
+
+  const getYearDateRange = useCallback(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear(), 11, 31);
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+    };
+  }, []);
+
+  // Auto-update dates when period changes (performance optimized with useEffect)
+  useEffect(() => {
+    if (!openDialog) return; // Only run when dialog is open
+
+    if (formData.period === 'monthly') {
+      const { startDate, endDate } = getMonthDateRange();
+      setFormData(prev => ({ ...prev, startDate, endDate }));
+      setDateError('');
+    } else if (formData.period === 'yearly') {
+      const { startDate, endDate } = getYearDateRange();
+      setFormData(prev => ({ ...prev, startDate, endDate }));
+      setDateError('');
+    }
+    // For 'custom' period, keep user-selected dates
+  }, [formData.period, openDialog, getMonthDateRange, getYearDateRange]);
+
+  // Real-time date validation (memoized for performance)
+  const validateDates = useCallback((start: string, end: string) => {
+    if (!start || !end) {
+      setDateError('Both start and end dates are required');
+      return false;
+    }
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      setDateError('Invalid date format');
+      return false;
+    }
+
+    if (startDate >= endDate) {
+      setDateError('End date must be after start date');
+      return false;
+    }
+
+    setDateError('');
+    return true;
+  }, []);
+
+  // Trigger validation whenever dates change
+  useEffect(() => {
+    if (openDialog && formData.startDate && formData.endDate) {
+      validateDates(formData.startDate, formData.endDate);
+    }
+  }, [formData.startDate, formData.endDate, openDialog, validateDates]);
 
   const fetchBudgets = async () => {
     try {
@@ -238,6 +307,7 @@ const Budgets: React.FC = () => {
   );
 
   const handleOpenDialog = useCallback(() => {
+    const { startDate, endDate } = getMonthDateRange(); // Default to current month
     setFormData({
       name: '',
       categoryIds: [],
@@ -246,16 +316,17 @@ const Budgets: React.FC = () => {
       accountIds: [],
       calculationType: 'debit' as 'debit' | 'net',
       amount: '',
-      period: 'custom' as 'monthly' | 'yearly' | 'custom',
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      period: 'monthly' as 'monthly' | 'yearly' | 'custom',
+      startDate,
+      endDate,
       alertThreshold: '80',
       enableRollover: false,
       rolloverLimit: '',
     });
     setEditingBudget(null);
+    setDateError('');
     setOpenDialog(true);
-  }, []);
+  }, [getMonthDateRange]);
 
   const handleEditBudget = useCallback((budget: Budget) => {
     // Handle both new and legacy format
@@ -280,6 +351,7 @@ const Budgets: React.FC = () => {
       rolloverLimit: budget.rolloverLimit?.toString() || '',
     });
     setEditingBudget(budget);
+    setDateError('');
     setOpenDialog(true);
   }, []);
 
@@ -881,6 +953,13 @@ const Budgets: React.FC = () => {
                   fullWidth
                   value={formData.period}
                   onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
+                  helperText={
+                    formData.period === 'monthly'
+                      ? 'Auto-sets to current month'
+                      : formData.period === 'yearly'
+                      ? 'Auto-sets to current year'
+                      : 'Choose custom date range'
+                  }
                 >
                   <MenuItem value="monthly">Monthly</MenuItem>
                   <MenuItem value="yearly">Yearly</MenuItem>
@@ -898,9 +977,12 @@ const Budgets: React.FC = () => {
                   fullWidth
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  disabled={formData.period !== 'custom'}
                   InputLabelProps={{
                     shrink: true,
                   }}
+                  error={!!dateError}
+                  helperText={formData.period !== 'custom' ? 'Auto-calculated based on period' : ''}
                   required
                 />
               </Grid>
@@ -911,12 +993,22 @@ const Budgets: React.FC = () => {
                   fullWidth
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  disabled={formData.period !== 'custom'}
                   InputLabelProps={{
                     shrink: true,
                   }}
+                  error={!!dateError}
+                  helperText={formData.period !== 'custom' ? 'Auto-calculated based on period' : ''}
                   required
                 />
               </Grid>
+              {dateError && (
+                <Grid item xs={12}>
+                  <Alert severity="error" sx={{ mt: -1 }}>
+                    {dateError}
+                  </Alert>
+                </Grid>
+              )}
             </Grid>
 
             <Divider />
@@ -980,6 +1072,7 @@ const Budgets: React.FC = () => {
               !formData.amount ||
               !formData.startDate ||
               !formData.endDate ||
+              !!dateError ||
               (formData.categoryIds.length === 0 && 
                formData.includeTagIds.length === 0 && 
                formData.excludeTagIds.length === 0 && 

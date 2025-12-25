@@ -162,6 +162,45 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate dates
+    if (!startDate) {
+      res.status(400).json({
+        success: false,
+        message: 'Start date is required',
+      });
+      return;
+    }
+
+    const start = new Date(startDate);
+    if (isNaN(start.getTime())) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid start date',
+      });
+      return;
+    }
+
+    // Validate end date if provided
+    if (endDate) {
+      const end = new Date(endDate);
+      if (isNaN(end.getTime())) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid end date',
+        });
+        return;
+      }
+
+      // End date must be after start date
+      if (end <= start) {
+        res.status(400).json({
+          success: false,
+          message: 'End date must be after start date',
+        });
+        return;
+      }
+    }
+
     // Validate categories exist
     if (hasCategoryFilter) {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
@@ -337,6 +376,41 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         });
         return;
       }
+    }
+
+    // Validate dates if provided
+    if (startDate) {
+      const start = new Date(startDate);
+      if (isNaN(start.getTime())) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid start date',
+        });
+        return;
+      }
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      if (isNaN(end.getTime())) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid end date',
+        });
+        return;
+      }
+    }
+
+    // Validate start date is before end date (if both provided or updating)
+    const effectiveStartDate = startDate ? new Date(startDate) : budget.startDate;
+    const effectiveEndDate = endDate ? new Date(endDate) : budget.endDate;
+    
+    if (effectiveEndDate && effectiveStartDate >= effectiveEndDate) {
+      res.status(400).json({
+        success: false,
+        message: 'End date must be after start date',
+      });
+      return;
     }
 
     const updateData: any = {
