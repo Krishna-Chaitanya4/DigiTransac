@@ -30,6 +30,7 @@ import {
   Label as LabelIcon,
   AccountBalance as AccountIcon,
   Savings as SavingsIcon,
+  ContentCopy as ContentCopyIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -448,6 +449,20 @@ const Budgets: React.FC = () => {
     setConfirmDelete({ open: true, budgetId });
   }, []);
 
+  const handleDuplicateBudget = useCallback(async (budget: Budget) => {
+    try {
+      await axios.post(
+        `/api/budgets/${budget.id}/duplicate`,
+        { shiftMonths: 1 }, // Shift dates forward by 1 month
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Budget duplicated successfully');
+      fetchBudgets();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to duplicate budget');
+    }
+  }, [token, toast]);
+
   const handleDeleteBudget = useCallback(async () => {
     if (!confirmDelete.budgetId) return;
 
@@ -795,6 +810,13 @@ const Budgets: React.FC = () => {
                       </Box>
                     </Box>
                     <Box>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDuplicateBudget(budget)}
+                        title="Duplicate budget"
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
                       <IconButton size="small" onClick={() => handleEditBudget(budget)}>
                         <EditIcon fontSize="small" />
                       </IconButton>

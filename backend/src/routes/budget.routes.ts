@@ -283,6 +283,76 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   }
 });
 
+// POST /api/budgets/:id/duplicate - Duplicate budget with optional date shift
+router.post('/:id/duplicate', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { shiftMonths = 1, newName } = req.body; // Optional: shift dates forward by N months
+
+    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+
+    const originalBudget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
+    if (!originalBudget) {
+      res.status(404).json({
+        success: false,
+        message: 'Budget not found',
+      });
+      return;
+    }
+
+    // Calculate new dates by shifting forward
+    const originalStart = new Date(originalBudget.startDate);
+    const newStartDate = new Date(originalStart);
+    newStartDate.setMonth(newStartDate.getMonth() + shiftMonths);
+
+    let newEndDate: Date | undefined;
+    if (originalBudget.endDate) {
+      const originalEnd = new Date(originalBudget.endDate);
+      newEndDate = new Date(originalEnd);
+      newEndDate.setMonth(newEndDate.getMonth() + shiftMonths);
+    }
+
+    // Create duplicated budget
+    const duplicatedBudget: Budget = {
+      id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId,
+      name: newName || (originalBudget.name ? `${originalBudget.name} (Copy)` : undefined),
+      categoryIds: originalBudget.categoryIds,
+      includeTagIds: originalBudget.includeTagIds,
+      excludeTagIds: originalBudget.excludeTagIds,
+      accountIds: originalBudget.accountIds,
+      calculationType: originalBudget.calculationType,
+      amount: originalBudget.amount,
+      period: 'custom', // Always set to custom for duplicates
+      startDate: newStartDate,
+      endDate: newEndDate,
+      alertThreshold: originalBudget.alertThreshold,
+      alertThresholds: originalBudget.alertThresholds,
+      notificationChannels: originalBudget.notificationChannels,
+      enableRollover: originalBudget.enableRollover,
+      rolloverLimit: originalBudget.rolloverLimit,
+      rolledOverAmount: 0, // Reset rollover amount for new budget
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await budgetsContainer.insertOne(duplicatedBudget);
+
+    res.status(201).json({
+      success: true,
+      message: 'Budget duplicated successfully',
+      budget: duplicatedBudget,
+    });
+  } catch (error) {
+    console.error('Error duplicating budget:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error duplicating budget',
+    });
+  }
+});
+
 // PUT /api/budgets/:id - Update budget
 router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
