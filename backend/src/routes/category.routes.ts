@@ -427,4 +427,74 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
   }
 });
 
+// GET /api/categories/stats - Get categories with usage statistics
+router.get('/stats', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+
+    // Fetch all categories
+    const categories = (await categoriesContainer
+      .find({ userId })
+      .toArray()) as unknown as Category[];
+
+    // Fetch transaction counts per category (approved only)
+    const pipeline = [
+      {
+        $match: {
+          userId,
+          reviewStatus: 'approved',
+          'splits.categoryId': { $exists: true, $ne: null },
+        },
+      },
+      { $unwind: '$splits' },
+      {
+        $group: {
+          _id: '$splits.categoryId',
+          count: { $sum: 1 },
+          lastUsed: { $max: '$date' },
+          totalAmount: { $sum: '$splits.amount' },
+        },
+      },
+    ];
+
+    const statsResult = await transactionsContainer.aggregate(pipeline).toArray();
+    
+    // Create a map for quick lookup
+    const statsMap = new Map(
+      statsResult.map((stat: any) => [
+        stat._id,
+        {
+          transactionCount: stat.count,
+          lastUsed: stat.lastUsed,
+          totalAmount: stat.totalAmount,
+        },
+      ])
+    );
+
+    // Enrich categories with stats
+    const enrichedCategories = categories.map((cat) => {
+      const stats = statsMap.get(cat.id);
+      return {
+        ...cat,
+        transactionCount: stats?.transactionCount || 0,
+        lastUsed: stats?.lastUsed || null,
+        totalAmount: stats?.totalAmount || 0,
+      };
+    });
+
+    res.json({
+      success: true,
+      categories: enrichedCategories,
+    });
+  } catch (error) {
+    console.error('Error fetching category stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching category statistics',
+    });
+  }
+});
+
 export default router;

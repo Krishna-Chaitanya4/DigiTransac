@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography,
   Box,
@@ -16,6 +16,11 @@ import {
   Collapse,
   Tooltip,
   MenuItem,
+  InputAdornment,
+  Chip,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -25,6 +30,10 @@ import {
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
   CreateNewFolder as CreateNewFolderIcon,
+  Search as SearchIcon,
+  UnfoldMore as ExpandAllIcon,
+  UnfoldLess as CollapseAllIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +47,9 @@ interface Category {
   icon?: string;
   color?: string;
   path: string[];
+  transactionCount?: number;
+  lastUsed?: string | null;
+  totalAmount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +57,7 @@ interface Category {
 interface CategoryNode extends Category {
   children: CategoryNode[];
   level: number;
+  isMatch?: boolean; // Indicates if this node matches the search query
 }
 
 const Categories: React.FC = () => {
@@ -57,6 +70,19 @@ const Categories: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [parentForNew, setParentForNew] = useState<Category | null>(null);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'folder' | 'category'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'usage' | 'recent'>('name');
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    category: CategoryNode | null;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -69,16 +95,26 @@ const Categories: React.FC = () => {
     fetchCategories();
   }, []);
 
+  // Debounce search query (performance optimization - industry standard)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   useEffect(() => {
     if (categories.length > 0) {
       buildTree();
     }
-  }, [categories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, debouncedSearchQuery, filterType, sortBy]);
 
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/categories`, {
+      // Fetch categories with usage statistics
+      const response = await axios.get(`/api/categories/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -86,6 +122,9 @@ const Categories: React.FC = () => {
       const normalizedCategories = (response.data.categories || []).map((cat: any) => ({
         ...cat,
         path: cat.path || [], // Ensure path is always an array
+        transactionCount: cat.transactionCount || 0,
+        lastUsed: cat.lastUsed || null,
+        totalAmount: cat.totalAmount || 0,
       }));
       
       setCategories(normalizedCategories);
@@ -97,49 +136,110 @@ const Categories: React.FC = () => {
     }
   };
 
-  const buildTree = () => {
+  const buildTree = useCallback(() => {
     if (categories.length === 0) {
       return;
     }
 
-    const nodeMap = new Map<string, CategoryNode>();
+    // If searching, show flattened list with breadcrumbs (industry standard)
+    if (debouncedSearchQuery) {
+      // Find all categories that match the search query and type filter
+      const matchingCategories = categories.filter((cat) => {
+        const matchesSearch = cat.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+        const matchesType =
+          filterType === 'all' ||
+          (filterType === 'folder' && cat.isFolder) ||
+          (filterType === 'category' && !cat.isFolder);
+        return matchesSearch && matchesType;
+      });
 
-    categories.forEach((cat) => {
-      nodeMap.set(cat.id, { ...cat, children: [], level: cat.path.length });
-    });
-
-    const roots: CategoryNode[] = [];
-    categories.forEach((cat) => {
-      const node = nodeMap.get(cat.id)!;
-      if (cat.parentId && nodeMap.has(cat.parentId)) {
-        const parent = nodeMap.get(cat.parentId)!;
-        parent.children.push(node);
-      } else {
-        roots.push(node);
-      }
-    });
-
-    // Sort: folders first, then alphabetically
-    const sortNodes = (nodes: CategoryNode[]) => {
-      nodes.sort((a, b) => {
+      // Sort matching categories
+      const sorted = matchingCategories.sort((a, b) => {
+        if (sortBy === 'usage') {
+          return (b.transactionCount || 0) - (a.transactionCount || 0);
+        } else if (sortBy === 'recent') {
+          const aDate = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
+          const bDate = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
+          return bDate - aDate;
+        }
+        // Default: sort by name
         if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
         return a.name.localeCompare(b.name);
       });
-      nodes.forEach((node) => {
-        if (node.children.length > 0) sortNodes(node.children);
+
+      // Convert to flat list (no tree structure when searching)
+      const flatList: CategoryNode[] = sorted.map((cat) => ({
+        ...cat,
+        children: [],
+        level: 0, // All at same level in flat list
+        isMatch: true,
+      }));
+
+      setTreeData(flatList);
+      setExpandedNodes(new Set()); // No expansion needed in flat view
+    } else {
+      // Normal view: filter by type only
+      let filtered = categories.filter((cat) => {
+        const matchesType =
+          filterType === 'all' ||
+          (filterType === 'folder' && cat.isFolder) ||
+          (filterType === 'category' && !cat.isFolder);
+        return matchesType;
       });
-    };
 
-    sortNodes(roots);
-    setTreeData(roots);
+      // Sort categories
+      filtered = filtered.sort((a, b) => {
+        if (sortBy === 'usage') {
+          return (b.transactionCount || 0) - (a.transactionCount || 0);
+        } else if (sortBy === 'recent') {
+          const aDate = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
+          const bDate = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
+          return bDate - aDate;
+        }
+        // Default: sort by name
+        if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
 
-    // Auto-expand all folders initially
-    const allFolderIds = new Set<string>();
-    categories.forEach((cat) => {
-      if (cat.isFolder) allFolderIds.add(cat.id);
-    });
-    setExpandedNodes(allFolderIds);
-  };
+      const nodeMap = new Map<string, CategoryNode>();
+
+      filtered.forEach((cat) => {
+        nodeMap.set(cat.id, { ...cat, children: [], level: cat.path.length, isMatch: false });
+      });
+
+      const roots: CategoryNode[] = [];
+      filtered.forEach((cat) => {
+        const node = nodeMap.get(cat.id)!;
+        if (cat.parentId && nodeMap.has(cat.parentId)) {
+          const parent = nodeMap.get(cat.parentId)!;
+          parent.children.push(node);
+        } else {
+          roots.push(node);
+        }
+      });
+
+      // Sort children recursively
+      const sortNodes = (nodes: CategoryNode[]) => {
+        nodes.sort((a, b) => {
+          if (sortBy === 'usage') {
+            return (b.transactionCount || 0) - (a.transactionCount || 0);
+          } else if (sortBy === 'recent') {
+            const aDate = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
+            const bDate = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
+            return bDate - aDate;
+          }
+          if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+        nodes.forEach((node) => {
+          if (node.children.length > 0) sortNodes(node.children);
+        });
+      };
+
+      sortNodes(roots);
+      setTreeData(roots);
+    }
+  }, [categories, debouncedSearchQuery, filterType, sortBy]);
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes((prev) => {
@@ -151,6 +251,67 @@ const Categories: React.FC = () => {
       }
       return next;
     });
+  };
+
+  const handleExpandAll = useCallback(() => {
+    const allFolderIds = new Set<string>();
+    categories.forEach((cat) => {
+      if (cat.isFolder) allFolderIds.add(cat.id);
+    });
+    setExpandedNodes(allFolderIds);
+  }, [categories]);
+
+  const handleCollapseAll = useCallback(() => {
+    setExpandedNodes(new Set());
+  }, []);
+
+  const handleContextMenu = (event: React.MouseEvent, category: CategoryNode) => {
+    event.preventDefault();
+    setContextMenu({
+      mouseX: event.clientX - 2,
+      mouseY: event.clientY - 4,
+      category,
+    });
+  };
+
+  // Get breadcrumb path for a category
+  const getBreadcrumbPath = useCallback(
+    (category: Category): string => {
+      if (!category.parentId) return '';
+      const path: string[] = [];
+      let current = categories.find((c) => c.id === category.parentId);
+      while (current) {
+        path.unshift(current.name);
+        current = categories.find((c) => c.id === current!.parentId);
+      }
+      return path.join(' > ');
+    },
+    [categories]
+  );
+
+  // Highlight matching text in search results (memoized for performance)
+  const highlightText = useCallback((text: string, query: string) => {
+    if (!query) return text;
+    const index = text.toLowerCase().indexOf(query.toLowerCase());
+    if (index === -1) return text;
+    
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + query.length);
+    const after = text.substring(index + query.length);
+    
+    return (
+      <>
+        {before}
+        <Box component="span" sx={{ bgcolor: 'rgba(102, 126, 234, 0.3)', fontWeight: 600 }}>
+          {match}
+        </Box>
+        {after}
+      </>
+    );
+  }, []);
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
   };
 
   const handleOpenDialog = (parent?: Category) => {
@@ -229,16 +390,18 @@ const Categories: React.FC = () => {
 
   const renderTree = (nodes: CategoryNode[]) => {
     return nodes.map((node) => (
-      <Box key={node.id}>
+      <Box key={node.id} onContextMenu={(e) => handleContextMenu(e, node)}>
         {/* Tree Node */}
         <Box
           sx={{
-            pl: node.level * 3,
-            py: 1,
+            pl: debouncedSearchQuery ? 2 : node.level * 3,
+            py: 1.5,
             display: 'flex',
             alignItems: 'center',
-            borderLeft: node.level > 0 ? '2px solid rgba(102, 126, 234, 0.15)' : 'none',
-            ml: node.level > 0 ? 2 : 0,
+            borderLeft: !debouncedSearchQuery && node.level > 0 ? '2px solid rgba(102, 126, 234, 0.15)' : 'none',
+            ml: !debouncedSearchQuery && node.level > 0 ? 2 : 0,
+            cursor: 'pointer',
+            borderBottom: debouncedSearchQuery ? '1px solid rgba(0, 0, 0, 0.06)' : 'none',
             '&:hover': {
               bgcolor: 'rgba(102, 126, 234, 0.05)',
               borderRadius: 1,
@@ -267,16 +430,44 @@ const Categories: React.FC = () => {
             )}
           </Box>
 
-          {/* Name */}
-          <Typography
-            variant="body1"
-            sx={{
-              flexGrow: 1,
-              fontWeight: node.isFolder ? 600 : 400,
-            }}
-          >
-            {node.name}
-          </Typography>
+          {/* Name with usage stats and breadcrumb */}
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography
+                variant="body1"
+                sx={{
+                  fontWeight: node.isFolder ? 600 : 400,
+                }}
+              >
+                {debouncedSearchQuery ? highlightText(node.name, debouncedSearchQuery) : node.name}
+              </Typography>
+              {(node.transactionCount || 0) > 0 && (
+                <Chip
+                  label={node.transactionCount}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.75rem',
+                    bgcolor: node.color || '#667eea',
+                    color: 'white',
+                    opacity: 0.7,
+                  }}
+                />
+              )}
+            </Box>
+            {/* Breadcrumb path when searching */}
+            {debouncedSearchQuery && getBreadcrumbPath(node) && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.75rem',
+                }}
+              >
+                {getBreadcrumbPath(node)}
+              </Typography>
+            )}
+          </Box>
 
           {/* Action Buttons */}
           <Box sx={{ display: 'flex', gap: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}>
@@ -378,6 +569,101 @@ const Categories: React.FC = () => {
         </Alert>
       )}
 
+      {/* Search and Controls */}
+      <Box
+        sx={{
+          mb: 2,
+          p: 2,
+          background: (theme) =>
+            theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 30, 30, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: 2,
+          boxShadow: '0 4px 16px 0 rgba(31, 38, 135, 0.1)',
+        }}
+      >
+        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+          {/* Search */}
+          <TextField
+            size="small"
+            placeholder="Search categories..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ flexGrow: 1, minWidth: 200 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchQuery('')}
+                    edge="end"
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          {debouncedSearchQuery && (
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {treeData.length} {treeData.length === 1 ? 'result' : 'results'}
+            </Typography>
+          )}
+
+          {/* Filter by Type */}
+          <TextField
+            select
+            size="small"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as any)}
+            sx={{ minWidth: 130 }}
+            label="Type"
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="folder">Folders Only</MenuItem>
+            <MenuItem value="category">Categories Only</MenuItem>
+          </TextField>
+
+          {/* Sort By */}
+          <TextField
+            select
+            size="small"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            sx={{ minWidth: 150 }}
+            label="Sort By"
+          >
+            <MenuItem value="name">Name</MenuItem>
+            <MenuItem value="usage">Most Used</MenuItem>
+            <MenuItem value="recent">Recently Used</MenuItem>
+          </TextField>
+
+          {/* Expand/Collapse All */}
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Expand All">
+              <IconButton size="small" onClick={handleExpandAll} color="primary">
+                <ExpandAllIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Collapse All">
+              <IconButton size="small" onClick={handleCollapseAll} color="primary">
+                <CollapseAllIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
       <Box
         sx={{
           background: (theme) =>
@@ -399,12 +685,18 @@ const Categories: React.FC = () => {
           >
             <FolderOpenIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              No categories yet
+              {debouncedSearchQuery ? `No results for "${debouncedSearchQuery}"` : 'No categories yet'}
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={3} textAlign="center">
-              Create folders and categories to organize your expenses.
-              <br />
-              Folders can contain subcategories for better hierarchy.
+              {debouncedSearchQuery ? (
+                'Try a different search term or clear the filter.'
+              ) : (
+                <>
+                  Create folders and categories to organize your expenses.
+                  <br />
+                  Folders can contain subcategories for better hierarchy.
+                </>
+              )}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
@@ -536,6 +828,55 @@ const Categories: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Context Menu */}
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        {contextMenu?.category && contextMenu.category.isFolder && (
+          <MenuItem
+            onClick={() => {
+              handleOpenDialog(contextMenu.category!);
+              handleCloseContextMenu();
+            }}
+          >
+            <ListItemIcon>
+              <CreateNewFolderIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Add Subcategory</ListItemText>
+          </MenuItem>
+        )}
+        <MenuItem
+          onClick={() => {
+            handleEditCategory(contextMenu?.category!);
+            handleCloseContextMenu();
+          }}
+        >
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            handleDeleteCategory(contextMenu?.category!);
+            handleCloseContextMenu();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };
