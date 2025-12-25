@@ -112,6 +112,14 @@ const Accounts: React.FC = () => {
   const [actualBalance, setActualBalance] = useState('');
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
   
+  // Transfer dialog states
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferFromAccount, setTransferFromAccount] = useState<Account | null>(null);
+  const [transferToAccountId, setTransferToAccountId] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().split('T')[0]);
+  
   // Search, Filter, Sort states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
@@ -534,9 +542,50 @@ const Accounts: React.FC = () => {
   };
 
   const handleTransferMoney = (account: Account) => {
-    // Navigate to transactions with transfer mode
-    navigate('/transactions', { state: { transferMode: true, fromAccountId: account.id } });
+    setTransferFromAccount(account);
+    setTransferToAccountId('');
+    setTransferAmount('');
+    setTransferNotes('');
+    setTransferDate(new Date().toISOString().split('T')[0]);
+    setTransferDialogOpen(true);
     handleQuickActionClose();
+  };
+
+  const handleTransferSubmit = async () => {
+    if (!transferFromAccount || !transferToAccountId || !transferAmount) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    const amount = parseFloat(transferAmount);
+    if (amount <= 0) {
+      setError('Amount must be positive');
+      return;
+    }
+
+    try {
+      await axios.post(
+        '/api/transactions/transfer',
+        {
+          fromAccountId: transferFromAccount.id,
+          toAccountId: transferToAccountId,
+          amount,
+          date: transferDate,
+          notes: transferNotes,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Transfer completed successfully');
+      setTransferDialogOpen(false);
+      setTransferFromAccount(null);
+      setTransferToAccountId('');
+      setTransferAmount('');
+      setTransferNotes('');
+      fetchAccounts(); // Refresh account balances
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to create transfer');
+    }
   };
 
   // Render account card
@@ -714,11 +763,29 @@ const Accounts: React.FC = () => {
                 <Button
                   size="small"
                   variant="outlined"
-                  fullWidth
-                  startIcon={<ReceiptIcon />}
+                  sx={{ flex: 1 }}
+                  startIcon={<ReceiptIcon fontSize="small" />}
                   onClick={() => handleViewTransactions()}
                 >
-                  Transactions
+                  View
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  sx={{ flex: 1 }}
+                  startIcon={<AddIcon fontSize="small" />}
+                  onClick={() => handleAddTransaction(account)}
+                >
+                  Add
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  sx={{ flex: 1 }}
+                  startIcon={<TransferIcon fontSize="small" />}
+                  onClick={() => handleTransferMoney(account)}
+                >
+                  Transfer
                 </Button>
               </Box>
             </Box>
@@ -1123,23 +1190,18 @@ const Accounts: React.FC = () => {
         open={Boolean(quickActionAnchor)}
         onClose={handleQuickActionClose}
       >
-        <MenuItem onClick={() => handleViewTransactions()}>
+        <MenuItem
+          onClick={() => {
+            if (quickActionAccount) {
+              handleOpenDialog(quickActionAccount);
+              handleQuickActionClose();
+            }
+          }}
+        >
           <ListItemIcon>
-            <ReceiptIcon fontSize="small" />
+            <EditIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>View Transactions</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => quickActionAccount && handleAddTransaction(quickActionAccount)}>
-          <ListItemIcon>
-            <AddIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Add Transaction</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => quickActionAccount && handleTransferMoney(quickActionAccount)}>
-          <ListItemIcon>
-            <TransferIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Transfer Money</ListItemText>
+          <ListItemText>Edit Account</ListItemText>
         </MenuItem>
         <Divider />
         <MenuItem
@@ -1444,6 +1506,108 @@ const Accounts: React.FC = () => {
             }
           >
             Adjust Balance
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Transfer Money Dialog */}
+      <Dialog open={transferDialogOpen} onClose={() => setTransferDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Transfer Money</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* From Account (Read-only) */}
+            <TextField
+              label="From Account"
+              value={transferFromAccount?.name || ''}
+              fullWidth
+              disabled
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {transferFromAccount && (
+                      <>
+                        {React.createElement(
+                          accountTypeConfig[transferFromAccount.type].icon,
+                          { fontSize: 'small' }
+                        )}
+                      </>
+                    )}
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            {/* To Account */}
+            <TextField
+              select
+              label="To Account"
+              value={transferToAccountId}
+              onChange={(e) => setTransferToAccountId(e.target.value)}
+              fullWidth
+              required
+            >
+              {accounts
+                .filter((acc) => acc.id !== transferFromAccount?.id && acc.isActive)
+                .map((account) => {
+                  const IconComponent = accountTypeConfig[account.type].icon;
+                  return (
+                    <MenuItem key={account.id} value={account.id}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <IconComponent fontSize="small" />
+                        <span>{account.name}</span>
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                          {formatCurrency(
+                            accountBalances.get(account.id)?.calculatedBalance || account.balance,
+                            account.currency
+                          )}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  );
+                })}
+            </TextField>
+
+            {/* Amount */}
+            <TextField
+              label="Amount"
+              type="number"
+              value={transferAmount}
+              onChange={(e) => setTransferAmount(e.target.value)}
+              fullWidth
+              required
+              InputProps={{
+                startAdornment: <InputAdornment position="start">{CURRENCIES[transferFromAccount?.currency || 'USD']?.symbol || '$'}</InputAdornment>,
+              }}
+              inputProps={{ min: 0, step: 0.01 }}
+            />
+
+            {/* Date */}
+            <TextField
+              label="Date"
+              type="date"
+              value={transferDate}
+              onChange={(e) => setTransferDate(e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
+
+            {/* Notes (Optional) */}
+            <TextField
+              label="Notes (Optional)"
+              value={transferNotes}
+              onChange={(e) => setTransferNotes(e.target.value)}
+              multiline
+              rows={3}
+              fullWidth
+            />
+
+            {error && <Alert severity="error">{error}</Alert>}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTransferDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleTransferSubmit} variant="contained" disabled={!transferToAccountId || !transferAmount}>
+            Transfer
           </Button>
         </DialogActions>
       </Dialog>

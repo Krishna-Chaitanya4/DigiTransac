@@ -1186,4 +1186,204 @@ router.post('/bulk-reject', async (req: AuthRequest, res: Response): Promise<voi
   }
 });
 
+// POST /api/transactions/transfer - Create a transfer between accounts
+router.post('/transfer', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { fromAccountId, toAccountId, amount, date, notes } = req.body;
+
+    // Validation
+    if (!fromAccountId || !toAccountId || !amount) {
+      res.status(400).json({
+        success: false,
+        message: 'fromAccountId, toAccountId, and amount are required',
+      });
+      return;
+    }
+
+    if (fromAccountId === toAccountId) {
+      res.status(400).json({
+        success: false,
+        message: 'Cannot transfer to the same account',
+      });
+      return;
+    }
+
+    if (amount <= 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Amount must be positive',
+      });
+      return;
+    }
+
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const accountsContainer = await cosmosDBService.getAccountsContainer();
+    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+
+    // Verify both accounts exist
+    const fromAccount = await accountsContainer.findOne({ id: fromAccountId, userId });
+    const toAccount = await accountsContainer.findOne({ id: toAccountId, userId });
+
+    if (!fromAccount) {
+      res.status(404).json({
+        success: false,
+        message: 'Source account not found',
+      });
+      return;
+    }
+
+    if (!toAccount) {
+      res.status(404).json({
+        success: false,
+        message: 'Destination account not found',
+      });
+      return;
+    }
+
+    // Get or create "Transfer" category
+    let transferCategory = await categoriesContainer.findOne({
+      userId,
+      name: 'Transfer',
+    });
+
+    if (!transferCategory) {
+      const categoryId = uuidv4();
+      transferCategory = {
+        id: categoryId,
+        userId,
+        name: 'Transfer',
+        type: 'both',
+        color: '#2196f3',
+        icon: 'swap_horiz',
+        description: 'Money transfers between accounts',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await categoriesContainer.insertOne(transferCategory);
+    }
+
+    const transferId = uuidv4(); // Link both transactions
+    const transferDate = date ? new Date(date) : new Date();
+    const description = `Transfer: ${fromAccount.name} → ${toAccount.name}`;
+
+    // Encrypt description
+    const encryptedDescription = encryptTransaction({ description }).description || description;
+
+    // Create debit transaction (money OUT of source account)
+    const debitTransactionId = uuidv4();
+    const debitTransaction: Transaction = {
+      id: debitTransactionId,
+      userId,
+      type: 'debit',
+      amount,
+      accountId: fromAccountId,
+      description: encryptedDescription,
+      date: transferDate,
+      isRecurring: false,
+      source: 'transfer',
+      reviewStatus: 'approved',
+      transferId, // Link to credit transaction
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const debitSplit: TransactionSplit = {
+      id: uuidv4(),
+      transactionId: debitTransactionId,
+      userId,
+      categoryId: transferCategory.id,
+      amount,
+      tags: ['transfer'],
+      notes: notes || `Transfer to ${toAccount.name}`,
+      order: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Create credit transaction (money INTO destination account)
+    const creditTransactionId = uuidv4();
+    const creditTransaction: Transaction = {
+      id: creditTransactionId,
+      userId,
+      type: 'credit',
+      amount,
+      accountId: toAccountId,
+      description: encryptedDescription,
+      date: transferDate,
+      isRecurring: false,
+      source: 'transfer',
+      reviewStatus: 'approved',
+      transferId, // Link to debit transaction
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const creditSplit: TransactionSplit = {
+      id: uuidv4(),
+      transactionId: creditTransactionId,
+      userId,
+      categoryId: transferCategory.id,
+      amount,
+      tags: ['transfer'],
+      notes: notes || `Transfer from ${fromAccount.name}`,
+      order: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Insert both transactions and splits
+    await transactionsContainer.insertMany([debitTransaction, creditTransaction]);
+    await splitsContainer.insertMany([debitSplit, creditSplit]);
+
+    // Update account balances
+    await accountsContainer.updateOne(
+      { id: fromAccountId, userId },
+      {
+        $inc: { balance: -amount },
+        $set: { updatedAt: new Date() },
+      }
+    );
+
+    await accountsContainer.updateOne(
+      { id: toAccountId, userId },
+      {
+        $inc: { balance: amount },
+        $set: { updatedAt: new Date() },
+      }
+    );
+
+    // Decrypt transactions before sending to client
+    const decryptedDebitTxn = decryptTransaction(debitTransaction);
+    const decryptedCreditTxn = decryptTransaction(creditTransaction);
+
+    res.status(201).json({
+      success: true,
+      message: 'Transfer created successfully',
+      transfer: {
+        id: transferId,
+        fromAccountId,
+        toAccountId,
+        amount,
+        date: transferDate,
+        debitTransaction: {
+          ...decryptedDebitTxn,
+          splits: [debitSplit],
+        },
+        creditTransaction: {
+          ...decryptedCreditTxn,
+          splits: [creditSplit],
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error creating transfer:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating transfer',
+    });
+  }
+});
+
 export default router;
