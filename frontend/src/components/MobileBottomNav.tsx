@@ -76,4 +76,4 @@ const MobileBottomNav: React.FC = () => {
   );
 };
 
-export default MobileBottomNav;
+export default React.memo(MobileBottomNav);

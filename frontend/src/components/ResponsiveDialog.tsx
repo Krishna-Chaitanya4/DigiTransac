@@ -44,4 +44,4 @@ const ResponsiveDialog: React.FC<ResponsiveDialogProps> = ({ children, ...props 
   );
 };
 
-export default ResponsiveDialog;
+export default React.memo(ResponsiveDialog);

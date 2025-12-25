@@ -94,4 +94,4 @@ const SwipeableTransactionCard: React.FC<SwipeableTransactionCardProps> = (props
   );
 };
 
-export default SwipeableTransactionCard;
+export default React.memo(SwipeableTransactionCard);

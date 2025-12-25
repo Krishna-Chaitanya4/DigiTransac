@@ -35,4 +35,4 @@ const QuickAddFab: React.FC<QuickAddFabProps> = ({ onClick, tooltip = 'Quick Add
   );
 };
 
-export default QuickAddFab;
+export default React.memo(QuickAddFab);

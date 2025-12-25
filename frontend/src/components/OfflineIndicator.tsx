@@ -150,4 +150,4 @@ const OfflineIndicator: React.FC = () => {
   );
 };
 
-export default OfflineIndicator;
+export default React.memo(OfflineIndicator);
