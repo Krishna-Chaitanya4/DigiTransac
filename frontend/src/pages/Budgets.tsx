@@ -477,11 +477,94 @@ const Budgets: React.FC = () => {
     });
   };
 
+  // Enhanced color system for budget status (industry standard: Mint, YNAB patterns)
+  const getBudgetStatusColors = useCallback((percentUsed: number) => {
+    if (percentUsed < 70) {
+      return {
+        bg: '#e8f5e9',
+        color: '#2e7d32',
+        status: 'healthy',
+        progressColor: 'success' as const,
+        icon: '✓',
+      };
+    }
+    if (percentUsed < 90) {
+      return {
+        bg: '#fff3e0',
+        color: '#f57c00',
+        status: 'caution',
+        progressColor: 'warning' as const,
+        icon: '⚠️',
+      };
+    }
+    if (percentUsed < 100) {
+      return {
+        bg: '#ffe0b2',
+        color: '#e65100',
+        status: 'warning',
+        progressColor: 'warning' as const,
+        icon: '⚠️',
+      };
+    }
+    return {
+      bg: '#ffebee',
+      color: '#c62828',
+      status: 'exceeded',
+      progressColor: 'error' as const,
+      icon: '🚨',
+    };
+  }, []);
+
   const getProgressColor = (percentUsed: number) => {
-    if (percentUsed >= 100) return 'error';
-    if (percentUsed >= 80) return 'warning';
-    return 'success';
+    return getBudgetStatusColors(percentUsed).progressColor;
   };
+
+  // Spending velocity calculation (shows if user is on track, ahead, or behind)
+  const calculateSpendingVelocity = useCallback((budget: Budget) => {
+    const now = new Date();
+    const start = new Date(budget.startDate);
+    const end = budget.endDate ? new Date(budget.endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    // Calculate days elapsed and total days
+    const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    const daysElapsed = Math.max(0, Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    const daysRemaining = Math.max(0, totalDays - daysElapsed);
+    
+    // Calculate expected vs actual spending
+    const expectedPercent = Math.min(100, (daysElapsed / totalDays) * 100);
+    const actualPercent = budget.percentUsed || 0;
+    const velocity = actualPercent - expectedPercent; // Positive = overspending
+    
+    // Determine status
+    let velocityStatus: 'on-track' | 'ahead' | 'behind';
+    let velocityMessage: string;
+    let velocityColor: string;
+    
+    if (Math.abs(velocity) < 10) {
+      velocityStatus = 'on-track';
+      velocityMessage = 'On track';
+      velocityColor = '#4caf50';
+    } else if (velocity > 0) {
+      velocityStatus = 'ahead';
+      velocityMessage = `${Math.round(velocity)}% ahead of pace`;
+      velocityColor = '#f57c00';
+    } else {
+      velocityStatus = 'behind';
+      velocityMessage = `${Math.abs(Math.round(velocity))}% under budget`;
+      velocityColor = '#2196f3';
+    }
+    
+    return {
+      velocity,
+      velocityStatus,
+      velocityMessage,
+      velocityColor,
+      daysRemaining,
+      daysElapsed,
+      totalDays,
+      expectedPercent,
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -535,7 +618,11 @@ const Budgets: React.FC = () => {
         </Card>
       ) : (
         <Grid container spacing={3}>
-          {budgets.map((budget) => (
+          {budgets.map((budget) => {
+            const statusColors = getBudgetStatusColors(budget.percentUsed || 0);
+            const velocityInfo = calculateSpendingVelocity(budget);
+            
+            return (
             <Grid item xs={12} md={6} lg={4} key={budget.id}>
               <Card
                 sx={{
@@ -546,13 +633,45 @@ const Budgets: React.FC = () => {
                   backdropFilter: 'blur(10px)',
                   borderRadius: 2,
                   boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                  border: budget.isOverBudget ? '2px solid' : 'none',
-                  borderColor: budget.isOverBudget ? 'error.main' : 'transparent',
+                  border: '2px solid',
+                  borderColor: statusColors.color + '40',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 40px 0 rgba(31, 38, 135, 0.25)',
+                  },
                 }}
               >
                 <CardContent>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                  {/* Status Badge */}
+                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                    <Chip
+                      icon={<span style={{ fontSize: '14px' }}>{statusColors.icon}</span>}
+                      label={statusColors.status.toUpperCase()}
+                      size="small"
+                      sx={{
+                        bgcolor: statusColors.bg,
+                        color: statusColors.color,
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                      }}
+                    />
                     <Box>
+                      <IconButton size="small" onClick={() => handleEditBudget(budget)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteClick(budget.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+
+                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                    <Box flex={1}>
                       {/* Budget Name (if provided) */}
                       {budget.name && (
                         <Typography variant="h6" fontWeight="600" gutterBottom>
@@ -657,6 +776,23 @@ const Budgets: React.FC = () => {
                         {formatDate(budget.startDate)} -{' '}
                         {budget.endDate ? formatDate(budget.endDate) : 'Ongoing'}
                       </Typography>
+                      
+                      {/* Spending Velocity Indicator */}
+                      <Box mt={1}>
+                        <Chip
+                          label={velocityInfo.velocityMessage}
+                          size="small"
+                          sx={{
+                            bgcolor: velocityInfo.velocityColor + '20',
+                            color: velocityInfo.velocityColor,
+                            fontSize: '0.65rem',
+                            height: '20px',
+                          }}
+                        />
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                          {velocityInfo.daysRemaining} days left
+                        </Typography>
+                      </Box>
                     </Box>
                     <Box>
                       <IconButton size="small" onClick={() => handleEditBudget(budget)}>
@@ -710,7 +846,8 @@ const Budgets: React.FC = () => {
                 </CardContent>
               </Card>
             </Grid>
-          ))}
+            );
+          })}
         </Grid>
       )}
 
