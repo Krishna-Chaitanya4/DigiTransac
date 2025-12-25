@@ -31,6 +31,9 @@ import {
   AccountBalance as AccountIcon,
   Savings as SavingsIcon,
   ContentCopy as ContentCopyIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -120,6 +123,11 @@ const Budgets: React.FC = () => {
     budgetId: null,
   });
   const [dateError, setDateError] = useState<string>('');
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'healthy' | 'warning' | 'exceeded'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'amount' | 'percentUsed' | 'remaining'>('percentUsed');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -581,6 +589,75 @@ const Budgets: React.FC = () => {
     };
   }, []);
 
+  // Filter and sort budgets (memoized for performance)
+  const filteredAndSortedBudgets = useMemo(() => {
+    let filtered = budgets;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((budget) => {
+        // Search in budget name
+        if (budget.name && budget.name.toLowerCase().includes(query)) return true;
+        
+        // Search in category names
+        if (budget.categoryIds?.some((catId) => 
+          getCategoryName(catId).toLowerCase().includes(query)
+        )) return true;
+        
+        // Search in tag names
+        if (budget.includeTagIds?.some((tagId) => 
+          getTagName(tagId).toLowerCase().includes(query)
+        )) return true;
+        if (budget.excludeTagIds?.some((tagId) => 
+          getTagName(tagId).toLowerCase().includes(query)
+        )) return true;
+        
+        // Search in account names
+        if (budget.accountIds?.some((accId) => 
+          getAccountName(accId).toLowerCase().includes(query)
+        )) return true;
+        
+        return false;
+      });
+    }
+
+    // Apply status filter
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter((budget) => {
+        const percentUsed = budget.percentUsed || 0;
+        const status = getBudgetStatusColors(percentUsed).status;
+        
+        if (filterStatus === 'healthy') return status === 'healthy';
+        if (filterStatus === 'warning') return status === 'caution' || status === 'warning';
+        if (filterStatus === 'exceeded') return status === 'exceeded';
+        
+        return true;
+      });
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === 'name') {
+        const nameA = a.name || 'Unnamed';
+        const nameB = b.name || 'Unnamed';
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'amount') {
+        return (b.amount + (b.rolledOverAmount || 0)) - (a.amount + (a.rolledOverAmount || 0));
+      }
+      if (sortBy === 'percentUsed') {
+        return (b.percentUsed || 0) - (a.percentUsed || 0);
+      }
+      if (sortBy === 'remaining') {
+        return (a.remaining || 0) - (b.remaining || 0); // Ascending: most negative first
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [budgets, searchQuery, filterStatus, sortBy, getBudgetStatusColors, getCategoryName, getTagName, getAccountName]);
+
   if (loading) {
     return (
       <Box>
@@ -613,6 +690,98 @@ const Budgets: React.FC = () => {
         </Button>
       </Box>
 
+      {/* Search and Filter Bar */}
+      {budgets.length > 0 && (
+        <Card sx={{ mb: 3, p: 2 }}>
+          <Grid container spacing={2} alignItems="center">
+            {/* Search */}
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search budgets..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery && (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setSearchQuery('')}>
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            {/* Status Filter */}
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Filter by Status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <FilterListIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              >
+                <MenuItem value="all">All Budgets</MenuItem>
+                <MenuItem value="healthy">Healthy ({"<"}70%)</MenuItem>
+                <MenuItem value="warning">Warning (70-100%)</MenuItem>
+                <MenuItem value="exceeded">Exceeded ({">"}100%)</MenuItem>
+              </TextField>
+            </Grid>
+
+            {/* Sort By */}
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Sort By"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+              >
+                <MenuItem value="percentUsed">% Used (High to Low)</MenuItem>
+                <MenuItem value="remaining">Remaining (Low to High)</MenuItem>
+                <MenuItem value="amount">Amount (High to Low)</MenuItem>
+                <MenuItem value="name">Name (A-Z)</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+
+          {/* Results Count */}
+          <Box mt={2} display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              Showing {filteredAndSortedBudgets.length} of {budgets.length} budgets
+            </Typography>
+            {(searchQuery || filterStatus !== 'all') && (
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterStatus('all');
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
+          </Box>
+        </Card>
+      )}
+
       {budgets.length === 0 ? (
         <Card
           sx={{
@@ -631,9 +800,37 @@ const Budgets: React.FC = () => {
             onAction={handleOpenDialog}
           />
         </Card>
+      ) : filteredAndSortedBudgets.length === 0 ? (
+        <Card
+          sx={{
+            background: (theme) =>
+              theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 30, 30, 0.9)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 2,
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+            p: 4,
+            textAlign: 'center',
+          }}
+        >
+          <Typography variant="h6" gutterBottom>
+            No budgets match your filters
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Try adjusting your search or filters
+          </Typography>
+          <Button
+            startIcon={<ClearIcon />}
+            onClick={() => {
+              setSearchQuery('');
+              setFilterStatus('all');
+            }}
+          >
+            Clear Filters
+          </Button>
+        </Card>
       ) : (
         <Grid container spacing={3}>
-          {budgets.map((budget) => {
+          {filteredAndSortedBudgets.map((budget) => {
             const statusColors = getBudgetStatusColors(budget.percentUsed || 0);
             const velocityInfo = calculateSpendingVelocity(budget);
             
