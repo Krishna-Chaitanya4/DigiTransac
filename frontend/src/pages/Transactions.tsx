@@ -72,6 +72,7 @@ import SMSImportModal from '../components/SMSImportModal';
 import { useResponsive } from '../hooks/useResponsive';
 import { useIsTouchDevice } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -176,6 +177,7 @@ const INCOME_EXCLUDE_TAGS = ['transfer', 'refund'];
 
 const Transactions: React.FC = () => {
   const { token, user } = useAuth();
+  const location = useLocation();
   const toast = useToast();
   const { isMobile } = useResponsive();
   const userCurrency = user?.currency || 'USD';
@@ -273,6 +275,32 @@ const Transactions: React.FC = () => {
 
     initializeData();
   }, []);
+
+  // Handle navigation state from other pages (e.g., clicking "View Transactions" from Accounts)
+  useEffect(() => {
+    if (location.state) {
+      const state = location.state as any;
+
+      // Apply category filter
+      if (state.filterCategoryId) {
+        setSelectedCategories([state.filterCategoryId]);
+        toast.success('Filtered by category');
+      }
+
+      // Open add transaction dialog with pre-filled data
+      if (state.addTransaction) {
+        setFormData((prev) => ({
+          ...prev,
+          accountId: state.accountId || prev.accountId,
+          type: state.type || prev.type,
+        }));
+        setOpenDialog(true);
+      }
+
+      // Clear location state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Cleanup undo timeout on unmount
   useEffect(() => {
@@ -1631,6 +1659,18 @@ const Transactions: React.FC = () => {
 
                 <Grid item xs={12}>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Chip
+                      label="All Time"
+                      size="small"
+                      variant={activeDateFilter === 'all' ? 'filled' : 'outlined'}
+                      color={activeDateFilter === 'all' ? 'primary' : 'default'}
+                      onClick={() => {
+                        setStartDate(null);
+                        setEndDate(null);
+                        setActiveDateFilter('all');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
                     <Chip
                       label="Today"
                       size="small"
