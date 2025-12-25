@@ -72,8 +72,6 @@ const Categories: React.FC = () => {
   useEffect(() => {
     if (categories.length > 0) {
       buildTree();
-    } else {
-      setTreeData([]);
     }
   }, [categories]);
 
@@ -83,7 +81,14 @@ const Categories: React.FC = () => {
       const response = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setCategories(response.data.categories || []);
+      
+      // Normalize data: ensure all categories have required fields
+      const normalizedCategories = (response.data.categories || []).map((cat: any) => ({
+        ...cat,
+        path: cat.path || [], // Ensure path is always an array
+      }));
+      
+      setCategories(normalizedCategories);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch categories');
@@ -93,6 +98,10 @@ const Categories: React.FC = () => {
   };
 
   const buildTree = () => {
+    if (categories.length === 0) {
+      return;
+    }
+
     const nodeMap = new Map<string, CategoryNode>();
 
     categories.forEach((cat) => {
@@ -470,13 +479,13 @@ const Categories: React.FC = () => {
                   // When editing, exclude self and descendants to prevent circular refs
                   if (editingCategory) {
                     if (cat.id === editingCategory.id) return false;
-                    if (cat.path.includes(editingCategory.id)) return false;
+                    if (cat.path?.includes(editingCategory.id)) return false;
                   }
                   return true;
                 })
                 .map((folder) => (
                   <MenuItem key={folder.id} value={folder.id}>
-                    {'  '.repeat(folder.path.length)} 📁 {folder.name}
+                    {'  '.repeat(folder.path?.length || 0)} 📁 {folder.name}
                   </MenuItem>
                 ))}
             </TextField>

@@ -162,9 +162,14 @@ const Budgets: React.FC = () => {
       const response = await axios.get(`/api/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const allCategories = response.data.categories || [];
-      // Include both folders and categories for budget selection
-      setCategories(allCategories);
+      
+      // Normalize data: ensure all categories have required fields
+      const normalizedCategories = (response.data.categories || []).map((cat: any) => ({
+        ...cat,
+        path: cat.path || [], // Ensure path is always an array
+      }));
+      
+      setCategories(normalizedCategories);
     } catch (err: any) {
       console.error('Failed to fetch categories:', err);
     }
@@ -425,7 +430,7 @@ const Budgets: React.FC = () => {
                           <>
                             <Chip
                               icon={
-                                categories.find((c) => c.id === budget.categoryId)?.isFolder ? (
+                                categories?.find((c) => c.id === budget.categoryId)?.isFolder ? (
                                   <span>📁</span>
                                 ) : (
                                   <span>📄</span>
@@ -438,7 +443,7 @@ const Budgets: React.FC = () => {
                                 color: getCategoryColor(budget.categoryId),
                               }}
                             />
-                            {categories.find((c) => c.id === budget.categoryId)?.isFolder && (
+                            {categories?.find((c) => c.id === budget.categoryId)?.isFolder && (
                               <Chip
                                 label="Folder"
                                 size="small"
@@ -659,7 +664,7 @@ const Budgets: React.FC = () => {
                 required
                 helperText="Select a folder to budget across all subcategories, or a specific category"
               >
-                {categories.length === 0 ? (
+                {!categories || categories.length === 0 ? (
                   <MenuItem value="" disabled>
                     No categories available. Create one first.
                   </MenuItem>
@@ -712,7 +717,7 @@ const Budgets: React.FC = () => {
                   helperText="Transactions must have at least one of these tags"
                   sx={{ mb: 2 }}
                 >
-                  {tags.length === 0 ? (
+                  {!tags || tags.length === 0 ? (
                     <MenuItem value="" disabled>
                       No tags available. Create transactions with tags first.
                     </MenuItem>
@@ -750,7 +755,7 @@ const Budgets: React.FC = () => {
                   }}
                   helperText="Transactions with these tags will be ignored"
                 >
-                  {tags.length === 0 ? (
+                  {!tags || tags.length === 0 ? (
                     <MenuItem value="" disabled>
                       No tags available. Create transactions with tags first.
                     </MenuItem>
@@ -781,7 +786,7 @@ const Budgets: React.FC = () => {
                 required
                 helperText="Budget for all transactions in this account"
               >
-                {accounts.length === 0 ? (
+                {!accounts || accounts.length === 0 ? (
                   <MenuItem value="" disabled>
                     No accounts available. Create one first.
                   </MenuItem>
