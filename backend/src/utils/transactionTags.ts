@@ -158,11 +158,7 @@ export function applyCategoryTagSuggestions(
   let updatedTags = existingTags.filter(tag => !mapping.remove.includes(tag.toLowerCase()));
   
   // Add suggested tags
-  mapping.add.forEach(tag => {
-    if (!updatedTags.includes(tag)) {
-      updatedTags.push(tag);
-    }
-  });
+  updatedTags = [...updatedTags, ...mapping.add.filter(tag => !updatedTags.includes(tag))];
   
   return updatedTags;
 }
