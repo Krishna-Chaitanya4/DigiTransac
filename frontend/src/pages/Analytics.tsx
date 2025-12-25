@@ -1,54 +1,47 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Typography,
   Box,
-  Card,
-  CardContent,
+  Paper,
+  Typography,
   Grid,
   TextField,
+  MenuItem,
   CircularProgress,
   Alert,
-  MenuItem,
-  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Card,
+  CardContent,
   IconButton,
   Tooltip,
-  ToggleButton,
-  ToggleButtonGroup,
-  Collapse,
-  List,
-  ListItemButton,
-  LinearProgress,
-  Button,
-  Tabs,
-  Tab,
-  Skeleton,
 } from '@mui/material';
 import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  AccountBalance as AccountBalanceIcon,
-  Receipt as ReceiptIcon,
-  Warning as WarningIcon,
-  Lightbulb as LightbulbIcon,
-  Folder as FolderIcon,
-  Category as CategoryIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  UnfoldMore as UnfoldMoreIcon,
-  UnfoldLess as UnfoldLessIcon,
-  FileDownload as FileDownloadIcon,
-} from '@mui/icons-material';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+  DatePicker,
+  LocalizationProvider,
+} from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import {
+  TrendingUp,
+  TrendingDown,
+  Download,
+  Assessment,
+  Category as CategoryIcon,
+  Store,
+  AccountBalanceWallet,
+} from '@mui/icons-material';
+import {
+  LineChart,
+  Line,
   PieChart,
   Pie,
   Cell,
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -56,2777 +49,790 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
-import { FilterBar, FilterValues } from '../components/FilterBar';
-import PullToRefresh from '../components/PullToRefresh';
+import axios from 'axios';
+import ResponsiveChart from '../components/ResponsiveChart';
 
-interface Overview {
-  totalSpent: number;
-  totalBudget: number;
-  expenseCount: number;
-  avgExpense: number;
-  budgetUsedPercent: number;
-  period: {
-    startDate: Date;
-    endDate: Date;
-  };
-  comparison?: {
-    previousSpent: number;
-    changeAmount: number;
-    changePercent: number;
-    trend: 'up' | 'down' | 'stable';
-  };
-}
+// Date range presets
+const DATE_RANGES = [
+  { label: 'Last 7 Days', value: 7 },
+  { label: 'Last 30 Days', value: 30 },
+  { label: 'Last 90 Days', value: 90 },
+  { label: 'This Month', value: 'month' },
+  { label: 'Last Month', value: 'lastMonth' },
+  { label: 'This Year', value: 'year' },
+  { label: 'Custom', value: 'custom' },
+];
 
-interface CategoryBreakdown {
-  categoryId: string;
-  categoryName: string;
-  categoryColor: string;
-  isFolder: boolean;
-  parentId: string | null;
-  path: string[];
-  amount: number;
-  count: number;
-  percentage: number;
-}
+// Chart colors
+const COLORS = {
+  primary: '#667eea',
+  success: '#4caf50',
+  error: '#f44336',
+  warning: '#ff9800',
+  info: '#2196f3',
+  categoryColors: [
+    '#667eea', '#764ba2', '#f093fb', '#4facfe',
+    '#43e97b', '#fa709a', '#fee140', '#30cfd0',
+    '#a8edea', '#fed6e3', '#a6c1ee', '#fbc2eb',
+  ],
+};
 
-interface Trend {
-  date: string;
-  amount: number;
-}
-
-interface BudgetComparison {
-  budgetId: string;
-  scopeType: 'category' | 'tag' | 'account';
-  categoryId?: string;
-  categoryName: string;
-  categoryColor: string;
-  isFolder: boolean;
-  calculationType: 'debit' | 'credit' | 'net';
-  budgetAmount: number;
-  originalBudget: number;
-  rolledOver: number;
-  actualSpent: number;
-  difference: number;
-  percentUsed: number;
-  isOverBudget: boolean;
-}
-
-interface TopExpense {
+interface Transaction {
   id: string;
   description: string;
   amount: number;
+  type: 'credit' | 'debit';
   date: string;
-  categoryName: string;
-  categoryColor: string;
+  categoryId: string;
+  category?: { name: string; color: string };
+  merchant?: string;
+  tags?: string[];
 }
 
-interface AccountBreakdown {
-  accountId: string;
-  accountName: string;
-  accountType: string;
-  credits: number;
-  debits: number;
-  netFlow: number;
-  balance: number;
-  transactionCount: number;
+interface Category {
+  id: string;
+  name: string;
+  color: string;
 }
 
-interface RecurringInsights {
-  totalRecurringTemplates: number;
-  monthlyRecurringCost: number;
-  upcomingThisMonth: number;
-  recurringVsOneTime: {
-    recurringAmount: number;
-    oneTimeAmount: number;
-    recurringPercentage: number;
-  };
-  byFrequency: Array<{
-    frequency: string;
-    count: number;
-    totalAmount: number;
-  }>;
-}
-
-interface TagBreakdown {
-  tag: string;
-  amount: number;
-  count: number;
-  percentage: number;
-}
-
-interface MerchantData {
-  merchantName: string;
-  amount: number;
-  count: number;
-  percentage: number;
-}
-
-interface SmartInsights {
-  overallTrend: {
-    currentTotal: number;
-    previousTotal: number;
-    percentChange: number;
-    direction: 'up' | 'down';
-  };
-  overBudgetAlerts: Array<{
-    categoryName: string;
-    budgetAmount: number;
-    spent: number;
-    overBy: number;
-    percentOver: number;
-  }>;
-  unusualExpenses: Array<{
-    description: string;
-    amount: number;
-    date: string;
-    timesAverage: number;
-  }>;
-  categoryTrends: Array<{
-    categoryName: string;
-    currentAmount: number;
-    previousAmount: number;
-    percentChange: number;
-    trend: 'increasing' | 'decreasing';
-  }>;
-  folderTrends: Array<{
-    folderName: string;
-    categoryId: string;
-    categoryColor: string;
-    currentAmount: number;
-    previousAmount: number;
-    percentChange: number;
-    trend: 'increasing' | 'decreasing';
-  }>;
-  summary: {
-    totalExpenses: number;
-    avgDailySpending: number;
-    topSpendingDay: {
-      date: string;
-      amount: number;
-    };
-  };
+interface MonthlyData {
+  month: string;
+  income: number;
+  expenses: number;
+  net: number;
 }
 
 const Analytics: React.FC = () => {
-  const { token, user } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [loadingCharts, setLoadingCharts] = useState(true);
   const [error, setError] = useState('');
-  const [currentTab, setCurrentTab] = useState(0);
 
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
-  const [folderBreakdown, setFolderBreakdown] = useState<CategoryBreakdown[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [tags, setTags] = useState<any[]>([]);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<'amount' | 'name' | 'count'>('amount');
-  const [viewMode, setViewMode] = useState<'category' | 'folder'>('category');
-  const [trends, setTrends] = useState<Trend[]>([]);
-  const [budgetComparison, setBudgetComparison] = useState<BudgetComparison[]>([]);
-  const [topExpenses, setTopExpenses] = useState<TopExpense[]>([]);
-  const [accountBreakdown, setAccountBreakdown] = useState<AccountBreakdown[]>([]);
-  const [recurringInsights, setRecurringInsights] = useState<RecurringInsights | null>(null);
-  const [tagBreakdown, setTagBreakdown] = useState<TagBreakdown[]>([]);
-  const [topMerchants, setTopMerchants] = useState<MerchantData[]>([]);
-  const [smartInsights, setSmartInsights] = useState<SmartInsights | null>(null);
+  // Date range state
+  const [dateRangeType, setDateRangeType] = useState<string | number>('month');
+  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
+  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('month'));
 
-  // Filter state
-  const [filters, setFilters] = useState<FilterValues>({
-    dateRange: {
-      start: dayjs().startOf('month'),
-      end: dayjs(),
-      preset: 'thisMonth',
-    },
-    accounts: [],
-    categories: [],
-    includeTags: [],
-    excludeTags: [],
-    transactionType: 'all',
-    amountRange: {
-      min: '',
-      max: '',
-      quickFilter: 'any',
-    },
-  });
+  // Data state
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
 
-  const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'week' | 'month'>('day');
-
+  // Calculate date range based on selection
   useEffect(() => {
-    fetchAnalytics();
-    fetchFilterData();
-  }, [filters]);
+    const today = dayjs();
+    switch (dateRangeType) {
+      case 7:
+        setStartDate(today.subtract(7, 'days'));
+        setEndDate(today);
+        break;
+      case 30:
+        setStartDate(today.subtract(30, 'days'));
+        setEndDate(today);
+        break;
+      case 90:
+        setStartDate(today.subtract(90, 'days'));
+        setEndDate(today);
+        break;
+      case 'month':
+        setStartDate(today.startOf('month'));
+        setEndDate(today.endOf('month'));
+        break;
+      case 'lastMonth':
+        setStartDate(today.subtract(1, 'month').startOf('month'));
+        setEndDate(today.subtract(1, 'month').endOf('month'));
+        break;
+      case 'year':
+        setStartDate(today.startOf('year'));
+        setEndDate(today.endOf('year'));
+        break;
+      case 'custom':
+        // Keep existing dates
+        break;
+    }
+  }, [dateRangeType]);
 
+  // Fetch data
   useEffect(() => {
-    fetchAnalytics();
-    fetchFilterData();
-  }, [filters]);
+    if (startDate && endDate) {
+      fetchAnalyticsData();
+    }
+  }, [startDate, endDate]);
 
-  const fetchFilterData = async () => {
+  const fetchAnalyticsData = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError('');
+
     try {
-      const [categoriesRes, accountsRes, tagsRes] = await Promise.all([
-        axios.get(`/api/categories`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`/api/accounts`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`/api/tags`, { headers: { Authorization: `Bearer ${token}` } }),
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [txnRes, catRes, budgetRes] = await Promise.all([
+        axios.get('/api/transactions', {
+          params: {
+            startDate: startDate?.format('YYYY-MM-DD'),
+            endDate: endDate?.format('YYYY-MM-DD'),
+          },
+          headers,
+        }),
+        axios.get('/api/categories', { headers }),
+        axios.get('/api/budgets', { headers }),
       ]);
 
-      setCategories(categoriesRes.data.categories || []);
-      setAccounts(accountsRes.data.accounts || []);
-      setTags(tagsRes.data.tags || []);
-    } catch (err) {
-      console.error('Error fetching filter data:', err);
+      const txnData = txnRes.data.transactions || [];
+      const catData = Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || [];
+      const budgetData = Array.isArray(budgetRes.data) ? budgetRes.data : budgetRes.data?.budgets || [];
+      
+      setTransactions(txnData);
+      setCategories(catData);
+      setBudgets(budgetData);
+    } catch (err: any) {
+      console.error('Analytics fetch error:', err);
+      setError('Failed to load analytics data');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchAnalytics = async () => {
-    if (!filters.dateRange.start || !filters.dateRange.end) return;
+  // Create category map for lookups
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, Category>();
+    if (Array.isArray(categories)) {
+      categories.forEach((cat) => map.set(cat.id, cat));
+    }
+    return map;
+  }, [categories]);
 
-    try {
-      setLoading(true);
-      setLoadingCharts(true);
-      const params = new URLSearchParams({
-        startDate: filters.dateRange.start.startOf('day').format('YYYY-MM-DD'),
-        endDate: filters.dateRange.end.endOf('day').format('YYYY-MM-DD'),
-        compareWithPrevious: 'true',
-      });
+  // Enrich transactions with category data
+  const enrichedTransactions = useMemo(() => {
+    return transactions.map((txn) => ({
+      ...txn,
+      category: categoryMap.get(txn.categoryId),
+    }));
+  }, [transactions, categoryMap]);
 
-      if (filters.accounts.length > 0) {
-        params.append('accounts', filters.accounts.join(','));
+  // 1. Income vs Expense over time (Line Chart)
+  const incomeExpenseData = useMemo(() => {
+    const monthlyMap = new Map<string, { income: number; expenses: number }>();
+
+    enrichedTransactions.forEach((txn) => {
+      const monthKey = dayjs(txn.date).format('MMM YY');
+      const existing = monthlyMap.get(monthKey) || { income: 0, expenses: 0 };
+
+      if (txn.type === 'credit') {
+        existing.income += txn.amount;
+      } else {
+        existing.expenses += txn.amount;
       }
-      if (filters.categories.length > 0) {
-        params.append('categories', filters.categories.join(','));
-      }
-      if (filters.includeTags.length > 0) {
-        params.append('tags', filters.includeTags.join(','));
-      }
-      // Note: Backend analytics doesn't support excludeTags yet, 
-      // only include filtering for now (matches old behavior)
 
-      // PHASE 1: Load critical overview data first (fast)
-      const [overviewRes, accountsRes, categoriesRes, tagsRes] = await Promise.all([
-        axios.get(`/api/analytics/overview?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/accounts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/categories`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/tags`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
+      monthlyMap.set(monthKey, existing);
+    });
 
-      setOverview(overviewRes.data.overview);
-      setAccounts(accountsRes.data.accounts || []);
-      setCategories(categoriesRes.data.categories || []);
-      setTags(tagsRes.data.tags || []);
-      setLoading(false); // Show overview stats immediately
+    const data: MonthlyData[] = Array.from(monthlyMap.entries())
+      .map(([month, values]) => ({
+        month,
+        income: values.income,
+        expenses: values.expenses,
+        net: values.income - values.expenses,
+      }))
+      .sort((a, b) => dayjs(a.month, 'MMM YY').unix() - dayjs(b.month, 'MMM YY').unix());
 
-      // PHASE 2: Load detailed analytics and charts (slower, in background)
-      const [
-        breakdownRes,
-        folderBreakdownRes,
-        trendsRes,
-        comparisonRes,
-        topExpensesRes,
-        recurringRes,
-        merchantsRes,
-        insightsRes,
-      ] = await Promise.all([
-        axios.get(`/api/analytics/category-breakdown?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/analytics/folder-breakdown?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/analytics/trends?${params}&groupBy=${trendGroupBy}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/analytics/budget-comparison?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/analytics/top-expenses?${params}&limit=5`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/transactions?isRecurring=true`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/analytics/top-merchants?${params}&limit=10`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/analytics/smart-insights?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
+    return data;
+  }, [enrichedTransactions]);
 
-      const breakdown = breakdownRes.data.breakdown || [];
-      const folders = folderBreakdownRes.data.breakdown || [];
+  // 2. Category Breakdown (Pie Chart)
+  const categoryBreakdown = useMemo(() => {
+    const categoryMap = new Map<string, { name: string; value: number; color: string }>();
 
-      setCategoryBreakdown(breakdown);
-      setFolderBreakdown(folders);
-      setTrends(trendsRes.data.trends || []);
-      setBudgetComparison(comparisonRes.data.comparisons || []);
-      setTopExpenses(topExpensesRes.data.expenses || []);
-
-      // Process account breakdown
-      const accounts = accountsRes.data.accounts || [];
-      const transactionsRes = await axios.get(
-        `/api/transactions?startDate=${filters.dateRange.start.startOf('day').format('YYYY-MM-DD')}&endDate=${filters.dateRange.end.endOf('day').format('YYYY-MM-DD')}`,
-
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const transactions = transactionsRes.data.transactions || [];
-
-      const accountStats = accounts.map((account: any) => {
-        const accountTxns = transactions.filter((t: any) => t.accountId === account.id);
-        const credits = accountTxns
-          .filter((t: any) => t.type === 'credit')
-          .reduce((sum: number, t: any) => sum + t.amount, 0);
-        const debits = accountTxns
-          .filter((t: any) => t.type === 'debit')
-          .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-        return {
-          accountId: account.id,
-          accountName: account.name,
-          accountType: account.accountType,
-          credits,
-          debits,
-          netFlow: credits - debits,
-          balance: account.balance,
-          transactionCount: accountTxns.length,
-        };
-      });
-      setAccountBreakdown(accountStats);
-
-      // Process recurring insights
-      const recurringTxns = recurringRes.data.transactions || [];
-      const recurringTemplates = recurringTxns.filter((t: any) => !t.linkedTransactionId);
-
-      const frequencyMap = new Map<string, { count: number; amount: number }>();
-      let totalRecurringCost = 0;
-
-      recurringTemplates.forEach((t: any) => {
-        const freq = t.recurrencePattern?.frequency || 'unknown';
-        const existing = frequencyMap.get(freq) || { count: 0, amount: 0 };
-
-        // Annualize to monthly cost
-        let monthlyCost = t.amount;
-        if (freq === 'daily') monthlyCost = t.amount * 30;
-        else if (freq === 'weekly') monthlyCost = t.amount * 4;
-        else if (freq === 'yearly') monthlyCost = t.amount / 12;
-
-        frequencyMap.set(freq, {
-          count: existing.count + 1,
-          amount: existing.amount + (t.type === 'debit' ? monthlyCost : 0),
-        });
-
-        totalRecurringCost += t.type === 'debit' ? monthlyCost : 0;
-      });
-
-      const oneTimeDebits = transactions.filter(
-        (t: any) => t.type === 'debit' && !t.isRecurring && !t.linkedTransactionId
-      );
-      const oneTimeAmount = oneTimeDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
-      const recurringDebits = transactions.filter(
-        (t: any) => t.type === 'debit' && (t.isRecurring || t.linkedTransactionId)
-      );
-      const recurringAmount = recurringDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
-
-      const upcomingThisMonth = recurringTemplates.filter((t: any) => {
-        if (!t.recurrencePattern) return false;
-        const lastCreated = t.recurrencePattern.lastCreated
-          ? new Date(t.recurrencePattern.lastCreated)
-          : new Date(t.date);
-        const now = new Date();
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-        let nextDate = new Date(lastCreated);
-        const freq = t.recurrencePattern.frequency;
-
-        if (freq === 'daily') nextDate.setDate(nextDate.getDate() + 1);
-        else if (freq === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-        else if (freq === 'monthly') {
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          if (t.recurrencePattern.day) nextDate.setDate(t.recurrencePattern.day);
-        } else if (freq === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1);
-
-        return nextDate >= now && nextDate <= endOfMonth;
-      }).length;
-
-      setRecurringInsights({
-        totalRecurringTemplates: recurringTemplates.length,
-        monthlyRecurringCost: totalRecurringCost,
-        upcomingThisMonth,
-        recurringVsOneTime: {
-          recurringAmount,
-          oneTimeAmount,
-          recurringPercentage:
-            recurringAmount + oneTimeAmount > 0
-              ? Math.round((recurringAmount / (recurringAmount + oneTimeAmount)) * 100)
-              : 0,
-        },
-        byFrequency: Array.from(frequencyMap.entries()).map(([freq, data]) => ({
-          frequency: freq,
-          count: data.count,
-          totalAmount: data.amount,
-        })),
-      });
-
-      // Process tag breakdown
-      const allTags = tagsRes.data.tags || [];
-      const tagMap = new Map<string, { amount: number; count: number }>();
-
-      transactions.forEach((t: any) => {
-        if (t.type === 'debit' && t.tags && Array.isArray(t.tags)) {
-          t.tags.forEach((tagId: string) => {
-            const existing = tagMap.get(tagId) || { amount: 0, count: 0 };
-            tagMap.set(tagId, {
-              amount: existing.amount + t.amount,
-              count: existing.count + 1,
-            });
+    enrichedTransactions
+      .filter((txn) => txn.type === 'debit')
+      .forEach((txn) => {
+        if (txn.category) {
+          const existing = categoryMap.get(txn.categoryId);
+          categoryMap.set(txn.categoryId, {
+            name: txn.category.name,
+            value: (existing?.value || 0) + txn.amount,
+            color: txn.category.color,
           });
         }
       });
 
-      const totalTaggedAmount = Array.from(tagMap.values()).reduce(
-        (sum, data) => sum + data.amount,
-        0
-      );
-      const tagStats = Array.from(tagMap.entries())
-        .map(([tagId, data]) => {
-          const tag = allTags.find((t: any) => t.id === tagId);
-          return {
-            tag: tag?.name || 'Unknown',
-            amount: data.amount,
-            count: data.count,
-            percentage:
-              totalTaggedAmount > 0 ? Math.round((data.amount / totalTaggedAmount) * 100) : 0,
-          };
-        })
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 10);
+    const total = Array.from(categoryMap.values()).reduce((sum, cat) => sum + cat.value, 0);
 
-      setTagBreakdown(tagStats);
+    return Array.from(categoryMap.values())
+      .map((cat) => ({
+        ...cat,
+        percentage: (cat.value / total) * 100,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8); // Top 8 categories
+  }, [enrichedTransactions]);
 
-      setTopMerchants(merchantsRes.data.merchants || []);
-      setSmartInsights(insightsRes.data.insights || null);
+  // 3. Daily Spending Trends (Bar Chart)
+  const dailySpendingData = useMemo(() => {
+    const dailyMap = new Map<string, number>();
 
-      // Auto-expand top 3 spending folders
-      const top3Folders = folders.slice(0, 3).map((f: any) => f.categoryId);
-      setExpandedFolders(new Set(top3Folders));
+    enrichedTransactions
+      .filter((txn) => txn.type === 'debit')
+      .forEach((txn) => {
+        const dayKey = dayjs(txn.date).format('MMM DD');
+        dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + txn.amount);
+      });
 
-      setLoadingCharts(false);
-      setError('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch analytics');
-    } finally {
-      setLoading(false);
-      setLoadingCharts(false);
-    }
-  };
+    return Array.from(dailyMap.entries())
+      .map(([day, amount]) => ({ day, amount }))
+      .sort((a, b) => dayjs(a.day, 'MMM DD').unix() - dayjs(b.day, 'MMM DD').unix())
+      .slice(-30); // Last 30 days max
+  }, [enrichedTransactions]);
+
+  // 4. Budget vs Actual Comparison (Bar Chart)
+  const budgetComparisonData = useMemo(() => {
+    const categorySpending = new Map<string, number>();
+
+    enrichedTransactions
+      .filter((txn) => txn.type === 'debit')
+      .forEach((txn) => {
+        categorySpending.set(
+          txn.categoryId,
+          (categorySpending.get(txn.categoryId) || 0) + txn.amount
+        );
+      });
+
+    return budgets
+      .map((budget) => {
+        const category = categoryMap.get(budget.categoryId);
+        const spent = categorySpending.get(budget.categoryId) || 0;
+        return {
+          name: category?.name || 'Unknown',
+          budget: budget.amount,
+          spent,
+          remaining: Math.max(0, budget.amount - spent),
+        };
+      })
+      .slice(0, 6); // Top 6 budgets
+  }, [enrichedTransactions, budgets, categoryMap]);
+
+  // 5. Top Merchants (Table)
+  const topMerchants = useMemo(() => {
+    const merchantMap = new Map<string, { amount: number; count: number }>();
+
+    enrichedTransactions
+      .filter((txn) => txn.type === 'debit' && txn.merchant)
+      .forEach((txn) => {
+        const merchant = txn.merchant || 'Unknown';
+        const existing = merchantMap.get(merchant);
+        merchantMap.set(merchant, {
+          amount: (existing?.amount || 0) + txn.amount,
+          count: (existing?.count || 0) + 1,
+        });
+      });
+
+    return Array.from(merchantMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+  }, [enrichedTransactions]);
+
+  // 6. Month-over-Month Comparison (Table)
+  const monthOverMonthData = useMemo(() => {
+    const monthlyMap = new Map<string, { income: number; expenses: number }>();
+
+    enrichedTransactions.forEach((txn) => {
+      const monthKey = dayjs(txn.date).format('MMM YYYY');
+      const existing = monthlyMap.get(monthKey) || { income: 0, expenses: 0 };
+
+      if (txn.type === 'credit') {
+        existing.income += txn.amount;
+      } else {
+        existing.expenses += txn.amount;
+      }
+
+      monthlyMap.set(monthKey, existing);
+    });
+
+    const sorted = Array.from(monthlyMap.entries())
+      .map(([month, values]) => ({
+        month,
+        income: values.income,
+        expenses: values.expenses,
+        net: values.income - values.expenses,
+      }))
+      .sort((a, b) => dayjs(b.month, 'MMM YYYY').unix() - dayjs(a.month, 'MMM YYYY').unix());
+
+    // Calculate changes
+    return sorted.map((item, index) => {
+      const prev = sorted[index + 1];
+      return {
+        ...item,
+        incomeChange: prev ? ((item.income - prev.income) / prev.income) * 100 : 0,
+        expensesChange: prev ? ((item.expenses - prev.expenses) / prev.expenses) * 100 : 0,
+      };
+    });
+  }, [enrichedTransactions]);
+
+  // Summary stats
+  const summaryStats = useMemo(() => {
+    const income = enrichedTransactions
+      .filter((t) => t.type === 'credit')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const expenses = enrichedTransactions
+      .filter((t) => t.type === 'debit')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const net = income - expenses;
+    const avgDailySpending = expenses / (endDate?.diff(startDate, 'days') || 1);
+
+    return { income, expenses, net, avgDailySpending };
+  }, [enrichedTransactions, startDate, endDate]);
 
   const formatCurrency = (amount: number) => {
     return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
+  const exportData = () => {
+    const csvData = [
+      ['Date', 'Description', 'Category', 'Amount', 'Type'],
+      ...enrichedTransactions.map((txn) => [
+        dayjs(txn.date).format('YYYY-MM-DD'),
+        txn.description,
+        txn.category?.name || 'Uncategorized',
+        txn.amount.toString(),
+        txn.type,
+      ]),
+    ]
+      .map((row) => row.join(','))
+      .join('\n');
+
+    const blob = new Blob([csvData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${dayjs().format('YYYY-MM-DD')}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
-
-  // Export to CSV
-  const exportToCSV = () => {
-    if (!overview) return;
-
-    const rows: string[][] = [];
-    
-    // Overview section
-    rows.push(['Analytics Export']);
-    rows.push(['Period', `${filters.dateRange.start.format('YYYY-MM-DD')} to ${filters.dateRange.end.format('YYYY-MM-DD')}`]);
-    rows.push(['']);
-    rows.push(['Overview']);
-    rows.push(['Total Spent', overview.totalSpent.toString()]);
-    rows.push(['Total Budget', overview.totalBudget.toString()]);
-    rows.push(['Budget Used %', overview.budgetUsedPercent.toString()]);
-    rows.push(['Expense Count', overview.expenseCount.toString()]);
-    rows.push(['Average Expense', overview.avgExpense.toString()]);
-    if (overview.comparison) {
-      rows.push(['Previous Period Spent', overview.comparison.previousSpent.toString()]);
-      rows.push(['Change Amount', overview.comparison.changeAmount.toString()]);
-      rows.push(['Change %', overview.comparison.changePercent.toString()]);
-    }
-    rows.push(['']);
-
-    // Category Breakdown
-    rows.push(['Category Breakdown']);
-    rows.push(['Category', 'Amount', 'Count', 'Percentage']);
-    categoryBreakdown.forEach(cat => {
-      rows.push([cat.categoryName, cat.amount.toString(), cat.count.toString(), cat.percentage.toFixed(2) + '%']);
-    });
-    rows.push(['']);
-
-    // Budget Comparison
-    if (budgetComparison.length > 0) {
-      rows.push(['Budget Comparison']);
-      rows.push(['Category', 'Budget', 'Spent', 'Difference', 'Status']);
-      budgetComparison.forEach(budget => {
-        rows.push([
-          budget.categoryName,
-          budget.budgetAmount.toString(),
-          budget.actualSpent.toString(),
-          budget.difference.toString(),
-          budget.isOverBudget ? 'Over Budget' : 'On Track'
-        ]);
-      });
-      rows.push(['']);
-    }
-
-    // Top Expenses
-    if (topExpenses.length > 0) {
-      rows.push(['Top Expenses']);
-      rows.push(['Description', 'Amount', 'Category', 'Date']);
-      topExpenses.slice(0, 20).forEach(exp => {
-        rows.push([exp.description, exp.amount.toString(), exp.categoryName, exp.date]);
-      });
-    }
-
-    // Convert to CSV string
-    const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-    
-    // Download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `analytics_${filters.dateRange.start.format('YYYY-MM-DD')}_to_${filters.dateRange.end.format('YYYY-MM-DD')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Tree view helper functions
-  const toggleFolder = (folderId: string) => {
-    setExpandedFolders((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(folderId)) {
-        newSet.delete(folderId);
-      } else {
-        newSet.add(folderId);
-      }
-      return newSet;
-    });
-  };
-
-  const expandAll = () => {
-    const allFolderIds = categories.filter((cat) => cat.isFolder).map((cat) => cat.id);
-    setExpandedFolders(new Set(allFolderIds));
-  };
-
-  const collapseAll = () => {
-    setExpandedFolders(new Set());
-  };
-
-  const handleCategoryClick = (categoryId: string) => {
-    navigate('/expenses', { state: { filterCategoryId: categoryId } });
-  };
-
-  // Build hierarchical tree structure with spending data
-  const buildTreeData = () => {
-    const totalSpent = categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
-
-    // Create a map of category spending
-    const spendingMap = new Map(categoryBreakdown.map((item) => [item.categoryId, item]));
-
-    // Helper to calculate total spending for a category/folder (including children)
-    const calculateTotalSpending = (categoryId: string): { amount: number; count: number } => {
-      const directSpending = spendingMap.get(categoryId);
-      const children = categories.filter((cat) => cat.parentId === categoryId);
-
-      let totalAmount = directSpending?.amount || 0;
-      let totalCount = directSpending?.count || 0;
-
-      children.forEach((child) => {
-        const childTotal = calculateTotalSpending(child.id);
-        totalAmount += childTotal.amount;
-        totalCount += childTotal.count;
-      });
-
-      return { amount: totalAmount, count: totalCount };
-    };
-
-    // Build tree nodes
-    const buildNode = (category: any, level: number = 0): any => {
-      const spending = calculateTotalSpending(category.id);
-      const children = categories
-        .filter((cat) => cat.parentId === category.id)
-        .map((child) => buildNode(child, level + 1));
-
-      // Sort children based on sortBy
-      if (sortBy === 'amount') {
-        children.sort((a, b) => b.spending.amount - a.spending.amount);
-      } else if (sortBy === 'name') {
-        children.sort((a, b) => a.category.name.localeCompare(b.category.name));
-      } else if (sortBy === 'count') {
-        children.sort((a, b) => b.spending.count - a.spending.count);
-      }
-
-      return {
-        category,
-        spending,
-        percentage: totalSpent > 0 ? (spending.amount / totalSpent) * 100 : 0,
-        children,
-        level,
-      };
-    };
-
-    // Get root categories (no parent)
-    const roots = categories.filter((cat) => !cat.parentId).map((cat) => buildNode(cat));
-
-    // Sort roots
-    if (sortBy === 'amount') {
-      roots.sort((a, b) => b.spending.amount - a.spending.amount);
-    } else if (sortBy === 'name') {
-      roots.sort((a, b) => a.category.name.localeCompare(b.category.name));
-    } else if (sortBy === 'count') {
-      roots.sort((a, b) => b.spending.count - a.spending.count);
-    }
-
-    return roots;
-  };
-
-  const treeData = buildTreeData();
 
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
+        <CircularProgress size={60} />
       </Box>
     );
   }
 
   return (
-    <PullToRefresh onRefresh={fetchAnalytics}>
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box sx={{ 
-        width: '100%', 
-        overflow: 'hidden',
-        mx: { xs: -3, sm: -3, md: 0 },
-        px: { xs: 2, sm: 3, md: 0 }
-      }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-          <Typography variant="h4" fontWeight={700}>
-            📊 Analytics
-          </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
-            onClick={exportToCSV}
-            disabled={!overview}
-            size="small"
-          >
-            Export
-          </Button>
+    <Box>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box>
+            <Typography variant="h4" fontWeight={800} gutterBottom>
+              Analytics
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Detailed financial insights and trends
+            </Typography>
+          </Box>
+          <Tooltip title="Export to CSV">
+            <IconButton onClick={exportData} color="primary" size="large">
+              <Download />
+            </IconButton>
+          </Tooltip>
         </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
-        )}
-
-        <FilterBar
-          filters={filters}
-          onFiltersChange={setFilters}
-          accounts={accounts}
-          categories={categories}
-          tags={tags}
-          showTransactionType={false}
-        />
-
-        {/* Quick Date Filters */}
-        <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
-            Quick:
-          </Typography>
-          <Chip label="This Week" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().startOf('week'), end: dayjs().endOf('week'), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
-          <Chip label="This Month" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().startOf('month'), end: dayjs().endOf('month'), preset: 'thisMonth' } })} sx={{ cursor: 'pointer' }} />
-          <Chip label="Last 30 Days" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().subtract(30, 'days'), end: dayjs(), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
-          <Chip label="Last 3 Months" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().subtract(3, 'months'), end: dayjs(), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
-          <Chip label="This Year" size="small" onClick={() => setFilters({ ...filters, dateRange: { start: dayjs().startOf('year'), end: dayjs().endOf('year'), preset: 'custom' } })} sx={{ cursor: 'pointer' }} />
-        </Box>
-
-        {/* Tabs for different views */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs 
-            value={currentTab} 
-            onChange={(_, newValue) => setCurrentTab(newValue)}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-          >
-            <Tab label="Overview" />
-            <Tab label="Trends & Patterns" />
-            <Tab label="Budgets & Goals" />
-          </Tabs>
-        </Box>
-
-        {/* Overview Statistics with Comparison */}
-        {overview && overview.comparison && (
-          <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="textSecondary" variant="body2">
-                    Total Spent
-                  </Typography>
-                  <Typography variant="h5" fontWeight={600}>
-                    {formatCurrency(overview.totalSpent)}
-                  </Typography>
-                  {overview.comparison && (
-                    <Box display="flex" alignItems="center" gap={0.5} mt={1}>
-                      {overview.comparison.trend === 'up' ? (
-                        <TrendingUpIcon color="error" fontSize="small" />
-                      ) : overview.comparison.trend === 'down' ? (
-                        <TrendingDownIcon color="success" fontSize="small" />
-                      ) : null}
-                      <Typography
-                        variant="body2"
-                        color={
-                          overview.comparison.trend === 'up'
-                            ? 'error'
-                            : overview.comparison.trend === 'down'
-                            ? 'success'
-                            : 'textSecondary'
-                        }
-                      >
-                        {overview.comparison.changePercent > 0 ? '+' : ''}
-                        {overview.comparison.changePercent.toFixed(1)}% vs previous
-                      </Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="textSecondary" variant="body2">
-                    Budget Used
-                  </Typography>
-                  <Typography variant="h5" fontWeight={600}>
-                    {overview.budgetUsedPercent}%
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min(overview.budgetUsedPercent, 100)}
-                    color={overview.budgetUsedPercent > 100 ? 'error' : 'primary'}
-                    sx={{ mt: 1 }}
-                  />
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="textSecondary" variant="body2">
-                    Transactions
-                  </Typography>
-                  <Typography variant="h5" fontWeight={600}>
-                    {overview.expenseCount}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" mt={1}>
-                    Avg: {formatCurrency(overview.avgExpense)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="textSecondary" variant="body2">
-                    Budget Remaining
-                  </Typography>
-                  <Typography variant="h5" fontWeight={600}>
-                    {formatCurrency(overview.totalBudget - overview.totalSpent)}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" mt={1}>
-                    of {formatCurrency(overview.totalBudget)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        )}
-
-        {/* Tab Content */}
-        {currentTab === 0 && (
-          <>
-            {/* Smart Insights Section */}
-            {loadingCharts ? (
-              <Box sx={{ mb: 3 }}>
-                <Card>
-                  <CardContent>
-                    <Skeleton variant="text" width="30%" height={32} sx={{ mb: 2 }} />
-                    <Skeleton variant="rectangular" height={80} sx={{ mb: 2, borderRadius: 1 }} />
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={6}>
-                        <Skeleton variant="rectangular" height={150} sx={{ borderRadius: 1 }} />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Skeleton variant="rectangular" height={150} sx={{ borderRadius: 1 }} />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Box>
-            ) : (
-            smartInsights && (
-              <Grid container spacing={2} mb={3}>
-            {/* Overall Trend Alert */}
-            {smartInsights.overallTrend && (
-              <Grid item xs={12}>
-                <Alert
-                  severity={smartInsights.overallTrend.direction === 'up' ? 'warning' : 'success'}
-                  icon={
-                    smartInsights.overallTrend.direction === 'up' ? (
-                      <TrendingUpIcon />
-                    ) : (
-                      <TrendingDownIcon />
-                    )
-                  }
-                  sx={{ borderRadius: 2 }}
-                >
-                  <Typography variant="body2">
-                    <strong>Spending Trend:</strong> Your spending is{' '}
-                    <strong>
-                      {Math.abs(smartInsights.overallTrend.percentChange)}%{' '}
-                      {smartInsights.overallTrend.direction === 'up' ? 'higher' : 'lower'}
-                    </strong>{' '}
-                    compared to the previous period (
-                    {formatCurrency(smartInsights.overallTrend.previousTotal)} →{' '}
-                    {formatCurrency(smartInsights.overallTrend.currentTotal)})
-                  </Typography>
-                </Alert>
-              </Grid>
-            )}
-
-            {/* Over Budget Alerts */}
-            {smartInsights.overBudgetAlerts && smartInsights.overBudgetAlerts.length > 0 && (
-              <Grid item xs={12} md={6}>
-                <Card sx={{ borderLeft: '4px solid', borderColor: 'error.main' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
-                      <WarningIcon color="error" />
-                      <Typography variant="h6" fontWeight={600}>
-                        Over Budget ({smartInsights.overBudgetAlerts.length})
-                      </Typography>
-                    </Box>
-                    {smartInsights.overBudgetAlerts.map((alert, idx) => (
-                      <Box key={idx} mb={idx < smartInsights.overBudgetAlerts.length - 1 ? 2 : 0}>
-                        <Typography variant="body2" fontWeight={500}>
-                          {alert.categoryName}
-                        </Typography>
-                        <Typography variant="caption" color="error.main">
-                          {formatCurrency(alert.spent)} / {formatCurrency(alert.budgetAmount)}(
-                          {alert.percentOver}% over)
-                        </Typography>
-                      </Box>
-                    ))}
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Category Trends */}
-            {smartInsights.categoryTrends && smartInsights.categoryTrends.length > 0 && (
-              <Grid item xs={12}>
-                <Card sx={{ borderLeft: '4px solid', borderColor: 'info.main' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
-                      <LightbulbIcon color="info" />
-                      <Typography variant="h6" fontWeight={600}>
-                        Category Insights
-                      </Typography>
-                    </Box>
-                    <Grid container spacing={2}>
-                      {smartInsights.categoryTrends.map((trend, idx) => (
-                        <Grid item xs={12} sm={6} md={4} key={idx}>
-                          <Box
-                            p={1.5}
-                            borderRadius={1}
-                            bgcolor={
-                              trend.trend === 'increasing' ? 'error.lighter' : 'success.lighter'
-                            }
-                            sx={{
-                              bgcolor:
-                                trend.trend === 'increasing'
-                                  ? 'rgba(211, 47, 47, 0.08)'
-                                  : 'rgba(46, 125, 50, 0.08)',
-                            }}
-                          >
-                            <Typography variant="body2" fontWeight={500}>
-                              {trend.categoryName}
-                            </Typography>
-                            <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
-                              {trend.trend === 'increasing' ? (
-                                <TrendingUpIcon fontSize="small" color="error" />
-                              ) : (
-                                <TrendingDownIcon fontSize="small" color="success" />
-                              )}
-                              <Typography
-                                variant="caption"
-                                color={trend.trend === 'increasing' ? 'error.main' : 'success.main'}
-                                fontWeight={600}
-                              >
-                                {Math.abs(trend.percentChange)}% {trend.trend}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Folder Trends */}
-            {smartInsights.folderTrends && smartInsights.folderTrends.length > 0 && (
-              <Grid item xs={12}>
-                <Card sx={{ borderLeft: '4px solid', borderColor: 'primary.main' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
-                      <FolderIcon color="primary" />
-                      <Typography variant="h6" fontWeight={600}>
-                        Folder Spending Trends
-                      </Typography>
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" mb={2} display="block">
-                      High-level spending patterns across your folder structure
-                    </Typography>
-                    <Grid container spacing={2}>
-                      {smartInsights.folderTrends.map((trend, idx) => (
-                        <Grid item xs={12} sm={6} md={4} key={idx}>
-                          <Box
-                            p={2}
-                            borderRadius={2}
-                            sx={{
-                              bgcolor:
-                                trend.trend === 'increasing'
-                                  ? 'rgba(211, 47, 47, 0.08)'
-                                  : 'rgba(46, 125, 50, 0.08)',
-                              border: '1px solid',
-                              borderColor:
-                                trend.trend === 'increasing'
-                                  ? 'rgba(211, 47, 47, 0.2)'
-                                  : 'rgba(46, 125, 50, 0.2)',
-                            }}
-                          >
-                            <Box display="flex" alignItems="center" gap={1} mb={1}>
-                              <Box
-                                width={16}
-                                height={16}
-                                borderRadius="50%"
-                                bgcolor={trend.categoryColor}
-                                flexShrink={0}
-                              />
-                              <Typography variant="body2" fontWeight={600}>
-                                {trend.folderName} 📁
-                              </Typography>
-                            </Box>
-                            <Box display="flex" alignItems="center" justifyContent="space-between">
-                              <Box display="flex" alignItems="center" gap={0.5}>
-                                {trend.trend === 'increasing' ? (
-                                  <TrendingUpIcon fontSize="small" color="error" />
-                                ) : (
-                                  <TrendingDownIcon fontSize="small" color="success" />
-                                )}
-                                <Typography
-                                  variant="body2"
-                                  color={
-                                    trend.trend === 'increasing' ? 'error.main' : 'success.main'
-                                  }
-                                  fontWeight={700}
-                                >
-                                  {Math.abs(trend.percentChange)}%
-                                </Typography>
-                              </Box>
-                              <Typography variant="caption" color="text.secondary">
-                                {formatCurrency(trend.currentAmount)}
-                              </Typography>
-                            </Box>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              mt={0.5}
-                              display="block"
-                            >
-                              Previous: {formatCurrency(trend.previousAmount)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Unusual Expenses */}
-            {smartInsights.unusualExpenses && smartInsights.unusualExpenses.length > 0 && (
-              <Grid item xs={12}>
-                <Card sx={{ borderLeft: '4px solid', borderColor: 'warning.main' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
-                      <WarningIcon color="warning" />
-                      <Typography variant="h6" fontWeight={600}>
-                        Unusual Expenses
-                      </Typography>
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" mb={2} display="block">
-                      These expenses are significantly higher than your average
-                    </Typography>
-                    {smartInsights.unusualExpenses.map((expense, idx) => (
-                      <Box
-                        key={idx}
-                        display="flex"
-                        justifyContent="space-between"
-                        py={1}
-                        borderBottom={
-                          idx < smartInsights.unusualExpenses.length - 1 ? '1px solid' : 'none'
-                        }
-                        borderColor="divider"
-                      >
-                        <Box>
-                          <Typography variant="body2" fontWeight={500}>
-                            {expense.description}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(expense.date).toLocaleDateString()} • {expense.timesAverage}x
-                            average
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" fontWeight={600} color="warning.main">
-                          {formatCurrency(expense.amount)}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-            )
-        )}
-
-        {/* Overview Stats */}
-        <Grid container spacing={3} mb={3}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Total Spent
-                    </Typography>
-                    <Typography variant="h4" fontWeight={700} mt={1}>
-                      {formatCurrency(overview?.totalSpent || 0)}
-                    </Typography>
-                  </Box>
-                  <TrendingUpIcon />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                color: 'white',
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Total Budget
-                    </Typography>
-                    <Typography variant="h4" fontWeight={700} mt={1}>
-                      {formatCurrency(overview?.totalBudget || 0)}
-                    </Typography>
-                  </Box>
-                  <AccountBalanceIcon />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                color: 'white',
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Expenses
-                    </Typography>
-                    <Typography variant="h4" fontWeight={700} mt={1}>
-                      {overview?.expenseCount || 0}
-                    </Typography>
-                  </Box>
-                  <ReceiptIcon />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-                color: 'white',
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Avg Expense
-                    </Typography>
-                    <Typography variant="h4" fontWeight={700} mt={1}>
-                      {formatCurrency(overview?.avgExpense || 0)}
-                    </Typography>
-                  </Box>
-                  <TrendingDownIcon />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Spending Heatmap */}
-        {!loadingCharts && topExpenses.length > 0 && (
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight={600} mb={1}>
-                📅 Daily Spending Activity
-              </Typography>
-              <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                Visualize your spending patterns across the selected period
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                {(() => {
-                  const daysData = new Map<string, number>();
-                  topExpenses.forEach((exp) => {
-                    const key = dayjs(exp.date).format('YYYY-MM-DD');
-                    daysData.set(key, (daysData.get(key) || 0) + exp.amount);
-                  });
-                  
-                  const maxAmount = Math.max(...Array.from(daysData.values()), 1);
-                  const start = filters.dateRange.start;
-                  const end = filters.dateRange.end;
-                  const days = end.diff(start, 'day') + 1;
-                  const weeks: Array<Array<{ date: dayjs.Dayjs; amount: number; bgColor: string; key: string }>> = [];
-                  
-                  for (let i = 0; i < days; i++) {
-                    const date = start.add(i, 'day');
-                    const key = date.format('YYYY-MM-DD');
-                    const amount = daysData.get(key) || 0;
-                    const intensity = amount / maxAmount;
-                    
-                    let bgColor = '#ebedf0';
-                    if (intensity > 0.75) bgColor = '#d32f2f';
-                    else if (intensity > 0.5) bgColor = '#f57c00';
-                    else if (intensity > 0.25) bgColor = '#fbc02d';
-                    else if (intensity > 0) bgColor = '#9e9e9e';
-                    
-                    const weekIndex = Math.floor(i / 7);
-                    if (!weeks[weekIndex]) weeks[weekIndex] = [];
-                    weeks[weekIndex].push({ date, amount, bgColor, key });
-                  }
-                  
-                  return weeks.map((week, wIdx) => (
-                    <Box key={wIdx} display="flex" gap={0.5}>
-                      {week.map((day) => (
-                        <Tooltip key={day.key} title={`${day.date.format('MMM D')}: ${formatCurrency(day.amount)}`} arrow>
-                          <Box
-                            sx={{
-                              width: 'calc((100% - 24px) / 7)',
-                              aspectRatio: '1',
-                              bgcolor: day.bgColor,
-                              borderRadius: 0.5,
-                              cursor: 'pointer',
-                              transition: 'transform 0.2s',
-                              '&:hover': { transform: 'scale(1.15)', boxShadow: 1 },
-                            }}
-                          />
-                        </Tooltip>
-                      ))}
-                    </Box>
-                  ));
-                })()}
-              </Box>
-              <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1} mt={2}>
-                <Typography variant="caption" color="text.secondary">Less</Typography>
-                {['#ebedf0', '#9e9e9e', '#fbc02d', '#f57c00', '#d32f2f'].map((color, idx) => (
-                  <Box key={idx} sx={{ width: 16, height: 16, bgcolor: color, borderRadius: 0.5 }} />
+        {/* Date Range Filter */}
+        <Paper sx={{ p: 3, borderRadius: 3 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <TextField
+                select
+                fullWidth
+                label="Date Range"
+                value={dateRangeType}
+                onChange={(e) => setDateRangeType(e.target.value)}
+                size="small"
+              >
+                {DATE_RANGES.map((range) => (
+                  <MenuItem key={range.value} value={range.value}>
+                    {range.label}
+                  </MenuItem>
                 ))}
-                <Typography variant="caption" color="text.secondary">More</Typography>
-              </Box>
+              </TextField>
+            </Grid>
+            {dateRangeType === 'custom' && (
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <Grid item xs={12} md={4}>
+                  <DatePicker
+                    label="Start Date"
+                    value={startDate}
+                    onChange={(newValue) => setStartDate(newValue)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <DatePicker
+                    label="End Date"
+                    value={endDate}
+                    onChange={(newValue) => setEndDate(newValue)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+              </LocalizationProvider>
+            )}
+          </Grid>
+        </Paper>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Summary Cards */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Total Income
+              </Typography>
+              <Typography variant="h5" fontWeight={700} color="success.main">
+                {formatCurrency(summaryStats.income)}
+              </Typography>
             </CardContent>
           </Card>
-        )}
-
-        {/* Charts */}
-        <Grid container spacing={{ xs: 2, sm: 3 }}>
-          {/* Category Breakdown Pie Chart */}
-          <Grid item xs={12} md={6}>
-            <Card
-              sx={{
-                background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'rgba(255, 255, 255, 0.9)'
-                    : 'rgba(30, 30, 30, 0.9)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 2,
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6" fontWeight={600}>
-                    Spending by {viewMode === 'folder' ? 'Folder' : 'Category'}
-                  </Typography>
-                  <ToggleButtonGroup
-                    value={viewMode}
-                    exclusive
-                    onChange={(_, newMode) => {
-                      if (newMode !== null) {
-                        setViewMode(newMode);
-                      }
-                    }}
-                    size="small"
-                    sx={{ height: 32 }}
-                  >
-                    <ToggleButton value="category">
-                      <Tooltip title="View by individual categories">
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          <CategoryIcon fontSize="small" />
-                          <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'inline' } }}>Categories</Typography>
-                        </Box>
-                      </Tooltip>
-                    </ToggleButton>
-                    <ToggleButton value="folder">
-                      <Tooltip title="View grouped by folders">
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          <FolderIcon fontSize="small" />
-                          <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'inline' } }}>Folders</Typography>
-                        </Box>
-                      </Tooltip>
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-                </Box>
-                {(viewMode === 'category' ? categoryBreakdown : folderBreakdown).length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={viewMode === 'category' ? categoryBreakdown : folderBreakdown}
-                          dataKey="amount"
-                          nameKey="categoryName"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          label={(entry) => `${entry.percentage}%`}
-                        >
-                          {(viewMode === 'category' ? categoryBreakdown : folderBreakdown).map(
-                            (entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.categoryColor} />
-                            )
-                          )}
-                        </Pie>
-                        <RechartsTooltip
-                          formatter={(value: number) => formatCurrency(value)}
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            padding: '8px',
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <Box mt={2}>
-                      {(viewMode === 'category' ? categoryBreakdown : folderBreakdown).map(
-                        (cat, index) => (
-                          <Box
-                            key={cat.categoryId}
-                            display="flex"
-                            justifyContent="space-between"
-                            alignItems="center"
-                            py={1}
-                            borderBottom={
-                              index <
-                              (viewMode === 'category' ? categoryBreakdown : folderBreakdown)
-                                .length -
-                                1
-                                ? '1px solid'
-                                : 'none'
-                            }
-                            borderColor="divider"
-                          >
-                            <Box display="flex" alignItems="center" gap={1} minWidth={0} flex={1} sx={{ overflow: 'hidden' }}>
-                              <Box
-                                width={12}
-                                height={12}
-                                borderRadius="50%"
-                                bgcolor={cat.categoryColor}
-                                flexShrink={0}
-                              />
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {viewMode === 'folder' ? cat.categoryName : cat.path.join(' > ')}{' '}
-                                {cat.isFolder && '📁'}
-                              </Typography>
-                            </Box>
-                            <Box textAlign="right" flexShrink={0}>
-                              <Typography variant="body2" fontWeight={600} noWrap>
-                                {formatCurrency(cat.amount)}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" noWrap>
-                                {cat.count} expenses · {cat.percentage}%
-                              </Typography>
-                            </Box>
-                          </Box>
-                        )
-                      )}
-                    </Box>
-                  </>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">
-                      No data available for this period
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Spending Trends Line Chart */}
-          <Grid item xs={12} md={6}>
-            <Card
-              sx={{
-                background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'rgba(255, 255, 255, 0.9)'
-                    : 'rgba(30, 30, 30, 0.9)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 2,
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6" fontWeight={600}>
-                    Spending Trends
-                  </Typography>
-                  <TextField
-                    select
-                    size="small"
-                    value={trendGroupBy}
-                    onChange={(e) => setTrendGroupBy(e.target.value as 'day' | 'week' | 'month')}
-                    sx={{ minWidth: 120 }}
-                  >
-                    <MenuItem value="day">Daily</MenuItem>
-                    <MenuItem value="week">Weekly</MenuItem>
-                    <MenuItem value="month">Monthly</MenuItem>
-                  </TextField>
-                </Box>
-                {trends.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={trends}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tickFormatter={formatDate} />
-                      <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                      <RechartsTooltip
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={formatDate}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="amount"
-                        stroke="#667eea"
-                        strokeWidth={2}
-                        dot={{ fill: '#667eea' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">
-                      No data available for this period
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Budget vs Actual Bar Chart */}
-          <Grid item xs={12}>
-            <Card
-              sx={{
-                background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'rgba(255, 255, 255, 0.9)'
-                    : 'rgba(30, 30, 30, 0.9)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 2,
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-              }}
-            >
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} mb={2}>
-                  Budget vs Actual Spending
-                </Typography>
-                {budgetComparison.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={budgetComparison}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="categoryName" tick={{ fontSize: 12 }} />
-                        <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                        <RechartsTooltip
-                          formatter={(value: number) => formatCurrency(value)}
-                          content={({ active, payload }: any) => {
-                            if (active && payload && payload.length) {
-                              const data = payload[0].payload;
-                              return (
-                                <Box
-                                  sx={{
-                                    bgcolor: 'background.paper',
-                                    p: 1.5,
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    borderRadius: 1,
-                                  }}
-                                >
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {data.categoryName} {data.isFolder && '📁'}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Budget: {formatCurrency(data.budgetAmount)}
-                                  </Typography>
-                                  <br />
-                                  <Typography variant="caption" color="text.secondary">
-                                    Spent: {formatCurrency(data.actualSpent)} ({data.percentUsed}%)
-                                  </Typography>
-                                </Box>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Legend />
-                        <Bar dataKey="budgetAmount" fill="#667eea" name="Budget" />
-                        <Bar dataKey="actualSpent" fill="#f5576c" name="Actual" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <Box mt={2}>
-                      {budgetComparison.map((budget, index) => (
-                        <Box
-                          key={budget.categoryId}
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          py={1}
-                          borderBottom={index < budgetComparison.length - 1 ? '1px solid' : 'none'}
-                          borderColor="divider"
-                        >
-                          <Box minWidth={0} flex={1}>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {budget.categoryName} {budget.isFolder && '📁'}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {budget.percentUsed}% used
-                            </Typography>
-                          </Box>
-                          <Box textAlign="right" flexShrink={0}>
-                            <Typography
-                              variant="body2"
-                              fontWeight={600}
-                              color={budget.isOverBudget ? 'error.main' : 'success.main'}
-                              noWrap
-                            >
-                              {formatCurrency(budget.actualSpent)} /{' '}
-                              {formatCurrency(budget.budgetAmount)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {budget.isOverBudget ? 'Over by ' : 'Remaining '}
-                              {formatCurrency(Math.abs(budget.difference))}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                  </>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">No budgets set for this period</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Top Expenses */}
-          <Grid item xs={12}>
-            <Card
-              sx={{
-                background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'rgba(255, 255, 255, 0.9)'
-                    : 'rgba(30, 30, 30, 0.9)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 2,
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-              }}
-            >
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} mb={2}>
-                  Top Expenses
-                </Typography>
-                {topExpenses.length > 0 ? (
-                  <Box>
-                    {topExpenses.map((expense, index) => (
-                      <Box
-                        key={expense.id}
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        py={1.5}
-                        borderBottom={index < topExpenses.length - 1 ? '1px solid' : 'none'}
-                        borderColor="divider"
-                      >
-                        <Box display="flex" alignItems="center" gap={2} minWidth={0} flex={1}>
-                          <Typography
-                            variant="h6"
-                            color="text.secondary"
-                            fontWeight={600}
-                            flexShrink={0}
-                          >
-                            #{index + 1}
-                          </Typography>
-                          <Box minWidth={0} flex={1}>
-                            <Typography
-                              variant="body1"
-                              fontWeight={500}
-                              sx={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {expense.description}
-                            </Typography>
-                            <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
-                              <Chip
-                                label={expense.categoryName}
-                                size="small"
-                                sx={{
-                                  bgcolor: expense.categoryColor + '20',
-                                  color: expense.categoryColor,
-                                  maxWidth: '200px',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                }}
-                              />
-                              <Typography variant="caption" color="text.secondary" noWrap>
-                                {formatDate(expense.date)}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Box>
-                        <Typography
-                          variant="h6"
-                          fontWeight={700}
-                          color="error.main"
-                          flexShrink={0}
-                          noWrap
-                        >
-                          {formatCurrency(expense.amount)}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">No expenses for this period</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Account Cash Flow Breakdown */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} mb={3}>
-                  Account Cash Flow
-                </Typography>
-                {accountBreakdown.length > 0 ? (
-                  <Box>
-                    {accountBreakdown.map((account, index) => (
-                      <Box
-                        key={account.accountId}
-                        py={2}
-                        borderBottom={index < accountBreakdown.length - 1 ? '1px solid' : 'none'}
-                        borderColor="divider"
-                      >
-                        <Box
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          mb={1}
-                        >
-                          <Typography variant="body1" fontWeight={600}>
-                            {account.accountName}
-                          </Typography>
-                          <Chip
-                            label={account.accountType}
-                            size="small"
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                        </Box>
-                        <Box display="flex" justifyContent="space-between" mb={1}>
-                          <Typography variant="body2" color="success.main">
-                            ↑ Credits: {formatCurrency(account.credits)}
-                          </Typography>
-                          <Typography variant="body2" color="error.main">
-                            ↓ Debits: {formatCurrency(account.debits)}
-                          </Typography>
-                        </Box>
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <Typography variant="caption" color="text.secondary">
-                            {account.transactionCount} transactions
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            fontWeight={700}
-                            color={account.netFlow >= 0 ? 'success.main' : 'error.main'}
-                          >
-                            Net: {account.netFlow >= 0 ? '+' : ''}
-                            {formatCurrency(account.netFlow)}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">No account data available</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Recurring Transaction Insights */}
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} mb={3}>
-                  Recurring Transaction Insights
-                </Typography>
-                {recurringInsights ? (
-                  <Grid container spacing={3}>
-                    {/* Overview Cards */}
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Box
-                        textAlign="center"
-                        p={2}
-                        bgcolor="rgba(102, 126, 234, 0.08)"
-                        borderRadius={2}
-                      >
-                        <Typography variant="h4" fontWeight={700} color="primary">
-                          {recurringInsights.totalRecurringTemplates}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" mt={1}>
-                          Active Templates
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Box
-                        textAlign="center"
-                        p={2}
-                        bgcolor="rgba(244, 67, 54, 0.08)"
-                        borderRadius={2}
-                      >
-                        <Typography variant="h4" fontWeight={700} color="error.main">
-                          {formatCurrency(recurringInsights.monthlyRecurringCost)}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" mt={1}>
-                          Monthly Cost
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Box
-                        textAlign="center"
-                        p={2}
-                        bgcolor="rgba(76, 175, 80, 0.08)"
-                        borderRadius={2}
-                      >
-                        <Typography variant="h4" fontWeight={700} color="success.main">
-                          {recurringInsights.upcomingThisMonth}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" mt={1}>
-                          Due This Month
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Box
-                        textAlign="center"
-                        p={2}
-                        bgcolor="rgba(255, 152, 0, 0.08)"
-                        borderRadius={2}
-                      >
-                        <Typography variant="h4" fontWeight={700} color="warning.main">
-                          {recurringInsights.recurringVsOneTime.recurringPercentage}%
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" mt={1}>
-                          Recurring Ratio
-                        </Typography>
-                      </Box>
-                    </Grid>
-
-                    {/* Frequency Breakdown */}
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="body1" fontWeight={600} mb={2}>
-                        By Frequency
-                      </Typography>
-                      {recurringInsights.byFrequency.map((freq, idx) => (
-                        <Box
-                          key={idx}
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          py={1.5}
-                          borderBottom={
-                            idx < recurringInsights.byFrequency.length - 1 ? '1px solid' : 'none'
-                          }
-                          borderColor="divider"
-                        >
-                          <Box>
-                            <Typography
-                              variant="body2"
-                              fontWeight={600}
-                              sx={{ textTransform: 'capitalize' }}
-                            >
-                              {freq.frequency}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {freq.count} {freq.count === 1 ? 'transaction' : 'transactions'}
-                            </Typography>
-                          </Box>
-                          <Typography variant="body2" fontWeight={700}>
-                            {formatCurrency(freq.totalAmount)}/mo
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Grid>
-
-                    {/* Recurring vs One-Time */}
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="body1" fontWeight={600} mb={2}>
-                        Spending Composition
-                      </Typography>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <PieChart>
-                          <Pie
-                            data={[
-                              {
-                                name: 'Recurring',
-                                value: recurringInsights.recurringVsOneTime.recurringAmount,
-                                color: '#667eea',
-                              },
-                              {
-                                name: 'One-Time',
-                                value: recurringInsights.recurringVsOneTime.oneTimeAmount,
-                                color: '#43e97b',
-                              },
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={80}
-                            dataKey="value"
-                          >
-                            <Cell fill="#667eea" />
-                            <Cell fill="#43e97b" />
-                          </Pie>
-                          <RechartsTooltip formatter={(value: any) => formatCurrency(value)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </Grid>
-                  </Grid>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">
-                      No recurring transaction data available
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Tag-Based Analytics */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} mb={3}>
-                  Spending by Tags
-                </Typography>
-                {tagBreakdown.length > 0 ? (
-                  <Box>
-                    {tagBreakdown.map((tag, index) => (
-                      <Box
-                        key={index}
-                        py={1.5}
-                        borderBottom={index < tagBreakdown.length - 1 ? '1px solid' : 'none'}
-                        borderColor="divider"
-                      >
-                        <Box
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          mb={0.5}
-                        >
-                          <Typography variant="body2" fontWeight={600}>
-                            #{tag.tag}
-                          </Typography>
-                          <Typography variant="body2" fontWeight={700}>
-                            {formatCurrency(tag.amount)}
-                          </Typography>
-                        </Box>
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <LinearProgress
-                            variant="determinate"
-                            value={tag.percentage}
-                            sx={{
-                              width: '70%',
-                              height: 6,
-                              borderRadius: 1,
-                              bgcolor: 'rgba(0,0,0,0.05)',
-                              '& .MuiLinearProgress-bar': {
-                                borderRadius: 1,
-                                bgcolor: '#667eea',
-                              },
-                            }}
-                          />
-                          <Typography variant="caption" color="text.secondary">
-                            {tag.count} txns · {tag.percentage}%
-                          </Typography>
-                        </Box>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">No tagged transactions</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Payment Method Breakdown - REMOVED */}
-          {/* Top Merchants */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} mb={3}>
-                  Top Merchants
-                </Typography>
-                {topMerchants.length > 0 ? (
-                  <Box>
-                    {topMerchants.map((merchant, index) => (
-                      <Box
-                        key={merchant.merchantName}
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        py={1.5}
-                        borderBottom={index < topMerchants.length - 1 ? '1px solid' : 'none'}
-                        borderColor="divider"
-                      >
-                        <Box display="flex" alignItems="center" gap={2} minWidth={0} flex={1}>
-                          <Typography
-                            variant="h6"
-                            color="text.secondary"
-                            fontWeight={600}
-                            flexShrink={0}
-                          >
-                            #{index + 1}
-                          </Typography>
-                          <Box minWidth={0} flex={1}>
-                            <Typography
-                              variant="body1"
-                              fontWeight={500}
-                              sx={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {merchant.merchantName}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {merchant.count} transactions · {merchant.percentage}% of total
-                            </Typography>
-                          </Box>
-                        </Box>
-                        <Typography
-                          variant="h6"
-                          fontWeight={700}
-                          color="primary.main"
-                          flexShrink={0}
-                          noWrap
-                        >
-                          {formatCurrency(merchant.amount)}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">No merchant data available</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Folder Structure Tree View */}
-          <Grid item xs={12}>
-            <Card
-              sx={{
-                background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'rgba(255, 255, 255, 0.9)'
-                    : 'rgba(30, 30, 30, 0.9)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 2,
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-              }}
-            >
-              <CardContent>
-                <Box
-                  display="flex"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  mb={3}
-                  flexWrap="wrap"
-                  gap={2}
-                >
-                  <Box>
-                    <Typography variant="h6" fontWeight={600}>
-                      Folder Structure Analysis
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Hierarchical view of your spending by categories and folders
-                    </Typography>
-                  </Box>
-                  <Box display="flex" gap={1} flexWrap="wrap">
-                    <TextField
-                      select
-                      size="small"
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as 'amount' | 'name' | 'count')}
-                      sx={{ minWidth: 140 }}
-                      label="Sort by"
-                    >
-                      <MenuItem value="amount">Amount</MenuItem>
-                      <MenuItem value="name">Name</MenuItem>
-                      <MenuItem value="count">Expense Count</MenuItem>
-                    </TextField>
-                    <Button
-                      size="small"
-                      startIcon={<UnfoldMoreIcon />}
-                      onClick={expandAll}
-                      variant="outlined"
-                    >
-                      Expand All
-                    </Button>
-                    <Button
-                      size="small"
-                      startIcon={<UnfoldLessIcon />}
-                      onClick={collapseAll}
-                      variant="outlined"
-                    >
-                      Collapse All
-                    </Button>
-                  </Box>
-                </Box>
-
-                {treeData.length > 0 ? (
-                  <List disablePadding>{treeData.map((node) => renderTreeNode(node))}</List>
-                ) : (
-                  <Box textAlign="center" py={6}>
-                    <Typography color="text.secondary">
-                      No spending data available for this period
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
         </Grid>
-          </>
-        )}
-
-        {/* Tab 1: Trends & Patterns */}
-        {currentTab === 1 && (
-          <Grid container spacing={3}>
-            {/* Spending Trend Line Chart */}
-            <Grid item xs={12}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="h6" fontWeight={600}>
-                      Spending Trend Over Time
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={trendGroupBy}
-                      exclusive
-                      onChange={(_, value) => value && setTrendGroupBy(value)}
-                      size="small"
-                    >
-                      <ToggleButton value="day">Daily</ToggleButton>
-                      <ToggleButton value="week">Weekly</ToggleButton>
-                      <ToggleButton value="month">Monthly</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-                  {trends.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={trends}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          tickFormatter={(date) => formatDate(date)}
-                          style={{ fontSize: '12px' }}
-                        />
-                        <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                        <RechartsTooltip
-                          formatter={(value: any) => [formatCurrency(value), 'Amount']}
-                          labelFormatter={(label) => formatDate(label)}
-                        />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="amount"
-                          stroke="#667eea"
-                          strokeWidth={2}
-                          dot={{ fill: '#667eea', r: 4 }}
-                          name="Spending"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <Box textAlign="center" py={6}>
-                      <Typography color="textSecondary">No trend data available</Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Day of Week Analysis */}
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight={600} mb={2}>
-                    Spending by Day of Week
-                  </Typography>
-                  {(() => {
-                    // Calculate day of week spending
-                    const dayOfWeekData = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
-                      (day, index) => {
-                        const dayTransactions = topExpenses.filter((exp) => {
-                          const expDate = new Date(exp.date);
-                          return expDate.getDay() === index;
-                        });
-                        const total = dayTransactions.reduce((sum, exp) => sum + exp.amount, 0);
-                        return { day, amount: total, count: dayTransactions.length };
-                      }
-                    );
-
-                    return dayOfWeekData.some((d) => d.amount > 0) ? (
-                      <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={dayOfWeekData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="day" />
-                          <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                          <RechartsTooltip
-                            formatter={(value: any) => [formatCurrency(value), 'Amount']}
-                          />
-                          <Bar dataKey="amount" fill="#667eea" radius={[8, 8, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <Box textAlign="center" py={4}>
-                        <Typography color="textSecondary">
-                          Not enough data for day of week analysis
-                        </Typography>
-                      </Box>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Category Trend */}
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight={600} mb={2}>
-                    Top Category Growth
-                  </Typography>
-                  {categoryBreakdown.length > 0 ? (
-                    <Box>
-                      {categoryBreakdown.slice(0, 5).map((cat, index) => (
-                        <Box
-                          key={cat.categoryId}
-                          mb={2}
-                          pb={index < 4 ? 2 : 0}
-                          borderBottom={index < 4 ? '1px solid' : 'none'}
-                          borderColor="divider"
-                        >
-                          <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Box
-                                width={12}
-                                height={12}
-                                borderRadius="50%"
-                                bgcolor={cat.categoryColor}
-                              />
-                              <Typography variant="body2" fontWeight={500}>
-                                {cat.categoryName}
-                              </Typography>
-                            </Box>
-                            <Typography variant="body2" fontWeight={700}>
-                              {formatCurrency(cat.amount)}
-                            </Typography>
-                          </Box>
-                          <Box mt={1}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={cat.percentage}
-                              sx={{
-                                height: 6,
-                                borderRadius: 3,
-                                '& .MuiLinearProgress-bar': {
-                                  backgroundColor: cat.categoryColor,
-                                },
-                              }}
-                            />
-                            <Typography variant="caption" color="textSecondary" mt={0.5}>
-                              {cat.percentage.toFixed(1)}% of total · {cat.count} transactions
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                  ) : (
-                    <Box textAlign="center" py={4}>
-                      <Typography color="textSecondary">No category data available</Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Average Daily Spending */}
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography color="textSecondary" variant="body2" mb={1}>
-                    Average Daily Spending
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700} color="primary">
-                    {overview
-                      ? formatCurrency(
-                          overview.totalSpent /
-                            Math.max(
-                              1,
-                              filters.dateRange.end.diff(filters.dateRange.start, 'days') + 1
-                            )
-                        )
-                      : formatCurrency(0)}
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary" mt={1}>
-                    Based on {filters.dateRange.end.diff(filters.dateRange.start, 'days') + 1} days
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Highest Spending Day */}
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography color="textSecondary" variant="body2" mb={1}>
-                    Highest Spending Day
-                  </Typography>
-                  {trends.length > 0 ? (
-                    <>
-                      <Typography variant="h4" fontWeight={700} color="error">
-                        {formatCurrency(Math.max(...trends.map((t) => t.amount)))}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary" mt={1}>
-                        {formatDate(
-                          trends.find((t) => t.amount === Math.max(...trends.map((d) => d.amount)))
-                            ?.date || ''
-                        )}
-                      </Typography>
-                    </>
-                  ) : (
-                    <Typography variant="body2" color="textSecondary">
-                      No data
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Most Active Category */}
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography color="textSecondary" variant="body2" mb={1}>
-                    Most Active Category
-                  </Typography>
-                  {categoryBreakdown.length > 0 ? (
-                    <>
-                      <Typography variant="h6" fontWeight={700} noWrap>
-                        {categoryBreakdown[0].categoryName}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary" mt={1}>
-                        {categoryBreakdown[0].count} transactions ·{' '}
-                        {categoryBreakdown[0].percentage.toFixed(1)}%
-                      </Typography>
-                    </>
-                  ) : (
-                    <Typography variant="body2" color="textSecondary">
-                      No data
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        )}
-
-        {/* Tab 2: Budgets & Goals */}
-        {currentTab === 2 && (
-          <Grid container spacing={3}>
-            {/* Budget Overview Summary */}
-            <Grid item xs={12}>
-              <Card
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                }}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Total Expenses
+              </Typography>
+              <Typography variant="h5" fontWeight={700} color="error.main">
+                {formatCurrency(summaryStats.expenses)}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Net Savings
+              </Typography>
+              <Typography
+                variant="h5"
+                fontWeight={700}
+                color={summaryStats.net >= 0 ? 'success.main' : 'error.main'}
               >
-                <CardContent>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={4}>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Total Budget
-                      </Typography>
-                      <Typography variant="h4" fontWeight={700}>
-                        {overview ? formatCurrency(overview.totalBudget) : formatCurrency(0)}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Total Spent
-                      </Typography>
-                      <Typography variant="h4" fontWeight={700}>
-                        {overview ? formatCurrency(overview.totalSpent) : formatCurrency(0)}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Remaining
-                      </Typography>
-                      <Typography variant="h4" fontWeight={700}>
-                        {overview
-                          ? formatCurrency(overview.totalBudget - overview.totalSpent)
-                          : formatCurrency(0)}
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={overview ? Math.min(overview.budgetUsedPercent, 100) : 0}
-                        sx={{
-                          mt: 1,
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: 'rgba(255,255,255,0.3)',
-                          '& .MuiLinearProgress-bar': {
-                            backgroundColor: 'white',
-                          },
-                        }}
+                {formatCurrency(summaryStats.net)}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Avg Daily Spending
+              </Typography>
+              <Typography variant="h5" fontWeight={700}>
+                {formatCurrency(summaryStats.avgDailySpending)}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* 1. Income vs Expense Trend */}
+      <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={3}>
+          <TrendingUp color="primary" />
+          <Typography variant="h6" fontWeight={700}>
+            Income vs Expenses Over Time
+          </Typography>
+        </Box>
+        {incomeExpenseData.length > 0 ? (
+          <ResponsiveChart>
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={incomeExpenseData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                <XAxis dataKey="month" stroke="#666" />
+                <YAxis stroke="#666" />
+                <RechartsTooltip
+                  formatter={(value: number) => formatCurrency(value)}
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: '1px solid rgba(0,0,0,0.1)',
+                  }}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="income"
+                  stroke={COLORS.success}
+                  strokeWidth={3}
+                  name="Income"
+                  dot={{ fill: COLORS.success, r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="expenses"
+                  stroke={COLORS.error}
+                  strokeWidth={3}
+                  name="Expenses"
+                  dot={{ fill: COLORS.error, r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  stroke={COLORS.primary}
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="Net"
+                  dot={{ fill: COLORS.primary, r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </ResponsiveChart>
+        ) : (
+          <Box textAlign="center" py={6}>
+            <Typography color="text.secondary">No data available</Typography>
+          </Box>
+        )}
+      </Paper>
+
+      {/* 2 & 3: Category Breakdown and Daily Spending */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {/* Category Breakdown Pie */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, borderRadius: 3, height: '100%' }}>
+            <Box display="flex" alignItems="center" gap={1} mb={3}>
+              <CategoryIcon color="primary" />
+              <Typography variant="h6" fontWeight={700}>
+                Spending by Category
+              </Typography>
+            </Box>
+            {categoryBreakdown.length > 0 ? (
+              <>
+                <ResponsiveChart>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={categoryBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={(entry) => `${entry.percentage.toFixed(0)}%`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {categoryBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ResponsiveChart>
+                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {categoryBreakdown.slice(0, 5).map((cat) => (
+                    <Box key={cat.name} display="flex" alignItems="center" gap={1}>
+                      <Box
+                        sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: cat.color }}
                       />
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Budget vs Actual Comparison */}
-            <Grid item xs={12}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight={600} mb={3}>
-                    Budget vs Actual by Category
-                  </Typography>
-                  {budgetComparison.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart
-                        data={budgetComparison}
-                        layout="horizontal"
-                        margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
-                        <YAxis type="category" dataKey="categoryName" width={90} />
-                        <RechartsTooltip
-                          formatter={(value: any) => [formatCurrency(value), '']}
-                          contentStyle={{ fontSize: '14px' }}
-                        />
-                        <Legend />
-                        <Bar
-                          dataKey="budgetAmount"
-                          fill="#90caf9"
-                          name="Budget"
-                          radius={[0, 4, 4, 0]}
-                        />
-                        <Bar dataKey="spent" fill="#667eea" name="Spent" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <Box textAlign="center" py={6}>
-                      <Typography color="textSecondary">
-                        No budgets configured. Create budgets to see comparisons.
+                      <Typography variant="body2" sx={{ flex: 1 }}>
+                        {cat.name}
                       </Typography>
-                      <Button
-                        variant="contained"
-                        sx={{ mt: 2 }}
-                        onClick={() => navigate('/budgets')}
-                      >
-                        Create Budget
-                      </Button>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Budget Status Cards */}
-            {budgetComparison.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="h6" fontWeight={600} mb={2}>
-                  Budget Status Details
-                </Typography>
-                <Grid container spacing={2}>
-                  {budgetComparison.map((budget) => {
-                    const percentUsed = budget.percentUsed;
-                    const isOverBudget = budget.isOverBudget;
-                    const isNearLimit = percentUsed > 80 && percentUsed <= 100;
-
-                    return (
-                      <Grid item xs={12} sm={6} md={4} key={budget.categoryId}>
-                        <Card
-                          sx={{
-                            borderLeft: '4px solid',
-                            borderColor: isOverBudget
-                              ? 'error.main'
-                              : isNearLimit
-                              ? 'warning.main'
-                              : 'success.main',
-                          }}
-                        >
-                          <CardContent>
-                            <Box display="flex" alignItems="center" gap={1} mb={1}>
-                              <Box
-                                width={12}
-                                height={12}
-                                borderRadius="50%"
-                                bgcolor={budget.categoryColor || '#667eea'}
-                              />
-                              <Typography variant="body2" fontWeight={600} noWrap>
-                                {budget.categoryName}
-                              </Typography>
-                            </Box>
-                            <Typography variant="h6" fontWeight={700}>
-                              {formatCurrency(budget.actualSpent)}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">
-                              of {formatCurrency(budget.budgetAmount)}
-                            </Typography>
-                            <LinearProgress
-                              variant="determinate"
-                              value={Math.min(percentUsed, 100)}
-                              color={isOverBudget ? 'error' : isNearLimit ? 'warning' : 'success'}
-                              sx={{ mt: 1, mb: 1, height: 6, borderRadius: 3 }}
-                            />
-                            <Box display="flex" justifyContent="space-between" alignItems="center">
-                              <Typography variant="caption" fontWeight={600}>
-                                {percentUsed.toFixed(1)}% used
-                              </Typography>
-                              {isOverBudget && (
-                                <Chip
-                                  label="Over Budget"
-                                  size="small"
-                                  color="error"
-                                  sx={{ height: 20 }}
-                                />
-                              )}
-                              {isNearLimit && !isOverBudget && (
-                                <Chip
-                                  label="Near Limit"
-                                  size="small"
-                                  color="warning"
-                                  sx={{ height: 20 }}
-                                />
-                              )}
-                            </Box>
-                            {budget.difference < 0 ? (
-                              <Typography variant="caption" color="error.main" mt={1}>
-                                Over by {formatCurrency(Math.abs(budget.difference))}
-                              </Typography>
-                            ) : (
-                              <Typography variant="caption" color="success.main" mt={1}>
-                                {formatCurrency(budget.difference)} remaining
-                              </Typography>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-              </Grid>
-            )}
-
-            {/* Budget Performance Insights */}
-            {budgetComparison.length > 0 && (
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" fontWeight={600} mb={2}>
-                      Budget Performance Insights
-                    </Typography>
-                    <Grid container spacing={2}>
-                      {/* Categories Over Budget */}
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Box textAlign="center" p={2}>
-                          <Typography variant="h3" fontWeight={700} color="error">
-                            {budgetComparison.filter((b) => b.isOverBudget).length}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            Over Budget
-                          </Typography>
-                        </Box>
-                      </Grid>
-
-                      {/* Categories On Track */}
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Box textAlign="center" p={2}>
-                          <Typography variant="h3" fontWeight={700} color="success">
-                            {
-                              budgetComparison.filter(
-                                (b) => !b.isOverBudget && b.percentUsed >= 80
-                              ).length
-                            }
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            On Track
-                          </Typography>
-                        </Box>
-                      </Grid>
-
-                      {/* Categories Under Budget */}
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Box textAlign="center" p={2}>
-                          <Typography variant="h3" fontWeight={700} color="primary">
-                            {budgetComparison.filter((b) => b.percentUsed < 80).length}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            Under Budget
-                          </Typography>
-                        </Box>
-                      </Grid>
-
-                      {/* Total Savings */}
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Box textAlign="center" p={2}>
-                          <Typography variant="h3" fontWeight={700} color="success.main">
-                            {formatCurrency(
-                              budgetComparison
-                                .filter((b) => b.difference > 0)
-                                .reduce((sum, b) => sum + b.difference, 0)
-                            )}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            Total Savings
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Budget Forecast */}
-            {budgetComparison.length > 0 && overview && (
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
-                      <LightbulbIcon color="primary" />
-                      <Typography variant="h6" fontWeight={600}>
-                        Budget Forecast
+                      <Typography variant="body2" fontWeight={600}>
+                        {formatCurrency(cat.value)}
                       </Typography>
                     </Box>
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      Based on your current spending rate, here's a projection for the rest of the
-                      period
-                    </Alert>
-                    <Grid container spacing={2}>
-                      {budgetComparison.slice(0, 3).map((budget) => {
-                        const daysInPeriod =
-                          filters.dateRange.end.diff(filters.dateRange.start, 'days') + 1;
-                        const daysElapsed =
-                          dayjs().diff(filters.dateRange.start, 'days') + 1;
-                        const daysRemaining = Math.max(0, daysInPeriod - daysElapsed);
-                        const dailyRate = budget.actualSpent / Math.max(1, daysElapsed);
-                        const projectedTotal = budget.actualSpent + dailyRate * daysRemaining;
-                        const willExceed = projectedTotal > budget.budgetAmount;
-
-                        return (
-                          <Grid item xs={12} md={4} key={budget.categoryId}>
-                            <Card variant="outlined">
-                              <CardContent>
-                                <Typography variant="body2" fontWeight={600} gutterBottom>
-                                  {budget.categoryName}
-                                </Typography>
-                                <Typography variant="caption" color="textSecondary">
-                                  Daily average: {formatCurrency(dailyRate)}
-                                </Typography>
-                                <Box mt={2}>
-                                  <Typography variant="body2" color="textSecondary">
-                                    Projected total:
-                                  </Typography>
-                                  <Typography
-                                    variant="h6"
-                                    fontWeight={700}
-                                    color={willExceed ? 'error' : 'success.main'}
-                                  >
-                                    {formatCurrency(projectedTotal)}
-                                  </Typography>
-                                  {willExceed ? (
-                                    <Chip
-                                      label={`May exceed by ${formatCurrency(
-                                        projectedTotal - budget.budgetAmount
-                                      )}`}
-                                      size="small"
-                                      color="error"
-                                      sx={{ mt: 1 }}
-                                    />
-                                  ) : (
-                                    <Chip
-                                      label="On track"
-                                      size="small"
-                                      color="success"
-                                      sx={{ mt: 1 }}
-                                    />
-                                  )}
-                                </Box>
-                              </CardContent>
-                            </Card>
-                          </Grid>
-                        );
-                      })}
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        )}
-      </Box>
-    </LocalizationProvider>
-    </PullToRefresh>
-  );
-
-  // Render tree node recursively
-  function renderTreeNode(node: any): React.ReactNode {
-    const { category, spending, percentage, children, level } = node;
-    const isFolder = category.isFolder;
-    const hasChildren = children.length > 0;
-    const isExpanded = expandedFolders.has(category.id);
-    const hasSpending = spending.amount > 0;
-
-    if (!hasSpending && !hasChildren) {
-      return null; // Don't show empty categories
-    }
-
-    return (
-      <Box key={category.id}>
-        <ListItemButton
-          onClick={() => {
-            if (hasChildren && isFolder) {
-              toggleFolder(category.id);
-            } else {
-              handleCategoryClick(category.id);
-            }
-          }}
-          sx={{
-            pl: 2 + level * 3,
-            py: 1.5,
-            borderRadius: 1,
-            mb: 0.5,
-            '&:hover': {
-              backgroundColor: 'action.hover',
-            },
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={1} flex={1} minWidth={0}>
-            {/* Expand/Collapse Icon */}
-            {hasChildren && isFolder ? (
-              <IconButton size="small" sx={{ p: 0 }}>
-                {isExpanded ? (
-                  <ExpandLessIcon fontSize="small" />
-                ) : (
-                  <ExpandMoreIcon fontSize="small" />
-                )}
-              </IconButton>
+                  ))}
+                </Box>
+              </>
             ) : (
-              <Box width={24} /> // Spacer
+              <Box textAlign="center" py={6}>
+                <Typography color="text.secondary">No category data</Typography>
+              </Box>
             )}
+          </Paper>
+        </Grid>
 
-            {/* Category/Folder Icon and Color */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Box
-                width={16}
-                height={16}
-                borderRadius="50%"
-                bgcolor={category.color}
-                flexShrink={0}
-              />
-              <Typography variant="body2" fontWeight={isFolder ? 600 : 500}>
-                {isFolder ? '📁' : '🏷️'} {category.name}
+        {/* Daily Spending Bar Chart */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, borderRadius: 3, height: '100%' }}>
+            <Box display="flex" alignItems="center" gap={1} mb={3}>
+              <Assessment color="primary" />
+              <Typography variant="h6" fontWeight={700}>
+                Daily Spending Trend
               </Typography>
             </Box>
-
-            {/* Expense Count */}
-            {spending.count > 0 && (
-              <Chip
-                label={`${spending.count} expense${spending.count > 1 ? 's' : ''}`}
-                size="small"
-                variant="outlined"
-                sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
-              />
+            {dailySpendingData.length > 0 ? (
+              <ResponsiveChart>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dailySpendingData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                    <XAxis dataKey="day" stroke="#666" />
+                    <YAxis stroke="#666" />
+                    <RechartsTooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        borderRadius: 8,
+                        border: '1px solid rgba(0,0,0,0.1)',
+                      }}
+                    />
+                    <Bar dataKey="amount" fill={COLORS.primary} radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ResponsiveChart>
+            ) : (
+              <Box textAlign="center" py={6}>
+                <Typography color="text.secondary">No spending data</Typography>
+              </Box>
             )}
-          </Box>
+          </Paper>
+        </Grid>
+      </Grid>
 
-          {/* Amount and Progress */}
-          <Box display="flex" alignItems="center" gap={2} flexShrink={0}>
-            <Box width={120} display={{ xs: 'none', sm: 'block' }}>
-              <LinearProgress
-                variant="determinate"
-                value={Math.min(percentage, 100)}
-                sx={{
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: 'action.hover',
-                  '& .MuiLinearProgress-bar': {
-                    borderRadius: 3,
-                    backgroundColor: category.color,
-                  },
-                }}
-              />
-            </Box>
-            <Box textAlign="right" minWidth={100}>
-              <Typography variant="body2" fontWeight={700}>
-                {formatCurrency(spending.amount)}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {percentage.toFixed(1)}%
-              </Typography>
-            </Box>
+      {/* 4. Budget vs Actual */}
+      {budgetComparisonData.length > 0 && (
+        <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+          <Box display="flex" alignItems="center" gap={1} mb={3}>
+            <AccountBalanceWallet color="primary" />
+            <Typography variant="h6" fontWeight={700}>
+              Budget vs Actual Spending
+            </Typography>
           </Box>
-        </ListItemButton>
+          <ResponsiveChart>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={budgetComparisonData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                <XAxis dataKey="name" stroke="#666" />
+                <YAxis stroke="#666" />
+                <RechartsTooltip
+                  formatter={(value: number) => formatCurrency(value)}
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: '1px solid rgba(0,0,0,0.1)',
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="budget" fill={COLORS.info} name="Budget" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="spent" fill={COLORS.error} name="Spent" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ResponsiveChart>
+        </Paper>
+      )}
 
-        {/* Render children if expanded */}
-        {hasChildren && isExpanded && (
-          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-            {children.map((child: any) => renderTreeNode(child))}
-          </Collapse>
-        )}
-      </Box>
-    );
-  }
+      {/* 5 & 6: Tables */}
+      <Grid container spacing={3}>
+        {/* Top Merchants */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, borderRadius: 3 }}>
+            <Box display="flex" alignItems="center" gap={1} mb={3}>
+              <Store color="primary" />
+              <Typography variant="h6" fontWeight={700}>
+                Top Merchants
+              </Typography>
+            </Box>
+            {topMerchants.length > 0 ? (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Merchant</TableCell>
+                      <TableCell align="right">Transactions</TableCell>
+                      <TableCell align="right">Total</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {topMerchants.map((merchant, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{merchant.name}</TableCell>
+                        <TableCell align="right">{merchant.count}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(merchant.amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Box textAlign="center" py={4}>
+                <Typography color="text.secondary">No merchant data</Typography>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Month-over-Month */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, borderRadius: 3 }}>
+            <Box display="flex" alignItems="center" gap={1} mb={3}>
+              <TrendingUp color="primary" />
+              <Typography variant="h6" fontWeight={700}>
+                Month-over-Month Comparison
+              </Typography>
+            </Box>
+            {monthOverMonthData.length > 0 ? (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Month</TableCell>
+                      <TableCell align="right">Income</TableCell>
+                      <TableCell align="right">Expenses</TableCell>
+                      <TableCell align="right">Change</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {monthOverMonthData.slice(0, 6).map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{row.month}</TableCell>
+                        <TableCell align="right">{formatCurrency(row.income)}</TableCell>
+                        <TableCell align="right">{formatCurrency(row.expenses)}</TableCell>
+                        <TableCell align="right">
+                          <Box display="flex" alignItems="center" justifyContent="flex-end" gap={0.5}>
+                            {row.expensesChange > 0 ? (
+                              <TrendingUp fontSize="small" color="error" />
+                            ) : row.expensesChange < 0 ? (
+                              <TrendingDown fontSize="small" color="success" />
+                            ) : null}
+                            <Typography
+                              variant="body2"
+                              color={
+                                row.expensesChange > 0
+                                  ? 'error'
+                                  : row.expensesChange < 0
+                                  ? 'success.main'
+                                  : 'text.secondary'
+                              }
+                            >
+                              {row.expensesChange.toFixed(1)}%
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Box textAlign="center" py={4}>
+                <Typography color="text.secondary">No monthly data</Typography>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+    </Box>
+  );
 };
 
 export default Analytics;

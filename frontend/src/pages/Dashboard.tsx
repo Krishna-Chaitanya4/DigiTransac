@@ -23,10 +23,11 @@ import {
   AccountBalanceWallet,
   Warning as WarningIcon,
   Add as AddIcon,
-  Lightbulb as LightbulbIcon,
   AccountBalance,
   CreditCard,
   Savings,
+  Assessment,
+  Remove,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -34,21 +35,7 @@ import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import PullToRefresh from '../components/PullToRefresh';
-import ResponsiveChart from '../components/ResponsiveChart';
 import { useResponsive } from '../hooks/useResponsive';
-import {
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 
 // Smart tag filtering: exclude these tags from expense/income calculations
 const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
@@ -111,18 +98,6 @@ interface BudgetStatus {
   isOver: boolean;
 }
 
-interface SpendingTrend {
-  month: string;
-  expenses: number;
-  income: number;
-}
-
-interface CategorySpending {
-  name: string;
-  value: number;
-  color: string;
-}
-
 interface UpcomingRecurring {
   id: string;
   description: string;
@@ -151,12 +126,10 @@ const Dashboard: React.FC = () => {
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-  const [spendingTrends, setSpendingTrends] = useState<SpendingTrend[]>([]);
-  const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
   const [smartInsights, setSmartInsights] = useState<{
-    highestCategory: string;
+    highestCategory: { name: string; amount: number };
     unusualSpending: boolean;
     savingsTrend: 'improving' | 'declining' | 'stable';
     budgetHealthScore: number;
@@ -542,54 +515,6 @@ const Dashboard: React.FC = () => {
         return true;
       });
 
-      // Group by month for both income and expenses
-      const monthlyData = new Map<string, { expenses: number; income: number }>();
-      allTransactions.forEach((t: any) => {
-        const date = new Date(t.date);
-        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
-        const existing = monthlyData.get(monthKey) || { expenses: 0, income: 0 };
-
-        if (t.type === 'debit') {
-          existing.expenses += t.amount;
-        } else if (t.type === 'credit') {
-          existing.income += t.amount;
-        }
-        monthlyData.set(monthKey, existing);
-      });
-
-      const trends: SpendingTrend[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
-        const data = monthlyData.get(monthKey) || { expenses: 0, income: 0 };
-        trends.push({
-          month: monthKey,
-          expenses: data.expenses,
-          income: data.income,
-        });
-      }
-      setSpendingTrends(trends);
-
-      // Calculate top categories (current month)
-      const categorySpending = new Map<string, { name: string; value: number; color: string }>();
-      debits.forEach((t: any) => {
-        const category = categoryMap.get(t.categoryId);
-        if (category) {
-          const existing = categorySpending.get(t.categoryId);
-          categorySpending.set(t.categoryId, {
-            name: category.name,
-            value: (existing?.value || 0) + t.amount,
-            color: category.color,
-          });
-        }
-      });
-
-      const topCats = Array.from(categorySpending.values())
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-      setTopCategories(topCats);
-
       // Get upcoming recurring transactions
       const recurringRes = await axios.get(`/api/transactions?isRecurring=true`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -658,9 +583,27 @@ const Dashboard: React.FC = () => {
       }
       setAlerts(newAlerts);
 
+      // Calculate top category for insights
+      const categorySpending = new Map<string, { name: string; amount: number }>();
+      debits.forEach((t: any) => {
+        const category = categoryMap.get(t.categoryId);
+        if (category) {
+          const existing = categorySpending.get(t.categoryId);
+          categorySpending.set(t.categoryId, {
+            name: category.name,
+            amount: (existing?.amount || 0) + t.amount,
+          });
+        }
+      });
+      const topCategory = Array.from(categorySpending.values())
+        .sort((a, b) => b.amount - a.amount)[0];
+
       // Generate Smart Insights
       const insights = {
-        highestCategory: topCats.length > 0 ? topCats[0].name : 'N/A',
+        highestCategory: {
+          name: topCategory?.name || 'N/A',
+          amount: topCategory?.amount || 0,
+        },
         unusualSpending: Math.abs(spentChange) > 30,
         savingsTrend:
           netSavings > 0 && incomeChange > spentChange
@@ -747,7 +690,7 @@ const Dashboard: React.FC = () => {
       value: budgetStatus.length === 0 ? 'No budgets' : formatCurrency(stats?.budgetLeft || 0),
       change: budgetStatus.length === 0 ? 'Create budgets' : `${stats?.expenseCount || 0} expenses`,
       trend: (stats?.budgetLeft || 0) > 0 ? 'up' : 'down',
-      icon: <LightbulbIcon sx={{ fontSize: 32 }} />,
+      icon: <Savings sx={{ fontSize: 32 }} />,
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
     },
     {
@@ -810,169 +753,6 @@ const Dashboard: React.FC = () => {
               </Alert>
             ))}
         </Box>
-      )}
-
-      {/* Smart Insights */}
-      {smartInsights && (
-        <Grid container spacing={2} mb={3}>
-          <Grid item xs={12}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                borderRadius: 3,
-              }}
-            >
-              <CardContent>
-                <Box display="flex" alignItems="center" gap={1} mb={2}>
-                  <LightbulbIcon sx={{ fontSize: 28 }} />
-                  <Typography variant="h6" fontWeight={700}>
-                    Smart Insights
-                  </Typography>
-                </Box>
-                <Grid container spacing={2}>
-                  {/* Budget Health Score */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box
-                      sx={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                        borderRadius: 2,
-                        p: 2,
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                        Budget Health Score
-                      </Typography>
-                      <Box display="flex" alignItems="baseline" gap={1}>
-                        <Typography variant="h3" fontWeight={700}>
-                          {Math.round(smartInsights.budgetHealthScore)}
-                        </Typography>
-                        <Typography variant="h6">/100</Typography>
-                      </Box>
-                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
-                        {smartInsights.budgetHealthScore >= 80
-                          ? 'Excellent budget management'
-                          : smartInsights.budgetHealthScore >= 60
-                          ? 'Good budget control'
-                          : smartInsights.budgetHealthScore >= 40
-                          ? 'Needs attention'
-                          : 'Critical - Review budgets'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-
-                  {/* Top Spending Category */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box
-                      sx={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                        borderRadius: 2,
-                        p: 2,
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                        Top Spending Category
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700} noWrap>
-                        {smartInsights.highestCategory}
-                      </Typography>
-                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
-                        Largest expense driver
-                      </Typography>
-                    </Box>
-                  </Grid>
-
-                  {/* Spending Pattern */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box
-                      sx={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                        borderRadius: 2,
-                        p: 2,
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                        Spending Pattern
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        {smartInsights.unusualSpending ? (
-                          <>
-                            <WarningIcon />
-                            <Typography variant="h6" fontWeight={700}>
-                              Unusual
-                            </Typography>
-                          </>
-                        ) : (
-                          <>
-                            <Typography variant="h6" fontWeight={700}>
-                              Normal
-                            </Typography>
-                          </>
-                        )}
-                      </Box>
-                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
-                        {smartInsights.unusualSpending
-                          ? 'Spending significantly differs'
-                          : 'Consistent with previous period'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-
-                  {/* Savings Trend */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box
-                      sx={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                        borderRadius: 2,
-                        p: 2,
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                        Savings Trend
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        {smartInsights.savingsTrend === 'improving' ? (
-                          <TrendingUp sx={{ fontSize: 28 }} />
-                        ) : smartInsights.savingsTrend === 'declining' ? (
-                          <TrendingDown sx={{ fontSize: 28 }} />
-                        ) : null}
-                        <Typography variant="h6" fontWeight={700}>
-                          {smartInsights.savingsTrend === 'improving'
-                            ? 'Improving'
-                            : smartInsights.savingsTrend === 'declining'
-                            ? 'Declining'
-                            : 'Stable'}
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" sx={{ opacity: 0.8, mt: 1 }}>
-                        {smartInsights.savingsTrend === 'improving'
-                          ? 'Great job saving money!'
-                          : smartInsights.savingsTrend === 'declining'
-                          ? 'Consider reducing expenses'
-                          : 'Maintaining current level'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-                <Box sx={{ mt: 3, textAlign: 'center' }}>
-                  <Button
-                    variant="text"
-                    onClick={() => navigate('/analytics')}
-                    sx={{
-                      color: 'white',
-                      textTransform: 'none',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      },
-                    }}
-                  >
-                    View Detailed Analytics →
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
       )}
 
       {/* Stats Cards */}
@@ -1392,76 +1172,97 @@ const Dashboard: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Spending Trends & Category Breakdown */}
+      {/* Financial Health Score & Quick Actions */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
-        {/* Spending Trends Chart */}
-        <Grid item xs={12} md={8}>
+        {/* Financial Health Score */}
+        <Grid item xs={12} md={6}>
           <Paper
             sx={{
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
                 theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : 'linear-gradient(135deg, #434343 0%, #000000 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              Spending Trends
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Last 6 months overview
-            </Typography>
-            {spendingTrends.length > 0 ? (
-              <ResponsiveChart>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={spendingTrends}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                    <XAxis dataKey="month" stroke="#666" />
-                    <YAxis stroke="#666" />
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        borderRadius: 8,
-                        border: '1px solid rgba(0,0,0,0.1)',
-                        background: 'rgba(255,255,255,0.95)',
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <TrendingUp sx={{ fontSize: 28 }} />
+                <Typography variant="h5" fontWeight={700}>
+                  Financial Health Score
+                </Typography>
+              </Box>
+              <Box display="flex" alignItems="baseline" gap={2} mb={3}>
+                <Typography variant="h1" fontWeight={800}>
+                  {smartInsights?.budgetHealthScore || 0}
+                </Typography>
+                <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                  / 100
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                    Top Spending
+                  </Typography>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        bgcolor: 'rgba(255,255,255,0.8)',
                       }}
                     />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="expenses"
-                      stroke="#f44336"
-                      strokeWidth={3}
-                      name="Expenses"
-                      dot={{ fill: '#f44336', r: 6 }}
-                      activeDot={{ r: 8 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="income"
-                      stroke="#4caf50"
-                      strokeWidth={3}
-                      name="Income"
-                      dot={{ fill: '#4caf50', r: 6 }}
-                      activeDot={{ r: 8 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ResponsiveChart>
-            ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No spending data available</Typography>
+                    <Typography variant="body1" fontWeight={600}>
+                      {smartInsights?.highestCategory.name || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8, ml: 'auto' }}>
+                      {formatCurrency(smartInsights?.highestCategory.amount || 0)}
+                    </Typography>
+                  </Box>
+                </Box>
+                {smartInsights?.savingsTrend && (
+                  <Box>
+                    <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                      Savings Trend
+                    </Typography>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      {smartInsights.savingsTrend === 'improving' ? (
+                        <TrendingUp fontSize="small" />
+                      ) : smartInsights.savingsTrend === 'declining' ? (
+                        <TrendingDown fontSize="small" />
+                      ) : (
+                        <Remove fontSize="small" />
+                      )}
+                      <Typography variant="body1" fontWeight={600} sx={{ textTransform: 'capitalize' }}>
+                        {smartInsights.savingsTrend}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
               </Box>
-            )}
+            </Box>
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -50,
+                right: -50,
+                width: 200,
+                height: 200,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
           </Paper>
         </Grid>
 
-        {/* Top Categories Pie Chart */}
-        <Grid item xs={12} md={4}>
+        {/* Quick Actions */}
+        <Grid item xs={12} md={6}>
           <Paper
             sx={{
               p: 3,
@@ -1476,54 +1277,71 @@ const Dashboard: React.FC = () => {
             }}
           >
             <Typography variant="h5" fontWeight={700} gutterBottom>
-              Top Categories
+              Quick Actions
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              This month breakdown
+              Common tasks at your fingertips
             </Typography>
-            {topCategories.length > 0 ? (
-              <ResponsiveChart>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={topCategories}
-                      cx="50%"
-                      cy="45%"
-                      labelLine={false}
-                      label={false}
-                      outerRadius={90}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {topCategories.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend
-                      formatter={(_value, entry: any) => {
-                        const name =
-                          entry.payload.name.length > 15
-                            ? entry.payload.name.substring(0, 15) + '...'
-                            : entry.payload.name;
-                        const percent = (
-                          (entry.payload.value /
-                            topCategories.reduce((sum, cat) => sum + cat.value, 0)) *
-                          100
-                      ).toFixed(0);
-                      return `${name} ${percent}% (${formatCurrency(entry.payload.value)})`;
-                    }}
-                    wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }}
-                    iconSize={12}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              </ResponsiveChart>
-            ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No category data available</Typography>
-              </Box>
-            )}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AddIcon />}
+                onClick={() => navigate('/transactions')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  bgcolor: 'primary.main',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                Add Transaction
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<Assessment />}
+                onClick={() => navigate('/analytics')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                }}
+              >
+                View Analytics
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<Receipt />}
+                onClick={() => navigate('/budgets')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                }}
+              >
+                Manage Budgets
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<AccountBalance />}
+                onClick={() => navigate('/accounts')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                }}
+              >
+                View Accounts
+              </Button>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
