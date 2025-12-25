@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography,
   Box,
@@ -681,29 +681,29 @@ const Transactions: React.FC = () => {
     }
   };
 
-  const handleImportMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleImportMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setImportMenuAnchor(event.currentTarget);
-  };
+  }, []);
 
-  const handleImportMenuClose = () => {
+  const handleImportMenuClose = useCallback(() => {
     setImportMenuAnchor(null);
-  };
+  }, []);
 
-  const handleSMSImport = () => {
+  const handleSMSImport = useCallback(() => {
     handleImportMenuClose();
     setSmsImportOpen(true);
-  };
+  }, [handleImportMenuClose]);
 
-  const handleEmailImport = () => {
+  const handleEmailImport = useCallback(() => {
     handleImportMenuClose();
     setEmailImportOpen(true);
-  };
+  }, [handleImportMenuClose]);
 
-  const handleImportSuccess = async () => {
+  const handleImportSuccess = useCallback(async () => {
     await fetchTransactions();
     
     toast.success('Transactions imported successfully');
-  };
+  }, [fetchTransactions, toast]);
 
   const handleOpenDialog = (transaction?: Transaction) => {
     if (transaction) {
@@ -1206,16 +1206,16 @@ const Transactions: React.FC = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (selectAll) {
       setSelectedTransactions(new Set());
     } else {
       setSelectedTransactions(new Set(transactions.map((t) => t.id)));
     }
     setSelectAll(!selectAll);
-  };
+  }, [selectAll, transactions]);
 
-  const handleSelectTransaction = (id: string) => {
+  const handleSelectTransaction = useCallback((id: string) => {
     const newSelected = new Set(selectedTransactions);
     if (newSelected.has(id)) {
       newSelected.delete(id);
@@ -1224,7 +1224,7 @@ const Transactions: React.FC = () => {
     }
     setSelectedTransactions(newSelected);
     setSelectAll(newSelected.size === transactions.length);
-  };
+  }, [selectedTransactions, transactions.length]);
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -1257,15 +1257,15 @@ const Transactions: React.FC = () => {
     return categories.find((c) => c.id === categoryId)?.color || '#667eea';
   };
 
-  const formatCurrency = (amount: number, accountId: string) => {
+  const formatCurrency = useCallback((amount: number, accountId: string) => {
     const account = accounts.find((a) => a.id === accountId);
     const currency = account?.currency || user?.currency || 'USD';
     return formatCurrencyUtil(amount, currency);
-  };
+  }, [accounts, user?.currency]);
 
-  const formatUserCurrency = (amount: number) => {
+  const formatUserCurrency = useCallback((amount: number) => {
     return formatCurrencyUtil(amount, user?.currency || 'USD');
-  };
+  }, [user?.currency]);
 
   if (loading) {
     return (
