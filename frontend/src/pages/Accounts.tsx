@@ -720,15 +720,6 @@ const Accounts: React.FC = () => {
                 >
                   Transactions
                 </Button>
-                <Tooltip title="Adjust Balance">
-                  <IconButton
-                    size="small"
-                    onClick={() => handleAdjustBalance(account)}
-                    sx={{ border: 1, borderColor: 'divider' }}
-                  >
-                    <RefreshIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
               </Box>
             </Box>
           </CardContent>
@@ -791,15 +782,21 @@ const Accounts: React.FC = () => {
           type: difference > 0 ? 'credit' : 'debit',
           amount: Math.abs(difference),
           accountId: adjustingAccount.id,
-          categoryId: adjustmentCategory.id,
           description: 'Balance Adjustment',
-          notes:
-            adjustmentNotes ||
-            `Adjusted to match actual balance: ${formatCurrency(newBalance, adjustingAccount.currency)}`,
-          tags: ['balance-adjustment'],
           date: new Date().toISOString(),
           isRecurring: false,
           reviewStatus: 'approved',
+          splits: [
+            {
+              categoryId: adjustmentCategory.id,
+              amount: Math.abs(difference),
+              tags: ['balance-adjustment'],
+              notes:
+                adjustmentNotes ||
+                `Adjusted to match actual balance: ${formatCurrency(newBalance, adjustingAccount.currency)}`,
+              order: 1,
+            },
+          ],
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
