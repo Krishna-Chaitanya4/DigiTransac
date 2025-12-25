@@ -916,8 +916,8 @@ const Budgets: React.FC = () => {
                 }}
               >
                 <CardContent>
-                  {/* Status Badge */}
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                  {/* Status Badge and Action Buttons */}
+                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
                     <Chip
                       icon={<span style={{ fontSize: '14px' }}>{statusColors.icon}</span>}
                       label={statusColors.status.toUpperCase()}
@@ -930,20 +930,32 @@ const Budgets: React.FC = () => {
                       }}
                     />
                     <Box>
-                      <IconButton size="small" onClick={() => handleEditBudget(budget)}>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDuplicateBudget(budget)}
+                        title="Duplicate budget"
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleEditBudget(budget)}
+                        title="Edit budget"
+                      >
                         <EditIcon fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => handleDeleteClick(budget.id)}
                         color="error"
+                        title="Delete budget"
                       >
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Box>
                   </Box>
 
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                  <Box>
                     <Box flex={1}>
                       {/* Budget Name (if provided) */}
                       {budget.name && (
@@ -1110,25 +1122,6 @@ const Budgets: React.FC = () => {
                           {velocityInfo.daysRemaining} days left
                         </Typography>
                       </Box>
-                    </Box>
-                    <Box>
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleDuplicateBudget(budget)}
-                        title="Duplicate budget"
-                      >
-                        <ContentCopyIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => handleEditBudget(budget)}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteClick(budget.id)}
-                        color="error"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
                     </Box>
                   </Box>
 
