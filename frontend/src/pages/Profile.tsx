@@ -37,11 +37,11 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     fetchUserProfile();
-    
+
     // Check for OAuth callback status in URL
     const params = new URLSearchParams(window.location.search);
     const gmailStatus = params.get('gmail');
-    
+
     if (gmailStatus === 'connected') {
       setSuccess('Gmail connected successfully!');
       // Clear URL params
@@ -81,7 +81,7 @@ const Profile: React.FC = () => {
       const height = 700;
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
-      
+
       const popup = window.open(
         response.data.authUrl,
         'Gmail Authorization',
@@ -228,9 +228,7 @@ const Profile: React.FC = () => {
                 <Typography variant="h6" fontWeight={600}>
                   Email Integration
                 </Typography>
-                {emailIntegration.enabled && (
-                  <Chip label="Active" color="success" size="small" />
-                )}
+                {emailIntegration.enabled && <Chip label="Active" color="success" size="small" />}
               </Box>
               <Divider sx={{ my: 2 }} />
 
@@ -252,8 +250,8 @@ const Profile: React.FC = () => {
                   </Button>
                   <Alert severity="info">
                     <Typography variant="caption">
-                      We'll read bank SMS from your inbox to automatically create expenses.
-                      You can review and approve them before they're added to your expenses.
+                      We'll read bank SMS from your inbox to automatically create expenses. You can
+                      review and approve them before they're added to your expenses.
                     </Typography>
                   </Alert>
                 </>
@@ -342,8 +340,7 @@ const Profile: React.FC = () => {
                       • Supported banks: HDFC, ICICI, SBI, Axis, Kotak, and more
                       <br />
                       • Parsed expenses appear in Review Queue for approval
-                      <br />
-                      • You can approve, edit, or reject each transaction
+                      <br />• You can approve, edit, or reject each transaction
                     </Typography>
                   </Alert>
                 </>
@@ -396,4 +393,3 @@ const Profile: React.FC = () => {
 };
 
 export default Profile;
-

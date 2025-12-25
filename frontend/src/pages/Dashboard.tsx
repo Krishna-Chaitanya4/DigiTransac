@@ -15,9 +15,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Menu,
-  TextField,
-  InputAdornment,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -26,33 +23,46 @@ import {
   AccountBalanceWallet,
   Warning as WarningIcon,
   Add as AddIcon,
-  Lightbulb as LightbulbIcon,
-  Repeat as RepeatIcon,
-  FilterList as FilterListIcon,
-  Close as CloseIcon,
-  Check as CheckIcon,
-  Search as SearchIcon,
   AccountBalance,
   CreditCard,
   Savings,
+  Assessment,
+  Remove,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
-import {
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
+import PullToRefresh from '../components/PullToRefresh';
+import { useResponsive } from '../hooks/useResponsive';
+
+// Smart tag filtering: exclude these tags from expense/income calculations
+const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
+const INCOME_EXCLUDE_TAGS = ['transfer', 'refund'];
+
+// Helper function to check if transaction should be excluded from calculations
+const shouldExcludeFromExpenses = (transaction: any): boolean => {
+  // Check splits for excluding tags
+  if (transaction.splits && transaction.splits.length > 0) {
+    return transaction.splits.some((split: any) =>
+      split.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase()))
+    );
+  }
+  // Fallback to transaction-level tags
+  return transaction.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+};
+
+const shouldExcludeFromIncome = (transaction: any): boolean => {
+  // Check splits for excluding tags
+  if (transaction.splits && transaction.splits.length > 0) {
+    return transaction.splits.some((split: any) =>
+      split.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase()))
+    );
+  }
+  // Fallback to transaction-level tags
+  return transaction.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+};
 
 interface DashboardStats {
   totalSpent: number;
@@ -88,18 +98,6 @@ interface BudgetStatus {
   isOver: boolean;
 }
 
-interface SpendingTrend {
-  month: string;
-  expenses: number;
-  income: number;
-}
-
-interface CategorySpending {
-  name: string;
-  value: number;
-  color: string;
-}
-
 interface UpcomingRecurring {
   id: string;
   description: string;
@@ -117,52 +115,119 @@ interface AccountBalance {
   currency: string;
 }
 
-interface Tag {
-  id: string;
-  name: string;
-  color?: string;
-}
-
 const Dashboard: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
+  const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
-  const [spendingTrends, setSpendingTrends] = useState<SpendingTrend[]>([]);
-  const [topCategories, setTopCategories] = useState<CategorySpending[]>([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
+  const [smartInsights, setSmartInsights] = useState<{
+    highestCategory: { name: string; amount: number };
+    unusualSpending: boolean;
+    savingsTrend: 'improving' | 'declining' | 'stable';
+    budgetHealthScore: number;
+  } | null>(null);
+
+  // Filter states - Dashboard is locked to "This Month"
+  const [categories, setCategories] = useState<any[]>([]);
+  const [tags, setTags] = useState<any[]>([]);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
-  // Tag filtering states
-  const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [includeTags, setIncludeTags] = useState<string[]>(['expense', 'income']); // Include by default
-  const [excludeTags, setExcludeTags] = useState<string[]>([]);
-  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
-  const [tagSearchQuery, setTagSearchQuery] = useState('');
+  // Dashboard always shows "This Month" - no user filtering
+  const filters = {
+    dateRange: {
+      start: dayjs().startOf('month'),
+      end: dayjs().endOf('month'),
+      preset: 'thisMonth',
+    },
+    accounts: [] as string[],
+    categories: [] as string[],
+    includeTags: [] as string[],
+    excludeTags: [] as string[],
+    transactionType: 'all' as const,
+  };
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [includeTags, excludeTags]); // Re-fetch when filters change
+    fetchInitialData();
+    // Load dismissed alerts from localStorage
+    const dismissed = localStorage.getItem('dismissedAlerts');
+    if (dismissed) {
+      try {
+        setDismissedAlerts(new Set(JSON.parse(dismissed)));
+      } catch (e) {
+        console.error('Failed to load dismissed alerts:', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    // Only fetch dashboard data once initial data is loaded
+    // Dashboard is locked to "This Month" - no filter dependencies needed
+    if (initialDataLoaded) {
+      fetchDashboardData();
+    }
+  }, [initialDataLoaded]);
+
+  const fetchInitialData = async () => {
+    try {
+      const [, categoriesRes, tagsRes] = await Promise.all([
+        axios.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } }), // Still fetch but don't store
+        axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/tags', { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      // We don't store accounts in state anymore since we removed filtering
+      setCategories(categoriesRes.data.categories || []);
+      setTags(tagsRes.data.tags || []);
+    } catch (err) {
+      console.error('Failed to fetch initial data:', err);
+      // Set empty arrays on error to unblock dashboard loading
+      setCategories([]);
+      setTags([]);
+    } finally {
+      setInitialDataLoaded(true);
+    }
+  };
+
+  const handleDismissAlert = (alert: string) => {
+    const newDismissed = new Set(dismissedAlerts);
+    newDismissed.add(alert);
+    setDismissedAlerts(newDismissed);
+    // Save to localStorage
+    localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
+  };
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const params = new URLSearchParams({
-        startDate: startOfMonth.toISOString().split('T')[0],
-        endDate: now.toISOString().split('T')[0],
+      // Ensure start date includes beginning of day and end date includes end of day
+      const startDate = filters.dateRange.start.startOf('day').toISOString();
+      const endDate = filters.dateRange.end.endOf('day').toISOString();
+      
+      // Build query params for transactions API
+      // Only fetch approved transactions for accurate financial calculations
+      const txnParams = new URLSearchParams({
+        startDate,
+        endDate,
+        reviewStatus: 'approved',
+        sortBy: 'date',
+        sortOrder: 'desc',
       });
+      
+      // Add account filters if specified
+      if (filters.accounts.length > 0) {
+        filters.accounts.forEach(accountId => txnParams.append('accountIds', accountId));
+      }
 
-      const [overviewRes, transactionsRes, budgetsRes, accountsRes, tagsRes] = await Promise.all([
-        axios.get(`/api/analytics/overview?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/transactions?sortBy=date&sortOrder=desc&startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`, {
+      const [transactionsRes, budgetsRes, accountsRes] = await Promise.all([
+        axios.get(`/api/transactions?${txnParams}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`/api/budgets`, {
@@ -171,105 +236,135 @@ const Dashboard: React.FC = () => {
         axios.get(`/api/accounts`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`/api/tags`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
       ]);
 
-      // Store all tags
-      const tags = tagsRes.data.tags || [];
-      setAllTags(tags);
-
-      const overview = overviewRes.data.overview;
       let transactions = transactionsRes.data.transactions || [];
-      
-      // Apply tag filtering
+
+      // Apply client-side filtering for categories and tags
       transactions = transactions.filter((t: any) => {
-        const txnTags = t.tags || [];
-        
-        // If include tags specified, transaction must have at least one
-        if (includeTags.length > 0) {
-          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
-          if (!hasIncluded) return false;
+        // Filter by transaction type
+        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
+          return false;
         }
         
-        // If exclude tags specified, transaction must not have any
-        if (excludeTags.length > 0) {
-          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
-          if (hasExcluded) return false;
+        // Filter by categories (check splits)
+        if (filters.categories.length > 0) {
+          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
+          const hasMatchingCategory = txnCategories.some((catId: string) => 
+            filters.categories.includes(catId)
+          );
+          if (!hasMatchingCategory) return false;
+        }
+        
+        // Filter by tags (include/exclude logic)
+        if (filters.includeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
+          if (!hasIncludedTag) return false;
+        }
+        
+        if (filters.excludeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
+          if (hasExcludedTag) return false;
         }
         
         return true;
       });
-      
-      const debits = transactions.filter((t: any) => t.type === 'debit');
-      const credits = transactions.filter((t: any) => t.type === 'credit');
+
+      // Filter debits and credits with smart tag exclusion
+      const debits = transactions.filter((t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t));
+      const credits = transactions.filter((t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t));
       const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const netSavings = totalIncome - totalSpent;
+
+      // Calculate previous period for comparison (same duration as current period)
+      const currentStart = filters.dateRange.start.toDate();
+      const currentEnd = filters.dateRange.end.toDate();
+      const periodDuration = currentEnd.getTime() - currentStart.getTime();
+      const prevEnd = new Date(currentStart.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - periodDuration);
       
-      // Get last month data for comparison
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      const lastMonthRes = await axios.get(`/api/transactions?startDate=${lastMonthStart.toISOString()}&endDate=${lastMonthEnd.toISOString()}`, {
+      const prevParams = new URLSearchParams({
+        startDate: prevStart.toISOString(),
+        endDate: prevEnd.toISOString(),
+        reviewStatus: 'approved',
+      });
+      if (filters.accounts.length > 0) {
+        filters.accounts.forEach(accountId => prevParams.append('accountIds', accountId));
+      }
+      
+      const prevRes = await axios.get(`/api/transactions?${prevParams}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      let lastMonthTxns = lastMonthRes.data.transactions || [];
-      
-      // Apply tag filtering to last month data
-      lastMonthTxns = lastMonthTxns.filter((t: any) => {
-        const txnTags = t.tags || [];
-        
-        if (includeTags.length > 0) {
-          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
-          if (!hasIncluded) return false;
+      let prevTransactions = prevRes.data.transactions || [];
+
+      // Apply same client-side filtering to previous period
+      prevTransactions = prevTransactions.filter((t: any) => {
+        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
+          return false;
         }
-        
-        if (excludeTags.length > 0) {
-          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
-          if (hasExcluded) return false;
+        if (filters.categories.length > 0) {
+          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
+          const hasMatchingCategory = txnCategories.some((catId: string) => 
+            filters.categories.includes(catId)
+          );
+          if (!hasMatchingCategory) return false;
         }
-        
+        if (filters.includeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
+          if (!hasIncludedTag) return false;
+        }
+        if (filters.excludeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
+          if (hasExcludedTag) return false;
+        }
         return true;
       });
-      
-      const lastMonthSpent = lastMonthTxns.filter((t: any) => t.type === 'debit').reduce((sum: number, t: any) => sum + t.amount, 0);
-      const lastMonthIncome = lastMonthTxns.filter((t: any) => t.type === 'credit').reduce((sum: number, t: any) => sum + t.amount, 0);
-      
-      // Calculate percentage changes for stat cards
+
+      const prevSpent = prevTransactions
+        .filter((t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t))
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
+      const prevIncome = prevTransactions
+        .filter((t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t))
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+      // Calculate percentage changes
       let spentChange = 0;
-      if (lastMonthSpent > 0) {
-        spentChange = Math.round(((totalSpent - lastMonthSpent) / lastMonthSpent) * 100);
+      if (prevSpent > 0) {
+        spentChange = Math.round(((totalSpent - prevSpent) / prevSpent) * 100);
       } else if (totalSpent > 0) {
         spentChange = 100;
       }
-      
+
       let incomeChange = 0;
-      if (lastMonthIncome > 0) {
-        incomeChange = Math.round(((totalIncome - lastMonthIncome) / lastMonthIncome) * 100);
+      if (prevIncome > 0) {
+        incomeChange = Math.round(((totalIncome - prevIncome) / prevIncome) * 100);
       } else if (totalIncome > 0) {
         incomeChange = 100;
       }
       
+      // Calculate days in current period for average daily spending
+      const daysInPeriod = Math.ceil(periodDuration / (1000 * 60 * 60 * 24)) || 1;
+
       setStats({
         totalSpent,
         monthSpent: totalSpent,
         monthIncome: totalIncome,
         netSavings,
-        budgetLeft: overview.totalBudget - totalSpent,
+        budgetLeft: 0, // Will be calculated from budgets
         categoryCount: new Set(debits.map((t: any) => t.categoryId)).size,
         expenseCount: debits.length,
         incomeCount: credits.length,
-        avgDailySpending: totalSpent / new Date().getDate(),
+        avgDailySpending: totalSpent / daysInPeriod,
         percentChange: spentChange,
         incomePercentChange: incomeChange,
       });
 
       // Process recent transactions (both credits and debits)
-      const categoriesRes = await axios.get(`/api/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const categories = categoriesRes.data.categories || [];
       const categoryMap = new Map<string, { name: string; color: string }>(
         categories.map((c: any) => [c.id, { name: c.name, color: c.color }])
       );
@@ -289,132 +384,152 @@ const Dashboard: React.FC = () => {
         })
       );
 
-      // Process budget status (should use unfiltered transactions)
+      // Process account balances first (needed for budget display)
+      const accounts = accountsRes.data.accounts || [];
+      setAccountBalances(
+        accounts.map((acc: any) => ({
+          id: acc.id,
+          name: acc.name,
+          accountType: acc.accountType,
+          balance: acc.balance,
+          currency: acc.currency || user?.currency || 'USD',
+        }))
+      );
+
+      // Process budget status
       const budgets = budgetsRes.data.budgets || [];
       const budgetStatuses: BudgetStatus[] = [];
-      
-      // Use unfiltered transactions for budget calculation
-      const allMonthTransactions = transactionsRes.data.transactions || [];
-      const unfilteredDebits = allMonthTransactions.filter((t: any) => t.type === 'debit');
-      
+      let totalBudget = 0;
+
       for (const budget of budgets) {
-        const category = categoryMap.get(budget.categoryId);
-        const categoryDebits = unfilteredDebits.filter((t: any) => t.categoryId === budget.categoryId);
-        const spent = categoryDebits.reduce((sum: number, t: any) => sum + t.amount, 0);
-        const percentage = Math.round((spent / budget.amount) * 100);
+        // Use effective budget (includes rollover)
+        const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
+        totalBudget += effectiveBudget;
         
+        // Use spent amount calculated by backend (handles all budget types correctly)
+        const spent = budget.spent || 0;
+        const percentage = Math.round((spent / effectiveBudget) * 100);
+
+        // Get display name based on budget type
+        let displayName = 'Unknown';
+        let displayColor = '#667eea';
+        
+        if (budget.scopeType === 'category' && budget.categoryId) {
+          const category = categoryMap.get(budget.categoryId);
+          displayName = category?.name || 'Unknown Category';
+          displayColor = category?.color || '#667eea';
+        } else if (budget.scopeType === 'tag') {
+          // For tag budgets, show tag names
+          const includeTagNames = (budget.includeTagIds || [])
+            .map((id: string) => {
+              const tag = tags.find((t: any) => t.id === id);
+              return tag?.name || id;
+            })
+            .join(', ');
+          const excludeTagNames = (budget.excludeTagIds || [])
+            .map((id: string) => {
+              const tag = tags.find((t: any) => t.id === id);
+              return tag?.name || id;
+            })
+            .join(', ');
+          
+          if (includeTagNames && excludeTagNames) {
+            displayName = `${includeTagNames} (excl: ${excludeTagNames})`;
+          } else if (includeTagNames) {
+            displayName = includeTagNames;
+          } else {
+            displayName = `Excl: ${excludeTagNames}`;
+          }
+          displayColor = '#ff6b6b';
+        } else if (budget.scopeType === 'account' && budget.accountId) {
+          const account = accounts.find((a: any) => a.id === budget.accountId);
+          displayName = account?.name || 'Unknown Account';
+          displayColor = account?.color || '#4caf50';
+        }
+
         budgetStatuses.push({
-          categoryName: category?.name || 'Unknown',
-          categoryId: budget.categoryId,
-          categoryColor: category?.color || '#667eea',
+          categoryName: displayName,
+          categoryId: budget.categoryId || budget.accountId || 'tag-budget',
+          categoryColor: displayColor,
           spent,
-          budget: budget.amount,
+          budget: effectiveBudget,
           percentage,
-          isOver: spent > budget.amount,
+          isOver: spent > effectiveBudget,
         });
       }
+      
+      // Update budget left in stats
+      // Only calculate budget left if there are budgets configured
+      const budgetLeft = budgets.length > 0 ? totalBudget - totalSpent : 0;
+      setStats(prev => prev ? { ...prev, budgetLeft } : null);
 
       setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
 
-      // Process account balances
-      const accounts = accountsRes.data.accounts || [];
-      setAccountBalances(accounts.map((acc: any) => ({
-        id: acc.id,
-        name: acc.name,
-        accountType: acc.accountType,
-        balance: acc.balance,
-        currency: acc.currency || user?.currency || 'USD',
-      })));
-
       // Calculate spending trends (last 6 months)
+      const now = new Date();
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
-      const trendsRes = await axios.get(`/api/transactions?startDate=${sixMonthsAgo.toISOString()}&endDate=${now.toISOString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      let allTransactions = trendsRes.data.transactions || [];
+      // Set to start and end of day for inclusive date range
+      sixMonthsAgo.setHours(0, 0, 0, 0);
+      now.setHours(23, 59, 59, 999);
       
-      // Apply tag filtering to spending trends
+      const trendParams = new URLSearchParams({
+        startDate: sixMonthsAgo.toISOString(),
+        endDate: now.toISOString(),
+      });
+      if (filters.accounts.length > 0) {
+        filters.accounts.forEach(accountId => trendParams.append('accountIds', accountId));
+      }
+
+      const trendsRes = await axios.get(
+        `/api/transactions?${trendParams}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      let allTransactions = trendsRes.data.transactions || [];
+
+      // Apply same client-side filtering
       allTransactions = allTransactions.filter((t: any) => {
-        const txnTags = t.tags || [];
-        
-        // If include tags specified, transaction must have at least one
-        if (includeTags.length > 0) {
-          const hasIncluded = txnTags.some((tag: string) => includeTags.includes(tag));
-          if (!hasIncluded) return false;
+        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
+          return false;
         }
-        
-        // If exclude tags specified, transaction must not have any
-        if (excludeTags.length > 0) {
-          const hasExcluded = txnTags.some((tag: string) => excludeTags.includes(tag));
-          if (hasExcluded) return false;
+        if (filters.categories.length > 0) {
+          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
+          const hasMatchingCategory = txnCategories.some((catId: string) => 
+            filters.categories.includes(catId)
+          );
+          if (!hasMatchingCategory) return false;
         }
-        
+        if (filters.includeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
+          if (!hasIncludedTag) return false;
+        }
+        if (filters.excludeTags.length > 0) {
+          const txnTags = t.tags || [];
+          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
+          if (hasExcludedTag) return false;
+        }
         return true;
       });
-      
-      // Group by month for both income and expenses
-      const monthlyData = new Map<string, { expenses: number; income: number }>();
-      allTransactions.forEach((t: any) => {
-        const date = new Date(t.date);
-        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
-        const existing = monthlyData.get(monthKey) || { expenses: 0, income: 0 };
-        
-        if (t.type === 'debit') {
-          existing.expenses += t.amount;
-        } else if (t.type === 'credit') {
-          existing.income += t.amount;
-        }
-        monthlyData.set(monthKey, existing);
-      });
-      
-      const trends: SpendingTrend[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
-        const data = monthlyData.get(monthKey) || { expenses: 0, income: 0 };
-        trends.push({
-          month: monthKey,
-          expenses: data.expenses,
-          income: data.income,
-        });
-      }
-      setSpendingTrends(trends);
-
-      // Calculate top categories (current month)
-      const categorySpending = new Map<string, { name: string; value: number; color: string }>();
-      debits.forEach((t: any) => {
-        const category = categoryMap.get(t.categoryId);
-        if (category) {
-          const existing = categorySpending.get(t.categoryId);
-          categorySpending.set(t.categoryId, {
-            name: category.name,
-            value: (existing?.value || 0) + t.amount,
-            color: category.color,
-          });
-        }
-      });
-      
-      const topCats = Array.from(categorySpending.values())
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-      setTopCategories(topCats);
 
       // Get upcoming recurring transactions
       const recurringRes = await axios.get(`/api/transactions?isRecurring=true`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const recurringTxns = recurringRes.data.transactions || [];
-      
+
       const upcoming: UpcomingRecurring[] = recurringTxns
         .map((t: any) => {
           if (!t.recurrencePattern) return null;
-          
-          const lastCreated = t.recurrencePattern.lastCreated ? new Date(t.recurrencePattern.lastCreated) : new Date(t.date);
+
+          const lastCreated = t.recurrencePattern.lastCreated
+            ? new Date(t.recurrencePattern.lastCreated)
+            : new Date(t.date);
           let nextDate = new Date(lastCreated);
-          
+
           switch (t.recurrencePattern.frequency) {
             case 'daily':
               nextDate.setDate(nextDate.getDate() + 1);
@@ -432,11 +547,11 @@ const Dashboard: React.FC = () => {
               nextDate.setFullYear(nextDate.getFullYear() + 1);
               break;
           }
-          
+
           // Only show next 30 days
           const thirtyDaysFromNow = new Date();
           thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-          
+
           if (nextDate <= thirtyDaysFromNow && nextDate >= now) {
             return {
               id: t.id,
@@ -452,19 +567,56 @@ const Dashboard: React.FC = () => {
         .filter((t: any) => t !== null)
         .sort((a: any, b: any) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
         .slice(0, 5);
-      
+
       setUpcomingRecurring(upcoming);
 
       // Generate alerts
       const newAlerts: string[] = [];
-      const overBudget = budgetStatuses.filter(b => b.isOver);
+      const overBudget = budgetStatuses.filter((b) => b.isOver);
       if (overBudget.length > 0) {
         newAlerts.push(`${overBudget.length} categories are over budget`);
       }
       if (netSavings < 0) {
-        newAlerts.push(`Spending exceeds income by ${formatCurrency(Math.abs(netSavings))} this month`);
+        newAlerts.push(
+          `Spending exceeds income by ${formatCurrency(Math.abs(netSavings))} this month`
+        );
       }
       setAlerts(newAlerts);
+
+      // Calculate top category for insights
+      const categorySpending = new Map<string, { name: string; amount: number }>();
+      debits.forEach((t: any) => {
+        const category = categoryMap.get(t.categoryId);
+        if (category) {
+          const existing = categorySpending.get(t.categoryId);
+          categorySpending.set(t.categoryId, {
+            name: category.name,
+            amount: (existing?.amount || 0) + t.amount,
+          });
+        }
+      });
+      const topCategory = Array.from(categorySpending.values())
+        .sort((a, b) => b.amount - a.amount)[0];
+
+      // Generate Smart Insights
+      const insights = {
+        highestCategory: {
+          name: topCategory?.name || 'N/A',
+          amount: topCategory?.amount || 0,
+        },
+        unusualSpending: Math.abs(spentChange) > 30,
+        savingsTrend:
+          netSavings > 0 && incomeChange > spentChange
+            ? ('improving' as const)
+            : netSavings < 0 || spentChange > incomeChange
+            ? ('declining' as const)
+            : ('stable' as const),
+        budgetHealthScore: Math.max(
+          0,
+          Math.min(100, 100 - (overBudget.length / Math.max(1, budgetStatuses.length)) * 100)
+        ),
+      };
+      setSmartInsights(insights);
 
       setError('');
     } catch (err: any) {
@@ -490,50 +642,11 @@ const Dashboard: React.FC = () => {
 
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    
+
     const daysAgo = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
     if (daysAgo < 7) return `${daysAgo} days ago`;
-    
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const handleClearFilters = () => {
-    setIncludeTags([]);
-    setExcludeTags([]);
-  };
-
-  const handleToggleIncludeTag = (tagName: string) => {
-    const isIncluded = includeTags.includes(tagName);
-    const isExcluded = excludeTags.includes(tagName);
-    
-    // If already included, remove it (go to neutral)
-    if (isIncluded) {
-      setIncludeTags(prev => prev.filter(t => t !== tagName));
-    } else {
-      // If excluded, remove from excluded first
-      if (isExcluded) {
-        setExcludeTags(prev => prev.filter(t => t !== tagName));
-      }
-      // Add to included
-      setIncludeTags(prev => [...prev, tagName]);
-    }
-  };
-
-  const handleToggleExcludeTag = (tagName: string) => {
-    const isIncluded = includeTags.includes(tagName);
-    const isExcluded = excludeTags.includes(tagName);
-    
-    // If already excluded, remove it (go to neutral)
-    if (isExcluded) {
-      setExcludeTags(prev => prev.filter(t => t !== tagName));
-    } else {
-      // If included, remove from included first
-      if (isIncluded) {
-        setIncludeTags(prev => prev.filter(t => t !== tagName));
-      }
-      // Add to excluded
-      setExcludeTags(prev => [...prev, tagName]);
-    }
   };
 
   if (loading) {
@@ -567,16 +680,17 @@ const Dashboard: React.FC = () => {
       change: (stats?.netSavings || 0) >= 0 ? 'Positive flow' : 'Negative flow',
       trend: (stats?.netSavings || 0) >= 0 ? 'up' : 'down',
       icon: <AccountBalanceWallet sx={{ fontSize: 32 }} />,
-      gradient: (stats?.netSavings || 0) >= 0 
-        ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
-        : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      gradient:
+        (stats?.netSavings || 0) >= 0
+          ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+          : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
     },
     {
       title: 'Budget Left',
-      value: formatCurrency(stats?.budgetLeft || 0),
-      change: `${stats?.expenseCount || 0} expenses`,
+      value: budgetStatus.length === 0 ? 'No budgets' : formatCurrency(stats?.budgetLeft || 0),
+      change: budgetStatus.length === 0 ? 'Create budgets' : `${stats?.expenseCount || 0} expenses`,
       trend: (stats?.budgetLeft || 0) > 0 ? 'up' : 'down',
-      icon: <LightbulbIcon sx={{ fontSize: 32 }} />,
+      icon: <Savings sx={{ fontSize: 32 }} />,
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
     },
     {
@@ -589,9 +703,9 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  return (
-    <Box>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  const content = (
+    <>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h3" fontWeight={800} gutterBottom sx={{ letterSpacing: '-0.02em' }}>
             Dashboard
@@ -600,199 +714,20 @@ const Dashboard: React.FC = () => {
             Welcome back, {user?.firstName || user?.email || 'User'}! Here's your expense overview.
           </Typography>
         </Box>
-        <Box display="flex" gap={2}>
-          <Button
-            variant="outlined"
-            startIcon={<FilterListIcon />}
-            onClick={(e) => setFilterMenuAnchor(e.currentTarget)}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-              ...((includeTags.length > 0 || excludeTags.length > 0) && {
-                borderColor: 'primary.main',
-                bgcolor: 'primary.main',
-                color: 'white',
-                '&:hover': {
-                  borderColor: 'primary.dark',
-                  bgcolor: 'primary.dark',
-                }
-              })
-            }}
-          >
-            Filter by Tags
-          </Button>
-          <Menu
-            anchorEl={filterMenuAnchor}
-            open={Boolean(filterMenuAnchor)}
-            onClose={() => {
-              setFilterMenuAnchor(null);
-              setTagSearchQuery('');
-            }}
-            PaperProps={{
-              sx: {
-                mt: 1,
-                minWidth: 280,
-                maxHeight: 500,
-                borderRadius: 2,
-              }
-            }}
-          >
-            <Box sx={{ p: 2, pb: 1 }}>
-              <Typography variant="subtitle2" fontWeight={600} mb={1.5}>
-                Filter transactions by tags
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search tags..."
-                value={tagSearchQuery}
-                onChange={(e) => setTagSearchQuery(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 1.5 }}
-              />
-            </Box>
-            <Box sx={{ maxHeight: 300, overflowY: 'auto', px: 2, pb: 2 }}>
-              <Box display="flex" flexDirection="column" gap={1}>
-                {allTags
-                  .filter(tag => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()))
-                  .map((tag) => {
-                    const isIncluded = includeTags.includes(tag.name);
-                    const isExcluded = excludeTags.includes(tag.name);
-                    const chipColor = isIncluded ? 'success' : isExcluded ? 'error' : 'default';
-                    
-                    return (
-                      <Chip
-                        key={tag.id}
-                        label={tag.name}
-                        size="small"
-                        color={chipColor}
-                        variant={(isIncluded || isExcluded) ? 'filled' : 'outlined'}
-                        sx={{
-                          justifyContent: 'space-between',
-                          bgcolor: isIncluded ? 'success.main' : isExcluded ? 'error.main' : undefined,
-                          borderColor: undefined,
-                          color: (isIncluded || isExcluded) ? 'white' : undefined,
-                          pr: 0.5,
-                        }}
-                        deleteIcon={
-                          <Box display="flex" gap={0.25} alignItems="center">
-                            <Box
-                              component="span"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleIncludeTag(tag.name);
-                              }}
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              cursor: 'pointer',
-                              bgcolor: isIncluded ? 'rgba(255,255,255,0.3)' : 'transparent',
-                              '&:hover': {
-                                bgcolor: isIncluded ? 'rgba(255,255,255,0.4)' : 'success.light',
-                              },
-                            }}
-                          >
-                            <CheckIcon sx={{ fontSize: 16, color: isIncluded ? 'white' : 'inherit' }} />
-                          </Box>
-                          <Box
-                            component="span"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleExcludeTag(tag.name);
-                            }}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              cursor: 'pointer',
-                              bgcolor: isExcluded ? 'rgba(255,255,255,0.3)' : 'transparent',
-                              '&:hover': {
-                                bgcolor: isExcluded ? 'rgba(255,255,255,0.4)' : 'error.light',
-                              },
-                            }}
-                          >
-                            <CloseIcon sx={{ fontSize: 16, color: isExcluded ? 'white' : 'inherit' }} />
-                          </Box>
-                        </Box>
-                      }
-                      onDelete={() => {}}
-                    />
-                  );
-                })}
-                {allTags.filter(tag => tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase())).length === 0 && (
-                  <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
-                    {tagSearchQuery ? 'No tags match your search' : 'No tags available'}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-            {(includeTags.length > 0 || excludeTags.length > 0) && (
-              <Box sx={{ p: 2, pt: 0, borderTop: 1, borderColor: 'divider' }}>
-                <Button
-                  fullWidth
-                  size="small"
-                  onClick={handleClearFilters}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Clear All Filters
-                </Button>
-              </Box>
-            )}
-          </Menu>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/transactions')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            }}
-          >
-            New Transaction
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => navigate('/accounts')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-            }}
-          >
-            Accounts
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => navigate('/analytics')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1.5,
-            }}
-          >
-            Analytics
-          </Button>
-        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => navigate('/transactions')}
+          sx={{
+            borderRadius: 2,
+            textTransform: 'none',
+            px: 3,
+            py: 1.5,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          }}
+        >
+          {isMobile ? 'New' : 'New Transaction'}
+        </Button>
       </Box>
 
       {error && (
@@ -804,16 +739,19 @@ const Dashboard: React.FC = () => {
       {/* Alerts */}
       {alerts.length > 0 && (
         <Box mb={3}>
-          {alerts.map((alert, idx) => (
-            <Alert
-              key={idx}
-              severity="warning"
-              icon={<WarningIcon />}
-              sx={{ mb: 1, borderRadius: 2 }}
-            >
-              {alert}
-            </Alert>
-          ))}
+          {alerts
+            .filter((alert) => !dismissedAlerts.has(alert))
+            .map((alert, idx) => (
+              <Alert
+                key={idx}
+                severity="warning"
+                icon={<WarningIcon />}
+                onClose={() => handleDismissAlert(alert)}
+                sx={{ mb: 1, borderRadius: 2 }}
+              >
+                {alert}
+              </Alert>
+            ))}
         </Box>
       )}
 
@@ -828,9 +766,7 @@ const Dashboard: React.FC = () => {
                 overflow: 'hidden',
                 borderRadius: 3,
                 background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'white'
-                    : 'rgba(30, 30, 30, 0.8)',
+                  theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
                 backdropFilter: 'blur(10px)',
                 border: (theme) =>
                   theme.palette.mode === 'light'
@@ -865,28 +801,28 @@ const Dashboard: React.FC = () => {
                     {stat.icon}
                   </Avatar>
                 </Box>
-                <Typography 
-                  variant="h4" 
-                  fontWeight={800} 
-                  sx={{ 
-                    mb: 0.5, 
+                <Typography
+                  variant="h4"
+                  fontWeight={800}
+                  sx={{
+                    mb: 0.5,
                     letterSpacing: '-0.02em',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {stat.value}
                 </Typography>
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary" 
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
                   fontWeight={500}
                   sx={{
                     mb: 1,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {stat.title}
@@ -897,12 +833,12 @@ const Dashboard: React.FC = () => {
                   ) : (
                     <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
                   )}
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
+                  <Typography
+                    variant="caption"
+                    sx={{
                       color: stat.trend === 'up' ? 'success.main' : 'error.main',
                       fontWeight: 600,
-                      fontSize: '0.75rem'
+                      fontSize: '0.75rem',
                     }}
                   >
                     {stat.change}
@@ -923,9 +859,7 @@ const Dashboard: React.FC = () => {
               height: 450,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -947,9 +881,9 @@ const Dashboard: React.FC = () => {
               Your accounts overview
             </Typography>
             {accountBalances.length > 0 ? (
-              <Box 
-                sx={{ 
-                  maxHeight: 280, 
+              <Box
+                sx={{
+                  maxHeight: 280,
                   overflowY: 'auto',
                   pr: 1,
                   '&::-webkit-scrollbar': {
@@ -964,9 +898,7 @@ const Dashboard: React.FC = () => {
                   },
                   '&::-webkit-scrollbar-thumb': {
                     background: (theme) =>
-                      theme.palette.mode === 'light'
-                        ? 'rgba(0,0,0,0.2)'
-                        : 'rgba(255,255,255,0.2)',
+                      theme.palette.mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)',
                     borderRadius: '10px',
                     '&:hover': {
                       background: (theme) =>
@@ -986,13 +918,13 @@ const Dashboard: React.FC = () => {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
                     }).format(account.balance);
-                    
+
                     // Determine icon and color based on account type
                     const accountType = (account.accountType || 'wallet').toLowerCase();
-                    
+
                     let accountIcon = <AccountBalanceWallet />;
                     let accountGradient = 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
-                    
+
                     if (accountType.includes('bank')) {
                       accountIcon = <AccountBalance />;
                       accountGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
@@ -1003,7 +935,7 @@ const Dashboard: React.FC = () => {
                       accountIcon = <Savings />;
                       accountGradient = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
                     }
-                    
+
                     return (
                       <Grid item xs={12} key={account.id}>
                         <Box
@@ -1011,9 +943,7 @@ const Dashboard: React.FC = () => {
                             p: 2,
                             borderRadius: 3,
                             background: (theme) =>
-                              theme.palette.mode === 'light'
-                                ? 'white'
-                                : 'rgba(255,255,255,0.05)',
+                              theme.palette.mode === 'light' ? 'white' : 'rgba(255,255,255,0.05)',
                             border: (theme) =>
                               theme.palette.mode === 'light'
                                 ? '1px solid rgba(0,0,0,0.08)'
@@ -1039,26 +969,26 @@ const Dashboard: React.FC = () => {
                               {accountIcon}
                             </Avatar>
                             <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography 
-                                variant="body2" 
+                              <Typography
+                                variant="body2"
                                 fontWeight={600}
                                 sx={{
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                  lineHeight: 1.3
+                                  lineHeight: 1.3,
                                 }}
                               >
                                 {account.name}
                               </Typography>
                             </Box>
-                            <Typography 
-                              variant="h6" 
-                              fontWeight={700} 
+                            <Typography
+                              variant="h6"
+                              fontWeight={700}
                               color={account.balance >= 0 ? 'success.main' : 'error.main'}
                               sx={{
                                 fontSize: '1.1rem',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {formattedBalance}
@@ -1077,9 +1007,15 @@ const Dashboard: React.FC = () => {
                     boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box
+                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                  >
                     <Box>
-                      <Typography variant="body2" color="rgba(255,255,255,0.8)" sx={{ mb: 0.5, fontWeight: 500 }}>
+                      <Typography
+                        variant="body2"
+                        color="rgba(255,255,255,0.8)"
+                        sx={{ mb: 0.5, fontWeight: 500 }}
+                      >
                         Total Balance
                       </Typography>
                       <Typography variant="h4" fontWeight={700} color="white">
@@ -1101,9 +1037,7 @@ const Dashboard: React.FC = () => {
               </Box>
             ) : (
               <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">
-                  No accounts found
-                </Typography>
+                <Typography color="text.secondary">No accounts found</Typography>
                 <Button
                   variant="outlined"
                   size="small"
@@ -1124,9 +1058,7 @@ const Dashboard: React.FC = () => {
               height: 450,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1145,7 +1077,15 @@ const Dashboard: React.FC = () => {
               Latest activity
             </Typography>
             {recentTransactions.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 320, overflowY: 'auto' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                }}
+              >
                 {recentTransactions.map((transaction) => (
                   <Box
                     key={transaction.id}
@@ -1170,19 +1110,33 @@ const Dashboard: React.FC = () => {
                     }}
                     onClick={() => navigate('/transactions')}
                   >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 0.5,
+                      }}
+                    >
                       <Typography variant="body1" fontWeight={600} noWrap sx={{ maxWidth: '60%' }}>
                         {transaction.description}
                       </Typography>
-                      <Typography 
-                        variant="body1" 
-                        fontWeight={700} 
+                      <Typography
+                        variant="body1"
+                        fontWeight={700}
                         color={transaction.type === 'credit' ? 'success.main' : 'error.main'}
                       >
-                        {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        {transaction.type === 'credit' ? '+' : '-'}
+                        {formatCurrency(transaction.amount)}
                       </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <Chip
                         label={transaction.categoryName}
                         size="small"
@@ -1202,9 +1156,7 @@ const Dashboard: React.FC = () => {
               </Box>
             ) : (
               <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">
-                  No recent transactions
-                </Typography>
+                <Typography color="text.secondary">No recent transactions</Typography>
                 <Button
                   variant="outlined"
                   size="small"
@@ -1220,84 +1172,103 @@ const Dashboard: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Spending Trends & Category Breakdown */}
+      {/* Financial Health Score & Quick Actions */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
-        {/* Spending Trends Chart */}
-        <Grid item xs={12} md={8}>
+        {/* Financial Health Score */}
+        <Grid item xs={12} md={6}>
           <Paper
             sx={{
               p: 3,
               borderRadius: 3,
               background: (theme) =>
                 theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : 'linear-gradient(135deg, #434343 0%, #000000 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              Spending Trends
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Last 6 months overview
-            </Typography>
-            {spendingTrends.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={spendingTrends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                  <XAxis dataKey="month" stroke="#666" />
-                  <YAxis stroke="#666" />
-                  <Tooltip 
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{ 
-                      borderRadius: 8, 
-                      border: '1px solid rgba(0,0,0,0.1)',
-                      background: 'rgba(255,255,255,0.95)'
-                    }}
-                  />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="expenses" 
-                    stroke="#f44336" 
-                    strokeWidth={3}
-                    name="Expenses"
-                    dot={{ fill: '#f44336', r: 6 }}
-                    activeDot={{ r: 8 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="income" 
-                    stroke="#4caf50" 
-                    strokeWidth={3}
-                    name="Income"
-                    dot={{ fill: '#4caf50', r: 6 }}
-                    activeDot={{ r: 8 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No spending data available</Typography>
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <TrendingUp sx={{ fontSize: 28 }} />
+                <Typography variant="h5" fontWeight={700}>
+                  Financial Health Score
+                </Typography>
               </Box>
-            )}
+              <Box display="flex" alignItems="baseline" gap={2} mb={3}>
+                <Typography variant="h1" fontWeight={800}>
+                  {smartInsights?.budgetHealthScore || 0}
+                </Typography>
+                <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                  / 100
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                    Top Spending
+                  </Typography>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        bgcolor: 'rgba(255,255,255,0.8)',
+                      }}
+                    />
+                    <Typography variant="body1" fontWeight={600}>
+                      {smartInsights?.highestCategory.name || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8, ml: 'auto' }}>
+                      {formatCurrency(smartInsights?.highestCategory.amount || 0)}
+                    </Typography>
+                  </Box>
+                </Box>
+                {smartInsights?.savingsTrend && (
+                  <Box>
+                    <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                      Savings Trend
+                    </Typography>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      {smartInsights.savingsTrend === 'improving' ? (
+                        <TrendingUp fontSize="small" />
+                      ) : smartInsights.savingsTrend === 'declining' ? (
+                        <TrendingDown fontSize="small" />
+                      ) : (
+                        <Remove fontSize="small" />
+                      )}
+                      <Typography variant="body1" fontWeight={600} sx={{ textTransform: 'capitalize' }}>
+                        {smartInsights.savingsTrend}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -50,
+                right: -50,
+                width: 200,
+                height: 200,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
           </Paper>
         </Grid>
 
-        {/* Top Categories Pie Chart */}
-        <Grid item xs={12} md={4}>
+        {/* Quick Actions */}
+        <Grid item xs={12} md={6}>
           <Paper
             sx={{
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1306,47 +1277,71 @@ const Dashboard: React.FC = () => {
             }}
           >
             <Typography variant="h5" fontWeight={700} gutterBottom>
-              Top Categories
+              Quick Actions
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              This month breakdown
+              Common tasks at your fingertips
             </Typography>
-            {topCategories.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={topCategories}
-                    cx="50%"
-                    cy="45%"
-                    labelLine={false}
-                    label={false}
-                    outerRadius={90}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {topCategories.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend 
-                    formatter={(_value, entry: any) => {
-                      const name = entry.payload.name.length > 15 
-                        ? entry.payload.name.substring(0, 15) + '...' 
-                        : entry.payload.name;
-                      const percent = ((entry.payload.value / topCategories.reduce((sum, cat) => sum + cat.value, 0)) * 100).toFixed(0);
-                      return `${name} ${percent}% (${formatCurrency(entry.payload.value)})`;
-                    }}
-                    wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }}
-                    iconSize={12}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No category data available</Typography>
-              </Box>
-            )}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AddIcon />}
+                onClick={() => navigate('/transactions')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  bgcolor: 'primary.main',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                Add Transaction
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<Assessment />}
+                onClick={() => navigate('/analytics')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                }}
+              >
+                View Analytics
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<Receipt />}
+                onClick={() => navigate('/budgets')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                }}
+              >
+                Manage Budgets
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<AccountBalance />}
+                onClick={() => navigate('/accounts')}
+                sx={{
+                  justifyContent: 'flex-start',
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                }}
+              >
+                View Accounts
+              </Button>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
@@ -1360,9 +1355,7 @@ const Dashboard: React.FC = () => {
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1410,12 +1403,15 @@ const Dashboard: React.FC = () => {
                           bgcolor: budget.isOver
                             ? '#f44336'
                             : budget.percentage > 80
-                            ? '#ff9800'
-                            : '#4caf50',
+                              ? '#ff9800'
+                              : '#4caf50',
                         },
                       }}
                     />
-                    <Typography variant="caption" color={budget.isOver ? 'error' : 'text.secondary'}>
+                    <Typography
+                      variant="caption"
+                      color={budget.isOver ? 'error' : 'text.secondary'}
+                    >
                       {budget.percentage}% used
                       {budget.isOver && ' - Over budget!'}
                     </Typography>
@@ -1445,9 +1441,7 @@ const Dashboard: React.FC = () => {
               p: 3,
               borderRadius: 3,
               background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'white'
-                  : 'rgba(30, 30, 30, 0.8)',
+                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
               backdropFilter: 'blur(10px)',
               border: (theme) =>
                 theme.palette.mode === 'light'
@@ -1456,7 +1450,7 @@ const Dashboard: React.FC = () => {
             }}
           >
             <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <RepeatIcon color="primary" />
+              <Receipt color="primary" />
               <Typography variant="h5" fontWeight={700}>
                 Upcoming Recurring
               </Typography>
@@ -1501,7 +1495,12 @@ const Dashboard: React.FC = () => {
                         </Box>
                       }
                       secondary={
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5}>
+                        <Box
+                          display="flex"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          mt={0.5}
+                        >
                           <Chip
                             label={txn.frequency}
                             size="small"
@@ -1540,6 +1539,14 @@ const Dashboard: React.FC = () => {
           </Paper>
         </Grid>
       </Grid>
+    </>
+  );
+
+  return (
+    <Box>
+      <PullToRefresh onRefresh={fetchDashboardData}>
+        {content}
+      </PullToRefresh>
     </Box>
   );
 };

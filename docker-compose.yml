@@ -8,21 +8,23 @@ services:
     container_name: digitransac-backend
     ports:
       - "5000:5000"
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - PORT=5000
-      - COSMOS_ENDPOINT=${COSMOS_ENDPOINT}
-      - COSMOS_KEY=${COSMOS_KEY}
-      - COSMOS_DATABASE_NAME=${COSMOS_DATABASE_NAME}
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRE=7d
-      - CORS_ORIGIN=http://localhost:3000
     volumes:
       - ./backend/src:/app/src
       - /app/node_modules
     networks:
       - digitransac-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
     build:
@@ -32,12 +34,19 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
-    environment:
-      - VITE_API_URL=http://localhost:5000/api
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env
     networks:
       - digitransac-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 networks:
   digitransac-network:

@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cosmosDBService } from '../config/cosmosdb';
-import { Tag } from '../models/types';
+import { Tag, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -11,16 +11,16 @@ router.use(authenticate);
 // Helper function to ensure default tags exist
 async function ensureDefaultTags(userId: string): Promise<void> {
   const tagsContainer = await cosmosDBService.getTagsContainer();
-  
+
   const defaultTags = [
     { name: 'expense', color: '#f44336' },
-    { name: 'income', color: '#4caf50' }
+    { name: 'income', color: '#4caf50' },
   ];
 
   for (const defaultTag of defaultTags) {
-    const exists = await tagsContainer.findOne({ 
-      userId, 
-      name: defaultTag.name 
+    const exists = await tagsContainer.findOne({
+      userId,
+      name: defaultTag.name,
     });
 
     if (!exists) {
@@ -31,7 +31,7 @@ async function ensureDefaultTags(userId: string): Promise<void> {
         color: defaultTag.color,
         usageCount: 0,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
       await tagsContainer.insertOne(newTag);
     }
@@ -42,32 +42,30 @@ async function ensureDefaultTags(userId: string): Promise<void> {
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    
+
     // Ensure default tags exist
     await ensureDefaultTags(userId);
-    
-    const tagsContainer = await cosmosDBService.getTagsContainer();
-    const tags = (await tagsContainer
-      .find({ userId })
-      .toArray()) as unknown as Tag[];
 
-    // Sort in-memory to avoid composite index requirement
+    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tags = (await tagsContainer.find({ userId }).toArray()) as unknown as Tag[];
+
+    // Sort in memory for now to avoid index issues
     tags.sort((a, b) => {
       if (a.usageCount !== b.usageCount) {
-        return b.usageCount - a.usageCount; // Descending by usageCount
+        return b.usageCount - a.usageCount;
       }
-      return a.name.localeCompare(b.name); // Ascending by name
+      return a.name.localeCompare(b.name);
     });
 
     res.json({
       success: true,
-      tags
+      tags,
     });
   } catch (error) {
     console.error('Error fetching tags:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching tags'
+      message: 'Error fetching tags',
     });
   }
 });
@@ -81,7 +79,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!name) {
       res.status(400).json({
         success: false,
-        message: 'Tag name is required'
+        message: 'Tag name is required',
       });
       return;
     }
@@ -89,15 +87,15 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const tagsContainer = await cosmosDBService.getTagsContainer();
 
     // Check if tag already exists
-    const existingTag = await tagsContainer.findOne({ 
-      userId, 
-      name: { $regex: new RegExp(`^${name}$`, 'i') } 
+    const existingTag = await tagsContainer.findOne({
+      userId,
+      name: { $regex: new RegExp(`^${name}$`, 'i') },
     });
 
     if (existingTag) {
       res.status(400).json({
         success: false,
-        message: 'Tag with this name already exists'
+        message: 'Tag with this name already exists',
       });
       return;
     }
@@ -109,7 +107,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       color,
       usageCount: 0,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await tagsContainer.insertOne(newTag);
@@ -117,13 +115,13 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(201).json({
       success: true,
       message: 'Tag created successfully',
-      tag: newTag
+      tag: newTag,
     });
   } catch (error) {
     console.error('Error creating tag:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating tag'
+      message: 'Error creating tag',
     });
   }
 });
@@ -141,23 +139,23 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!tag) {
       res.status(404).json({
         success: false,
-        message: 'Tag not found'
+        message: 'Tag not found',
       });
       return;
     }
 
     // Check if new name conflicts with existing tag
     if (name && name !== tag.name) {
-      const existingTag = await tagsContainer.findOne({ 
-        userId, 
+      const existingTag = await tagsContainer.findOne({
+        userId,
         name: { $regex: new RegExp(`^${name}$`, 'i') },
-        id: { $ne: id }
+        id: { $ne: id },
       });
 
       if (existingTag) {
         res.status(400).json({
           success: false,
-          message: 'Tag with this name already exists'
+          message: 'Tag with this name already exists',
         });
         return;
       }
@@ -166,13 +164,10 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const updateData: Partial<Tag> = {
       ...(name && { name: name.trim() }),
       ...(color !== undefined && { color }),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
-    await tagsContainer.updateOne(
-      { id, userId },
-      { $set: updateData }
-    );
+    await tagsContainer.updateOne({ id, userId }, { $set: updateData });
 
     // If name changed, update all transactions using this tag
     if (name && name !== tag.name) {
@@ -188,13 +183,13 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     res.json({
       success: true,
       message: 'Tag updated successfully',
-      tag: updatedTag
+      tag: updatedTag,
     });
   } catch (error) {
     console.error('Error updating tag:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating tag'
+      message: 'Error updating tag',
     });
   }
 });
@@ -207,11 +202,11 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
     const tagsContainer = await cosmosDBService.getTagsContainer();
 
-    const tag = await tagsContainer.findOne({ id, userId }) as unknown as Tag;
+    const tag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
     if (!tag) {
       res.status(404).json({
         success: false,
-        message: 'Tag not found'
+        message: 'Tag not found',
       });
       return;
     }
@@ -227,13 +222,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
     res.json({
       success: true,
-      message: 'Tag deleted successfully'
+      message: 'Tag deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting tag:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting tag'
+      message: 'Error deleting tag',
     });
   }
 });
@@ -243,15 +238,15 @@ router.get('/suggestions', async (req: AuthRequest, res: Response): Promise<void
   try {
     const userId = req.userId!;
     const { query } = req.query;
-    
+
     const tagsContainer = await cosmosDBService.getTagsContainer();
-    
-    let filter: any = { userId };
-    
+
+    const filter: MongoFilter<Tag> = { userId };
+
     if (query) {
-      filter.name = { $regex: query, $options: 'i' };
+      filter.name = { $regex: query as string, $options: 'i' };
     }
-    
+
     const tags = (await tagsContainer
       .find(filter)
       .sort({ usageCount: -1 })
@@ -260,13 +255,13 @@ router.get('/suggestions', async (req: AuthRequest, res: Response): Promise<void
 
     res.json({
       success: true,
-      suggestions: tags.map(t => t.name)
+      suggestions: tags.map((t) => t.name),
     });
   } catch (error) {
     console.error('Error fetching tag suggestions:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching tag suggestions'
+      message: 'Error fetching tag suggestions',
     });
   }
 });

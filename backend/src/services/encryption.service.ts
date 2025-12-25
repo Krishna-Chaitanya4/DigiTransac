@@ -27,10 +27,10 @@ class EncryptionService {
       // In production, use Azure Key Vault
       const credential = new DefaultAzureCredential();
       this.secretClient = new SecretClient(this.keyVaultUrl, credential);
-      
+
       const secret = await this.secretClient.getSecret('master-encryption-key');
       this.masterKey = secret.value!;
-      
+
       console.log('✅ Master encryption key retrieved from Azure Key Vault');
     } catch (error) {
       console.error('❌ Error initializing encryption service:', error);
@@ -55,7 +55,7 @@ class EncryptionService {
     try {
       // Generate random initialization vector (IV)
       const iv = crypto.randomBytes(16);
-      
+
       // Create cipher (GCM mode)
       const cipher = crypto.createCipheriv(
         this.algorithm,

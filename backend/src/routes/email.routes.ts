@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { emailParserService } from '../services/emailParser.service';
 import { cosmosDBService } from '../config/cosmosdb';
 import { randomUUID } from 'crypto';
-import { Expense } from '../models/types';
+import { Transaction, TransactionSplit } from '../models/types';
 
 const router = express.Router();
 
@@ -38,8 +38,8 @@ router.post('/inbound', async (req: Request, res: Response) => {
       return res.status(200).json({ message: 'Not a transaction SMS, ignored' });
     }
 
-    // Parse the transaction
-    const parsedTransaction = emailParserService.parseTransaction(text, from);
+    // Parse the transaction (pass userId for learning)
+    const parsedTransaction = await emailParserService.parseTransaction(text, from, userId);
 
     if (!parsedTransaction) {
       console.log('Could not parse transaction from email');
@@ -55,19 +55,30 @@ router.post('/inbound', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Email integration not enabled' });
     }
 
-    // Suggest category based on merchant
-    const suggestedCategory = emailParserService.suggestCategory(
-      parsedTransaction.merchant,
-      user.emailIntegration?.merchantMappings
-    );
+    // Fallback hierarchy for category suggestion:
+    // 1. MerchantLearning (auto-learned from approvals)
+    // 2. Generic keyword patterns (hardcoded common merchants)
+    // 3. Empty (user will fill during review)
+    const genericCategory = emailParserService.suggestCategory(parsedTransaction.merchant);
 
-    // Create pending expense
-    const expenseContainer = await cosmosDBService.getExpensesContainer();
-    
-    const newExpense: Expense = {
-      id: randomUUID(),
+    const categoryId = parsedTransaction.learnedCategoryId || genericCategory || '';
+    // Priority for account: matched (email/SMS info) > learned (merchant history) > empty (manual)
+    const accountId =
+      parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
+
+    // Create pending transaction
+    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+
+    const transactionId = randomUUID();
+    const splitId = randomUUID();
+
+    const newTransaction: Transaction = {
+      id: transactionId,
       userId: userId,
-      categoryId: suggestedCategory || '', // Empty if no category found
+      accountId: accountId, // Auto-filled from learning
+      categoryId: categoryId, // Auto-filled from learning (legacy field)
+      type: 'debit',
       amount: parsedTransaction.amount,
       description: `${parsedTransaction.merchant} - ${parsedTransaction.bankName}`,
       date: parsedTransaction.date,
@@ -75,6 +86,7 @@ router.post('/inbound', async (req: Request, res: Response) => {
       source: 'email',
       sourceEmailId: emailData.messageId,
       merchantName: parsedTransaction.merchant,
+      tags: parsedTransaction.tags || [], // Auto-detected tags
       parsedData: {
         rawText: parsedTransaction.rawText,
         bankName: parsedTransaction.bankName,
@@ -83,12 +95,25 @@ router.post('/inbound', async (req: Request, res: Response) => {
         confidence: parsedTransaction.confidence,
       },
       reviewStatus: 'pending',
-      notes: '',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    await expenseContainer.insertOne(newExpense);
+    const newSplit: TransactionSplit = {
+      id: splitId,
+      transactionId: transactionId,
+      userId: userId,
+      categoryId: categoryId, // Auto-filled from learning
+      amount: parsedTransaction.amount,
+      tags: parsedTransaction.tags || [], // Auto-detected tags
+      notes: categoryId ? 'Auto-filled from learning' : undefined,
+      order: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await transactionsContainer.insertOne(newTransaction);
+    await splitsContainer.insertOne(newSplit);
 
     // Update user's email integration stats
     await userContainer.updateOne(
@@ -96,23 +121,23 @@ router.post('/inbound', async (req: Request, res: Response) => {
       {
         $set: {
           'emailIntegration.lastProcessedAt': new Date(),
-          'emailIntegration.totalEmailsProcessed': (user?.emailIntegration?.totalEmailsProcessed || 0) + 1,
+          'emailIntegration.totalEmailsProcessed':
+            (user?.emailIntegration?.totalEmailsProcessed || 0) + 1,
         },
       }
     );
 
-    console.log('Created pending expense:', newExpense.id);
+    console.log('Created pending transaction:', newTransaction.id);
 
     return res.status(200).json({
       message: 'Transaction processed successfully',
       expense: {
-        id: newExpense.id,
-        amount: newExpense.amount,
+        id: newTransaction.id,
+        amount: newTransaction.amount,
         merchant: parsedTransaction.merchant,
         status: 'pending',
       },
     });
-
   } catch (error: any) {
     console.error('Error processing inbound email:', error);
     return res.status(500).json({ message: error.message || 'Internal server error' });
@@ -122,7 +147,9 @@ router.post('/inbound', async (req: Request, res: Response) => {
 /**
  * Parse inbound email from Mailgun/SendGrid format
  */
-function parseInboundEmail(body: any): { to: string; from: string; subject: string; text: string; messageId: string } | null {
+function parseInboundEmail(
+  body: any
+): { to: string; from: string; subject: string; text: string; messageId: string } | null {
   try {
     // Mailgun format
     if (body.recipient) {

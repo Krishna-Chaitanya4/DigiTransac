@@ -13,116 +13,116 @@ export const CURRENCIES: Record<string, CurrencyInfo> = {
     code: 'USD',
     symbol: '$',
     name: 'US Dollar',
-    locale: 'en-US'
+    locale: 'en-US',
   },
   EUR: {
     code: 'EUR',
     symbol: '€',
     name: 'Euro',
-    locale: 'en-EU'
+    locale: 'en-EU',
   },
   GBP: {
     code: 'GBP',
     symbol: '£',
     name: 'British Pound',
-    locale: 'en-GB'
+    locale: 'en-GB',
   },
   INR: {
     code: 'INR',
     symbol: '₹',
     name: 'Indian Rupee',
-    locale: 'en-IN'
+    locale: 'en-IN',
   },
   JPY: {
     code: 'JPY',
     symbol: '¥',
     name: 'Japanese Yen',
-    locale: 'ja-JP'
+    locale: 'ja-JP',
   },
   CNY: {
     code: 'CNY',
     symbol: '¥',
     name: 'Chinese Yuan',
-    locale: 'zh-CN'
+    locale: 'zh-CN',
   },
   AUD: {
     code: 'AUD',
     symbol: 'A$',
     name: 'Australian Dollar',
-    locale: 'en-AU'
+    locale: 'en-AU',
   },
   CAD: {
     code: 'CAD',
     symbol: 'C$',
     name: 'Canadian Dollar',
-    locale: 'en-CA'
+    locale: 'en-CA',
   },
   CHF: {
     code: 'CHF',
     symbol: 'CHF',
     name: 'Swiss Franc',
-    locale: 'de-CH'
+    locale: 'de-CH',
   },
   SEK: {
     code: 'SEK',
     symbol: 'kr',
     name: 'Swedish Krona',
-    locale: 'sv-SE'
+    locale: 'sv-SE',
   },
   NZD: {
     code: 'NZD',
     symbol: 'NZ$',
     name: 'New Zealand Dollar',
-    locale: 'en-NZ'
+    locale: 'en-NZ',
   },
   SGD: {
     code: 'SGD',
     symbol: 'S$',
     name: 'Singapore Dollar',
-    locale: 'en-SG'
+    locale: 'en-SG',
   },
   HKD: {
     code: 'HKD',
     symbol: 'HK$',
     name: 'Hong Kong Dollar',
-    locale: 'en-HK'
+    locale: 'en-HK',
   },
   KRW: {
     code: 'KRW',
     symbol: '₩',
     name: 'South Korean Won',
-    locale: 'ko-KR'
+    locale: 'ko-KR',
   },
   BRL: {
     code: 'BRL',
     symbol: 'R$',
     name: 'Brazilian Real',
-    locale: 'pt-BR'
+    locale: 'pt-BR',
   },
   MXN: {
     code: 'MXN',
     symbol: 'MX$',
     name: 'Mexican Peso',
-    locale: 'es-MX'
+    locale: 'es-MX',
   },
   ZAR: {
     code: 'ZAR',
     symbol: 'R',
     name: 'South African Rand',
-    locale: 'en-ZA'
+    locale: 'en-ZA',
   },
   AED: {
     code: 'AED',
     symbol: 'د.إ',
     name: 'UAE Dirham',
-    locale: 'ar-AE'
+    locale: 'ar-AE',
   },
   SAR: {
     code: 'SAR',
     symbol: '﷼',
     name: 'Saudi Riyal',
-    locale: 'ar-SA'
-  }
+    locale: 'ar-SA',
+  },
 };
 
 /**
@@ -153,29 +153,26 @@ export const formatCurrency = (
   decimals: number = 2
 ): string => {
   const currencyInfo = getCurrencyInfo(currencyCode);
-  
+
   // Format the number with appropriate locale
   const formattedAmount = new Intl.NumberFormat(currencyInfo.locale, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(Math.abs(amount));
-  
+
   // Add symbol if requested
   const symbol = showSymbol ? currencyInfo.symbol : '';
   const sign = amount < 0 ? '-' : '';
-  
+
   return `${sign}${symbol}${formattedAmount}`;
 };
 
 /**
  * Format currency with full locale support (using Intl.NumberFormat)
  */
-export const formatCurrencyFull = (
-  amount: number,
-  currencyCode: string = 'USD'
-): string => {
+export const formatCurrencyFull = (amount: number, currencyCode: string = 'USD'): string => {
   const currencyInfo = getCurrencyInfo(currencyCode);
-  
+
   return new Intl.NumberFormat(currencyInfo.locale, {
     style: 'currency',
     currency: currencyInfo.code,

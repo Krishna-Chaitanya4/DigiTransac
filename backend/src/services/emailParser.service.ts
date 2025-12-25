@@ -1,3 +1,8 @@
+import { detectTransactionTags } from '../utils/transactionTags';
+import { getLearnedMapping } from './merchantLearning.service';
+import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
+import { cosmosDBService } from '../config/cosmosdb';
+
 interface ParsedTransaction {
   amount: number;
   merchant: string;
@@ -7,6 +12,10 @@ interface ParsedTransaction {
   transactionId?: string;
   rawText: string;
   confidence: number;
+  tags?: string[]; // Auto-detected tags
+  learnedCategoryId?: string; // Auto-filled from learning
+  learnedAccountId?: string; // Auto-filled from learning
+  matchedAccountId?: string; // Auto-matched from email account info
 }
 
 // Top 10 Indian Bank SMS Patterns
@@ -16,12 +25,14 @@ const BANK_PATTERNS = [
     senders: ['HDFCBK', 'HDFC'],
     patterns: [
       {
-        regex: /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent|paid).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+?)(?:\s+on|\s+at|\s*\.|\s+Avl)/i,
+        regex:
+          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent|paid).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+?)(?:\s+on|\s+at|\s*\.|\s+Avl)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
       {
-        regex: /(?:debited|spent).*?(?:Rs\.?|INR)\s*([\d,]+\.?\d*).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:debited|spent).*?(?:Rs\.?|INR)\s*([\d,]+\.?\d*).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -34,7 +45,8 @@ const BANK_PATTERNS = [
     senders: ['ICICIB', 'ICICI'],
     patterns: [
       {
-        regex: /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:spent|debited).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+?)(?:\s+on|\.|Card)/i,
+        regex:
+          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:spent|debited).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+?)(?:\s+on|\.|Card)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -47,7 +59,8 @@ const BANK_PATTERNS = [
     senders: ['SBIIN', 'SBI'],
     patterns: [
       {
-        regex: /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|withdrawn).*?(?:at|from)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|withdrawn).*?(?:at|from)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -60,7 +73,8 @@ const BANK_PATTERNS = [
     senders: ['AXISBK', 'AXIS'],
     patterns: [
       {
-        regex: /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:spent|debited).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:spent|debited).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -73,7 +87,8 @@ const BANK_PATTERNS = [
     senders: ['KOTAKB', 'KOTAK'],
     patterns: [
       {
-        regex: /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -86,7 +101,8 @@ const BANK_PATTERNS = [
     senders: ['PNBSMS', 'PNB'],
     patterns: [
       {
-        regex: /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -99,7 +115,8 @@ const BANK_PATTERNS = [
     senders: ['BOBIN', 'BOB'],
     patterns: [
       {
-        regex: /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -112,7 +129,8 @@ const BANK_PATTERNS = [
     senders: ['CANBNK', 'CANARA'],
     patterns: [
       {
-        regex: /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -125,7 +143,8 @@ const BANK_PATTERNS = [
     senders: ['UBOI', 'UNION'],
     patterns: [
       {
-        regex: /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -138,7 +157,8 @@ const BANK_PATTERNS = [
     senders: ['IDBIBN', 'IDBI'],
     patterns: [
       {
-        regex: /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
+        regex:
+          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -152,10 +172,14 @@ export class EmailParserService {
   /**
    * Parse transaction SMS/email text
    */
-  public parseTransaction(text: string, sender?: string): ParsedTransaction | null {
+  public async parseTransaction(
+    text: string,
+    sender?: string,
+    userId?: string
+  ): Promise<ParsedTransaction | null> {
     // Try to identify bank from sender or text
     const bank = this.identifyBank(text, sender);
-    
+
     if (!bank) {
       console.log('Could not identify bank from text:', text.substring(0, 100));
       return null;
@@ -164,7 +188,7 @@ export class EmailParserService {
     // Try each pattern for this bank
     for (const pattern of bank.patterns) {
       const match = text.match(pattern.regex);
-      
+
       if (match) {
         try {
           // Extract amount
@@ -179,6 +203,9 @@ export class EmailParserService {
           let merchant = match[pattern.merchantGroup].trim();
           merchant = this.cleanMerchantName(merchant);
 
+          // Normalize merchant name for consistency
+          const normalizedMerchant = normalizeMerchantName(merchant);
+
           // Extract card last 4 digits
           const cardMatch = text.match(bank.cardPattern);
           const cardLast4 = cardMatch ? cardMatch[1] : undefined;
@@ -190,15 +217,48 @@ export class EmailParserService {
           // Extract transaction ID if present
           const transactionId = this.extractTransactionId(text);
 
+          // Auto-detect and assign tags (email transactions are typically debits)
+          const tagDetection = detectTransactionTags('debit', text, normalizedMerchant);
+
+          // Check if we have learned category/account for this merchant
+          let learnedCategoryId: string | undefined;
+          let learnedAccountId: string | undefined;
+
+          if (userId && normalizedMerchant) {
+            const learned = await getLearnedMapping(userId, normalizedMerchant);
+            if (learned) {
+              learnedCategoryId = learned.categoryId;
+              learnedAccountId = learned.accountId;
+            }
+          }
+
+          // Match email account info to user's accounts
+          let matchedAccountId: string | undefined;
+
+          if (userId && (bank.name || cardLast4)) {
+            try {
+              const accountsContainer = await cosmosDBService.getAccountsContainer();
+              matchedAccountId =
+                (await matchAccount(userId, accountsContainer as any, bank.name, cardLast4)) ||
+                undefined;
+            } catch (error) {
+              // Account matching failed, continue without it
+            }
+          }
+
           return {
             amount,
-            merchant,
+            merchant: normalizedMerchant,
             date,
             bankName: bank.name,
             cardLast4,
             transactionId,
             rawText: text,
-            confidence: this.calculateConfidence(amount, merchant, bank.name),
+            confidence: this.calculateConfidence(amount, normalizedMerchant, bank.name),
+            tags: tagDetection.tags,
+            learnedCategoryId,
+            learnedAccountId,
+            matchedAccountId,
           };
         } catch (error) {
           console.error('Error parsing transaction:', error);
@@ -214,7 +274,7 @@ export class EmailParserService {
   /**
    * Identify bank from sender or text content
    */
-  private identifyBank(text: string, sender?: string): typeof BANK_PATTERNS[0] | null {
+  private identifyBank(text: string, sender?: string): (typeof BANK_PATTERNS)[0] | null {
     const searchText = (sender || '') + ' ' + text;
 
     for (const bank of BANK_PATTERNS) {
@@ -243,7 +303,7 @@ export class EmailParserService {
     merchant = merchant
       .toLowerCase()
       .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
 
     return merchant;
@@ -255,8 +315,18 @@ export class EmailParserService {
   private parseDate(dateStr: string): Date {
     // Handle DD-MMM-YY or DD-MMM-YYYY
     const monthMap: { [key: string]: number } = {
-      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
     };
 
     const match = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{2,4})/i);
@@ -264,7 +334,7 @@ export class EmailParserService {
       const day = parseInt(match[1]);
       const month = monthMap[match[2].toLowerCase()];
       let year = parseInt(match[3]);
-      
+
       // Handle 2-digit year
       if (year < 100) {
         year += 2000;
@@ -274,12 +344,12 @@ export class EmailParserService {
     }
 
     // Handle DD/MM/YYYY or DD-MM-YYYY
-    const match2 = dateStr.match(/(\d{2})[\/-](\d{2})[\/-](\d{2,4})/);
+    const match2 = dateStr.match(/(\d{2})[/-](\d{2})[/-](\d{2,4})/);
     if (match2) {
       const day = parseInt(match2[1]);
       const month = parseInt(match2[2]) - 1;
       let year = parseInt(match2[3]);
-      
+
       if (year < 100) {
         year += 2000;
       }
@@ -318,29 +388,33 @@ export class EmailParserService {
   }
 
   /**
-   * Suggest category based on merchant name
+   * Suggest category based on merchant name using generic keyword patterns
+   * This is a fallback when MerchantLearning has no data
    */
-  public suggestCategory(merchant: string, userMappings?: { merchantKeyword: string; categoryId: string }[]): string | null {
+  public suggestCategory(merchant: string): string | null {
     const merchantLower = merchant.toLowerCase();
 
-    // Check user's custom mappings first
-    if (userMappings) {
-      for (const mapping of userMappings) {
-        if (merchantLower.includes(mapping.merchantKeyword.toLowerCase())) {
-          return mapping.categoryId;
-        }
-      }
-    }
-
-    // Default category suggestions based on keywords
+    // Generic category suggestions based on common keywords
     const categoryKeywords: { [key: string]: string[] } = {
-      'Food & Dining': ['swiggy', 'zomato', 'restaurant', 'cafe', 'coffee', 'pizza', 'burger', 'mcdonald', 'kfc', 'dominos', 'subway'],
-      'Groceries': ['bigbasket', 'grofer', 'dmart', 'reliance', 'more', 'supermarket', 'grocery'],
-      'Transport': ['uber', 'ola', 'rapido', 'fuel', 'petrol', 'diesel', 'gas', 'parking'],
-      'Shopping': ['amazon', 'flipkart', 'myntra', 'ajio', 'nykaa', 'mall', 'shop'],
-      'Utilities': ['electricity', 'water', 'gas', 'broadband', 'internet', 'mobile', 'recharge'],
-      'Entertainment': ['netflix', 'prime', 'hotstar', 'spotify', 'movie', 'cinema', 'pvr', 'inox'],
-      'Healthcare': ['pharmacy', 'hospital', 'clinic', 'doctor', 'medical', 'apollo', 'netmeds'],
+      'Food & Dining': [
+        'swiggy',
+        'zomato',
+        'restaurant',
+        'cafe',
+        'coffee',
+        'pizza',
+        'burger',
+        'mcdonald',
+        'kfc',
+        'dominos',
+        'subway',
+      ],
+      Groceries: ['bigbasket', 'grofer', 'dmart', 'reliance', 'more', 'supermarket', 'grocery'],
+      Transport: ['uber', 'ola', 'rapido', 'fuel', 'petrol', 'diesel', 'gas', 'parking'],
+      Shopping: ['amazon', 'flipkart', 'myntra', 'ajio', 'nykaa', 'mall', 'shop'],
+      Utilities: ['electricity', 'water', 'gas', 'broadband', 'internet', 'mobile', 'recharge'],
+      Entertainment: ['netflix', 'prime', 'hotstar', 'spotify', 'movie', 'cinema', 'pvr', 'inox'],
+      Healthcare: ['pharmacy', 'hospital', 'clinic', 'doctor', 'medical', 'apollo', 'netmeds'],
     };
 
     for (const [category, keywords] of Object.entries(categoryKeywords)) {
@@ -360,12 +434,20 @@ export class EmailParserService {
   public isTransactionSMS(text: string): boolean {
     // Check for common transaction keywords
     const keywords = [
-      'debited', 'spent', 'withdrawn', 'paid', 'payment',
-      'rs', 'inr', 'rupees', 'card', 'account'
+      'debited',
+      'spent',
+      'withdrawn',
+      'paid',
+      'payment',
+      'rs',
+      'inr',
+      'rupees',
+      'card',
+      'account',
     ];
 
     const lowerText = text.toLowerCase();
-    return keywords.some(keyword => lowerText.includes(keyword));
+    return keywords.some((keyword) => lowerText.includes(keyword));
   }
 }
 

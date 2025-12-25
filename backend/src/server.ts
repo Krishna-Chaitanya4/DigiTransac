@@ -8,29 +8,25 @@ import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
 import { requestIdMiddleware } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
-import { globalLimiter, authLimiter } from './middleware/rateLimiter';
+import { globalLimiter } from './middleware/rateLimiter';
 import { validateConfig } from './utils/configValidator';
+import { validateEnv } from './utils/envValidator';
+import { setupSwagger } from './config/swagger';
 import { cosmosDBService } from './config/cosmosdb';
 import { encryptionService } from './services/encryption.service';
-import authRoutes from './routes/auth.routes';
-import userRoutes from './routes/user.routes';
-import categoryRoutes from './routes/category.routes';
-import budgetRoutes from './routes/budget.routes';
-import analyticsRoutes from './routes/analytics.routes';
-import emailRoutes from './routes/email.routes';
-import gmailRoutes from './routes/gmail.routes';
-import accountRoutes from './routes/account.routes';
-import tagRoutes from './routes/tag.routes';
-import transactionRoutes from './routes/transaction.routes';
 import configRoutes from './routes/config.routes';
+import v1Routes from './routes/v1';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
 import { startRecurringTransactionsJob } from './jobs/recurringTransactions.job';
 
 // Load environment variables
 dotenv.config();
 
+// Validate environment variables
+validateEnv();
+
 const app: Application = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 // Validate configuration on startup
 validateConfig();
@@ -42,35 +38,64 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS configuration - support multiple origins
-const allowedOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
   : ['http://localhost:3000'];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // In production, reject requests without origin
-    if (!origin && process.env.NODE_ENV === 'production') {
-      return callback(new Error('Not allowed by CORS'));
-    }
-    // Allow requests with no origin in development (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+logger.info({ allowedOrigins }, '🔒 CORS configuration loaded');
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      logger.debug({ origin }, '📡 CORS request received');
+
+      // In production, reject requests without origin
+      if (!origin && process.env.NODE_ENV === 'production') {
+        logger.warn('CORS request rejected - no origin in production');
+        return callback(new Error('Not allowed by CORS'));
+      }
+      // Allow requests with no origin in development (like mobile apps or curl)
+      if (!origin) {
+        logger.debug('No origin - allowing (development mode)');
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        logger.debug({ origin }, 'Origin allowed');
+        callback(null, true);
+      } else {
+        logger.warn({ origin }, 'Origin blocked by CORS policy');
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  })
+);
 
 app.use(compression());
-app.use(requestIdMiddleware as any);
-app.use(httpLogger as any);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(requestIdMiddleware as express.RequestHandler);
+app.use(httpLogger as express.RequestHandler);
+
+// Log all OPTIONS requests for debugging
+app.options('*', (req, res) => {
+  logger.debug(
+    {
+      url: req.url,
+      origin: req.headers.origin,
+      method: req.method,
+    },
+    '🔍 OPTIONS preflight request received'
+  );
+  res.status(204).end();
+});
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
 app.use(globalLimiter);
 
@@ -81,39 +106,60 @@ app.get('/ping', (_req, res) => {
 
 // Readiness probe - checks if DB is initialized
 app.get('/health', async (_req, res) => {
+  const healthCheckTimeout = setTimeout(() => {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'timeout',
+      error: 'Health check timeout',
+    });
+  }, 5000); // 5 second timeout
+
   try {
-   // Simple check: just verify DB service is initialized
+    // Simple check: just verify DB service is initialized
     const isInitialized = cosmosDBService.usersContainer !== null;
-    
-    res.status(isInitialized ? 200 : 503).json({ 
-      status: isInitialized ? 'healthy' : 'unhealthy', 
+
+    clearTimeout(healthCheckTimeout);
+    res.status(isInitialized ? 200 : 503).json({
+      status: isInitialized ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
       database: isInitialized ? 'initialized' : 'not initialized',
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
     });
   } catch (error) {
-    res.status(503).json({ 
-      status: 'unhealthy', 
+    clearTimeout(healthCheckTimeout);
+    res.status(503).json({
+      status: 'unhealthy',
       timestamp: new Date().toISOString(),
       database: 'error',
-      error: 'Health check failed'
+      error: 'Health check failed',
     });
   }
 });
 
+// API Documentation
+setupSwagger(app);
+
 // API Routes
+// Config route (unversioned for now)
 app.use('/api/config', configRoutes);
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/budgets', budgetRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/email', emailRoutes);
-app.use('/api/gmail', gmailRoutes);
-app.use('/api/accounts', accountRoutes);
-app.use('/api/tags', tagRoutes);
-app.use('/api/transactions', transactionRoutes);
+
+// v1 API Routes
+app.use('/api/v1', v1Routes);
+
+// Legacy routes (backward compatibility) - redirect to v1
+app.use('/api/auth', (req, res) => res.redirect(308, `/api/v1/auth${req.url}`));
+app.use('/api/users', (req, res) => res.redirect(308, `/api/v1/users${req.url}`));
+app.use('/api/categories', (req, res) => res.redirect(308, `/api/v1/categories${req.url}`));
+app.use('/api/budgets', (req, res) => res.redirect(308, `/api/v1/budgets${req.url}`));
+app.use('/api/analytics', (req, res) => res.redirect(308, `/api/v1/analytics${req.url}`));
+app.use('/api/email', (req, res) => res.redirect(308, `/api/v1/email${req.url}`));
+app.use('/api/gmail', (req, res) => res.redirect(308, `/api/v1/gmail${req.url}`));
+app.use('/api/accounts', (req, res) => res.redirect(308, `/api/v1/accounts${req.url}`));
+app.use('/api/tags', (req, res) => res.redirect(308, `/api/v1/tags${req.url}`));
+app.use('/api/transactions', (req, res) => res.redirect(308, `/api/v1/transactions${req.url}`));
+app.use('/api/sms', (req, res) => res.redirect(308, `/api/v1/sms${req.url}`));
 
 // Error handling
 app.use(errorHandler);
@@ -123,21 +169,22 @@ const startServer = async () => {
   try {
     // Initialize Cosmos DB connection
     await cosmosDBService.initialize();
-    
+
     // Initialize encryption service
     await encryptionService.initialize();
-    
+
     // Start email polling cron job
     startEmailPollingJob();
-    
+
     // Start recurring transactions cron job
     startRecurringTransactionsJob();
-    
-    // Start server
-    app.listen(PORT, () => {
+
+    // Start server - listen on all network interfaces for mobile testing
+    app.listen(PORT, '0.0.0.0', () => {
       logger.info(`🚀 Server is running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
       logger.info(`✅ Cosmos DB connected and ready`);
+      logger.info(`📱 Network: http://192.168.0.11:${PORT}`);
     });
   } catch (error) {
     logger.error({ error }, '❌ Failed to start server');
@@ -146,5 +193,24 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal: string) => {
+  logger.info(`${signal} signal received: closing HTTP server`);
+
+  try {
+    // Close database connection
+    await cosmosDBService.close();
+
+    logger.info('✅ Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    logger.error({ error }, '❌ Error during graceful shutdown');
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;

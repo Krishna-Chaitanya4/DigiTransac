@@ -9,32 +9,35 @@ export const globalLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  
+
   // Skip health check and ping endpoints
   skip: (req: Request) => {
     return req.path === '/health' || req.path === '/ping';
   },
-  
+
   // Custom handler for rate limit exceeded
   handler: (req: Request, res: Response) => {
-    logger.warn({
-      ip: req.ip,
-      url: req.url,
-      method: req.method
-    }, 'Rate limit exceeded');
-    
+    logger.warn(
+      {
+        ip: req.ip,
+        url: req.url,
+        method: req.method,
+      },
+      'Rate limit exceeded'
+    );
+
     res.status(429).json({
       success: false,
       error: 'Too many requests. Please try again later.',
-      retryAfter: res.getHeader('Retry-After')
+      retryAfter: res.getHeader('Retry-After'),
     });
   },
 
   // Skip successful requests in count (optional - only count failed requests)
   skipSuccessfulRequests: false,
-  
+
   // Skip failed requests in count
-  skipFailedRequests: false
+  skipFailedRequests: false,
 });
 
 // Strict rate limiter for authentication endpoints
@@ -44,20 +47,23 @@ export const authLimiter = rateLimit({
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  
+
   handler: (req: Request, res: Response) => {
-    logger.warn({
-      ip: req.ip,
-      url: req.url,
-      method: req.method
-    }, 'Auth rate limit exceeded - potential brute force attack');
-    
+    logger.warn(
+      {
+        ip: req.ip,
+        url: req.url,
+        method: req.method,
+      },
+      'Auth rate limit exceeded - potential brute force attack'
+    );
+
     res.status(429).json({
       success: false,
       error: 'Too many login attempts. Please try again after 15 minutes.',
-      retryAfter: res.getHeader('Retry-After')
+      retryAfter: res.getHeader('Retry-After'),
     });
-  }
+  },
 });
 
 // API rate limiter - more generous for authenticated API calls
@@ -67,7 +73,7 @@ export const apiLimiter = rateLimit({
   message: 'API rate limit exceeded.',
   standardHeaders: true,
   legacyHeaders: false,
-  
+
   // Don't use custom keyGenerator - let express-rate-limit handle IP properly
   // It will use userId from skip function if we need user-based limiting
   skip: (req: Request) => {
@@ -79,20 +85,23 @@ export const apiLimiter = rateLimit({
     }
     return false;
   },
-  
+
   handler: (req: Request, res: Response) => {
     const userId = (req as any).userId;
-    logger.warn({
-      userId: userId || 'anonymous',
-      ip: req.ip,
-      url: req.url,
-      method: req.method
-    }, 'API rate limit exceeded');
-    
+    logger.warn(
+      {
+        userId: userId || 'anonymous',
+        ip: req.ip,
+        url: req.url,
+        method: req.method,
+      },
+      'API rate limit exceeded'
+    );
+
     res.status(429).json({
       success: false,
       error: 'API rate limit exceeded. Please slow down your requests.',
-      retryAfter: res.getHeader('Retry-After')
+      retryAfter: res.getHeader('Retry-After'),
     });
-  }
+  },
 });

@@ -6,23 +6,18 @@ export interface User {
   lastName: string;
   currency: string;
   emailIntegration?: EmailIntegration;
-  
-  // FUTURE: Multi-user settings (optional, for future expansion)
-  upiId?: string; // For UPI payments between users
-  phoneNumber?: string; // For notifications and UPI
-  
-  // FUTURE: Location tracking preferences (optional, for geo features)
-  locationSettings?: {
-    enabled: boolean;                           // Master toggle
-    captureMode: 'always' | 'ask' | 'never';   // When to capture
-    precision: 'exact' | 'approximate';         // Privacy level (exact GPS or rounded)
-    saveHistory: boolean;                       // Whether to store location data
-    sharePrecision?: 'exact' | 'city' | 'none'; // For future group features
-  };
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
+
+// MongoDB filter helper type (simplified for flexibility)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type MongoFilter<T> = Partial<Record<keyof T, any>> & {
+  $or?: MongoFilter<T>[];
+  $and?: MongoFilter<T>[];
+  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+};
 
 export interface EmailIntegration {
   enabled: boolean;
@@ -34,14 +29,7 @@ export interface EmailIntegration {
   lastProcessedAt?: Date;
   lastHistoryId?: string; // Gmail History ID for incremental delta sync
   totalEmailsProcessed: number;
-  merchantMappings?: MerchantCategoryMapping[];
   customBankPatterns?: BankPattern[];
-}
-
-export interface MerchantCategoryMapping {
-  merchantKeyword: string;
-  categoryId: string;
-  createdAt: Date;
 }
 
 export interface BankPattern {
@@ -120,12 +108,32 @@ export interface RecurrencePattern {
 export interface Budget {
   id: string;
   userId: string;
-  categoryId: string;
+  name?: string; // Optional user-defined name for the budget
+
+  // Budget scope - what to track (AND logic between types, OR logic within each type)
+  categoryIds?: string[]; // Track these categories (OR logic: cat1 OR cat2 OR cat3)
+  includeTagIds?: string[]; // Transactions MUST have at least one of these tags (OR logic)
+  excludeTagIds?: string[]; // Transactions must NOT have any of these tags (OR logic)
+  accountIds?: string[]; // Track these accounts (OR logic: acc1 OR acc2)
+
+  // Budget calculation type
+  calculationType: 'debit' | 'net'; // debit=total expenses, net=expenses after refunds (debit-credit)
+
   amount: number;
-  period: 'monthly' | 'yearly' | 'custom';
+  period: 'this-month' | 'next-month' | 'this-year' | 'custom';
   startDate: Date;
   endDate?: Date;
-  alertThreshold: number;
+
+  // Alert configuration
+  alertThreshold: number; // Primary threshold (percentage)
+  alertThresholds?: number[]; // Multiple thresholds (e.g., [50, 80, 100])
+  notificationChannels?: ('in-app' | 'email')[]; // Where to send alerts
+
+  // Rollover configuration
+  enableRollover?: boolean; // Allow unused budget to roll over to next period
+  rolloverLimit?: number; // Max amount that can roll over (optional cap)
+  rolledOverAmount?: number; // Amount rolled over from previous period
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -162,72 +170,39 @@ export interface Account {
 export interface Transaction {
   id: string;
   userId: string;
-  
+
   // CORE FIELDS
   type: 'credit' | 'debit'; // Money IN or OUT
   amount: number; // Always positive (total amount - sum of all splits)
   accountId: string; // Which account this affects
-  
+
   // CLASSIFICATION (DEPRECATED - use splits instead, kept for backwards compatibility)
   categoryId?: string; // @deprecated Use splits[0].categoryId instead
   tags?: string[]; // @deprecated Use splits[].tags instead
-  
+
   description: string;
-  
-  // TRANSACTION DETAILS
   date: Date;
-  notes?: string;
-  
+
   // RECURRENCE
   isRecurring: boolean;
   recurrencePattern?: RecurrencePattern;
-  
-  // SOURCE & PARSING
-  source?: 'manual' | 'email' | 'sms' | 'api';
+
+  // SOURCE & PARSING (for email/SMS imports)
+  source?: 'manual' | 'email' | 'sms' | 'api' | 'transfer';
   sourceEmailId?: string;
   merchantName?: string;
   parsedData?: ParsedTransactionData;
-  
+
   // REVIEW & APPROVAL
   reviewStatus: 'pending' | 'approved' | 'rejected';
-  reviewedAt?: Date; // When transaction was approved/rejected
-  rejectionReason?: string; // Why transaction was rejected
-  confidence?: number; // 0-100, parser confidence score
-  originalContent?: string; // Original email/SMS content for reference
-  
-  // LINKED TRANSACTIONS (for transfers)
-  linkedTransactionId?: string; // If this is part of a transfer, links to the other side
-  
-  // FUTURE: MULTI-USER & COLLABORATION (Optional fields for future expansion)
-  organizationId?: string; // For shared expenses in organizations/groups
-  paidBy?: string; // userId who actually paid (defaults to userId for single-user mode)
-  sharedWith?: string[]; // Array of userIds this transaction is shared with
-  
-  // FUTURE: PAYMENT INTEGRATION (Optional fields for future UPI/payment tracking)
-  paymentMethodType?: 'upi' | 'card' | 'bank' | 'cash' | 'other';
-  upiTransactionId?: string; // UPI transaction reference ID
-  paymentStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  
-  // FUTURE: INTER-USER TRANSACTIONS (Optional fields for send/receive between users)
-  counterpartyUserId?: string; // The other user in a send/receive transaction
-  settlementStatus?: 'pending_approval' | 'approved' | 'rejected' | 'settled';
-  settlementProof?: string; // URL to payment proof/receipt
-  
-  // FUTURE: LOCATION TRACKING (Optional fields for geo-based analytics)
-  location?: {
-    latitude: number;
-    longitude: number;
-    address?: string;           // Full address
-    placeName?: string;         // Merchant/place name (e.g., "Starbucks")
-    city?: string;
-    state?: string;
-    country?: string;
-    postalCode?: string;
-    accuracy?: number;          // GPS accuracy in meters
-    source?: 'gps' | 'manual' | 'ip' | 'email';  // How location was obtained
-  };
-  locationCapturedAt?: Date;    // Timestamp when location was captured
-  
+  reviewedAt?: Date;
+  rejectionReason?: string;
+  confidence?: number; // Parser confidence score (0-100)
+  originalContent?: string; // Original email/SMS for reference
+
+  // LINKED TRANSACTIONS (for transfers between accounts)
+  linkedTransactionId?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -237,18 +212,18 @@ export interface TransactionSplit {
   id: string;
   transactionId: string; // References Transaction.id
   userId: string; // Denormalized for faster queries
-  
+
   // CLASSIFICATION
   categoryId: string; // Each split has its own category
   amount: number; // Amount for this split (must be positive)
-  
+
   // TAGS - Each split can have its own tags
   tags: string[]; // Flexible labels per split
-  
+
   // OPTIONAL
   notes?: string; // Split-specific notes
   order: number; // Display order (1, 2, 3...)
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -264,69 +239,15 @@ export interface Tag {
   updatedAt: Date;
 }
 
-// FUTURE: Organization/Group support (for multi-user features)
-// These interfaces are ready but not yet implemented in the API
-export interface Organization {
+// Merchant Learning - Remembers user's category/account choices for merchants
+export interface MerchantLearning {
   id: string;
-  name: string;
-  ownerId: string; // User who created the organization
-  memberCount: number;
-  plan: 'free' | 'premium' | 'enterprise';
-  settings: {
-    allowMemberInvites: boolean;
-    requireApprovalForExpenses: boolean;
-    currency: string;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface OrganizationMember {
-  id: string;
-  organizationId: string;
   userId: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  permissions: string[];
-  invitedBy?: string;
-  joinedAt: Date;
-}
-
-// FUTURE: Settlement tracking (for split expenses between users)
-export interface Settlement {
-  id: string;
-  transactionId: string; // Original transaction being settled
-  fromUserId: string; // Who owes money
-  toUserId: string; // Who is owed money
-  amount: number;
-  currency: string;
-  status: 'pending_approval' | 'approved' | 'rejected' | 'completed';
-  paymentMethod?: 'upi' | 'bank_transfer' | 'cash' | 'other';
-  upiTransactionId?: string;
-  proofUrl?: string; // Receipt/screenshot URL
-  notes?: string;
-  dueDate?: Date;
-  completedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// FUTURE: Pending actions/notifications queue
-export interface PendingAction {
-  id: string;
-  userId: string; // Who needs to take action
-  type: 'transaction_approval' | 'settlement_request' | 'organization_invite' | 'split_expense_invite';
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
-  priority: 'low' | 'medium' | 'high';
-  
-  // Related entities
-  relatedTransactionId?: string;
-  relatedSettlementId?: string;
-  relatedOrganizationId?: string;
-  fromUserId?: string; // Who initiated this action
-  
-  data: any; // Flexible payload for action-specific data
-  expiresAt?: Date;
-  actionTakenAt?: Date;
+  merchantName: string; // Normalized merchant name (lowercase, trimmed)
+  categoryId: string; // Learned category
+  accountId?: string; // Learned account (optional)
+  usageCount: number; // How many times this mapping was used
+  lastUsedAt: Date; // Most recent usage
   createdAt: Date;
   updatedAt: Date;
 }

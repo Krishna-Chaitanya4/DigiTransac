@@ -1,6 +1,6 @@
 /**
  * Migration Script: Convert existing transactions to use split model
- * 
+ *
  * This script:
  * 1. Finds all transactions without splits
  * 2. Creates a single split for each transaction using its categoryId and tags
@@ -35,7 +35,7 @@ async function migrateToSplits() {
       try {
         // Check if splits already exist for this transaction
         const existingSplits = await splitsContainer.findOne({ transactionId: transaction.id });
-        
+
         if (existingSplits) {
           console.log(`⏭️  Transaction ${transaction.id} already has splits, skipping`);
           skippedCount++;
@@ -60,13 +60,15 @@ async function migrateToSplits() {
           notes: undefined,
           order: 1,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
 
         await splitsContainer.insertOne(split);
-        
+
         migratedCount++;
-        console.log(`✅ Migrated transaction ${transaction.id} (${transaction.description || 'No description'})`);
+        console.log(
+          `✅ Migrated transaction ${transaction.id} (${transaction.description || 'No description'})`
+        );
       } catch (error) {
         errorCount++;
         console.error(`❌ Error migrating transaction ${transaction.id}:`, error);
