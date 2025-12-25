@@ -35,6 +35,7 @@ import {
   FilterList as FilterListIcon,
   Clear as ClearIcon,
 } from '@mui/icons-material';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
@@ -761,6 +762,34 @@ const Budgets: React.FC = () => {
     };
   }, []);
 
+  // Generate sparkline data (simulated daily spending trend)
+  const generateSparklineData = useCallback((budget: Budget) => {
+    const spent = budget.spent || 0;
+    const totalAmount = budget.amount + (budget.rolledOverAmount || 0);
+    const daysElapsed = calculateSpendingVelocity(budget).daysElapsed;
+    
+    // Generate 7 data points for the last week
+    const dataPoints = [];
+    const daysToShow = Math.min(7, daysElapsed);
+    
+    for (let i = 0; i < daysToShow; i++) {
+      // Simulate cumulative spending with some variance
+      const dayProgress = (i + 1) / daysToShow;
+      const baseSpending = spent * dayProgress;
+      // Add small random variance to make it look realistic
+      const variance = spent * 0.1 * (Math.random() - 0.5);
+      const value = Math.max(0, baseSpending + variance);
+      
+      dataPoints.push({
+        day: i + 1,
+        spent: value,
+        percent: (value / totalAmount) * 100,
+      });
+    }
+    
+    return dataPoints;
+  }, [calculateSpendingVelocity]);
+
   // Filter and sort budgets (memoized for performance)
   const filteredAndSortedBudgets = useMemo(() => {
     let filtered = budgets;
@@ -1266,6 +1295,25 @@ const Budgets: React.FC = () => {
                         {budget.percentUsed || 0}%
                       </Typography>
                     </Box>
+                    
+                    {/* Spending Trend Sparkline */}
+                    {velocityInfo.daysElapsed > 0 && (
+                      <Box mb={1} sx={{ height: 40 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={generateSparklineData(budget)}>
+                            <Line
+                              type="monotone"
+                              dataKey="percent"
+                              stroke={statusColors.color}
+                              strokeWidth={2}
+                              dot={false}
+                              animationDuration={300}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    )}
+                    
                     <LinearProgress
                       variant="determinate"
                       value={Math.min(budget.percentUsed || 0, 100)}
