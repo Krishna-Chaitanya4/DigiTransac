@@ -132,6 +132,93 @@ const Budgets: React.FC = () => {
   // Inline editing state
   const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
   const [editingAmountValue, setEditingAmountValue] = useState<string>('');
+  
+  // Template dialog state
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // Budget Templates (industry-standard categories)
+  const budgetTemplates = useMemo(() => [
+    {
+      id: 'groceries',
+      name: '🛒 Groceries',
+      description: 'Food and household essentials',
+      amount: 10000,
+      calculationType: 'debit' as const,
+      icon: '🛒',
+    },
+    {
+      id: 'dining',
+      name: '🍽️ Dining Out',
+      description: 'Restaurants and food delivery',
+      amount: 5000,
+      calculationType: 'debit' as const,
+      icon: '🍽️',
+    },
+    {
+      id: 'transportation',
+      name: '🚗 Transportation',
+      description: 'Fuel, parking, and commute',
+      amount: 8000,
+      calculationType: 'net' as const,
+      icon: '🚗',
+    },
+    {
+      id: 'entertainment',
+      name: '🎬 Entertainment',
+      description: 'Movies, games, and fun',
+      amount: 3000,
+      calculationType: 'debit' as const,
+      icon: '🎬',
+    },
+    {
+      id: 'shopping',
+      name: '🛍️ Shopping',
+      description: 'Clothes, accessories, and more',
+      amount: 7000,
+      calculationType: 'net' as const,
+      icon: '🛍️',
+    },
+    {
+      id: 'healthcare',
+      name: '⚕️ Healthcare',
+      description: 'Medical expenses and pharmacy',
+      amount: 5000,
+      calculationType: 'debit' as const,
+      icon: '⚕️',
+    },
+    {
+      id: 'utilities',
+      name: '💡 Utilities',
+      description: 'Electricity, water, internet',
+      amount: 4000,
+      calculationType: 'debit' as const,
+      icon: '💡',
+    },
+    {
+      id: 'subscriptions',
+      name: '📱 Subscriptions',
+      description: 'Netflix, Spotify, apps, etc.',
+      amount: 2000,
+      calculationType: 'debit' as const,
+      icon: '📱',
+    },
+    {
+      id: 'personal',
+      name: '💆 Personal Care',
+      description: 'Salon, spa, grooming',
+      amount: 3000,
+      calculationType: 'debit' as const,
+      icon: '💆',
+    },
+    {
+      id: 'education',
+      name: '📚 Education',
+      description: 'Courses, books, learning',
+      amount: 5000,
+      calculationType: 'debit' as const,
+      icon: '📚',
+    },
+  ], []);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -383,6 +470,30 @@ const Budgets: React.FC = () => {
     setIsManualDateEdit(false);
     setOpenDialog(true);
   }, [getMonthDateRange]);
+
+  const handleCreateFromTemplate = useCallback((template: typeof budgetTemplates[0]) => {
+    const { startDate, endDate } = getMonthDateRange();
+    setFormData({
+      name: template.name,
+      categoryIds: [],
+      includeTagIds: [],
+      excludeTagIds: [],
+      accountIds: [],
+      calculationType: template.calculationType,
+      amount: template.amount.toString(),
+      period: 'this-month' as 'this-month' | 'next-month' | 'this-year' | 'custom',
+      startDate,
+      endDate,
+      alertThreshold: '80',
+      enableRollover: false,
+      rolloverLimit: '',
+    });
+    setEditingBudget(null);
+    setDateError('');
+    setIsManualDateEdit(false);
+    setShowTemplates(false);
+    setOpenDialog(true);
+  }, [getMonthDateRange, budgetTemplates]);
 
   const handleEditBudget = useCallback((budget: Budget) => {
     setFormData({
@@ -736,19 +847,36 @@ const Budgets: React.FC = () => {
         <Typography variant="h4" fontWeight={700}>
           Budgets
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
-          sx={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
-            },
-          }}
-        >
-          Create Budget
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={() => setShowTemplates(true)}
+            sx={{
+              borderColor: '#667eea',
+              color: '#667eea',
+              '&:hover': {
+                borderColor: '#5568d3',
+                bgcolor: '#667eea10',
+              },
+            }}
+          >
+            From Template
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleOpenDialog}
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+              },
+            }}
+          >
+            Create Budget
+          </Button>
+        </Box>
       </Box>
 
       {/* Search and Filter Bar */}
@@ -1601,6 +1729,74 @@ const Budgets: React.FC = () => {
 
       {/* Quick Add FAB */}
       <QuickAddFab onClick={handleOpenDialog} tooltip="Create Budget" />
+
+      {/* Budget Templates Dialog */}
+      <ResponsiveDialog 
+        open={showTemplates} 
+        onClose={() => setShowTemplates(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <span style={{ fontSize: '24px' }}>📋</span>
+            <Typography variant="h6">Choose a Budget Template</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Quick-start your budget with pre-configured templates. You can customize amounts and filters after selection.
+          </Typography>
+          <Grid container spacing={2}>
+            {budgetTemplates.map((template) => (
+              <Grid item xs={12} sm={6} key={template.id}>
+                <Card
+                  sx={{
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    border: '2px solid transparent',
+                    '&:hover': {
+                      borderColor: '#667eea',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(102, 126, 234, 0.2)',
+                    },
+                  }}
+                  onClick={() => handleCreateFromTemplate(template)}
+                >
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={2} mb={1}>
+                      <Typography variant="h4">{template.icon}</Typography>
+                      <Box flex={1}>
+                        <Typography variant="h6" fontWeight={600}>
+                          {template.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {template.description}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2" fontWeight={600} color="primary">
+                        {formatCurrency(template.amount)}
+                      </Typography>
+                      <Chip
+                        label={template.calculationType === 'debit' ? 'Expenses' : 'Net'}
+                        size="small"
+                        color={template.calculationType === 'debit' ? 'error' : 'info'}
+                        variant="outlined"
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowTemplates(false)}>Cancel</Button>
+        </DialogActions>
+      </ResponsiveDialog>
     </Box>
   );
 };
