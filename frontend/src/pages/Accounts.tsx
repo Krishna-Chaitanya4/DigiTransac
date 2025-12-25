@@ -21,9 +21,6 @@ import {
   Switch,
   InputAdornment,
   Tooltip,
-  Menu,
-  ListItemIcon,
-  ListItemText,
   Collapse,
 } from '@mui/material';
 import {
@@ -37,13 +34,13 @@ import {
   Money as CashIcon,
   AccountBalanceWallet as WalletIcon,
   Star as StarIcon,
+  Balance as BalanceIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
   Sort as SortIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
-  MoreVert as MoreVertIcon,
   Receipt as ReceiptIcon,
   SwapHoriz as TransferIcon,
   Download as DownloadIcon,
@@ -131,8 +128,7 @@ const Accounts: React.FC = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [groupByType, setGroupByType] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [quickActionAnchor, setQuickActionAnchor] = useState<null | HTMLElement>(null);
-  const [quickActionAccount, setQuickActionAccount] = useState<Account | null>(null);
+
 
   // Form states
   const [formData, setFormData] = useState({
@@ -308,11 +304,6 @@ const Accounts: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save account');
     }
-  };
-
-  const handleDeleteClick = (account: Account) => {
-    setAccountToDelete(account);
-    setDeleteConfirmOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
@@ -522,24 +513,14 @@ const Accounts: React.FC = () => {
   };
 
   // Quick actions
-  const handleQuickActionOpen = (event: React.MouseEvent<HTMLElement>, account: Account) => {
-    setQuickActionAnchor(event.currentTarget);
-    setQuickActionAccount(account);
-  };
 
-  const handleQuickActionClose = () => {
-    setQuickActionAnchor(null);
-    setQuickActionAccount(null);
-  };
 
   const handleViewTransactions = () => {
     navigate('/transactions');
-    handleQuickActionClose();
   };
 
   const handleAddTransaction = (account: Account) => {
     navigate('/transactions', { state: { addTransaction: true, accountId: account.id } });
-    handleQuickActionClose();
   };
 
   const handleTransferMoney = (account: Account | null) => {
@@ -550,7 +531,6 @@ const Accounts: React.FC = () => {
     setTransferNotes('');
     setTransferDate(new Date().toISOString().split('T')[0]);
     setTransferDialogOpen(true);
-    handleQuickActionClose();
   };
 
   const handleTransferSubmit = async () => {
@@ -644,25 +624,36 @@ const Accounts: React.FC = () => {
                     {account.isDefault ? <StarIcon /> : <StarIcon sx={{ opacity: 0.3 }} />}
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Quick Actions">
+                <Tooltip title="Adjust Balance">
                   <IconButton
                     size="small"
-                    onClick={(e) => handleQuickActionOpen(e, account)}
+                    onClick={() => handleAdjustBalance(account)}
                     color="primary"
                   >
-                    <MoreVertIcon fontSize="small" />
+                    <BalanceIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <IconButton size="small" onClick={() => handleOpenDialog(account)}>
-                  <EditIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleDeleteClick(account)}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
+                <Tooltip title="Edit Account">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => handleOpenDialog(account)}
+                    color="primary"
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Delete Account">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      setAccountToDelete(account);
+                      setDeleteConfirmOpen(true);
+                    }}
+                    color="error"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Box>
 
@@ -793,15 +784,6 @@ const Accounts: React.FC = () => {
                   onClick={() => handleTransferMoney(account)}
                 >
                   Transfer
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  sx={{ flex: 1 }}
-                  startIcon={<RefreshIcon fontSize="small" />}
-                  onClick={() => handleAdjustBalance(account)}
-                >
-                  Adjust
                 </Button>
               </Box>
             </Box>
@@ -1203,40 +1185,7 @@ const Accounts: React.FC = () => {
         </Grid>
       )}
 
-      {/* Quick Action Menu */}
-      <Menu
-        anchorEl={quickActionAnchor}
-        open={Boolean(quickActionAnchor)}
-        onClose={handleQuickActionClose}
-      >
-        <MenuItem
-          onClick={() => {
-            if (quickActionAccount) {
-              handleOpenDialog(quickActionAccount);
-              handleQuickActionClose();
-            }
-          }}
-        >
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Edit Account</ListItemText>
-        </MenuItem>
-        <Divider />
-        <MenuItem
-          onClick={() => {
-            if (quickActionAccount) {
-              handleDeleteClick(quickActionAccount);
-              handleQuickActionClose();
-            }
-          }}
-        >
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Delete Account</ListItemText>
-        </MenuItem>
-      </Menu>
+
 
       {/* Add/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
