@@ -413,19 +413,11 @@ const Budgets: React.FC = () => {
         enableRollover: formData.enableRollover,
       };
 
-      // Add multi-select filters (only if non-empty)
-      if (formData.categoryIds.length > 0) {
-        payload.categoryIds = formData.categoryIds;
-      }
-      if (formData.includeTagIds.length > 0) {
-        payload.includeTagIds = formData.includeTagIds;
-      }
-      if (formData.excludeTagIds.length > 0) {
-        payload.excludeTagIds = formData.excludeTagIds;
-      }
-      if (formData.accountIds.length > 0) {
-        payload.accountIds = formData.accountIds;
-      }
+      // Always send filter arrays (even if empty) to allow clearing
+      payload.categoryIds = formData.categoryIds;
+      payload.includeTagIds = formData.includeTagIds;
+      payload.excludeTagIds = formData.excludeTagIds;
+      payload.accountIds = formData.accountIds;
 
       // Add rollover limit if enabled and specified
       if (formData.enableRollover && formData.rolloverLimit) {

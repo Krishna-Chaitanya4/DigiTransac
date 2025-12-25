@@ -418,10 +418,11 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     };
 
     if (name !== undefined) updateData.name = sanitizedName;
-    if (categoryIds !== undefined) updateData.categoryIds = categoryIds.length > 0 ? categoryIds : undefined;
-    if (includeTagIds !== undefined) updateData.includeTagIds = includeTagIds.length > 0 ? includeTagIds : undefined;
-    if (excludeTagIds !== undefined) updateData.excludeTagIds = excludeTagIds.length > 0 ? excludeTagIds : undefined;
-    if (accountIds !== undefined) updateData.accountIds = accountIds.length > 0 ? accountIds : undefined;
+    // Always update arrays (even if empty) to allow clearing
+    if (categoryIds !== undefined) updateData.categoryIds = categoryIds;
+    if (includeTagIds !== undefined) updateData.includeTagIds = includeTagIds;
+    if (excludeTagIds !== undefined) updateData.excludeTagIds = excludeTagIds;
+    if (accountIds !== undefined) updateData.accountIds = accountIds;
     if (calculationType !== undefined) updateData.calculationType = calculationType;
     if (amount !== undefined) updateData.amount = parseFloat(amount);
     if (period) updateData.period = period;
