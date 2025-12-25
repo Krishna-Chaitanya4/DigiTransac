@@ -1250,18 +1250,27 @@ router.post('/transfer', async (req: AuthRequest, res: Response): Promise<void> 
 
     if (!transferCategory) {
       const categoryId = uuidv4();
-      transferCategory = {
+      const newCategory = {
         id: categoryId,
         userId,
         name: 'Transfer',
-        type: 'both',
+        type: 'both' as 'income' | 'expense' | 'both',
         color: '#2196f3',
         icon: 'swap_horiz',
         description: 'Money transfers between accounts',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      await categoriesContainer.insertOne(transferCategory);
+      await categoriesContainer.insertOne(newCategory);
+      transferCategory = await categoriesContainer.findOne({ id: categoryId });
+    }
+
+    if (!transferCategory) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create or find Transfer category',
+      });
+      return;
     }
 
     const transferId = uuidv4(); // Link both transactions
@@ -1284,7 +1293,7 @@ router.post('/transfer', async (req: AuthRequest, res: Response): Promise<void> 
       isRecurring: false,
       source: 'transfer',
       reviewStatus: 'approved',
-      transferId, // Link to credit transaction
+      linkedTransactionId: transferId, // Link to credit transaction
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -1315,7 +1324,7 @@ router.post('/transfer', async (req: AuthRequest, res: Response): Promise<void> 
       isRecurring: false,
       source: 'transfer',
       reviewStatus: 'approved',
-      transferId, // Link to debit transaction
+      linkedTransactionId: transferId, // Link to debit transaction
       createdAt: new Date(),
       updatedAt: new Date(),
     };

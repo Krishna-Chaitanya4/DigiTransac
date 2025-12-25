@@ -115,6 +115,7 @@ const Accounts: React.FC = () => {
   // Transfer dialog states
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [transferFromAccount, setTransferFromAccount] = useState<Account | null>(null);
+  const [transferFromPreFilled, setTransferFromPreFilled] = useState(false); // Track if FROM was pre-filled
   const [transferToAccountId, setTransferToAccountId] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
@@ -541,8 +542,9 @@ const Accounts: React.FC = () => {
     handleQuickActionClose();
   };
 
-  const handleTransferMoney = (account: Account) => {
+  const handleTransferMoney = (account: Account | null) => {
     setTransferFromAccount(account);
+    setTransferFromPreFilled(account !== null); // Mark as pre-filled if account provided
     setTransferToAccountId('');
     setTransferAmount('');
     setTransferNotes('');
@@ -552,7 +554,9 @@ const Accounts: React.FC = () => {
   };
 
   const handleTransferSubmit = async () => {
-    if (!transferFromAccount || !transferToAccountId || !transferAmount) {
+    const fromAccountId = transferFromAccount?.id;
+    
+    if (!fromAccountId || !transferToAccountId || !transferAmount) {
       setError('Please fill in all required fields');
       return;
     }
@@ -567,7 +571,7 @@ const Accounts: React.FC = () => {
       await axios.post(
         '/api/transactions/transfer',
         {
-          fromAccountId: transferFromAccount.id,
+          fromAccountId,
           toAccountId: transferToAccountId,
           amount,
           date: transferDate,
@@ -579,6 +583,7 @@ const Accounts: React.FC = () => {
       setSuccess('Transfer completed successfully');
       setTransferDialogOpen(false);
       setTransferFromAccount(null);
+      setTransferFromPreFilled(false);
       setTransferToAccountId('');
       setTransferAmount('');
       setTransferNotes('');
@@ -941,6 +946,9 @@ const Accounts: React.FC = () => {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
+          <Button variant="outlined" startIcon={<TransferIcon />} onClick={() => handleTransferMoney(null)}>
+            Transfer
+          </Button>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
             Add Account
           </Button>
@@ -1511,31 +1519,74 @@ const Accounts: React.FC = () => {
       </Dialog>
 
       {/* Transfer Money Dialog */}
-      <Dialog open={transferDialogOpen} onClose={() => setTransferDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={transferDialogOpen} 
+        onClose={() => {
+          setTransferDialogOpen(false);
+          setTransferFromAccount(null);
+          setTransferFromPreFilled(false);
+          setTransferToAccountId('');
+          setTransferAmount('');
+          setTransferNotes('');
+          setError('');
+        }} 
+        maxWidth="sm" 
+        fullWidth
+      >
         <DialogTitle>Transfer Money</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* From Account (Read-only) */}
-            <TextField
-              label="From Account"
-              value={transferFromAccount?.name || ''}
-              fullWidth
-              disabled
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    {transferFromAccount && (
-                      <>
-                        {React.createElement(
-                          accountTypeConfig[transferFromAccount.type].icon,
-                          { fontSize: 'small' }
-                        )}
-                      </>
-                    )}
-                  </InputAdornment>
-                ),
-              }}
-            />
+            {/* From Account - Selectable if not pre-filled */}
+            {transferFromPreFilled ? (
+              <TextField
+                label="From Account"
+                value={transferFromAccount?.name || ''}
+                fullWidth
+                disabled
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      {transferFromAccount && React.createElement(
+                        accountTypeConfig[transferFromAccount.type].icon,
+                        { fontSize: 'small' }
+                      )}
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            ) : (
+              <TextField
+                select
+                label="From Account"
+                value={transferFromAccount?.id || ''}
+                onChange={(e) => {
+                  const account = accounts.find((acc) => acc.id === e.target.value);
+                  setTransferFromAccount(account || null);
+                }}
+                fullWidth
+                required
+              >
+                {accounts
+                  .filter((acc) => acc.isActive)
+                  .map((account) => {
+                    const IconComponent = accountTypeConfig[account.type].icon;
+                    return (
+                      <MenuItem key={account.id} value={account.id}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <IconComponent fontSize="small" />
+                          <span>{account.name}</span>
+                          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                            {formatCurrency(
+                              accountBalances.get(account.id)?.calculatedBalance || account.balance,
+                              account.currency
+                            )}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    );
+                  })}
+              </TextField>
+            )}
 
             {/* To Account */}
             <TextField
@@ -1605,8 +1656,20 @@ const Accounts: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTransferDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleTransferSubmit} variant="contained" disabled={!transferToAccountId || !transferAmount}>
+          <Button onClick={() => {
+            setTransferDialogOpen(false);
+            setTransferFromAccount(null);
+            setTransferFromPreFilled(false);
+            setTransferToAccountId('');
+            setTransferAmount('');
+            setTransferNotes('');
+            setError('');
+          }}>Cancel</Button>
+          <Button 
+            onClick={handleTransferSubmit} 
+            variant="contained" 
+            disabled={!transferFromAccount || !transferToAccountId || !transferAmount}
+          >
             Transfer
           </Button>
         </DialogActions>

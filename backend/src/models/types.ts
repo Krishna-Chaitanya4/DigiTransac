@@ -188,7 +188,7 @@ export interface Transaction {
   recurrencePattern?: RecurrencePattern;
 
   // SOURCE & PARSING (for email/SMS imports)
-  source?: 'manual' | 'email' | 'sms' | 'api';
+  source?: 'manual' | 'email' | 'sms' | 'api' | 'transfer';
   sourceEmailId?: string;
   merchantName?: string;
   parsedData?: ParsedTransactionData;
