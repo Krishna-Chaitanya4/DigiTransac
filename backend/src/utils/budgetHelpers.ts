@@ -90,7 +90,9 @@ export async function calculateBudgetSpending(
     .filter((exp: any) => exp.type === 'credit')
     .reduce((sum: number, exp: any) => sum + exp.amount, 0);
 
-  const net = credit - debit;
+  // Net = total expenses after refunds (debit - credit)
+  // Positive = net spending, Negative = net income (rare for expense budgets)
+  const net = debit - credit;
 
   // Return spent based on calculation type
   let spent = 0;
