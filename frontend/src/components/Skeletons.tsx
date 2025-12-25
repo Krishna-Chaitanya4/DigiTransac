@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Card, CardContent, Skeleton, Grid } from '@mui/material';
 
-export const DashboardCardSkeleton: React.FC = () => {
+const DashboardCardSkeletonComponent: React.FC = () => {
   return (
     <Card
       sx={{
@@ -19,7 +19,9 @@ export const DashboardCardSkeleton: React.FC = () => {
   );
 };
 
-export const TransactionRowSkeleton: React.FC = () => {
+export const DashboardCardSkeleton = React.memo(DashboardCardSkeletonComponent);
+
+const TransactionRowSkeletonComponent: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', py: 2, px: 2, borderBottom: '1px solid #eee' }}>
       <Skeleton variant="circular" width={40} height={40} sx={{ mr: 2 }} />
@@ -32,7 +34,9 @@ export const TransactionRowSkeleton: React.FC = () => {
   );
 };
 
-export const BudgetCardSkeleton: React.FC = () => {
+export const TransactionRowSkeleton = React.memo(TransactionRowSkeletonComponent);
+
+const BudgetCardSkeletonComponent: React.FC = () => {
   return (
     <Card>
       <CardContent>
@@ -50,7 +54,9 @@ export const BudgetCardSkeleton: React.FC = () => {
   );
 };
 
-export const ChartSkeleton: React.FC<{ height?: number }> = ({ height = 300 }) => {
+export const BudgetCardSkeleton = React.memo(BudgetCardSkeletonComponent);
+
+const ChartSkeletonComponent: React.FC<{ height?: number }> = ({ height = 300 }) => {
   return (
     <Card>
       <CardContent>
@@ -61,7 +67,9 @@ export const ChartSkeleton: React.FC<{ height?: number }> = ({ height = 300 }) =
   );
 };
 
-export const TableSkeleton: React.FC<{ rows?: number }> = ({ rows = 5 }) => {
+export const ChartSkeleton = React.memo(ChartSkeletonComponent);
+
+const TableSkeletonComponent: React.FC<{ rows?: number }> = ({ rows = 5 }) => {
   return (
     <Box>
       {Array.from({ length: rows }).map((_, index) => (
@@ -71,12 +79,14 @@ export const TableSkeleton: React.FC<{ rows?: number }> = ({ rows = 5 }) => {
   );
 };
 
+export const TableSkeleton = React.memo(TableSkeletonComponent);
+
 interface GridSkeletonProps {
   count?: number;
   component: React.ComponentType;
 }
 
-export const GridSkeleton: React.FC<GridSkeletonProps> = ({ count = 4, component: Component }) => {
+const GridSkeletonComponent: React.FC<GridSkeletonProps> = ({ count = 4, component: Component }) => {
   return (
     <Grid container spacing={3}>
       {Array.from({ length: count }).map((_, index) => (
@@ -87,3 +97,5 @@ export const GridSkeleton: React.FC<GridSkeletonProps> = ({ count = 4, component
     </Grid>
   );
 };
+
+export const GridSkeleton = React.memo(GridSkeletonComponent);

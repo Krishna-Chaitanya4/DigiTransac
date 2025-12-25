@@ -59,7 +59,7 @@ const DATE_PRESETS = [
   { label: 'Custom', value: 'custom' },
 ];
 
-export const FilterBar: React.FC<FilterBarProps> = ({
+const FilterBarComponent: React.FC<FilterBarProps> = ({
   filters,
   onFiltersChange,
   accounts,
@@ -458,3 +458,4 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   );
 };
 
+export const FilterBar = React.memo(FilterBarComponent);
