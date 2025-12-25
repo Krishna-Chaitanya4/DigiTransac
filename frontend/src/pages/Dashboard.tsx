@@ -35,7 +35,6 @@ import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import PullToRefresh from '../components/PullToRefresh';
-import { useResponsive } from '../hooks/useResponsive';
 
 // Smart tag filtering: exclude these tags from expense/income calculations
 const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
@@ -118,7 +117,6 @@ interface AccountBalance {
 const Dashboard: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
-  const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -728,7 +726,8 @@ const Dashboard: React.FC = () => {
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           }}
         >
-          {isMobile ? 'New' : 'New Transaction'}
+          <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>New Transaction</Box>
+          <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>New</Box>
         </Button>
       </Box>
 

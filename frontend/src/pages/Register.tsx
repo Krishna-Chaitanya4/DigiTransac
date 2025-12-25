@@ -22,8 +22,6 @@ import {
   Stack,
   Fade,
   Zoom,
-  useMediaQuery,
-  useTheme,
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
@@ -53,8 +51,6 @@ const currencies = [
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -298,8 +294,7 @@ const Register: React.FC = () => {
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
         <Grid container spacing={0} sx={{ minHeight: { md: '90vh' } }}>
           {/* Left Side - Features */}
-          {!isMobile && (
-            <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={5} sx={{ display: { xs: 'none', md: 'block' } }}>
               <Fade in timeout={800}>
                 <Box
                   sx={{
@@ -381,8 +376,7 @@ const Register: React.FC = () => {
                   </Stack>
                 </Box>
               </Fade>
-            </Grid>
-          )}
+          </Grid>
 
           {/* Right Side - Registration Form */}
           <Grid item xs={12} md={7}>

@@ -14,8 +14,6 @@ import {
   Fade,
   Zoom,
   Divider,
-  useMediaQuery,
-  useTheme,
   Grid,
   Stack,
   Chip,
@@ -38,8 +36,6 @@ import { useAuth } from '../context/AuthContext';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -242,9 +238,8 @@ const Login: React.FC = () => {
       />
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, px: { xs: 2, sm: 3 } }}>
         <Grid container spacing={{ xs: 0, md: 4 }} alignItems="center">
-          {/* Left Side - Features (Hidden on mobile) */}
-          {!isMobile && (
-            <Grid item xs={12} md={6}>
+          {/* Left Side - Features */}
+          <Grid item xs={12} md={6} sx={{ display: { xs: 'none', md: 'block' } }}>
               <Fade in timeout={800}>
                 <Box>
                   {/* App Branding */}
@@ -430,8 +425,7 @@ const Login: React.FC = () => {
                   </Box>
                 </Box>
               </Fade>
-            </Grid>
-          )}
+          </Grid>
 
           {/* Right Side - Login Form */}
           <Grid item xs={12} md={6}>
@@ -460,30 +454,29 @@ const Login: React.FC = () => {
                 >
             <Zoom in timeout={800}>
               <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>
-                {isMobile && (
-                  <Box
-                    sx={{
-                      display: 'inline-flex',
-                      p: { xs: 1.5, sm: 2 },
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                      mb: 2,
-                      boxShadow: '0 4px 20px rgba(20, 184, 166, 0.4)',
-                      animation: 'float 3s ease-in-out infinite',
-                      '@keyframes float': {
-                        '0%, 100%': { transform: 'translateY(0px)' },
-                        '50%': { transform: 'translateY(-10px)' },
-                      },
-                    }}
-                  >
-                    <AccountBalance sx={{ fontSize: { xs: 40, sm: 48 }, color: 'white' }} />
-                  </Box>
-                )}
+                <Box
+                  sx={{
+                    display: { xs: 'inline-flex', md: 'none' },
+                    p: { xs: 1.5, sm: 2 },
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                    mb: 2,
+                    boxShadow: '0 4px 20px rgba(20, 184, 166, 0.4)',
+                    animation: 'float 3s ease-in-out infinite',
+                    '@keyframes float': {
+                      '0%, 100%': { transform: 'translateY(0px)' },
+                      '50%': { transform: 'translateY(-10px)' },
+                    },
+                  }}
+                >
+                  <AccountBalance sx={{ fontSize: { xs: 40, sm: 48 }, color: 'white' }} />
+                </Box>
                 <Typography
-                  variant={isMobile ? 'h4' : 'h3'}
+                  variant="h3"
                   fontWeight={800}
                   gutterBottom
                   sx={{
+                    fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' },
                     background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
                     backgroundClip: 'text',
                     WebkitBackgroundClip: 'text',

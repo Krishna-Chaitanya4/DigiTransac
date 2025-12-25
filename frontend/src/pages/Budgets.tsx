@@ -42,9 +42,8 @@ import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { useToast } from '../components/Toast';
 import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { BudgetCardSkeleton, GridSkeleton } from '../components/Skeletons';
+import { BudgetCardSkeleton } from '../components/Skeletons';
 import ResponsiveDialog from '../components/ResponsiveDialog';
-import { useResponsive } from '../hooks/useResponsive';
 
 interface Category {
   id: string;
@@ -110,7 +109,6 @@ interface Budget {
 const Budgets: React.FC = () => {
   const { token, user } = useAuth();
   const toast = useToast();
-  const { isMobile } = useResponsive();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -889,7 +887,13 @@ const Budgets: React.FC = () => {
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4">Budgets</Typography>
         </Box>
-        <GridSkeleton count={isMobile ? 2 : 4} component={BudgetCardSkeleton} />
+        <Grid container spacing={3}>
+          {[...Array(4)].map((_, index) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={index} sx={{ display: { xs: index >= 2 ? 'none' : 'block', sm: 'block' } }}>
+              <BudgetCardSkeleton />
+            </Grid>
+          ))}
+        </Grid>
       </Box>
     );
   }

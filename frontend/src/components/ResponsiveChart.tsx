@@ -1,6 +1,5 @@
 import React, { ReactElement } from 'react';
-import { Box } from '@mui/material';
-import { useResponsive } from '../hooks/useResponsive';
+import { Box, useMediaQuery, useTheme } from '@mui/material';
 
 interface ResponsiveChartProps {
   children: ReactElement;
@@ -16,7 +15,8 @@ const ResponsiveChart: React.FC<ResponsiveChartProps> = ({
   mobileHeight = 250,
   desktopHeight = 350,
 }) => {
-  const { isMobile } = useResponsive();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const height = isMobile ? mobileHeight : desktopHeight;
 
