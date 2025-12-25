@@ -7,15 +7,15 @@ export const API_CONFIG = {
   // Request timeouts
   DEFAULT_TIMEOUT: 30000, // 30 seconds
   UPLOAD_TIMEOUT: 60000, // 1 minute
-  
+
   // Retry configuration
   MAX_RETRIES: 3,
   RETRY_DELAY: 2000, // 2 seconds
-  
+
   // Rate limiting
   RATE_LIMIT_WINDOW: 15 * 60 * 1000, // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: 100,
-  
+
   // Pagination
   DEFAULT_PAGE_SIZE: 100,
   MAX_PAGE_SIZE: 1000,
@@ -25,7 +25,7 @@ export const AUTH_CONFIG = {
   // Token expiration
   JWT_EXPIRE_TIME: '7d',
   REFRESH_TOKEN_EXPIRE: '30d',
-  
+
   // Password requirements
   MIN_PASSWORD_LENGTH: 8,
   MAX_PASSWORD_LENGTH: 128,
@@ -35,10 +35,10 @@ export const DATABASE_CONFIG = {
   // Connection pool
   MIN_POOL_SIZE: 10,
   MAX_POOL_SIZE: 50,
-  
+
   // Query timeout
   QUERY_TIMEOUT: 10000, // 10 seconds
-  
+
   // Health check
   HEALTH_CHECK_TIMEOUT: 5000, // 5 seconds
 } as const;
@@ -48,13 +48,13 @@ export const VALIDATION_CONFIG = {
   MAX_DESCRIPTION_LENGTH: 500,
   MIN_AMOUNT: 0.01,
   MAX_AMOUNT: 999999999.99,
-  
+
   // Category
   MAX_CATEGORY_NAME_LENGTH: 100,
-  
+
   // Budget
   MAX_BUDGET_NAME_LENGTH: 100,
-  
+
   // Account
   MAX_ACCOUNT_NAME_LENGTH: 100,
 } as const;
@@ -86,19 +86,19 @@ export const ERROR_MESSAGES = {
   TOKEN_EXPIRED: 'Authentication token has expired',
   TOKEN_INVALID: 'Invalid authentication token',
   UNAUTHORIZED: 'Authentication required',
-  
+
   // Validation
   REQUIRED_FIELD: 'This field is required',
   INVALID_EMAIL: 'Invalid email address',
   INVALID_DATE: 'Invalid date format',
   AMOUNT_TOO_LOW: 'Amount must be greater than 0',
   AMOUNT_TOO_HIGH: 'Amount exceeds maximum allowed value',
-  
+
   // Database
   NOT_FOUND: 'Resource not found',
   ALREADY_EXISTS: 'Resource already exists',
   DATABASE_ERROR: 'Database operation failed',
-  
+
   // Server
   INTERNAL_ERROR: 'An internal server error occurred',
   SERVICE_UNAVAILABLE: 'Service is temporarily unavailable',
@@ -109,7 +109,7 @@ export const SUCCESS_MESSAGES = {
   LOGIN_SUCCESS: 'Login successful',
   LOGOUT_SUCCESS: 'Logout successful',
   REGISTER_SUCCESS: 'Registration successful',
-  
+
   // CRUD
   CREATED: 'Resource created successfully',
   UPDATED: 'Resource updated successfully',

@@ -40,7 +40,7 @@ export async function calculateBudgetSpending(
           const categoryIds = category.isFolder
             ? categoryToDescendantsMap.get(budgetCategoryId) || []
             : [budgetCategoryId];
-          
+
           if (categoryIds.includes(exp.categoryId)) {
             matchesCategory = true;
             break;
@@ -55,18 +55,14 @@ export async function calculateBudgetSpending(
       if (!exp.tags || exp.tags.length === 0) {
         return false; // No tags on expense, but budget requires tags
       }
-      const hasIncludedTag = budget.includeTagIds.some((tagId) =>
-        exp.tags.includes(tagId)
-      );
+      const hasIncludedTag = budget.includeTagIds.some((tagId) => exp.tags.includes(tagId));
       if (!hasIncludedTag) return false; // AND logic: must have at least one included tag
     }
 
     // Filter 3: Exclude Tags (OR logic for exclusion)
     if (budget.excludeTagIds && budget.excludeTagIds.length > 0) {
       if (exp.tags && exp.tags.length > 0) {
-        const hasExcludedTag = budget.excludeTagIds.some((tagId) =>
-          exp.tags.includes(tagId)
-        );
+        const hasExcludedTag = budget.excludeTagIds.some((tagId) => exp.tags.includes(tagId));
         if (hasExcludedTag) return false; // AND logic: must NOT have any excluded tags
       }
     }

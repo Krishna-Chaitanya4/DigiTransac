@@ -109,31 +109,31 @@ export interface Budget {
   id: string;
   userId: string;
   name?: string; // Optional user-defined name for the budget
-  
+
   // Budget scope - what to track (AND logic between types, OR logic within each type)
   categoryIds?: string[]; // Track these categories (OR logic: cat1 OR cat2 OR cat3)
   includeTagIds?: string[]; // Transactions MUST have at least one of these tags (OR logic)
   excludeTagIds?: string[]; // Transactions must NOT have any of these tags (OR logic)
   accountIds?: string[]; // Track these accounts (OR logic: acc1 OR acc2)
-  
+
   // Budget calculation type
   calculationType: 'debit' | 'net'; // debit=total expenses, net=expenses after refunds (debit-credit)
-  
+
   amount: number;
   period: 'this-month' | 'next-month' | 'this-year' | 'custom';
   startDate: Date;
   endDate?: Date;
-  
+
   // Alert configuration
   alertThreshold: number; // Primary threshold (percentage)
   alertThresholds?: number[]; // Multiple thresholds (e.g., [50, 80, 100])
   notificationChannels?: ('in-app' | 'email')[]; // Where to send alerts
-  
+
   // Rollover configuration
   enableRollover?: boolean; // Allow unused budget to roll over to next period
   rolloverLimit?: number; // Max amount that can roll over (optional cap)
   rolledOverAmount?: number; // Amount rolled over from previous period
-  
+
   createdAt: Date;
   updatedAt: Date;
 }

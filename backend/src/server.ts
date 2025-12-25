@@ -48,7 +48,7 @@ app.use(
   cors({
     origin: (origin, callback) => {
       logger.debug({ origin }, '📡 CORS request received');
-      
+
       // In production, reject requests without origin
       if (!origin && process.env.NODE_ENV === 'production') {
         logger.warn('CORS request rejected - no origin in production');
@@ -73,7 +73,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Content-Type', 'Authorization'],
     preflightContinue: false,
-    optionsSuccessStatus: 204
+    optionsSuccessStatus: 204,
   })
 );
 
@@ -83,11 +83,14 @@ app.use(httpLogger as express.RequestHandler);
 
 // Log all OPTIONS requests for debugging
 app.options('*', (req, res) => {
-  logger.debug({
-    url: req.url,
-    origin: req.headers.origin,
-    method: req.method,
-  }, '🔍 OPTIONS preflight request received');
+  logger.debug(
+    {
+      url: req.url,
+      origin: req.headers.origin,
+      method: req.method,
+    },
+    '🔍 OPTIONS preflight request received'
+  );
   res.status(204).end();
 });
 
@@ -194,11 +197,11 @@ startServer();
 // Graceful shutdown handling
 const gracefulShutdown = async (signal: string) => {
   logger.info(`${signal} signal received: closing HTTP server`);
-  
+
   try {
     // Close database connection
     await cosmosDBService.close();
-    
+
     logger.info('✅ Graceful shutdown completed');
     process.exit(0);
   } catch (error) {

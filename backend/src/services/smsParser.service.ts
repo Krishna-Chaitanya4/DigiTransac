@@ -41,7 +41,8 @@ export class SMSParserService {
       patterns: [
         {
           // Standard: Rs.500.00 debited from A/c **1234/XX1234/....1234 on 23-Dec-25 to/at Swiggy
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:at|to|for)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:at|to|for)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -54,7 +55,8 @@ export class SMSParserService {
         },
         {
           // Alternative format: INR 500 debited for MERCHANT on 23-Dec-25 from **1234
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:for|at)\s+([A-Z][A-Za-z0-9\s*]+?)\s+on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:A\/c|from).*?([xX*.]{2,}\d{4}|\d{4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:for|at)\s+([A-Z][A-Za-z0-9\s*]+?)\s+on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:A\/c|from).*?([xX*.]{2,}\d{4}|\d{4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -67,7 +69,8 @@ export class SMSParserService {
         },
         {
           // Credit: Rs.1000.00 credited to A/c **1234/XX1234/....1234 on 23-Dec-25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:A\/c|account|to).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:A\/c|account|to).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -79,7 +82,8 @@ export class SMSParserService {
         },
         {
           // Credit from: Rs 5000 credited from SALARY on 25-Dec-24 to **1234
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)\s+on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)\s+on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -99,7 +103,8 @@ export class SMSParserService {
       patterns: [
         {
           // Standard: Your A/c **5678/XX5678/....5678 is debited with Rs 250 on 23-12-25. Info: UPI-Zomato
-          regex: /(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?(?:debited|withdrawn).*?(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:Info|for|at):?\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
+          regex:
+            /(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?(?:debited|withdrawn).*?(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:Info|for|at):?\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[2].replace(/,/g, '')),
             type: 'debit',
@@ -112,7 +117,8 @@ export class SMSParserService {
         },
         {
           // Alternative: Rs 250 debited from **5678 on 23-12-25 for MERCHANT
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:for|at)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:for|at)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -125,7 +131,8 @@ export class SMSParserService {
         },
         {
           // Credit: Your A/c **5678 is credited with Rs 1000 on 23-12-25
-          regex: /(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?credited.*?(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
+          regex:
+            /(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?credited.*?(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[2].replace(/,/g, '')),
             type: 'credit',
@@ -137,7 +144,8 @@ export class SMSParserService {
         },
         {
           // Credit from: Rs 5000 credited from SALARY to **5678 on 23-12-25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -157,7 +165,8 @@ export class SMSParserService {
       patterns: [
         {
           // Card: Rs 1000.00 spent on SBI Card **9012/XX9012/....9012 at AMAZON on 23/12/25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:spent|debited).*?(?:card|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?at\s+([A-Z][A-Za-z0-9\s*]+?)\s+on\s+(\d{1,2}[/]\d{1,2}[/]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:spent|debited).*?(?:card|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?at\s+([A-Z][A-Za-z0-9\s*]+?)\s+on\s+(\d{1,2}[/]\d{1,2}[/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -170,7 +179,8 @@ export class SMSParserService {
         },
         {
           // Standard debit: Rs.500 debited from A/c ....1234/**1234/XX1234 on 23-12-25 via UPI/IMPS/NEFT
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:via|for|to|Info)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:via|for|to|Info)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -183,7 +193,8 @@ export class SMSParserService {
         },
         {
           // Debit without merchant: Rs 500 debited from ....1234 on 23/12/25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -195,7 +206,8 @@ export class SMSParserService {
         },
         {
           // Credit: Rs 2000 credited to A/c ....1234/**1234/XX1234 on 23/12/25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:A\/c|account|to).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:A\/c|account|to).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -214,7 +226,8 @@ export class SMSParserService {
       patterns: [
         {
           // Debit: INR 750.00 debited from **3456/XX3456/....3456 on 23Dec for PAYTM
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}\s*\w{3}\s*\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:for|at)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}\s*\w{3}\s*\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:for|at)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -227,7 +240,8 @@ export class SMSParserService {
         },
         {
           // Debit without merchant: Rs 500 debited from **3456 on 23-Dec-25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -239,7 +253,8 @@ export class SMSParserService {
         },
         {
           // Credit: INR 5000 credited to **3456/XX3456/....3456 on 23-Dec-25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -258,7 +273,8 @@ export class SMSParserService {
       patterns: [
         {
           // Debit: Rs.300.00 debited from A/c **7890/XX7890/....7890 on 23-12-25 at/for Uber
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/\d{1,2}[/\d{2,4}).*?(?:at|to|for)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/\d{1,2}[/\d{2,4}).*?(?:at|to|for)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -271,7 +287,8 @@ export class SMSParserService {
         },
         {
           // Credit: Rs 1000 credited to **7890/XX7890/....7890 on 23-12-25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -290,7 +307,8 @@ export class SMSParserService {
       patterns: [
         {
           // Debit: Rs 400 debited from A/c **2345/XX2345/....2345 on 23/12/25 for UPI/Phonepe
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}).*?(?:for|Info|via)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}).*?(?:for|Info|via)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -303,7 +321,8 @@ export class SMSParserService {
         },
         {
           // Credit: Rs 2000 credited to **2345/XX2345/....2345 on 23/12/25
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -322,7 +341,8 @@ export class SMSParserService {
       patterns: [
         {
           // Generic debit with merchant: Rs/INR amount debited from **1234/XX1234/....1234/1234 for/at MERCHANT
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn|spent).*?(?:from|on|A\/c|account|card).*?([xX*.]{2,}\d{4}|\d{4}).*?(?:for|at|to|via)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Ref|Avl|$)/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn|spent).*?(?:from|on|A\/c|account|card).*?([xX*.]{2,}\d{4}|\d{4}).*?(?:for|at|to|via)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Ref|Avl|$)/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -333,7 +353,8 @@ export class SMSParserService {
         },
         {
           // Generic debit without merchant: Rs/INR amount debited from account
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn|spent).*?(?:from|on|A\/c|account|card).*?([xX*.]{2,}\d{4}|\d{4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn|spent).*?(?:from|on|A\/c|account|card).*?([xX*.]{2,}\d{4}|\d{4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'debit',
@@ -343,7 +364,8 @@ export class SMSParserService {
         },
         {
           // Generic credit with source: Rs/INR amount credited from SOURCE to **1234
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)(?:to|in|A\/c).*?([xX*.]{2,}\d{4}|\d{4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)(?:to|in|A\/c).*?([xX*.]{2,}\d{4}|\d{4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -354,7 +376,8 @@ export class SMSParserService {
         },
         {
           // Generic credit without source: Rs/INR amount credited to account
-          regex: /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|in|A\/c|account).*?([xX*.]{2,}\d{4}|\d{4})/i,
+          regex:
+            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|in|A\/c|account).*?([xX*.]{2,}\d{4}|\d{4})/i,
           extract: (match) => ({
             amount: parseFloat(match[1].replace(/,/g, '')),
             type: 'credit',
@@ -382,21 +405,23 @@ export class SMSParserService {
         const match = cleanText.match(pattern.regex);
         if (match) {
           const parsed = pattern.extract(match);
-          
+
           // Normalize merchant name for consistency
-          const normalizedMerchant = parsed.merchant ? normalizeMerchantName(parsed.merchant) : undefined;
-          
+          const normalizedMerchant = parsed.merchant
+            ? normalizeMerchantName(parsed.merchant)
+            : undefined;
+
           // Auto-detect and assign tags based on transaction type and content
           const tagDetection = detectTransactionTags(
             parsed.type || 'debit',
             cleanText,
             normalizedMerchant
           );
-          
+
           // Check if we have learned category/account for this merchant
           let learnedCategoryId: string | undefined;
           let learnedAccountId: string | undefined;
-          
+
           if (userId && normalizedMerchant) {
             const learned = await getLearnedMapping(userId, normalizedMerchant);
             if (learned) {
@@ -404,24 +429,25 @@ export class SMSParserService {
               learnedAccountId = learned.accountId;
             }
           }
-          
+
           // Match SMS account info to user's accounts
           let matchedAccountId: string | undefined;
-          
+
           if (userId && (parsed.bankName || parsed.accountNumber)) {
             try {
               const accountsContainer = await cosmosDBService.getAccountsContainer();
-              matchedAccountId = await matchAccount(
-                userId,
-                accountsContainer as any,
-                parsed.bankName,
-                parsed.accountNumber
-              ) || undefined;
+              matchedAccountId =
+                (await matchAccount(
+                  userId,
+                  accountsContainer as any,
+                  parsed.bankName,
+                  parsed.accountNumber
+                )) || undefined;
             } catch (error) {
               // Account matching failed, continue without it
             }
           }
-          
+
           return {
             ...parsed,
             merchant: normalizedMerchant,
@@ -444,9 +470,7 @@ export class SMSParserService {
    * Parse multiple SMS messages (batch)
    */
   async parseMultipleSMS(smsTexts: string[], userId?: string): Promise<ParsedTransaction[]> {
-    const results = await Promise.all(
-      smsTexts.map(text => this.parseSMS(text, userId))
-    );
+    const results = await Promise.all(smsTexts.map((text) => this.parseSMS(text, userId)));
     return results.filter((parsed): parsed is ParsedTransaction => parsed !== null);
   }
 
@@ -473,8 +497,18 @@ export class SMSParserService {
 
         // Check if month is text (Jan, Feb, etc.)
         const monthMap: { [key: string]: number } = {
-          jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-          jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+          jan: 0,
+          feb: 1,
+          mar: 2,
+          apr: 3,
+          may: 4,
+          jun: 5,
+          jul: 6,
+          aug: 7,
+          sep: 8,
+          oct: 9,
+          nov: 10,
+          dec: 11,
         };
 
         let month: number;
@@ -540,8 +574,7 @@ export class SMSParserService {
   ): boolean {
     return existingTransactions.some((existing) => {
       const sameAmount = Math.abs(existing.amount - parsed.amount) < 0.01;
-      const sameDay =
-        existing.date.toDateString() === parsed.date?.toDateString();
+      const sameDay = existing.date.toDateString() === parsed.date?.toDateString();
       const similarDescription =
         existing.description &&
         parsed.merchant &&
@@ -555,9 +588,7 @@ export class SMSParserService {
    * Get supported banks list
    */
   getSupportedBanks(): string[] {
-    return this.bankPatterns
-      .filter((bp) => bp.name !== 'Generic')
-      .map((bp) => bp.name);
+    return this.bankPatterns.filter((bp) => bp.name !== 'Generic').map((bp) => bp.name);
   }
 }
 

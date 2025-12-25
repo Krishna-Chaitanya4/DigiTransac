@@ -52,7 +52,7 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
 
     // Get existing transactions for duplicate detection
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    
+
     // Get transactions from last 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -89,10 +89,10 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
 
       // Create pending transaction with proper structure
       const transactionId = uuidv4();
-      
+
       // Priority for account: matched (SMS info) > learned (merchant history) > empty (manual)
       const finalAccountId = parsed.matchedAccountId || parsed.learnedAccountId || '';
-      
+
       const pendingTransaction = {
         id: transactionId,
         userId,
@@ -124,11 +124,11 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
     // Save to database
     const savedTransactions: any[] = [];
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-    
+
     for (const transaction of pendingTransactions) {
       const result = await transactionsContainer.insertOne(transaction);
       savedTransactions.push({ ...transaction, id: result.insertedId });
-      
+
       // If we have a learned category, create a split automatically
       if (transaction.categoryId) {
         const splitId = uuidv4();
@@ -186,9 +186,7 @@ router.post('/preview', authenticate, async (req: AuthRequest, res: Response): P
     const preview = parsedTransactions.map((parsed) => ({
       amount: parsed.amount,
       type: parsed.type,
-      merchant: parsed.merchant
-        ? smsParserService.extractMerchant(parsed.merchant)
-        : 'Unknown',
+      merchant: parsed.merchant ? smsParserService.extractMerchant(parsed.merchant) : 'Unknown',
       date: parsed.date,
       accountNumber: parsed.accountNumber,
       bankName: parsed.bankName,

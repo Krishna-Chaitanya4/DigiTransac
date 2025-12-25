@@ -63,7 +63,8 @@ router.post('/inbound', async (req: Request, res: Response) => {
 
     const categoryId = parsedTransaction.learnedCategoryId || genericCategory || '';
     // Priority for account: matched (email/SMS info) > learned (merchant history) > empty (manual)
-    const accountId = parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
+    const accountId =
+      parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
 
     // Create pending transaction
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();

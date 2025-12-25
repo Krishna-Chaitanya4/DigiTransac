@@ -33,27 +33,25 @@ export async function getExpensesFromTransactions(
   reviewStatus?: string
 ): Promise<ExpenseFromSplit[]> {
   const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-  
+
   // Use centralized filter builder - defaults to approved if reviewStatus provided
   const filter: any = reviewStatus
     ? buildExpenseFilter(userId, startDate, endDate)
     : { userId, type: 'debit', date: { $gte: startDate, $lte: endDate } };
-  
+
   const transactions = await transactionsContainer.find(filter).toArray();
-  
+
   if (transactions.length === 0) return [];
-  
+
   // Decrypt transactions
   const decryptedTransactions = transactions.map((t: any) => decryptTransaction(t));
-  
+
   // Get splits for these transactions
   const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
   const transactionIds = decryptedTransactions.map((t: any) => t.id);
-  
-  const splits = await splitsContainer
-    .find({ transactionId: { $in: transactionIds } })
-    .toArray();
-  
+
+  const splits = await splitsContainer.find({ transactionId: { $in: transactionIds } }).toArray();
+
   // Create expense-like objects from splits with transaction data
   const expenses: ExpenseFromSplit[] = splits.map((split: any) => {
     const transaction = decryptedTransactions.find((t: any) => t.id === split.transactionId);
@@ -72,27 +70,30 @@ export async function getExpensesFromTransactions(
       type: transaction?.type || 'debit', // Include transaction type
     };
   });
-  
+
   return expenses;
 }
 
 /**
  * Get single expense by ID (searches through transaction splits)
  */
-export async function getExpenseById(userId: string, expenseId: string): Promise<ExpenseFromSplit | null> {
+export async function getExpenseById(
+  userId: string,
+  expenseId: string
+): Promise<ExpenseFromSplit | null> {
   const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
   const split = await splitsContainer.findOne({ id: expenseId, userId });
-  
+
   if (!split) return null;
-  
+
   const transactionsContainer = await cosmosDBService.getTransactionsContainer();
   const transaction = await transactionsContainer.findOne({ id: split.transactionId, userId });
-  
+
   if (!transaction) return null;
-  
+
   // Decrypt transaction
   const decryptedTransaction = decryptTransaction(transaction as any);
-  
+
   return {
     id: split.id,
     userId: split.userId,
@@ -114,25 +115,25 @@ export async function getExpenseById(userId: string, expenseId: string): Promise
  */
 export async function countExpenses(userId: string, filter: any = {}): Promise<number> {
   const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-  
+
   const txFilter: any = {
     userId,
     type: 'debit',
     ...filter,
   };
-  
+
   // First get matching transactions
   const transactions = await transactionsContainer.find(txFilter).toArray();
-  
+
   if (transactions.length === 0) return 0;
-  
+
   // Count splits for these transactions
   const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
   const transactionIds = transactions.map((t: any) => t.id);
-  
+
   const count = await splitsContainer.countDocuments({
     transactionId: { $in: transactionIds },
   });
-  
+
   return count;
 }

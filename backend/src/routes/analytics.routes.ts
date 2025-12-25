@@ -25,36 +25,34 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
 
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-    
+
     // Build filter for approved debit transactions only
     const txFilter: any = buildExpenseFilter(userId, start, end);
-    
+
     if (accounts) {
       const accountIds = (accounts as string).split(',');
       txFilter.accountId = { $in: accountIds };
     }
-    
+
     const expenses = await transactionsContainer.find(txFilter).toArray();
-    
+
     // Filter by categories/tags in splits if specified
     let splits = await splitsContainer
-      .find({ 
-        transactionId: { $in: expenses.map((e: any) => e.id) }
+      .find({
+        transactionId: { $in: expenses.map((e: any) => e.id) },
       })
       .toArray();
-    
+
     if (categories) {
       const categoryIds = (categories as string).split(',');
       splits = splits.filter((s: any) => categoryIds.includes(s.categoryId));
     }
-    
+
     if (tags) {
       const tagList = (tags as string).split(',');
-      splits = splits.filter((s: any) => 
-        s.tags && s.tags.some((t: string) => tagList.includes(t))
-      );
+      splits = splits.filter((s: any) => s.tags && s.tags.some((t: string) => tagList.includes(t)));
     }
-    
+
     const totalSpent = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
     const expenseCount = splits.length;
     const avgExpense = expenseCount > 0 ? totalSpent / expenseCount : 0;
@@ -77,30 +75,30 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
       const periodLength = end.getTime() - start.getTime();
       const prevStart = new Date(start.getTime() - periodLength);
       const prevEnd = new Date(start.getTime() - 1);
-      
+
       const prevTxFilter = { ...txFilter, date: { $gte: prevStart, $lte: prevEnd } };
       const prevExpenses = await transactionsContainer.find(prevTxFilter).toArray();
-      
+
       let prevSplits = await splitsContainer
         .find({ transactionId: { $in: prevExpenses.map((e: any) => e.id) } })
         .toArray();
-        
+
       if (categories) {
         const categoryIds = (categories as string).split(',');
         prevSplits = prevSplits.filter((s: any) => categoryIds.includes(s.categoryId));
       }
-      
+
       if (tags) {
         const tagList = (tags as string).split(',');
-        prevSplits = prevSplits.filter((s: any) => 
-          s.tags && s.tags.some((t: string) => tagList.includes(t))
+        prevSplits = prevSplits.filter(
+          (s: any) => s.tags && s.tags.some((t: string) => tagList.includes(t))
         );
       }
-      
+
       const prevTotalSpent = prevSplits.reduce((sum: number, split: any) => sum + split.amount, 0);
       const changeAmount = totalSpent - prevTotalSpent;
-      const changePercent = prevTotalSpent > 0 ? ((changeAmount / prevTotalSpent) * 100) : 0;
-      
+      const changePercent = prevTotalSpent > 0 ? (changeAmount / prevTotalSpent) * 100 : 0;
+
       comparison = {
         previousSpent: prevTotalSpent,
         changeAmount,
@@ -149,7 +147,7 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     // Get transactions and their splits to aggregate by category
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-    
+
     // Only include approved transactions in calculations
     const transactions = await transactionsContainer
       .find(buildExpenseFilter(userId, start, end))
@@ -423,7 +421,9 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
 
     const categoriesContainer = await cosmosDBService.getCategoriesContainer();
 
-    const categories = (await categoriesContainer.find({ userId }).toArray()) as unknown as Category[];
+    const categories = (await categoriesContainer
+      .find({ userId })
+      .toArray()) as unknown as Category[];
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
     // Build category hierarchy map
@@ -496,14 +496,16 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
           const allTagIds = [...(budget.includeTagIds || []), ...(budget.excludeTagIds || [])];
           const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
           const tagMap = new Map(tags.map((t: any) => [t.id, t.name]));
-          
-          const includePart = budget.includeTagIds && budget.includeTagIds.length > 0
-            ? budget.includeTagIds.map((id: string) => tagMap.get(id) || id).join(' / ')
-            : '';
-          const excludePart = budget.excludeTagIds && budget.excludeTagIds.length > 0
-            ? budget.excludeTagIds.map((id: string) => tagMap.get(id) || id).join(' / ')
-            : '';
-          
+
+          const includePart =
+            budget.includeTagIds && budget.includeTagIds.length > 0
+              ? budget.includeTagIds.map((id: string) => tagMap.get(id) || id).join(' / ')
+              : '';
+          const excludePart =
+            budget.excludeTagIds && budget.excludeTagIds.length > 0
+              ? budget.excludeTagIds.map((id: string) => tagMap.get(id) || id).join(' / ')
+              : '';
+
           if (includePart && excludePart) {
             displayName = `Tags: ${includePart} (excl: ${excludePart})`;
           } else if (includePart) {
@@ -746,7 +748,12 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const prevEnd = new Date(end);
     prevEnd.setDate(prevEnd.getDate() - periodDays);
 
-    const previousExpenses = await getExpensesFromTransactions(userId, prevStart, prevEnd, 'approved');
+    const previousExpenses = await getExpensesFromTransactions(
+      userId,
+      prevStart,
+      prevEnd,
+      'approved'
+    );
 
     const currentTotal = currentExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
     const previousTotal = previousExpenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);

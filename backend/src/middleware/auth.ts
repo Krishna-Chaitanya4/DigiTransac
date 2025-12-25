@@ -36,7 +36,7 @@ export const authenticate = async (
     if (!jwtSecret) {
       throw new AppError('JWT_SECRET not configured', 500);
     }
-    
+
     const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
 
     // Attach userId to request

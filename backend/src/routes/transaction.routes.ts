@@ -22,7 +22,7 @@ router.use(authenticate);
 
 /**
  * GET /api/transactions - Get all transactions with filtering and search
- * 
+ *
  * Performance Optimizations:
  * 1. Search on encrypted data: Fetches larger batches (10x limit, max 1000) since filtering
  *    happens post-decryption. Industry standard to prevent fetching entire dataset.
@@ -31,7 +31,7 @@ router.use(authenticate);
  * 3. Early returns: Filter function checks fastest conditions first (amount > description > merchant).
  * 4. Database-level operations: Non-search queries use MongoDB's native skip/limit for efficiency.
  * 5. Conditional fetching: Only fetches splits when explicitly requested (includeSplits=true).
- * 
+ *
  * Trade-offs:
  * - Search queries limited to 1000 recent transactions to prevent memory issues
  * - Users with >1000 transactions should use date filters to narrow search scope
@@ -95,7 +95,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // Limit search to reasonable bounds to prevent memory issues with large datasets.
     const isSearchQuery = !!searchStr;
     const MAX_SEARCH_DOCUMENTS = 1000; // Industry standard: limit search scope
-    const fetchLimit = isSearchQuery 
+    const fetchLimit = isSearchQuery
       ? Math.min(MAX_SEARCH_DOCUMENTS, Math.max(limitNum * 10, 100))
       : limitNum;
     const fetchSkip = isSearchQuery ? 0 : skipNum; // When searching, fetch from start and skip in-memory
@@ -197,7 +197,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       const searchLower = searchStr.toLowerCase();
       const amountSearch = parseFloat(searchStr);
       const isNumericSearch = !isNaN(amountSearch);
-      
+
       // Performance: Use filter with early returns
       decryptedTransactions = decryptedTransactions.filter((txn) => {
         // Search by exact amount if search term is a number (fastest check)
@@ -229,12 +229,12 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
         return true;
       });
     }
-      
+
     // Apply pagination in-memory for filtered results (search or amount range)
     if (searchStr || minAmountNum !== undefined || maxAmountNum !== undefined) {
       const totalSearchResults = decryptedTransactions.length;
       decryptedTransactions = decryptedTransactions.slice(skipNum, skipNum + limitNum);
-      
+
       res.json({
         success: true,
         transactions: decryptedTransactions,
@@ -617,10 +617,10 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Update splits if provided
     if (splits && Array.isArray(splits)) {
       const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-      
+
       // Delete old splits
       await splitsContainer.deleteMany({ transactionId: id, userId });
-      
+
       // Insert new splits
       const newSplits = splits.map((split: any, index: number) => ({
         id: uuidv4(),
@@ -634,7 +634,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }));
-      
+
       if (newSplits.length > 0) {
         await splitsContainer.insertMany(newSplits);
       }
@@ -952,10 +952,12 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response): Promise<vo
     if (updatedTransaction.merchantName && updatedTransaction.accountId) {
       // Get the category from the first split or legacy categoryId
       const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-      const splits = (await splitsContainer.find({ transactionId: id }).toArray()) as unknown as TransactionSplit[];
-      
+      const splits = (await splitsContainer
+        .find({ transactionId: id })
+        .toArray()) as unknown as TransactionSplit[];
+
       const categoryId = splits.length > 0 ? splits[0].categoryId : updatedTransaction.categoryId;
-      
+
       if (categoryId) {
         await learnFromTransaction(
           userId,
@@ -1070,10 +1072,7 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response): Promise<voi
     }
 
     // Update transaction status
-    await transactionsContainer.updateOne(
-      { id, userId },
-      { $set: updateFields }
-    );
+    await transactionsContainer.updateOne({ id, userId }, { $set: updateFields });
 
     const updatedTransaction = (await transactionsContainer.findOne({
       id,
@@ -1084,10 +1083,12 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response): Promise<voi
     if (status === 'approved' && updatedTransaction.merchantName && updatedTransaction.accountId) {
       // Get the category from the first split or legacy categoryId
       const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-      const splits = (await splitsContainer.find({ transactionId: id }).toArray()) as unknown as TransactionSplit[];
-      
+      const splits = (await splitsContainer
+        .find({ transactionId: id })
+        .toArray()) as unknown as TransactionSplit[];
+
       const categoryId = splits.length > 0 ? splits[0].categoryId : updatedTransaction.categoryId;
-      
+
       if (categoryId) {
         await learnFromTransaction(
           userId,

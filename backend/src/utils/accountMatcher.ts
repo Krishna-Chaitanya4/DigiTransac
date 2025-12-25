@@ -26,7 +26,7 @@ export function normalizeMerchantName(merchantName: string): string {
   // Title case (first letter of each word capitalized)
   normalized = normalized
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 
   return normalized;
@@ -34,7 +34,7 @@ export function normalizeMerchantName(merchantName: string): string {
 
 /**
  * Match SMS/email account information to user's accounts
- * 
+ *
  * Matching hierarchy:
  * 1. Bank name + last 4 digits (most accurate)
  * 2. Bank name only (if user has only 1 account with that bank)
@@ -53,9 +53,9 @@ export async function matchAccount(
     }
 
     // Get all user's accounts
-    const userAccounts = await accountsCollection
+    const userAccounts = (await accountsCollection
       .find({ userId, isActive: true })
-      .toArray() as unknown as Account[];
+      .toArray()) as unknown as Account[];
 
     if (userAccounts.length === 0) {
       logger.info(`No active accounts found for user ${userId}`);
@@ -71,12 +71,11 @@ export async function matchAccount(
 
     // Priority 1: Bank name + last 4 digits match
     if (normalizedBankName && last4) {
-      const exactMatch = userAccounts.find(account => {
+      const exactMatch = userAccounts.find((account) => {
         const accountBankLower = account.bankName?.toLowerCase().trim();
         const accountLast4 = account.accountNumber?.slice(-4);
-        
-        return accountBankLower?.includes(normalizedBankName) && 
-               accountLast4 === last4;
+
+        return accountBankLower?.includes(normalizedBankName) && accountLast4 === last4;
       });
 
       if (exactMatch) {
@@ -87,7 +86,7 @@ export async function matchAccount(
 
     // Priority 2: Bank name only (if user has single account with that bank)
     if (normalizedBankName) {
-      const bankMatches = userAccounts.filter(account => {
+      const bankMatches = userAccounts.filter((account) => {
         const accountBankLower = account.bankName?.toLowerCase().trim();
         return accountBankLower?.includes(normalizedBankName);
       });
@@ -104,7 +103,7 @@ export async function matchAccount(
 
     // Priority 3: Last 4 digits only (fallback)
     if (last4 && !normalizedBankName) {
-      const last4Matches = userAccounts.filter(account => {
+      const last4Matches = userAccounts.filter((account) => {
         const accountLast4 = account.accountNumber?.slice(-4);
         return accountLast4 === last4;
       });

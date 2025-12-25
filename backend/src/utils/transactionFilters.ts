@@ -1,6 +1,6 @@
 /**
  * Transaction Filter Utilities
- * 
+ *
  * Centralized utilities for building MongoDB filters following industry best practices:
  * - DRY (Don't Repeat Yourself) principle
  * - Single Responsibility Principle
@@ -43,18 +43,18 @@ export interface TransactionFilterOptions {
 
 /**
  * Build a MongoDB filter for approved transactions only
- * 
+ *
  * This is the default filter for ALL financial calculations including:
  * - Dashboard totals and summaries
  * - Account balances
  * - Budget spending calculations
  * - Analytics and reports
  * - Category/tag statistics
- * 
+ *
  * @param userId - User ID to filter by
  * @param additionalFilters - Additional MongoDB filter criteria
  * @returns MongoDB filter object
- * 
+ *
  * @example
  * const filter = buildApprovedTransactionsFilter(userId, {
  *   type: 'debit',
@@ -74,13 +74,13 @@ export function buildApprovedTransactionsFilter(
 
 /**
  * Build a flexible MongoDB filter for transaction queries
- * 
+ *
  * Use this for listing transactions where users can filter by any review status.
  * For financial calculations, prefer buildApprovedTransactionsFilter instead.
- * 
+ *
  * @param options - Filter options
  * @returns MongoDB filter object
- * 
+ *
  * @example
  * // Filter for pending debits in date range
  * const filter = buildTransactionFilter({
@@ -91,34 +91,19 @@ export function buildApprovedTransactionsFilter(
  *   endDate: new Date('2025-01-31')
  * });
  */
-export function buildTransactionFilter(
-  options: TransactionFilterOptions
-): MongoFilter<any> {
-  const {
-    userId,
-    type,
-    reviewStatus,
-    startDate,
-    endDate,
-    accountId,
-    categoryIds,
-    tags,
-  } = options;
+export function buildTransactionFilter(options: TransactionFilterOptions): MongoFilter<any> {
+  const { userId, type, reviewStatus, startDate, endDate, accountId, categoryIds, tags } = options;
 
   const filter: MongoFilter<any> = { userId };
 
   // Add type filter
   if (type) {
-    filter.type = Array.isArray(type)
-      ? { $in: type }
-      : type;
+    filter.type = Array.isArray(type) ? { $in: type } : type;
   }
 
   // Add review status filter
   if (reviewStatus) {
-    filter.reviewStatus = Array.isArray(reviewStatus)
-      ? { $in: reviewStatus }
-      : reviewStatus;
+    filter.reviewStatus = Array.isArray(reviewStatus) ? { $in: reviewStatus } : reviewStatus;
   }
 
   // Add date range filter
@@ -134,9 +119,7 @@ export function buildTransactionFilter(
 
   // Add account filter
   if (accountId) {
-    filter.accountId = Array.isArray(accountId)
-      ? { $in: accountId }
-      : accountId;
+    filter.accountId = Array.isArray(accountId) ? { $in: accountId } : accountId;
   }
 
   // Note: categoryIds and tags are typically filtered at the split level,
@@ -155,13 +138,13 @@ export function buildTransactionFilter(
 /**
  * Build filter specifically for expense calculations (debit transactions only)
  * Always uses approved status for accurate financial reporting.
- * 
+ *
  * @param userId - User ID
  * @param startDate - Start date (inclusive)
  * @param endDate - End date (inclusive)
  * @param additionalFilters - Additional filter criteria
  * @returns MongoDB filter object
- * 
+ *
  * @example
  * const filter = buildExpenseFilter(userId, startDate, endDate);
  */
@@ -181,13 +164,13 @@ export function buildExpenseFilter(
 /**
  * Build filter specifically for income calculations (credit transactions only)
  * Always uses approved status for accurate financial reporting.
- * 
+ *
  * @param userId - User ID
  * @param startDate - Start date (inclusive)
  * @param endDate - End date (inclusive)
  * @param additionalFilters - Additional filter criteria
  * @returns MongoDB filter object
- * 
+ *
  * @example
  * const filter = buildIncomeFilter(userId, startDate, endDate);
  */

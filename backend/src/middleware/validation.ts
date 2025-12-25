@@ -127,27 +127,27 @@ export const schemas = {
   createBudget: Joi.object({
     // Budget name (optional)
     name: Joi.string().max(100).allow('').optional(),
-    
+
     // Multi-select filters (at least one required)
     categoryIds: Joi.array().items(Joi.string()).min(1).optional(),
     includeTagIds: Joi.array().items(Joi.string()).min(1).optional(),
     excludeTagIds: Joi.array().items(Joi.string()).min(1).optional(),
     accountIds: Joi.array().items(Joi.string()).min(1).optional(),
-    
+
     // Calculation type
     calculationType: Joi.string().valid('debit', 'net').required(),
-    
+
     // Core budget fields
     amount: Joi.number().positive().required(),
     period: Joi.string().valid('this-month', 'next-month', 'this-year', 'custom').required(),
     startDate: Joi.date().iso().required(),
     endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),
-    
+
     // Alert configuration
     alertThreshold: Joi.number().min(0).max(100).default(80),
     alertThresholds: Joi.array().items(Joi.number().min(0).max(100)).optional(),
     notificationChannels: Joi.array().items(Joi.string().valid('in-app', 'email')).optional(),
-    
+
     // Rollover configuration
     enableRollover: Joi.boolean().optional().default(false),
     rolloverLimit: Joi.number().positive().optional(),

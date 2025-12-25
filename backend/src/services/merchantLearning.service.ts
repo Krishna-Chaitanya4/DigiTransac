@@ -8,11 +8,11 @@ let merchantLearningCollection: Collection<MerchantLearning>;
 export function initializeMerchantLearning(database: Db): void {
   db = database;
   merchantLearningCollection = db.collection<MerchantLearning>('merchant_learning');
-  
+
   // Create indexes for fast lookups
   merchantLearningCollection.createIndex({ userId: 1, merchantName: 1 }, { unique: true });
   merchantLearningCollection.createIndex({ userId: 1, lastUsedAt: -1 });
-  
+
   logger.info('Merchant learning service initialized');
 }
 
@@ -37,7 +37,7 @@ export async function learnFromTransaction(
   }
 
   const normalizedMerchant = normalizeMerchantName(merchantName);
-  
+
   // Skip generic/system merchants
   const skipMerchants = ['transfer', 'cash', 'unknown', 'n/a', 'na', ''];
   if (skipMerchants.includes(normalizedMerchant)) {
@@ -47,28 +47,30 @@ export async function learnFromTransaction(
   try {
     // Upsert: Update if exists, create if not
     await merchantLearningCollection.updateOne(
-      { 
-        userId: userId, 
-        merchantName: normalizedMerchant 
+      {
+        userId: userId,
+        merchantName: normalizedMerchant,
       },
       {
         $set: {
           categoryId: categoryId,
           accountId: accountId,
           lastUsedAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
         $inc: { usageCount: 1 },
         $setOnInsert: {
           userId: userId,
           merchantName: normalizedMerchant,
-          createdAt: new Date()
-        }
+          createdAt: new Date(),
+        },
       },
       { upsert: true }
     );
 
-    logger.info(`Learned mapping: ${normalizedMerchant} → category=${categoryId}, account=${accountId}`);
+    logger.info(
+      `Learned mapping: ${normalizedMerchant} → category=${categoryId}, account=${accountId}`
+    );
   } catch (error) {
     logger.error({ error }, 'Failed to learn from transaction');
   }
@@ -90,28 +92,30 @@ export async function getLearnedMapping(
   try {
     const learning = await merchantLearningCollection.findOne({
       userId: userId,
-      merchantName: normalizedMerchant
+      merchantName: normalizedMerchant,
     });
 
     if (learning) {
-      logger.info(`Found learned mapping for ${normalizedMerchant}: category=${learning.categoryId}, account=${learning.accountId}`);
+      logger.info(
+        `Found learned mapping for ${normalizedMerchant}: category=${learning.categoryId}, account=${learning.accountId}`
+      );
       return {
         categoryId: learning.categoryId,
-        accountId: learning.accountId || ''
+        accountId: learning.accountId || '',
       };
     }
 
     // Try partial match (e.g., "Swiggy Food" matches "Swiggy")
     const partialMatch = await merchantLearningCollection.findOne({
       userId: userId,
-      merchantName: { $regex: new RegExp(`^${normalizedMerchant.split(' ')[0]}`, 'i') }
+      merchantName: { $regex: new RegExp(`^${normalizedMerchant.split(' ')[0]}`, 'i') },
     });
 
     if (partialMatch) {
       logger.info(`Found partial match for ${normalizedMerchant}: ${partialMatch.merchantName}`);
       return {
         categoryId: partialMatch.categoryId,
-        accountId: partialMatch.accountId || ''
+        accountId: partialMatch.accountId || '',
       };
     }
 
@@ -143,11 +147,11 @@ export async function getUserLearnings(userId: string): Promise<MerchantLearning
  */
 export async function deleteLearnedMapping(userId: string, merchantName: string): Promise<boolean> {
   const normalizedMerchant = normalizeMerchantName(merchantName);
-  
+
   try {
     const result = await merchantLearningCollection.deleteOne({
       userId: userId,
-      merchantName: normalizedMerchant
+      merchantName: normalizedMerchant,
     });
 
     return (result.deletedCount || 0) > 0;
@@ -163,7 +167,7 @@ export async function deleteLearnedMapping(userId: string, merchantName: string)
 export async function clearUserLearnings(userId: string): Promise<number> {
   try {
     const result = await merchantLearningCollection.deleteMany({
-      userId: userId
+      userId: userId,
     });
 
     const deletedCount = result.deletedCount || 0;

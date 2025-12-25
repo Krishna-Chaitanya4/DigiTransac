@@ -303,9 +303,9 @@ class GmailPollingService {
           // 1. MerchantLearning (auto-learned from approvals)
           // 2. Generic keyword patterns (hardcoded)
           // 3. Uncategorized (fallback category)
-          let categoryId = parsedTransaction.learnedCategoryId || emailParserService.suggestCategory(
-            parsedTransaction.merchant
-          );
+          let categoryId =
+            parsedTransaction.learnedCategoryId ||
+            emailParserService.suggestCategory(parsedTransaction.merchant);
 
           // If no category suggested, use "Uncategorized" as fallback
           if (!categoryId) {
@@ -314,9 +314,10 @@ class GmailPollingService {
           } else {
             console.log('   📂 Category from MerchantLearning or generic keywords');
           }
-          
+
           // Priority for account: matched (email info) > learned (merchant history) > empty (manual)
-          const accountId = parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
+          const accountId =
+            parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
 
           // Create pending transaction
           const transactionsContainer = await cosmosDBService.getTransactionsContainer();
@@ -358,7 +359,10 @@ class GmailPollingService {
             categoryId: categoryId,
             amount: parsedTransaction.amount,
             tags: parsedTransaction.tags || [], // Auto-detected tags
-            notes: categoryId && parsedTransaction.learnedCategoryId ? 'Auto-filled from learning' : undefined,
+            notes:
+              categoryId && parsedTransaction.learnedCategoryId
+                ? 'Auto-filled from learning'
+                : undefined,
             order: 1,
             createdAt: new Date(),
             updatedAt: new Date(),

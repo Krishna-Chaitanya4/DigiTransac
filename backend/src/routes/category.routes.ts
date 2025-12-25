@@ -460,7 +460,7 @@ router.get('/stats', async (req: AuthRequest, res: Response): Promise<void> => {
     ];
 
     const statsResult = await transactionsContainer.aggregate(pipeline).toArray();
-    
+
     // Create a map for quick lookup
     const statsMap = new Map(
       statsResult.map((stat: any) => [

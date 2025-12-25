@@ -172,7 +172,11 @@ export class EmailParserService {
   /**
    * Parse transaction SMS/email text
    */
-  public async parseTransaction(text: string, sender?: string, userId?: string): Promise<ParsedTransaction | null> {
+  public async parseTransaction(
+    text: string,
+    sender?: string,
+    userId?: string
+  ): Promise<ParsedTransaction | null> {
     // Try to identify bank from sender or text
     const bank = this.identifyBank(text, sender);
 
@@ -198,7 +202,7 @@ export class EmailParserService {
           // Extract merchant
           let merchant = match[pattern.merchantGroup].trim();
           merchant = this.cleanMerchantName(merchant);
-          
+
           // Normalize merchant name for consistency
           const normalizedMerchant = normalizeMerchantName(merchant);
 
@@ -219,7 +223,7 @@ export class EmailParserService {
           // Check if we have learned category/account for this merchant
           let learnedCategoryId: string | undefined;
           let learnedAccountId: string | undefined;
-          
+
           if (userId && normalizedMerchant) {
             const learned = await getLearnedMapping(userId, normalizedMerchant);
             if (learned) {
@@ -227,19 +231,16 @@ export class EmailParserService {
               learnedAccountId = learned.accountId;
             }
           }
-          
+
           // Match email account info to user's accounts
           let matchedAccountId: string | undefined;
-          
+
           if (userId && (bank.name || cardLast4)) {
             try {
               const accountsContainer = await cosmosDBService.getAccountsContainer();
-              matchedAccountId = await matchAccount(
-                userId,
-                accountsContainer as any,
-                bank.name,
-                cardLast4
-              ) || undefined;
+              matchedAccountId =
+                (await matchAccount(userId, accountsContainer as any, bank.name, cardLast4)) ||
+                undefined;
             } catch (error) {
               // Account matching failed, continue without it
             }

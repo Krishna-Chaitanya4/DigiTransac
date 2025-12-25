@@ -151,7 +151,8 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate that at least one filter is specified
     const hasCategoryFilter = categoryIds && categoryIds.length > 0;
-    const hasTagFilter = (includeTagIds && includeTagIds.length > 0) || (excludeTagIds && excludeTagIds.length > 0);
+    const hasTagFilter =
+      (includeTagIds && includeTagIds.length > 0) || (excludeTagIds && excludeTagIds.length > 0);
     const hasAccountFilter = accountIds && accountIds.length > 0;
 
     if (!hasCategoryFilter && !hasTagFilter && !hasAccountFilter) {
@@ -204,7 +205,9 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // Validate categories exist
     if (hasCategoryFilter) {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-      const categories = await categoriesContainer.find({ id: { $in: categoryIds }, userId }).toArray();
+      const categories = await categoriesContainer
+        .find({ id: { $in: categoryIds }, userId })
+        .toArray();
       if (categories.length !== categoryIds.length) {
         res.status(404).json({
           success: false,
@@ -409,7 +412,9 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Validate categories if provided
     if (categoryIds !== undefined && categoryIds.length > 0) {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-      const categories = await categoriesContainer.find({ id: { $in: categoryIds }, userId }).toArray();
+      const categories = await categoriesContainer
+        .find({ id: { $in: categoryIds }, userId })
+        .toArray();
       if (categories.length !== categoryIds.length) {
         res.status(404).json({
           success: false,
@@ -474,7 +479,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Validate start date is before end date (if both provided or updating)
     const effectiveStartDate = startDate ? new Date(startDate) : budget.startDate;
     const effectiveEndDate = endDate ? new Date(endDate) : budget.endDate;
-    
+
     if (effectiveEndDate && effectiveStartDate >= effectiveEndDate) {
       res.status(400).json({
         success: false,
@@ -502,7 +507,8 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (alertThresholds !== undefined) updateData.alertThresholds = alertThresholds;
     if (notificationChannels !== undefined) updateData.notificationChannels = notificationChannels;
     if (enableRollover !== undefined) updateData.enableRollover = enableRollover;
-    if (rolloverLimit !== undefined) updateData.rolloverLimit = rolloverLimit ? parseFloat(rolloverLimit) : undefined;
+    if (rolloverLimit !== undefined)
+      updateData.rolloverLimit = rolloverLimit ? parseFloat(rolloverLimit) : undefined;
 
     await budgetsContainer.updateOne({ id, userId }, { $set: updateData });
 

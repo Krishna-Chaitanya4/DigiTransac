@@ -76,9 +76,9 @@ testCases.forEach((testCase, index) => {
   console.log(`   Text: "${testCase.text}"`);
   console.log(`   Type: ${testCase.type}`);
   console.log(`   Merchant: ${testCase.merchant}`);
-  
+
   const result = detectTransactionTags(testCase.type, testCase.text, testCase.merchant);
-  
+
   console.log(`   ✓ Tags: [${result.tags.join(', ')}]`);
   console.log(`   ✓ Confidence: ${result.confidence}`);
   console.log('');
