@@ -40,7 +40,6 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
-  FilterList as FilterListIcon,
   FileDownload as FileDownloadIcon,
   TrendingUp as CreditIcon,
   TrendingDown as DebitIcon,
@@ -57,6 +56,9 @@ import {
   ArrowDownward as ArrowDownwardIcon,
   UnfoldMore as UnfoldMoreIcon,
   Close as CloseIcon,
+  HourglassEmpty as PendingIcon,
+  Block as RejectedIcon,
+  Tune as TuneIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useToast } from '../components/Toast';
@@ -1412,126 +1414,244 @@ const Transactions: React.FC = () => {
           </Grid>
         </Grid>
 
-        {/* Filters */}
-        <Card sx={{ mb: 3 }}>
+        {/* Inline Filter Interface */}
+        <Card sx={{ mb: 3, overflow: 'visible' }}>
           <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Box display="flex" gap={2} alignItems="center" flexWrap="wrap" flex={1}>
-                <TextField
-                  placeholder="Search by description, merchant, amount..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+            <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+              {/* Search Bar */}
+              <TextField
+                placeholder="Search by description, merchant, amount..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery && (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        onClick={() => setSearchQuery('')}
+                        edge="end"
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ 
+                  minWidth: 250, 
+                  flexGrow: { xs: 1, sm: 0 },
+                  '& .MuiInputBase-input': {
+                    fontSize: '0.875rem',
+                  },
+                }}
+              />
+
+              {/* Transaction Type Chips */}
+              <Chip
+                label="All"
+                onClick={() => setSelectedType('all')}
+                color={selectedType === 'all' ? 'primary' : 'default'}
+                variant={selectedType === 'all' ? 'filled' : 'outlined'}
+                size="medium"
+                sx={{ 
+                  fontWeight: selectedType === 'all' ? 600 : 400,
+                  fontSize: '0.875rem',
+                  height: 32,
+                }}
+              />
+              <Chip
+                icon={<CreditIcon fontSize="small" />}
+                label="Credits"
+                onClick={() => setSelectedType('credit')}
+                color={selectedType === 'credit' ? 'success' : 'default'}
+                variant={selectedType === 'credit' ? 'filled' : 'outlined'}
+                size="medium"
+                sx={{ 
+                  fontWeight: selectedType === 'credit' ? 600 : 400,
+                  fontSize: '0.875rem',
+                  height: 32,
+                }}
+              />
+              <Chip
+                icon={<DebitIcon fontSize="small" />}
+                label="Debits"
+                onClick={() => setSelectedType('debit')}
+                color={selectedType === 'debit' ? 'error' : 'default'}
+                variant={selectedType === 'debit' ? 'filled' : 'outlined'}
+                size="medium"
+                sx={{ 
+                  fontWeight: selectedType === 'debit' ? 600 : 400,
+                  fontSize: '0.875rem',
+                  height: 32,
+                }}
+              />
+
+              {/* Divider */}
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+              {/* Status Chips */}
+              <Chip
+                label="All"
+                onClick={() => setReviewStatus('all')}
+                color={reviewStatus === 'all' ? 'primary' : 'default'}
+                variant={reviewStatus === 'all' ? 'filled' : 'outlined'}
+                size="medium"
+                sx={{ 
+                  fontWeight: reviewStatus === 'all' ? 600 : 400,
+                  fontSize: '0.875rem',
+                  height: 32,
+                }}
+              />
+              <Chip
+                icon={<PendingIcon fontSize="small" />}
+                label={`Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+                onClick={() => {
+                  setReviewStatus('pending');
+                  setStartDate(null);
+                  setEndDate(null);
+                  setActiveDateFilter('');
+                }}
+                color={reviewStatus === 'pending' ? 'warning' : 'default'}
+                variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
+                size="medium"
+                sx={{ 
+                  fontWeight: reviewStatus === 'pending' ? 600 : 400,
+                  fontSize: '0.875rem',
+                  height: 32,
+                  '& .MuiChip-label': {
+                    fontWeight: pendingCount > 0 ? 600 : 400,
+                  }
+                }}
+              />
+              <Chip
+                icon={<ApproveIcon fontSize="small" />}
+                label="Approved"
+                onClick={() => setReviewStatus('approved')}
+                color={reviewStatus === 'approved' ? 'success' : 'default'}
+                variant={reviewStatus === 'approved' ? 'filled' : 'outlined'}
+                size="medium"
+                sx={{ 
+                  fontWeight: reviewStatus === 'approved' ? 600 : 400,
+                  fontSize: '0.875rem',
+                  height: 32,
+                }}
+              />
+              <Chip
+                icon={<RejectedIcon fontSize="small" />}
+                label="Rejected"
+                onClick={() => setReviewStatus('rejected')}
+                color={reviewStatus === 'rejected' ? 'error' : 'default'}
+                variant={reviewStatus === 'rejected' ? 'filled' : 'outlined'}
+                size="medium"
+                sx={{ 
+                  fontWeight: reviewStatus === 'rejected' ? 600 : 400,
+                  fontSize: '0.875rem',
+                  height: 32,
+                }}
+              />
+
+              {/* Divider */}
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+              {/* More Filters Button */}
+              <Button
+                variant={showFilters ? 'contained' : 'outlined'}
+                startIcon={<TuneIcon />}
+                onClick={() => setShowFilters(!showFilters)}
+                size="small"
+                sx={{ fontSize: '0.875rem', minHeight: 32 }}
+              >
+                Filters
+              </Button>
+
+              {/* Clear Filters */}
+              {(searchQuery ||
+                selectedType !== 'all' ||
+                selectedAccount ||
+                selectedCategories.length > 0 ||
+                includeTags.length > 0 ||
+                excludeTags.length > 0 ||
+                minAmount ||
+                maxAmount ||
+                reviewStatus !== 'all') && (
+                <Chip
+                  label="Clear All"
+                  onDelete={clearFilters}
+                  onClick={clearFilters}
+                  color="primary"
                   size="small"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchQuery && (
-                      <InputAdornment position="end">
-                        <IconButton
-                          size="small"
-                          onClick={() => setSearchQuery('')}
-                          edge="end"
-                          sx={{ mr: -0.5 }}
-                        >
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{ minWidth: 250 }}
+                  variant="outlined"
+                  sx={{ fontWeight: 500, fontSize: '0.8125rem', height: 28 }}
                 />
-
-                <ToggleButtonGroup
-                  value={selectedType}
-                  exclusive
-                  onChange={(_, value) => value && setSelectedType(value)}
+              )}
+              
+              {/* Active filter indicators */}
+              {selectedAccount && (
+                <Chip
+                  label={`Account: ${accounts.find(a => a.id === selectedAccount)?.name || ''}`}
+                  onDelete={() => setSelectedAccount('')}
                   size="small"
-                >
-                  <ToggleButton value="all">All</ToggleButton>
-                  <ToggleButton value="credit">
-                    <CreditIcon fontSize="small" sx={{ mr: 0.5 }} />
-                    Credits
-                  </ToggleButton>
-                  <ToggleButton value="debit">
-                    <DebitIcon fontSize="small" sx={{ mr: 0.5 }} />
-                    Debits
-                  </ToggleButton>
-                </ToggleButtonGroup>
-
-                <ToggleButtonGroup
-                  value={reviewStatus}
-                  exclusive
-                  onChange={(_, value) => value && setReviewStatus(value)}
+                  color="info"
+                  variant="outlined"
+                  sx={{ fontSize: '0.8125rem', height: 28 }}
+                />
+              )}
+              {selectedCategories.length > 0 && (
+                <Chip
+                  label={`${selectedCategories.length} ${selectedCategories.length === 1 ? 'Category' : 'Categories'}`}
+                  onDelete={() => setSelectedCategories([])} 
                   size="small"
-                >
-                  <ToggleButton value="all">
-                    All
-                  </ToggleButton>
-                  <ToggleButton value="pending">
-                    Pending
-                    {pendingCount > 0 && (
-                      <Chip 
-                        label={pendingCount} 
-                        size="small" 
-                        color="warning" 
-                        sx={{ ml: 1, height: 20, minWidth: 20, cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent toggle button click
-                          setReviewStatus('pending');
-                          setStartDate(null);
-                          setEndDate(null);
-                          setActiveDateFilter('');
-                        }}
-                      />
-                    )}
-                  </ToggleButton>
-                  <ToggleButton value="approved">
-                    Approved
-                  </ToggleButton>
-                  <ToggleButton value="rejected">
-                    Rejected
-                  </ToggleButton>
-                </ToggleButtonGroup>
-
-                <Button
-                  variant={showFilters ? 'contained' : 'outlined'}
-                  startIcon={<FilterListIcon />}
-                  onClick={() => setShowFilters(!showFilters)}
+                  color="info"
+                  variant="outlined"
+                  sx={{ fontSize: '0.8125rem', height: 28 }}
+                />
+              )}
+              {(includeTags.length > 0 || excludeTags.length > 0) && (
+                <Chip
+                  label={`${includeTags.length + excludeTags.length} Tag Filter${includeTags.length + excludeTags.length > 1 ? 's' : ''}`}
+                  onDelete={() => {
+                    setIncludeTags([]);
+                    setExcludeTags([]);
+                  }}
                   size="small"
-                >
-                  Filters
-                </Button>
+                  color="info"
+                  variant="outlined"
+                  sx={{ fontSize: '0.8125rem', height: 28 }}
+                />
+              )}
+              {(minAmount || maxAmount) && (
+                <Chip
+                  label="Amount Range"
+                  onDelete={() => {
+                    setMinAmount('');
+                    setMaxAmount('');
+                  }}
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  sx={{ fontSize: '0.8125rem', height: 28 }}
+                />
+              )}
 
-                {(searchQuery ||
-                  selectedType !== 'all' ||
-                  selectedAccount ||
-                  selectedCategories.length > 0 ||
-                  includeTags.length > 0 ||
-                  excludeTags.length > 0 ||
-                  minAmount ||
-                  maxAmount ||
-                  reviewStatus !== 'all') && (
-                  <Chip
-                    label="Clear Filters"
-                    onDelete={clearFilters}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-              </Box>
-
+              {/* Bulk Actions */}
               {selectedTransactions.size > 0 && (
-                <Box display="flex" gap={1}>
+                <>
+                  <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
                   <Chip
                     label={`${selectedTransactions.size} selected`}
                     color="primary"
+                    variant="filled"
                     onDelete={() => {
                       setSelectedTransactions(new Set());
                       setSelectAll(false);
                     }}
+                    size="small"
+                    sx={{ fontWeight: 600, fontSize: '0.8125rem', height: 28 }}
                   />
                   {reviewStatus === 'pending' && (
                     <Button
@@ -1540,8 +1660,9 @@ const Transactions: React.FC = () => {
                       variant="contained"
                       startIcon={<ApproveIcon />}
                       onClick={handleBulkApprove}
+                      sx={{ fontSize: '0.875rem', minHeight: 32 }}
                     >
-                      Approve Selected
+                      Approve
                     </Button>
                   )}
                   <Button
@@ -1550,13 +1671,15 @@ const Transactions: React.FC = () => {
                     variant="outlined"
                     startIcon={<DeleteIcon />}
                     onClick={handleBulkDelete}
+                    sx={{ fontSize: '0.875rem', minHeight: 32 }}
                   >
-                    Delete Selected
+                    Delete
                   </Button>
-                </Box>
+                </>
               )}
             </Box>
 
+            {/* Collapsible Advanced Filters */}
             <Collapse in={showFilters}>
               <Divider sx={{ my: 2 }} />
               <Grid container spacing={2}>
