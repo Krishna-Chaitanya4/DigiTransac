@@ -77,16 +77,11 @@ interface Budget {
   excludeTagIds?: string[]; // Must NOT have any of these tags (OR logic)
   accountIds?: string[]; // Track these accounts (OR logic)
   
-  // Legacy fields (for backward compatibility)
-  scopeType?: 'category' | 'tag' | 'account';
-  categoryId?: string;
-  accountId?: string;
-  
   // Calculation type
   calculationType: 'debit' | 'net';
   
   amount: number;
-  period: 'monthly' | 'yearly' | 'custom';
+  period: 'this-month' | 'next-month' | 'this-year' | 'custom';
   startDate: string;
   endDate?: string;
   alertThreshold: number;
@@ -133,7 +128,7 @@ const Budgets: React.FC = () => {
     accountIds: [] as string[],
     calculationType: 'debit' as 'debit' | 'net',
     amount: '',
-    period: 'custom' as 'monthly' | 'yearly' | 'custom',
+    period: 'this-month' as 'this-month' | 'next-month' | 'this-year' | 'custom',
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     alertThreshold: '80',
@@ -154,8 +149,22 @@ const Budgets: React.FC = () => {
   // Memoized utility functions for date calculations (performance optimization)
   const getMonthDateRange = useCallback(() => {
     const now = new Date();
+    // Set to first day of current month at 00:00:00
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Set to last day of current month at 23:59:59
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+    };
+  }, []);
+
+  const getNextMonthDateRange = useCallback(() => {
+    const now = new Date();
+    // Set to first day of next month
+    const start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    // Set to last day of next month
+    const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
     return {
       startDate: start.toISOString().split('T')[0],
       endDate: end.toISOString().split('T')[0],
@@ -164,7 +173,9 @@ const Budgets: React.FC = () => {
 
   const getYearDateRange = useCallback(() => {
     const now = new Date();
+    // Jan 1 at 00:00:00
     const start = new Date(now.getFullYear(), 0, 1);
+    // Dec 31 at 23:59:59
     const end = new Date(now.getFullYear(), 11, 31);
     return {
       startDate: start.toISOString().split('T')[0],
@@ -172,21 +183,33 @@ const Budgets: React.FC = () => {
     };
   }, []);
 
+  // Track if dates were manually edited (to avoid infinite loops)
+  const [isManualDateEdit, setIsManualDateEdit] = React.useState(false);
+
   // Auto-update dates when period changes (performance optimized with useEffect)
   useEffect(() => {
-    if (!openDialog) return; // Only run when dialog is open
+    if (!openDialog || isManualDateEdit) return; // Skip if manual edit in progress
 
-    if (formData.period === 'monthly') {
+    if (formData.period === 'this-month') {
       const { startDate, endDate } = getMonthDateRange();
       setFormData(prev => ({ ...prev, startDate, endDate }));
       setDateError('');
-    } else if (formData.period === 'yearly') {
+    } else if (formData.period === 'next-month') {
+      const { startDate, endDate } = getNextMonthDateRange();
+      setFormData(prev => ({ ...prev, startDate, endDate }));
+      setDateError('');
+    } else if (formData.period === 'this-year') {
       const { startDate, endDate } = getYearDateRange();
       setFormData(prev => ({ ...prev, startDate, endDate }));
       setDateError('');
     }
     // For 'custom' period, keep user-selected dates
-  }, [formData.period, openDialog, getMonthDateRange, getYearDateRange]);
+    
+    // Reset manual edit flag after period change
+    if (isManualDateEdit) {
+      setIsManualDateEdit(false);
+    }
+  }, [formData.period, openDialog, getMonthDateRange, getNextMonthDateRange, getYearDateRange, isManualDateEdit]);
 
   // Real-time date validation (memoized for performance)
   const validateDates = useCallback((start: string, end: string) => {
@@ -218,6 +241,25 @@ const Budgets: React.FC = () => {
       validateDates(formData.startDate, formData.endDate);
     }
   }, [formData.startDate, formData.endDate, openDialog, validateDates]);
+
+  // Handle manual date edits - auto-switch to custom period
+  const handleStartDateChange = useCallback((newStartDate: string) => {
+    setIsManualDateEdit(true);
+    setFormData(prev => ({
+      ...prev,
+      startDate: newStartDate,
+      period: prev.period !== 'custom' ? 'custom' : prev.period, // Auto-switch to custom
+    }));
+  }, []);
+
+  const handleEndDateChange = useCallback((newEndDate: string) => {
+    setIsManualDateEdit(true);
+    setFormData(prev => ({
+      ...prev,
+      endDate: newEndDate,
+      period: prev.period !== 'custom' ? 'custom' : prev.period, // Auto-switch to custom
+    }));
+  }, []);
 
   const fetchBudgets = async () => {
     try {
@@ -316,7 +358,7 @@ const Budgets: React.FC = () => {
       accountIds: [],
       calculationType: 'debit' as 'debit' | 'net',
       amount: '',
-      period: 'monthly' as 'monthly' | 'yearly' | 'custom',
+      period: 'this-month' as 'this-month' | 'next-month' | 'this-year' | 'custom',
       startDate,
       endDate,
       alertThreshold: '80',
@@ -325,20 +367,17 @@ const Budgets: React.FC = () => {
     });
     setEditingBudget(null);
     setDateError('');
+    setIsManualDateEdit(false);
     setOpenDialog(true);
   }, [getMonthDateRange]);
 
   const handleEditBudget = useCallback((budget: Budget) => {
-    // Handle both new and legacy format
-    const categoryIds = budget.categoryIds || (budget.categoryId ? [budget.categoryId] : []);
-    const accountIds = budget.accountIds || (budget.accountId ? [budget.accountId] : []);
-    
     setFormData({
       name: budget.name || '',
-      categoryIds,
+      categoryIds: budget.categoryIds || [],
       includeTagIds: budget.includeTagIds || [],
       excludeTagIds: budget.excludeTagIds || [],
-      accountIds,
+      accountIds: budget.accountIds || [],
       calculationType: budget.calculationType,
       amount: budget.amount.toString(),
       period: budget.period,
@@ -352,6 +391,7 @@ const Budgets: React.FC = () => {
     });
     setEditingBudget(budget);
     setDateError('');
+    setIsManualDateEdit(false);
     setOpenDialog(true);
   }, []);
 
@@ -530,7 +570,7 @@ const Budgets: React.FC = () => {
                       
                       <Box display="flex" alignItems="center" gap={0.5} mb={1} flexWrap="wrap">
                         {/* Categories */}
-                        {(budget.categoryIds || (budget.categoryId ? [budget.categoryId] : [])).map((catId) => (
+                        {budget.categoryIds && budget.categoryIds.map((catId) => (
                           <Chip
                             key={catId}
                             icon={
@@ -578,7 +618,7 @@ const Budgets: React.FC = () => {
                         ))}
 
                         {/* Accounts */}
-                        {(budget.accountIds || (budget.accountId ? [budget.accountId] : [])).map((accId) => (
+                        {budget.accountIds && budget.accountIds.map((accId) => (
                           <Chip
                             key={accId}
                             icon={<AccountIcon sx={{ fontSize: 14 }} />}
@@ -694,7 +734,7 @@ const Budgets: React.FC = () => {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               onBlur={(e) => setFormData({ ...formData, name: e.target.value.trim() })}
-              placeholder="e.g., Monthly Groceries, Q1 Marketing"
+              placeholder="e.g., Groceries, Q1 Marketing, Annual Insurance"
               helperText="Give your budget a descriptive name for easy identification"
               inputProps={{ maxLength: 100 }}
             />
@@ -954,15 +994,18 @@ const Budgets: React.FC = () => {
                   value={formData.period}
                   onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
                   helperText={
-                    formData.period === 'monthly'
-                      ? 'Auto-sets to current month'
-                      : formData.period === 'yearly'
-                      ? 'Auto-sets to current year'
+                    formData.period === 'this-month'
+                      ? 'Auto-sets to current month dates'
+                      : formData.period === 'next-month'
+                      ? 'Auto-sets to next month dates'
+                      : formData.period === 'this-year'
+                      ? 'Auto-sets to current year dates'
                       : 'Choose custom date range'
                   }
                 >
-                  <MenuItem value="monthly">Monthly</MenuItem>
-                  <MenuItem value="yearly">Yearly</MenuItem>
+                  <MenuItem value="this-month">This Month</MenuItem>
+                  <MenuItem value="next-month">Next Month</MenuItem>
+                  <MenuItem value="this-year">This Year</MenuItem>
                   <MenuItem value="custom">Custom</MenuItem>
                 </TextField>
               </Grid>
@@ -976,13 +1019,20 @@ const Budgets: React.FC = () => {
                   type="date"
                   fullWidth
                   value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  disabled={formData.period !== 'custom'}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
                   InputLabelProps={{
                     shrink: true,
                   }}
                   error={!!dateError}
-                  helperText={formData.period !== 'custom' ? 'Auto-calculated based on period' : ''}
+                  helperText={
+                    formData.period === 'this-month'
+                      ? 'First day of this month (edit to switch to custom)'
+                      : formData.period === 'next-month'
+                      ? 'First day of next month (edit to switch to custom)'
+                      : formData.period === 'this-year'
+                      ? 'First day of this year (edit to switch to custom)'
+                      : ''
+                  }
                   required
                 />
               </Grid>
@@ -992,13 +1042,20 @@ const Budgets: React.FC = () => {
                   type="date"
                   fullWidth
                   value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  disabled={formData.period !== 'custom'}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   InputLabelProps={{
                     shrink: true,
                   }}
                   error={!!dateError}
-                  helperText={formData.period !== 'custom' ? 'Auto-calculated based on period' : ''}
+                  helperText={
+                    formData.period === 'this-month'
+                      ? 'Last day of this month (edit to switch to custom)'
+                      : formData.period === 'next-month'
+                      ? 'Last day of next month (edit to switch to custom)'
+                      : formData.period === 'this-year'
+                      ? 'Last day of this year (edit to switch to custom)'
+                      : ''
+                  }
                   required
                 />
               </Grid>

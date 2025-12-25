@@ -1,21 +1,7 @@
 import { Budget, Category } from '../models/types';
 
 /**
- * Migrate legacy budget format to new multi-select format
- */
-function migrateLegacyBudget(budget: Budget): void {
-  // Migrate categoryId -> categoryIds
-  if (budget.scopeType === 'category' && budget.categoryId && !budget.categoryIds) {
-    budget.categoryIds = [budget.categoryId];
-  }
-  // Migrate accountId -> accountIds
-  if (budget.scopeType === 'account' && budget.accountId && !budget.accountIds) {
-    budget.accountIds = [budget.accountId];
-  }
-}
-
-/**
- * Calculate budget spending with new multi-filter logic:
+ * Calculate budget spending with multi-filter logic:
  * - Categories: OR logic (cat1 OR cat2 OR cat3)
  * - Tags: Include (tag1 OR tag2) AND NOT Exclude (tag3 OR tag4)
  * - Accounts: OR logic (acc1 OR acc2)
@@ -28,9 +14,6 @@ export async function calculateBudgetSpending(
   categoryToDescendantsMap: Map<string, string[]>,
   expensesByCategory: Map<string, any[]>
 ): Promise<{ spent: number; credit: number; debit: number; net: number }> {
-  // Migrate legacy budget if needed
-  migrateLegacyBudget(budget);
-
   const startDate = new Date(budget.startDate);
   const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
 

@@ -125,35 +125,21 @@ export const schemas = {
 
   // Budget
   createBudget: Joi.object({
-    // Scope configuration
-    scopeType: Joi.string().valid('category', 'tag', 'account').required(),
-    categoryId: Joi.string().when('scopeType', {
-      is: 'category',
-      then: Joi.required(),
-      otherwise: Joi.forbidden(),
-    }),
-    includeTagIds: Joi.array().items(Joi.string()).when('scopeType', {
-      is: 'tag',
-      then: Joi.optional(),
-      otherwise: Joi.forbidden(),
-    }),
-    excludeTagIds: Joi.array().items(Joi.string()).when('scopeType', {
-      is: 'tag',
-      then: Joi.optional(),
-      otherwise: Joi.forbidden(),
-    }),
-    accountId: Joi.string().when('scopeType', {
-      is: 'account',
-      then: Joi.required(),
-      otherwise: Joi.forbidden(),
-    }),
+    // Budget name (optional)
+    name: Joi.string().max(100).allow('').optional(),
+    
+    // Multi-select filters (at least one required)
+    categoryIds: Joi.array().items(Joi.string()).min(1).optional(),
+    includeTagIds: Joi.array().items(Joi.string()).min(1).optional(),
+    excludeTagIds: Joi.array().items(Joi.string()).min(1).optional(),
+    accountIds: Joi.array().items(Joi.string()).min(1).optional(),
     
     // Calculation type
-    calculationType: Joi.string().valid('debit', 'credit', 'net').required(),
+    calculationType: Joi.string().valid('debit', 'net').required(),
     
     // Core budget fields
     amount: Joi.number().positive().required(),
-    period: Joi.string().valid('monthly', 'yearly', 'custom').required(),
+    period: Joi.string().valid('this-month', 'next-month', 'this-year', 'custom').required(),
     startDate: Joi.date().iso().required(),
     endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),
     

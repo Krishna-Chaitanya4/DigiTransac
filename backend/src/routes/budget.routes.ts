@@ -565,8 +565,8 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
           primaryId = budget.categoryIds[0];
         } else if (budget.accountIds && budget.accountIds.length > 0) {
           primaryId = budget.accountIds[0];
-        } else if (budget.categoryId) {
-          primaryId = budget.categoryId; // Legacy
+        } else if (budget.includeTagIds && budget.includeTagIds.length > 0) {
+          primaryId = budget.includeTagIds[0];
         }
 
         budgetAlerts.push({

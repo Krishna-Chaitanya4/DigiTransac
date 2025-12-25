@@ -116,16 +116,11 @@ export interface Budget {
   excludeTagIds?: string[]; // Transactions must NOT have any of these tags (OR logic)
   accountIds?: string[]; // Track these accounts (OR logic: acc1 OR acc2)
   
-  // Legacy fields (for backward compatibility - will be migrated)
-  scopeType?: 'category' | 'tag' | 'account'; // @deprecated - use categoryIds/accountIds/tagIds
-  categoryId?: string; // @deprecated - use categoryIds[]
-  accountId?: string; // @deprecated - use accountIds[]
-  
   // Budget calculation type
   calculationType: 'debit' | 'net'; // debit=total expenses, net=expenses after refunds (debit-credit)
   
   amount: number;
-  period: 'monthly' | 'yearly' | 'custom';
+  period: 'this-month' | 'next-month' | 'this-year' | 'custom';
   startDate: Date;
   endDate?: Date;
   
