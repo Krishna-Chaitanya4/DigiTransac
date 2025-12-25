@@ -1,87 +1,108 @@
 /**
- * Quick test script for transaction tag detection
- * Run with: npx ts-node src/utils/transactionTags.test.ts
+ * Jest test suite for transaction tag detection
  */
 
 import { detectTransactionTags } from './transactionTags';
 
-console.log('=== Transaction Tag Detection Tests ===\n');
+describe('Transaction Tag Detection', () => {
+  it('should detect expense tags for Swiggy', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Rs 500 debited for Swiggy order',
+      'Swiggy'
+    );
+    expect(result.tags).toContain('expense');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
 
-// Test cases
-const testCases = [
-  {
-    name: 'Regular expense - Swiggy',
-    type: 'debit' as const,
-    text: 'Rs 500 debited for Swiggy order',
-    merchant: 'Swiggy',
-  },
-  {
-    name: 'Investment - Zerodha stocks',
-    type: 'debit' as const,
-    text: 'Rs 50000 debited for Stock purchase at Zerodha',
-    merchant: 'Zerodha',
-  },
-  {
-    name: 'EMI payment',
-    type: 'debit' as const,
-    text: 'Your A/c debited Rs 15000 for Home Loan EMI payment',
-    merchant: 'HDFC Home Loan',
-  },
-  {
-    name: 'Transfer - NEFT',
-    type: 'debit' as const,
-    text: 'Rs 10000 transferred via NEFT to savings account',
-    merchant: 'Self Transfer',
-  },
-  {
-    name: 'Refund - Amazon',
-    type: 'credit' as const,
-    text: 'Rs 1500 refund from Amazon order cancellation',
-    merchant: 'Amazon',
-  },
-  {
-    name: 'Savings - Fixed Deposit',
-    type: 'debit' as const,
-    text: 'Rs 100000 debited for FD opening',
-    merchant: 'SBI FD',
-  },
-  {
-    name: 'Regular income - Salary',
-    type: 'credit' as const,
-    text: 'Rs 80000 credited to your account',
-    merchant: 'Salary',
-  },
-  {
-    name: 'Crypto purchase',
-    type: 'debit' as const,
-    text: 'Rs 25000 debited for Bitcoin purchase at WazirX',
-    merchant: 'WazirX',
-  },
-  {
-    name: 'SIP - Mutual fund',
-    type: 'debit' as const,
-    text: 'Rs 5000 debited for Mutual Fund SIP',
-    merchant: 'Groww',
-  },
-  {
-    name: 'Credit card payment',
-    type: 'debit' as const,
-    text: 'Rs 12000 debited for Credit Card Bill payment',
-    merchant: 'HDFC Credit Card',
-  },
-];
+  it('should detect investment tags for Zerodha', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Rs 50000 debited for Stock purchase at Zerodha',
+      'Zerodha'
+    );
+    expect(result.tags).toContain('investment');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
 
-testCases.forEach((testCase, index) => {
-  console.log(`${index + 1}. ${testCase.name}`);
-  console.log(`   Text: "${testCase.text}"`);
-  console.log(`   Type: ${testCase.type}`);
-  console.log(`   Merchant: ${testCase.merchant}`);
+  it('should detect loan tags for loan payments', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Your A/c debited Rs 15000 for Home Loan EMI payment',
+      'HDFC Home Loan'
+    );
+    expect(result.tags).toContain('loan');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
 
-  const result = detectTransactionTags(testCase.type, testCase.text, testCase.merchant);
+  it('should detect transfer tags for NEFT', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Rs 10000 transferred via NEFT to savings account',
+      'Self Transfer'
+    );
+    expect(result.tags).toContain('transfer');
+    expect(result.confidence).toBe('high');
+  });
 
-  console.log(`   ✓ Tags: [${result.tags.join(', ')}]`);
-  console.log(`   ✓ Confidence: ${result.confidence}`);
-  console.log('');
+  it('should detect refund tags for Amazon', () => {
+    const result = detectTransactionTags(
+      'credit',
+      'Rs 1500 refund from Amazon order cancellation',
+      'Amazon'
+    );
+    expect(result.tags).toContain('refund');
+    expect(result.confidence).toBe('high');
+  });
+
+  it('should detect savings tags for Fixed Deposit', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Rs 100000 debited for FD opening',
+      'SBI FD'
+    );
+    expect(result.tags).toContain('savings');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
+
+  it('should detect income tags for salary', () => {
+    const result = detectTransactionTags(
+      'credit',
+      'Rs 80000 credited to your account',
+      'Salary'
+    );
+    expect(result.tags).toContain('income');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
+
+  it('should detect investment tags for crypto purchase', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Rs 25000 debited for Bitcoin purchase at WazirX',
+      'WazirX'
+    );
+    expect(result.tags).toContain('investment');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
+
+  it('should detect investment tags for SIP', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Rs 5000 debited for Mutual Fund SIP',
+      'Groww'
+    );
+    expect(result.tags).toContain('investment');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
+
+  it('should detect loan tags for credit card payment', () => {
+    const result = detectTransactionTags(
+      'debit',
+      'Rs 12000 debited for Credit Card Bill payment',
+      'HDFC Credit Card'
+    );
+    expect(result.tags).toContain('loan');
+    expect(['high', 'medium', 'low']).toContain(result.confidence);
+  });
 });
 
-console.log('=== Test Complete ===');
