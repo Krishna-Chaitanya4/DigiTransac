@@ -289,10 +289,20 @@ const Transactions: React.FC = () => {
 
       // Open add transaction dialog with pre-filled data
       if (state.addTransaction) {
+        const transactionType = state.type || 'debit';
+        const defaultTag = transactionType === 'debit' ? 'expense' : 'income';
+        
         setFormData((prev) => ({
           ...prev,
           accountId: state.accountId || prev.accountId,
-          type: state.type || prev.type,
+          type: transactionType,
+          tags: [defaultTag],
+          splits: [
+            {
+              ...prev.splits[0],
+              tags: [defaultTag],
+            },
+          ],
         }));
         setOpenDialog(true);
       }
