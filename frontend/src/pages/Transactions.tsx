@@ -1313,7 +1313,17 @@ const Transactions: React.FC = () => {
       <Box sx={{ width: '100%', overflow: 'hidden' }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
           <Box>
-            <Typography variant="h4" gutterBottom>
+            <Typography 
+              variant="h4" 
+              gutterBottom
+              sx={{
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
               Transactions
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
@@ -1359,7 +1369,17 @@ const Transactions: React.FC = () => {
               startIcon={<AddIcon />} 
               onClick={() => handleOpenDialog()}
               size="small"
-              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
+              sx={{ 
+                minWidth: { xs: 80, sm: 'auto' },
+                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                boxShadow: '0 4px 14px rgba(20, 184, 166, 0.4)',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 20px rgba(20, 184, 166, 0.6)',
+                  background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
+                },
+              }}
             >
               Add
             </Button>
@@ -1369,7 +1389,14 @@ const Transactions: React.FC = () => {
         {/* Summary Cards */}
         <Grid container spacing={2} mb={3}>
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #4caf50 0%, #81c784 100%)' }}>
+            <Card sx={{ 
+              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
+              },
+            }}>
               <CardContent>
                 <Typography variant="body2" color="white" gutterBottom>
                   Total Credits
@@ -1381,7 +1408,14 @@ const Transactions: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #f44336 0%, #e57373 100%)' }}>
+            <Card sx={{ 
+              background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 8px 24px rgba(244, 63, 94, 0.4)',
+              },
+            }}>
               <CardContent>
                 <Typography variant="body2" color="white" gutterBottom>
                   Total Debits
@@ -1397,8 +1431,15 @@ const Transactions: React.FC = () => {
               sx={{
                 background:
                   netAmount >= 0
-                    ? 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)'
-                    : 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
+                    ? 'linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%)'
+                    : 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: netAmount >= 0 
+                    ? '0 8px 24px rgba(6, 182, 212, 0.4)'
+                    : '0 8px 24px rgba(249, 115, 22, 0.4)',
+                },
               }}
             >
               <CardContent>
