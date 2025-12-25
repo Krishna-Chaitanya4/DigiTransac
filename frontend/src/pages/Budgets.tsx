@@ -27,7 +27,6 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Warning as WarningIcon,
-  Category as CategoryIcon,
   Label as LabelIcon,
   AccountBalance as AccountIcon,
   Savings as SavingsIcon,
@@ -72,11 +71,15 @@ interface Budget {
   userId: string;
   name?: string;
   
-  // Scope configuration
-  scopeType: 'category' | 'tag' | 'account';
+  // Scope configuration (multi-select with AND logic between types, OR within)
+  categoryIds?: string[]; // Track these categories (OR logic)
+  includeTagIds?: string[]; // Must have at least one of these tags (OR logic)
+  excludeTagIds?: string[]; // Must NOT have any of these tags (OR logic)
+  accountIds?: string[]; // Track these accounts (OR logic)
+  
+  // Legacy fields (for backward compatibility)
+  scopeType?: 'category' | 'tag' | 'account';
   categoryId?: string;
-  includeTagIds?: string[];
-  excludeTagIds?: string[];
   accountId?: string;
   
   // Calculation type
@@ -123,11 +126,10 @@ const Budgets: React.FC = () => {
 
   const [formData, setFormData] = useState({
     name: '',
-    scopeType: 'category' as 'category' | 'tag' | 'account',
-    categoryId: '',
+    categoryIds: [] as string[],
     includeTagIds: [] as string[],
     excludeTagIds: [] as string[],
-    accountId: '',
+    accountIds: [] as string[],
     calculationType: 'debit' as 'debit' | 'credit' | 'net',
     amount: '',
     period: 'custom' as 'monthly' | 'yearly' | 'custom',
@@ -222,11 +224,10 @@ const Budgets: React.FC = () => {
   const handleOpenDialog = () => {
     setFormData({
       name: '',
-      scopeType: 'category',
-      categoryId: '',
+      categoryIds: [],
       includeTagIds: [],
       excludeTagIds: [],
-      accountId: '',
+      accountIds: [],
       calculationType: 'debit',
       amount: '',
       period: 'custom' as 'monthly' | 'yearly' | 'custom',
@@ -241,13 +242,16 @@ const Budgets: React.FC = () => {
   };
 
   const handleEditBudget = (budget: Budget) => {
+    // Handle both new and legacy format
+    const categoryIds = budget.categoryIds || (budget.categoryId ? [budget.categoryId] : []);
+    const accountIds = budget.accountIds || (budget.accountId ? [budget.accountId] : []);
+    
     setFormData({
       name: budget.name || '',
-      scopeType: budget.scopeType,
-      categoryId: budget.categoryId || '',
+      categoryIds,
       includeTagIds: budget.includeTagIds || [],
       excludeTagIds: budget.excludeTagIds || [],
-      accountId: budget.accountId || '',
+      accountIds,
       calculationType: budget.calculationType,
       amount: budget.amount.toString(),
       period: budget.period,
@@ -271,8 +275,7 @@ const Budgets: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const payload: any = {
-        name: formData.name || undefined, // Only include if provided
-        scopeType: formData.scopeType,
+        name: formData.name || undefined,
         calculationType: formData.calculationType,
         amount: formData.amount,
         period: formData.period,
@@ -282,18 +285,18 @@ const Budgets: React.FC = () => {
         enableRollover: formData.enableRollover,
       };
 
-      // Add scope-specific fields
-      if (formData.scopeType === 'category') {
-        payload.categoryId = formData.categoryId;
-      } else if (formData.scopeType === 'tag') {
-        if (formData.includeTagIds.length > 0) {
-          payload.includeTagIds = formData.includeTagIds;
-        }
-        if (formData.excludeTagIds.length > 0) {
-          payload.excludeTagIds = formData.excludeTagIds;
-        }
-      } else if (formData.scopeType === 'account') {
-        payload.accountId = formData.accountId;
+      // Add multi-select filters (only if non-empty)
+      if (formData.categoryIds.length > 0) {
+        payload.categoryIds = formData.categoryIds;
+      }
+      if (formData.includeTagIds.length > 0) {
+        payload.includeTagIds = formData.includeTagIds;
+      }
+      if (formData.excludeTagIds.length > 0) {
+        payload.excludeTagIds = formData.excludeTagIds;
+      }
+      if (formData.accountIds.length > 0) {
+        payload.accountIds = formData.accountIds;
       }
 
       // Add rollover limit if enabled and specified
@@ -437,104 +440,69 @@ const Budgets: React.FC = () => {
                       )}
                       
                       <Box display="flex" alignItems="center" gap={0.5} mb={1} flexWrap="wrap">
-                        {/* Scope chip */}
-                        {budget.scopeType === 'category' && budget.categoryId && (
-                          <>
-                            <Chip
-                              icon={
-                                categories?.find((c) => c.id === budget.categoryId)?.isFolder ? (
-                                  <span>📁</span>
-                                ) : (
-                                  <span>📄</span>
-                                )
-                              }
-                              label={getCategoryName(budget.categoryId)}
-                              size="small"
-                              sx={{
-                                bgcolor: getCategoryColor(budget.categoryId) + '20',
-                                color: getCategoryColor(budget.categoryId),
-                              }}
-                            />
-                            {categories?.find((c) => c.id === budget.categoryId)?.isFolder && (
-                              <Chip
-                                label="Folder"
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontSize: '0.7rem' }}
-                              />
-                            )}
-                          </>
-                        )}
-                        {budget.scopeType === 'tag' && (
-                          <>
-                            {/* Include Tags */}
-                            {budget.includeTagIds && budget.includeTagIds.length > 0 && (
-                              <>
-                                {budget.includeTagIds.map((tagId) => (
-                                  <Chip
-                                    key={tagId}
-                                    icon={<LabelIcon sx={{ fontSize: 14 }} />}
-                                    label={getTagName(tagId)}
-                                    size="small"
-                                    sx={{
-                                      bgcolor: '#4caf5020',
-                                      color: '#4caf50',
-                                      fontWeight: 500,
-                                    }}
-                                  />
-                                ))}
-                                {budget.includeTagIds.length > 1 && (
-                                  <Chip
-                                    label="OR"
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ fontSize: '0.7rem', color: '#4caf50', borderColor: '#4caf50' }}
-                                  />
-                                )}
-                              </>
-                            )}
-                            
-                            {/* Exclude Tags */}
-                            {budget.excludeTagIds && budget.excludeTagIds.length > 0 && (
-                              <>
-                                {budget.includeTagIds && budget.includeTagIds.length > 0 && (
-                                  <Chip
-                                    label="EXCEPT"
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ fontSize: '0.7rem', mx: 0.5 }}
-                                  />
-                                )}
-                                {budget.excludeTagIds.map((tagId) => (
-                                  <Chip
-                                    key={tagId}
-                                    icon={<LabelIcon sx={{ fontSize: 14 }} />}
-                                    label={getTagName(tagId)}
-                                    size="small"
-                                    sx={{
-                                      bgcolor: '#f4433620',
-                                      color: '#f44336',
-                                      fontWeight: 500,
-                                    }}
-                                  />
-                                ))}
-                              </>
-                            )}
-                          </>
-                        )}
-                        {budget.scopeType === 'account' && budget.accountId && (
+                        {/* Categories */}
+                        {(budget.categoryIds || (budget.categoryId ? [budget.categoryId] : [])).map((catId) => (
                           <Chip
+                            key={catId}
+                            icon={
+                              categories?.find((c) => c.id === catId)?.isFolder ? (
+                                <span>📁</span>
+                              ) : (
+                                <span>📄</span>
+                              )
+                            }
+                            label={getCategoryName(catId)}
+                            size="small"
+                            sx={{
+                              bgcolor: getCategoryColor(catId) + '20',
+                              color: getCategoryColor(catId),
+                            }}
+                          />
+                        ))}
+
+                        {/* Include Tags */}
+                        {budget.includeTagIds && budget.includeTagIds.length > 0 && budget.includeTagIds.map((tagId) => (
+                          <Chip
+                            key={tagId}
+                            icon={<LabelIcon sx={{ fontSize: 14 }} />}
+                            label={getTagName(tagId)}
+                            size="small"
+                            sx={{
+                              bgcolor: '#4caf5020',
+                              color: '#4caf50',
+                            }}
+                          />
+                        ))}
+
+                        {/* Exclude Tags */}
+                        {budget.excludeTagIds && budget.excludeTagIds.length > 0 && budget.excludeTagIds.map((tagId) => (
+                          <Chip
+                            key={`exclude-${tagId}`}
+                            icon={<LabelIcon sx={{ fontSize: 14 }} />}
+                            label={`NOT ${getTagName(tagId)}`}
+                            size="small"
+                            sx={{
+                              bgcolor: '#f4433620',
+                              color: '#f44336',
+                            }}
+                          />
+                        ))}
+
+                        {/* Accounts */}
+                        {(budget.accountIds || (budget.accountId ? [budget.accountId] : [])).map((accId) => (
+                          <Chip
+                            key={accId}
                             icon={<AccountIcon sx={{ fontSize: 14 }} />}
-                            label={getAccountName(budget.accountId)}
+                            label={getAccountName(accId)}
                             size="small"
                             sx={{
                               bgcolor: '#4ecdc420',
                               color: '#4ecdc4',
                             }}
                           />
-                        )}
+                        ))}
                         
-                        {/* Calculation type chip */}
+                        {/* Calculation Type */}
                         <Chip
                           label={
                             budget.calculationType === 'debit'
@@ -646,47 +614,50 @@ const Budgets: React.FC = () => {
               inputProps={{ maxLength: 100 }}
             />
 
-            {/* Budget Scope Type Selection */}
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                What do you want to budget?
-              </Typography>
-              <ToggleButtonGroup
-                value={formData.scopeType}
-                exclusive
-                onChange={(_, newScope) => {
-                  if (newScope !== null) {
-                    setFormData({ ...formData, scopeType: newScope });
-                  }
-                }}
-                fullWidth
-                size="small"
-              >
-                <ToggleButton value="category">
-                  <CategoryIcon sx={{ mr: 1 }} fontSize="small" />
-                  Category
-                </ToggleButton>
-                <ToggleButton value="tag">
-                  <LabelIcon sx={{ mr: 1 }} fontSize="small" />
-                  Tags
-                </ToggleButton>
-                <ToggleButton value="account">
-                  <AccountIcon sx={{ mr: 1 }} fontSize="small" />
-                  Account
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
+            <Divider />
 
-            {/* Scope-specific selectors */}
-            {formData.scopeType === 'category' && (
+            {/* Multi-Select Filters Section */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                Budget Filters (AND logic between sections, OR within each)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+                Select filters to define what transactions this budget tracks. At least one filter is required.
+              </Typography>
+
+              {/* Categories Multi-Select */}
               <TextField
                 select
-                label="Category or Folder"
+                label="Categories (Optional)"
                 fullWidth
-                value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                required
-                helperText="Select a folder to budget across all subcategories, or a specific category"
+                value={formData.categoryIds}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    categoryIds: typeof value === 'string' ? [value] : value,
+                  });
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((catId) => (
+                        <Chip 
+                          key={catId} 
+                          label={getCategoryName(catId)} 
+                          size="small" 
+                          sx={{ 
+                            bgcolor: `${getCategoryColor(catId)}20`,
+                            color: getCategoryColor(catId),
+                          }} 
+                        />
+                      ))}
+                    </Box>
+                  ),
+                }}
+                helperText="Track these categories (category1 OR category2 OR ...)"
+                sx={{ mb: 2 }}
               >
                 {!categories || categories.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -707,108 +678,114 @@ const Budgets: React.FC = () => {
                     ))
                 )}
               </TextField>
-            )}
 
-            {formData.scopeType === 'tag' && (
-              <Box>
-                <Typography variant="subtitle2" gutterBottom sx={{ mt: 1 }}>
-                  Tag Filters
-                </Typography>
-                
-                {/* Include Tags */}
-                <TextField
-                  select
-                  label="Include Tags (optional)"
-                  fullWidth
-                  value={formData.includeTagIds}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFormData({
-                      ...formData,
-                      includeTagIds: typeof value === 'string' ? [value] : value,
-                    });
-                  }}
-                  SelectProps={{
-                    multiple: true,
-                    renderValue: (selected) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {(selected as string[]).map((tagId) => (
-                          <Chip key={tagId} label={getTagName(tagId)} size="small" color="success" />
-                        ))}
-                      </Box>
-                    ),
-                  }}
-                  helperText="Transactions must have at least one of these tags"
-                  sx={{ mb: 2 }}
-                >
-                  {!tags || tags.length === 0 ? (
-                    <MenuItem value="" disabled>
-                      No tags available. Create transactions with tags first.
-                    </MenuItem>
-                  ) : (
-                    tags.map((tag) => (
-                      <MenuItem key={tag.id} value={tag.id}>
-                        {tag.name} ({tag.usageCount} uses)
-                      </MenuItem>
-                    ))
-                  )}
-                </TextField>
-
-                {/* Exclude Tags */}
-                <TextField
-                  select
-                  label="Exclude Tags (optional)"
-                  fullWidth
-                  value={formData.excludeTagIds}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFormData({
-                      ...formData,
-                      excludeTagIds: typeof value === 'string' ? [value] : value,
-                    });
-                  }}
-                  SelectProps={{
-                    multiple: true,
-                    renderValue: (selected) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {(selected as string[]).map((tagId) => (
-                          <Chip key={tagId} label={getTagName(tagId)} size="small" color="error" />
-                        ))}
-                      </Box>
-                    ),
-                  }}
-                  helperText="Transactions with these tags will be ignored"
-                >
-                  {!tags || tags.length === 0 ? (
-                    <MenuItem value="" disabled>
-                      No tags available. Create transactions with tags first.
-                    </MenuItem>
-                  ) : (
-                    tags.map((tag) => (
-                      <MenuItem key={tag.id} value={tag.id}>
-                        {tag.name} ({tag.usageCount} uses)
-                      </MenuItem>
-                    ))
-                  )}
-                </TextField>
-
-                {formData.includeTagIds.length === 0 && formData.excludeTagIds.length === 0 && (
-                  <Alert severity="warning" sx={{ mt: 2 }}>
-                    Please select at least one include or exclude tag
-                  </Alert>
-                )}
-              </Box>
-            )}
-
-            {formData.scopeType === 'account' && (
+              {/* Include Tags */}
               <TextField
                 select
-                label="Account"
+                label="Include Tags (Optional)"
                 fullWidth
-                value={formData.accountId}
-                onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
-                required
-                helperText="Budget for all transactions in this account"
+                value={formData.includeTagIds}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    includeTagIds: typeof value === 'string' ? [value] : value,
+                  });
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((tagId) => (
+                        <Chip key={tagId} label={getTagName(tagId)} size="small" color="success" />
+                      ))}
+                    </Box>
+                  ),
+                }}
+                helperText="Transactions must have at least one of these tags (tag1 OR tag2 OR ...)"
+                sx={{ mb: 2 }}
+              >
+                {!tags || tags.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No tags available. Create transactions with tags first.
+                  </MenuItem>
+                ) : (
+                  tags.map((tag) => (
+                    <MenuItem key={tag.id} value={tag.id}>
+                      {tag.name} ({tag.usageCount} uses)
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+
+              {/* Exclude Tags */}
+              <TextField
+                select
+                label="Exclude Tags (Optional)"
+                fullWidth
+                value={formData.excludeTagIds}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    excludeTagIds: typeof value === 'string' ? [value] : value,
+                  });
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((tagId) => (
+                        <Chip key={tagId} label={getTagName(tagId)} size="small" color="error" />
+                      ))}
+                    </Box>
+                  ),
+                }}
+                helperText="Transactions must NOT have any of these tags (NOT tag3 AND NOT tag4)"
+                sx={{ mb: 2 }}
+              >
+                {!tags || tags.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No tags available. Create transactions with tags first.
+                  </MenuItem>
+                ) : (
+                  tags.map((tag) => (
+                    <MenuItem key={tag.id} value={tag.id}>
+                      {tag.name} ({tag.usageCount} uses)
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+
+              {/* Accounts Multi-Select */}
+              <TextField
+                select
+                label="Accounts (Optional)"
+                fullWidth
+                value={formData.accountIds}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    accountIds: typeof value === 'string' ? [value] : value,
+                  });
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((accId) => (
+                        <Chip 
+                          key={accId} 
+                          label={getAccountName(accId)} 
+                          size="small" 
+                          color="info"
+                        />
+                      ))}
+                    </Box>
+                  ),
+                }}
+                helperText="Track these accounts (account1 OR account2 OR ...)"
               >
                 {!accounts || accounts.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -822,7 +799,17 @@ const Budgets: React.FC = () => {
                   ))
                 )}
               </TextField>
-            )}
+
+              {/* Validation Alert */}
+              {formData.categoryIds.length === 0 && 
+               formData.includeTagIds.length === 0 && 
+               formData.excludeTagIds.length === 0 && 
+               formData.accountIds.length === 0 && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  Please select at least one filter (categories, tags, or accounts)
+                </Alert>
+              )}
+            </Box>
 
             <Divider />
 
@@ -984,9 +971,10 @@ const Budgets: React.FC = () => {
               !formData.amount ||
               !formData.startDate ||
               !formData.endDate ||
-              (formData.scopeType === 'category' && !formData.categoryId) ||
-              (formData.scopeType === 'tag' && formData.includeTagIds.length === 0 && formData.excludeTagIds.length === 0) ||
-              (formData.scopeType === 'account' && !formData.accountId)
+              (formData.categoryIds.length === 0 && 
+               formData.includeTagIds.length === 0 && 
+               formData.excludeTagIds.length === 0 && 
+               formData.accountIds.length === 0)
             }
           >
             {editingBudget ? 'Update' : 'Create'}

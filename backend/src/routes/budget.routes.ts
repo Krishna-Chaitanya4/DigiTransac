@@ -116,11 +116,10 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const userId = req.userId!;
     const {
       name,
-      scopeType,
-      categoryId,
+      categoryIds,
       includeTagIds,
       excludeTagIds,
-      accountId,
+      accountIds,
       calculationType,
       amount,
       period,
@@ -150,44 +149,56 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       }
     }
 
-    // Validate scope-specific fields
-    if (scopeType === 'category' && categoryId) {
+    // Validate that at least one filter is specified
+    const hasCategoryFilter = categoryIds && categoryIds.length > 0;
+    const hasTagFilter = (includeTagIds && includeTagIds.length > 0) || (excludeTagIds && excludeTagIds.length > 0);
+    const hasAccountFilter = accountIds && accountIds.length > 0;
+
+    if (!hasCategoryFilter && !hasTagFilter && !hasAccountFilter) {
+      res.status(400).json({
+        success: false,
+        message: 'At least one filter (categories, tags, or accounts) must be specified',
+      });
+      return;
+    }
+
+    // Validate categories exist
+    if (hasCategoryFilter) {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-      const category = await categoriesContainer.findOne({ id: categoryId, userId });
-      if (!category) {
+      const categories = await categoriesContainer.find({ id: { $in: categoryIds }, userId }).toArray();
+      if (categories.length !== categoryIds.length) {
         res.status(404).json({
           success: false,
-          message: 'Category or folder not found',
+          message: 'One or more categories not found',
         });
         return;
       }
-    } else if (scopeType === 'tag' && (includeTagIds || excludeTagIds)) {
-      // Validate at least one of include or exclude is provided
-      if ((!includeTagIds || includeTagIds.length === 0) && (!excludeTagIds || excludeTagIds.length === 0)) {
-        res.status(400).json({
-          success: false,
-          message: 'At least one include or exclude tag must be specified',
-        });
-        return;
-      }
+    }
 
+    // Validate tags exist
+    if (hasTagFilter) {
       const tagsContainer = await cosmosDBService.getTagsContainer();
       const allTagIds = [...(includeTagIds || []), ...(excludeTagIds || [])];
-      const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
-      if (tags.length !== allTagIds.length) {
-        res.status(404).json({
-          success: false,
-          message: 'One or more tags not found',
-        });
-        return;
+      if (allTagIds.length > 0) {
+        const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
+        if (tags.length !== allTagIds.length) {
+          res.status(404).json({
+            success: false,
+            message: 'One or more tags not found',
+          });
+          return;
+        }
       }
-    } else if (scopeType === 'account' && accountId) {
+    }
+
+    // Validate accounts exist
+    if (hasAccountFilter) {
       const accountsContainer = await cosmosDBService.getAccountsContainer();
-      const account = await accountsContainer.findOne({ id: accountId, userId });
-      if (!account) {
+      const accounts = await accountsContainer.find({ id: { $in: accountIds }, userId }).toArray();
+      if (accounts.length !== accountIds.length) {
         res.status(404).json({
           success: false,
-          message: 'Account not found',
+          message: 'One or more accounts not found',
         });
         return;
       }
@@ -195,37 +206,14 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
 
-    // Check for existing budget with same scope and period
-    const duplicateFilter: any = {
-      userId,
-      scopeType,
-      startDate: new Date(startDate),
-    };
-    if (scopeType === 'category') duplicateFilter.categoryId = categoryId;
-    if (scopeType === 'tag') {
-      duplicateFilter.includeTagIds = includeTagIds;
-      duplicateFilter.excludeTagIds = excludeTagIds;
-    }
-    if (scopeType === 'account') duplicateFilter.accountId = accountId;
-
-    const existingBudget = await budgetsContainer.findOne(duplicateFilter);
-    if (existingBudget) {
-      res.status(400).json({
-        success: false,
-        message: 'Budget already exists for this scope in this period',
-      });
-      return;
-    }
-
     const newBudget: Budget = {
       id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId,
       name: sanitizedName,
-      scopeType,
-      categoryId: scopeType === 'category' ? categoryId : undefined,
-      includeTagIds: scopeType === 'tag' ? includeTagIds : undefined,
-      excludeTagIds: scopeType === 'tag' ? excludeTagIds : undefined,
-      accountId: scopeType === 'account' ? accountId : undefined,
+      categoryIds: hasCategoryFilter ? categoryIds : undefined,
+      includeTagIds: hasTagFilter && includeTagIds?.length > 0 ? includeTagIds : undefined,
+      excludeTagIds: hasTagFilter && excludeTagIds?.length > 0 ? excludeTagIds : undefined,
+      accountIds: hasAccountFilter ? accountIds : undefined,
       calculationType,
       amount: parseFloat(amount),
       period: period || 'custom',
@@ -263,11 +251,10 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = req.params;
     const {
       name,
-      scopeType,
-      categoryId,
+      categoryIds,
       includeTagIds,
       excludeTagIds,
-      accountId,
+      accountIds,
       calculationType,
       amount,
       period,
@@ -310,19 +297,21 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    // Validate scope changes
-    const newScopeType = scopeType || budget.scopeType;
-    if (newScopeType === 'category' && categoryId) {
+    // Validate categories if provided
+    if (categoryIds !== undefined && categoryIds.length > 0) {
       const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-      const category = await categoriesContainer.findOne({ id: categoryId, userId });
-      if (!category) {
+      const categories = await categoriesContainer.find({ id: { $in: categoryIds }, userId }).toArray();
+      if (categories.length !== categoryIds.length) {
         res.status(404).json({
           success: false,
-          message: 'Category or folder not found',
+          message: 'One or more categories not found',
         });
         return;
       }
-    } else if (newScopeType === 'tag' && (includeTagIds || excludeTagIds)) {
+    }
+
+    // Validate tags if provided
+    if (includeTagIds !== undefined || excludeTagIds !== undefined) {
       const tagsContainer = await cosmosDBService.getTagsContainer();
       const allTagIds = [...(includeTagIds || []), ...(excludeTagIds || [])];
       if (allTagIds.length > 0) {
@@ -335,13 +324,16 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
           return;
         }
       }
-    } else if (newScopeType === 'account' && accountId) {
+    }
+
+    // Validate accounts if provided
+    if (accountIds !== undefined && accountIds.length > 0) {
       const accountsContainer = await cosmosDBService.getAccountsContainer();
-      const account = await accountsContainer.findOne({ id: accountId, userId });
-      if (!account) {
+      const accounts = await accountsContainer.find({ id: { $in: accountIds }, userId }).toArray();
+      if (accounts.length !== accountIds.length) {
         res.status(404).json({
           success: false,
-          message: 'Account not found',
+          message: 'One or more accounts not found',
         });
         return;
       }
@@ -352,27 +344,10 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     };
 
     if (name !== undefined) updateData.name = sanitizedName;
-    if (scopeType !== undefined) updateData.scopeType = scopeType;
-    if (categoryId !== undefined) {
-      updateData.categoryId = categoryId;
-      updateData.includeTagIds = undefined;
-      updateData.excludeTagIds = undefined;
-      updateData.accountId = undefined;
-    }
-    if (includeTagIds !== undefined) {
-      updateData.includeTagIds = includeTagIds;
-      updateData.categoryId = undefined;
-      updateData.accountId = undefined;
-    }
-    if (excludeTagIds !== undefined) {
-      updateData.excludeTagIds = excludeTagIds;
-    }
-    if (accountId !== undefined) {
-      updateData.accountId = accountId;
-      updateData.categoryId = undefined;
-      updateData.includeTagIds = undefined;
-      updateData.excludeTagIds = undefined;
-    }
+    if (categoryIds !== undefined) updateData.categoryIds = categoryIds.length > 0 ? categoryIds : undefined;
+    if (includeTagIds !== undefined) updateData.includeTagIds = includeTagIds.length > 0 ? includeTagIds : undefined;
+    if (excludeTagIds !== undefined) updateData.excludeTagIds = excludeTagIds.length > 0 ? excludeTagIds : undefined;
+    if (accountIds !== undefined) updateData.accountIds = accountIds.length > 0 ? accountIds : undefined;
     if (calculationType !== undefined) updateData.calculationType = calculationType;
     if (amount !== undefined) updateData.amount = parseFloat(amount);
     if (period) updateData.period = period;
@@ -442,18 +417,17 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-
     if (budgets.length === 0) {
       res.json({ success: true, alerts: [] });
       return;
     }
 
+    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+
     // Fetch all categories and expenses once
     const categories = (await categoriesContainer
       .find({ userId })
       .toArray()) as unknown as Category[];
-    const categoryMap = new Map(categories.map((cat) => [cat.id, cat]));
 
     // Build category hierarchy map
     const categoryToDescendantsMap = new Map<string, string[]>();
@@ -499,37 +473,31 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
     const budgetAlerts = [];
 
     for (const budget of budgets) {
-      // Skip budgets without category scope (we only handle category budgets in alerts for now)
-      if (budget.scopeType !== 'category' || !budget.categoryId) {
-        continue;
-      }
-
-      const startDate = new Date(budget.startDate);
-      const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
-
-      const category = categoryMap.get(budget.categoryId);
-      const categoryIds = category?.isFolder
-        ? categoryToDescendantsMap.get(budget.categoryId) || []
-        : [budget.categoryId];
-
-      // Calculate spending from pre-fetched expenses
-      let spent = 0;
-      for (const catId of categoryIds) {
-        const expenses = expensesByCategory.get(catId) || [];
-        spent += expenses
-          .filter((exp: any) => {
-            const expDate = new Date(exp.date);
-            return expDate >= startDate && expDate <= endDate;
-          })
-          .reduce((sum: number, exp: any) => sum + exp.amount, 0);
-      }
+      // Use the budget helper to calculate spending (handles both legacy and new format)
+      const { spent } = await calculateBudgetSpending(
+        budget,
+        userId,
+        categories,
+        categoryToDescendantsMap,
+        expensesByCategory
+      );
 
       const percentUsed = (spent / budget.amount) * 100;
 
       if (percentUsed >= budget.alertThreshold) {
+        // Determine primary identifier for the alert
+        let primaryId = '';
+        if (budget.categoryIds && budget.categoryIds.length > 0) {
+          primaryId = budget.categoryIds[0];
+        } else if (budget.accountIds && budget.accountIds.length > 0) {
+          primaryId = budget.accountIds[0];
+        } else if (budget.categoryId) {
+          primaryId = budget.categoryId; // Legacy
+        }
+
         budgetAlerts.push({
           budgetId: budget.id,
-          categoryId: budget.categoryId,
+          primaryId,
           amount: budget.amount,
           spent,
           percentUsed: Math.round(percentUsed),

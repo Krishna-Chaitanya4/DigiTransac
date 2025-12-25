@@ -1,7 +1,25 @@
 import { Budget, Category } from '../models/types';
 
 /**
- * Calculate budget spending based on scope type and calculation type
+ * Migrate legacy budget format to new multi-select format
+ */
+function migrateLegacyBudget(budget: Budget): void {
+  // Migrate categoryId -> categoryIds
+  if (budget.scopeType === 'category' && budget.categoryId && !budget.categoryIds) {
+    budget.categoryIds = [budget.categoryId];
+  }
+  // Migrate accountId -> accountIds
+  if (budget.scopeType === 'account' && budget.accountId && !budget.accountIds) {
+    budget.accountIds = [budget.accountId];
+  }
+}
+
+/**
+ * Calculate budget spending with new multi-filter logic:
+ * - Categories: OR logic (cat1 OR cat2 OR cat3)
+ * - Tags: Include (tag1 OR tag2) AND NOT Exclude (tag3 OR tag4)
+ * - Accounts: OR logic (acc1 OR acc2)
+ * - Combine with AND: (categories) AND (tags) AND (accounts)
  */
 export async function calculateBudgetSpending(
   budget: Budget,
@@ -10,82 +28,75 @@ export async function calculateBudgetSpending(
   categoryToDescendantsMap: Map<string, string[]>,
   expensesByCategory: Map<string, any[]>
 ): Promise<{ spent: number; credit: number; debit: number; net: number }> {
+  // Migrate legacy budget if needed
+  migrateLegacyBudget(budget);
+
   const startDate = new Date(budget.startDate);
   const endDate = budget.endDate ? new Date(budget.endDate) : new Date();
 
-  let relevantExpenses: any[] = [];
-
-  // Get relevant expenses based on scope type
-  if (budget.scopeType === 'category' && budget.categoryId) {
-    const category = categories.find((c) => c.id === budget.categoryId);
-    if (!category) {
-      return { spent: 0, credit: 0, debit: 0, net: 0 };
-    }
-
-    const categoryIds = category.isFolder
-      ? categoryToDescendantsMap.get(budget.categoryId) || []
-      : [budget.categoryId];
-
-    for (const catId of categoryIds) {
-      const expenses = expensesByCategory.get(catId) || [];
-      relevantExpenses.push(
-        ...expenses.filter((exp: any) => {
-          const expDate = new Date(exp.date);
-          return expDate >= startDate && expDate <= endDate;
-        })
-      );
-    }
-  } else if (budget.scopeType === 'tag' && (budget.includeTagIds || budget.excludeTagIds)) {
-    // Tag-based budgets: filter by include/exclude tags
-    for (const expenses of expensesByCategory.values()) {
-      for (const exp of expenses) {
+  // Collect all expenses in date range
+  const allExpensesInRange: any[] = [];
+  for (const expenses of expensesByCategory.values()) {
+    allExpensesInRange.push(
+      ...expenses.filter((exp: any) => {
         const expDate = new Date(exp.date);
-        if (expDate >= startDate && expDate <= endDate) {
-          let shouldInclude = true;
+        return expDate >= startDate && expDate <= endDate;
+      })
+    );
+  }
 
-          // If includeTagIds specified, transaction must have at least one of these tags
-          if (budget.includeTagIds && budget.includeTagIds.length > 0) {
-            if (!exp.tags || exp.tags.length === 0) {
-              shouldInclude = false;
-            } else {
-              const hasIncludedTag = budget.includeTagIds.some((tagId) =>
-                exp.tags.includes(tagId)
-              );
-              if (!hasIncludedTag) {
-                shouldInclude = false;
-              }
-            }
-          }
-
-          // If excludeTagIds specified, transaction must NOT have any of these tags
-          if (shouldInclude && budget.excludeTagIds && budget.excludeTagIds.length > 0) {
-            if (exp.tags && exp.tags.length > 0) {
-              const hasExcludedTag = budget.excludeTagIds.some((tagId) =>
-                exp.tags.includes(tagId)
-              );
-              if (hasExcludedTag) {
-                shouldInclude = false;
-              }
-            }
-          }
-
-          if (shouldInclude) {
-            relevantExpenses.push(exp);
+  // Apply filters with AND logic between types, OR within each type
+  const relevantExpenses = allExpensesInRange.filter((exp: any) => {
+    // Filter 1: Categories (OR logic)
+    if (budget.categoryIds && budget.categoryIds.length > 0) {
+      // Check if expense category matches any of the budget categories (including folder descendants)
+      let matchesCategory = false;
+      for (const budgetCategoryId of budget.categoryIds) {
+        const category = categories.find((c) => c.id === budgetCategoryId);
+        if (category) {
+          const categoryIds = category.isFolder
+            ? categoryToDescendantsMap.get(budgetCategoryId) || []
+            : [budgetCategoryId];
+          
+          if (categoryIds.includes(exp.categoryId)) {
+            matchesCategory = true;
+            break;
           }
         }
       }
+      if (!matchesCategory) return false; // AND logic: must pass category filter
     }
-  } else if (budget.scopeType === 'account' && budget.accountId) {
-    // Account-based budgets: filter by account
-    for (const expenses of expensesByCategory.values()) {
-      relevantExpenses.push(
-        ...expenses.filter((exp: any) => {
-          const expDate = new Date(exp.date);
-          return expDate >= startDate && expDate <= endDate && exp.accountId === budget.accountId;
-        })
+
+    // Filter 2: Include Tags (OR logic)
+    if (budget.includeTagIds && budget.includeTagIds.length > 0) {
+      if (!exp.tags || exp.tags.length === 0) {
+        return false; // No tags on expense, but budget requires tags
+      }
+      const hasIncludedTag = budget.includeTagIds.some((tagId) =>
+        exp.tags.includes(tagId)
       );
+      if (!hasIncludedTag) return false; // AND logic: must have at least one included tag
     }
-  }
+
+    // Filter 3: Exclude Tags (OR logic for exclusion)
+    if (budget.excludeTagIds && budget.excludeTagIds.length > 0) {
+      if (exp.tags && exp.tags.length > 0) {
+        const hasExcludedTag = budget.excludeTagIds.some((tagId) =>
+          exp.tags.includes(tagId)
+        );
+        if (hasExcludedTag) return false; // AND logic: must NOT have any excluded tags
+      }
+    }
+
+    // Filter 4: Accounts (OR logic)
+    if (budget.accountIds && budget.accountIds.length > 0) {
+      if (!budget.accountIds.includes(exp.accountId)) {
+        return false; // AND logic: must be from one of the specified accounts
+      }
+    }
+
+    return true; // Passed all filters
+  });
 
   // Calculate totals based on transaction type
   const debit = relevantExpenses

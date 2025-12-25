@@ -110,12 +110,16 @@ export interface Budget {
   userId: string;
   name?: string; // Optional user-defined name for the budget
   
-  // Budget scope - what to track
-  scopeType: 'category' | 'tag' | 'account'; // Which dimension to track
-  categoryId?: string; // For category-based budgets (can be folder or leaf category)
-  includeTagIds?: string[]; // For tag-based budgets: transactions MUST have these tags (OR logic)
-  excludeTagIds?: string[]; // For tag-based budgets: transactions must NOT have these tags
-  accountId?: string; // For account-based budgets
+  // Budget scope - what to track (AND logic between types, OR logic within each type)
+  categoryIds?: string[]; // Track these categories (OR logic: cat1 OR cat2 OR cat3)
+  includeTagIds?: string[]; // Transactions MUST have at least one of these tags (OR logic)
+  excludeTagIds?: string[]; // Transactions must NOT have any of these tags (OR logic)
+  accountIds?: string[]; // Track these accounts (OR logic: acc1 OR acc2)
+  
+  // Legacy fields (for backward compatibility - will be migrated)
+  scopeType?: 'category' | 'tag' | 'account'; // @deprecated - use categoryIds/accountIds/tagIds
+  categoryId?: string; // @deprecated - use categoryIds[]
+  accountId?: string; // @deprecated - use accountIds[]
   
   // Budget calculation type
   calculationType: 'debit' | 'credit' | 'net'; // debit=expenses, credit=income, net=income-expenses
