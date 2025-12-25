@@ -89,7 +89,6 @@ axios.interceptors.response.use(
       }
 
       // For now, just clear auth and redirect to login
-      // TODO: Implement refresh token mechanism if backend supports it
       isRefreshing = false;
       processQueue(new Error('Authentication failed'));
       
@@ -139,5 +138,5 @@ axios.interceptors.response.use(
  * Call this once during app initialization
  */
 export const setupAxiosInterceptors = () => {
-  console.log('✅ Axios interceptors configured');
+  // Interceptors are configured above
 };

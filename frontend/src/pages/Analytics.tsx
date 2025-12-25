@@ -189,7 +189,6 @@ const Analytics: React.FC = () => {
       setCategories(catData);
       setBudgets(budgetData);
     } catch (err: any) {
-      console.error('Analytics fetch error:', err);
       setError('Failed to load analytics data');
     } finally {
       setLoading(false);

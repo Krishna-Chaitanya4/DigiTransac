@@ -26,11 +26,8 @@ class ConfigService {
       }
 
       this.config = await response.json();
-      console.log('✅ Configuration loaded:', this.config);
       logEnvironmentInfo();
     } catch (error) {
-      console.error('❌ Failed to load configuration:', error);
-
       // Use environment-aware fallback
       const fallbackApiUrl = getBackendUrl();
 
@@ -39,7 +36,6 @@ class ConfigService {
         environment: getEnvironment(),
         version: '1.0.0',
       };
-      console.log('⚠️ Using fallback configuration:', this.config);
       logEnvironmentInfo();
     }
   }

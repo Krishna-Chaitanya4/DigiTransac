@@ -24,7 +24,6 @@ export const isOnline = (): boolean => {
  */
 export const syncFromAPI = async (token: string): Promise<void> => {
   if (!isOnline()) {
-    console.log('Offline: Cannot sync from API');
     return;
   }
 
@@ -52,8 +51,6 @@ export const syncFromAPI = async (token: string): Promise<void> => {
         (tagsRes.data || []).map((tag: string) => ({ name: tag }))
       ),
     ]);
-
-    console.log('✅ Data synced from API to IndexedDB');
   } catch (error) {
     console.error('Failed to sync from API:', error);
     throw error;
@@ -65,7 +62,6 @@ export const syncFromAPI = async (token: string): Promise<void> => {
  */
 export const syncToAPI = async (token: string): Promise<void> => {
   if (!isOnline()) {
-    console.log('Offline: Cannot sync to API');
     return;
   }
 
@@ -74,7 +70,6 @@ export const syncToAPI = async (token: string): Promise<void> => {
     const queue = await getSyncQueue();
 
     if (queue.length === 0) {
-      console.log('No pending changes to sync');
       return;
     }
 
@@ -121,14 +116,12 @@ export const syncToAPI = async (token: string): Promise<void> => {
             break;
         }
       } catch (error) {
-        console.error(`Failed to sync item ${item.id}:`, error);
         // Continue with next item
       }
     }
 
     // Clear queue after successful sync
     await clearSyncQueue();
-    console.log('✅ Synced pending changes to API');
   } catch (error) {
     console.error('Failed to sync to API:', error);
     throw error;
@@ -143,7 +136,6 @@ export const getOfflineData = async <T>(storeName: string): Promise<T[]> => {
     await initDB();
     return await getAllItems<T>(storeName);
   } catch (error) {
-    console.error('Failed to get offline data:', error);
     return [];
   }
 };
@@ -162,7 +154,6 @@ export const clearOfflineData = async (): Promise<void> => {
       clearStore(STORES.TAGS),
       clearSyncQueue(),
     ]);
-    console.log('✅ Cleared all offline data');
   } catch (error) {
     console.error('Failed to clear offline data:', error);
     throw error;
@@ -174,7 +165,6 @@ export const clearOfflineData = async (): Promise<void> => {
  */
 export const setupAutoSync = (token: string): (() => void) => {
   const handleOnline = () => {
-    console.log('Network reconnected, syncing...');
     syncToAPI(token).then(() => syncFromAPI(token));
   };
 

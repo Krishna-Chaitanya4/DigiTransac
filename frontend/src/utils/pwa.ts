@@ -9,8 +9,6 @@ export const registerServiceWorker = async () => {
         scope: '/',
       });
 
-      console.log('Service Worker registered:', registration);
-
       // Check for updates periodically
       setInterval(() => {
         registration.update();
@@ -34,7 +32,6 @@ export const registerServiceWorker = async () => {
 
       return registration;
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
       return undefined;
     }
   } else {
@@ -47,7 +44,6 @@ export const unregisterServiceWorker = async () => {
   if ('serviceWorker' in navigator) {
     const registration = await navigator.serviceWorker.ready;
     await registration.unregister();
-    console.log('Service Worker unregistered');
   }
 };
 
@@ -68,7 +64,6 @@ export const isPWA = (): boolean => {
 export const requestPersistentStorage = async (): Promise<boolean> => {
   if (navigator.storage && navigator.storage.persist) {
     const isPersisted = await navigator.storage.persist();
-    console.log(`Persistent storage: ${isPersisted ? 'granted' : 'denied'}`);
     return isPersisted;
   }
   return false;

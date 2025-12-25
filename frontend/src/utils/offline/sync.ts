@@ -40,7 +40,6 @@ export class SyncManager {
 
     try {
       const queue = await offlineDB.getSyncQueue();
-      console.log(`Starting sync: ${queue.length} items in queue`);
 
       for (const item of queue) {
         try {
@@ -48,7 +47,6 @@ export class SyncManager {
           await offlineDB.removeSyncQueueItem(item.id);
           successCount++;
         } catch (error) {
-          console.error('Sync item failed:', error);
           failedCount++;
 
           // Increment retry count
@@ -57,13 +55,10 @@ export class SyncManager {
           // Remove from queue after 5 failed attempts
           const updatedItem = await offlineDB.get<SyncQueueItem>('syncQueue', item.id);
           if (updatedItem && updatedItem.retryCount >= 5) {
-            console.error('Max retries reached, removing from queue:', item);
             await offlineDB.removeSyncQueueItem(item.id);
           }
         }
       }
-
-      console.log(`Sync complete: ${successCount} success, ${failedCount} failed`);
 
       // Update last sync timestamp
       if (successCount > 0) {

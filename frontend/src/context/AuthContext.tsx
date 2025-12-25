@@ -73,13 +73,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!token) return;
 
     // Initialize IndexedDB
-    initDB().catch(console.error);
+    initDB().catch(() => {});
 
     // Sync data from API if online
     if (isOnline()) {
-      syncFromAPI(token).catch((error) => {
-        console.error('Initial sync failed:', error);
-      });
+      syncFromAPI(token).catch(() => {});
     }
 
     // Setup auto-sync on network reconnection
@@ -99,9 +97,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!isDevelopment) {
         const apiUrl = configService.getApiUrl();
         axios.defaults.baseURL = apiUrl;
-        console.log('🔧 Axios baseURL configured:', axios.defaults.baseURL);
-      } else {
-        console.log('🔧 Development mode: Using relative URLs (Vite proxy)');
       }
 
       const savedToken = localStorage.getItem('auth-token');
@@ -113,7 +108,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(JSON.parse(savedUser));
           axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
         } catch (error) {
-          console.error('Error restoring auth:', error);
           localStorage.removeItem('auth-token');
           localStorage.removeItem('auth-user');
           setToken(null);
@@ -131,7 +125,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       (error) => {
         // Handle any 401 error (unauthorized/token expired)
         if (error.response?.status === 401) {
-          console.log('Authentication error (401), logging out...', error.response?.data);
           // Clear auth state and redirect to login
           setUser(null);
           setToken(null);
@@ -150,14 +143,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    console.log('🔐 Login attempt started');
-    console.log('📧 Email:', email);
-    
     try {
       // Use relative URL to let Vite proxy handle it
       const loginUrl = '/api/auth/login';
-      console.log('📤 Sending POST request to:', loginUrl);
-      console.log('📦 Request body:', JSON.stringify({ email, password: '***' }));
       
       // Try fetch with relative path (uses Vite proxy)
       const fetchResponse = await fetch(loginUrl, {
@@ -167,19 +155,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         },
         body: JSON.stringify({ email, password }),
       }).catch((fetchError) => {
-        console.error('❌ Fetch failed immediately:', fetchError);
         throw new Error(`Network request failed: ${fetchError.message}`);
       });
 
-      console.log('✅ Fetch response received:', fetchResponse.status);
-      
       if (!fetchResponse.ok) {
         const errorData = await fetchResponse.json().catch(() => ({}));
         throw new Error(errorData.message || `HTTP ${fetchResponse.status}`);
       }
 
       const data = await fetchResponse.json();
-      console.log('📦 Response data:', data);
 
       if (!data.success) {
         throw new Error(data.message || 'Login failed');
@@ -192,13 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('auth-token', newToken);
       localStorage.setItem('auth-user', JSON.stringify(userData));
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      
-      console.log('✅ Login successful');
     } catch (error: any) {
-      console.error('❌ Login error:', error);
-      console.error('❌ Error name:', error.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
       const errorMessage = error.message || 'Login failed';
       throw new Error(errorMessage);
     }

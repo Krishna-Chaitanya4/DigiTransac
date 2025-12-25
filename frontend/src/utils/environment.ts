@@ -56,12 +56,5 @@ export const getBackendUrl = (): string => {
  * Logs current environment configuration
  */
 export const logEnvironmentInfo = (): void => {
-  const env = getEnvironment();
-  const backendUrl = getBackendUrl();
-  const hostname = window.location.hostname;
-
-  console.log('🌍 Environment Configuration:');
-  console.log(`  - Environment: ${env}`);
-  console.log(`  - Hostname: ${hostname}`);
-  console.log(`  - Backend URL: ${backendUrl}`);
+  // Environment info available via getEnvironment() and getBackendUrl()
 };
