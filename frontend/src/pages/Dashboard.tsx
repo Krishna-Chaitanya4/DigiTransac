@@ -664,7 +664,7 @@ const Dashboard: React.FC = () => {
       change: `${(stats?.percentChange ?? 0) <= 0 ? '+' : ''}${Math.abs(stats?.percentChange ?? 0)}% vs last month`,
       trend: (stats?.percentChange || 0) > 0 ? 'down' : 'up',
       icon: <Receipt sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      gradient: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
     },
     {
       title: 'Month Income',
@@ -672,7 +672,7 @@ const Dashboard: React.FC = () => {
       change: `${(stats?.incomePercentChange ?? 0) >= 0 ? '+' : ''}${stats?.incomePercentChange ?? 0}% vs last month`,
       trend: (stats?.incomePercentChange || 0) >= 0 ? 'up' : 'down',
       icon: <TrendingUp sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+      gradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
     },
     {
       title: 'Net Savings',
@@ -682,8 +682,8 @@ const Dashboard: React.FC = () => {
       icon: <AccountBalanceWallet sx={{ fontSize: 32 }} />,
       gradient:
         (stats?.netSavings || 0) >= 0
-          ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
-          : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          ? 'linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%)'
+          : 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
     },
     {
       title: 'Budget Left',
@@ -691,15 +691,15 @@ const Dashboard: React.FC = () => {
       change: budgetStatus.length === 0 ? 'Create budgets' : `${stats?.expenseCount || 0} expenses`,
       trend: (stats?.budgetLeft || 0) > 0 ? 'up' : 'down',
       icon: <Savings sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
     },
     {
       title: 'Avg Daily',
       value: formatCurrency(stats?.avgDailySpending || 0),
       change: 'This month',
       trend: 'up',
-      icon: <TrendingDown sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      icon: <Assessment sx={{ fontSize: 32 }} />,
+      gradient: 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
     },
   ];
 
@@ -707,7 +707,18 @@ const Dashboard: React.FC = () => {
     <>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h3" fontWeight={800} gutterBottom sx={{ letterSpacing: '-0.02em' }}>
+          <Typography 
+            variant="h3" 
+            fontWeight={800} 
+            gutterBottom 
+            sx={{ 
+              letterSpacing: '-0.02em',
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
             Dashboard
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
@@ -723,7 +734,14 @@ const Dashboard: React.FC = () => {
             textTransform: 'none',
             px: 3,
             py: 1.5,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+            boxShadow: '0 4px 14px rgba(20, 184, 166, 0.4)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 6px 20px rgba(20, 184, 166, 0.6)',
+              background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
+            },
           }}
         >
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>New Transaction</Box>
@@ -773,10 +791,13 @@ const Dashboard: React.FC = () => {
                   theme.palette.mode === 'light'
                     ? '1px solid rgba(0,0,0,0.05)'
                     : '1px solid rgba(255,255,255,0.1)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  transform: 'translateY(-8px)',
-                  boxShadow: '0 12px 40px rgba(102, 126, 234, 0.3)',
+                  transform: 'translateY(-8px) scale(1.02)',
+                  boxShadow: '0 16px 48px rgba(20, 184, 166, 0.25)',
+                  '& .stat-icon': {
+                    transform: 'scale(1.1) rotate(5deg)',
+                  },
                 },
                 '&::before': {
                   content: '\"\"',
@@ -792,11 +813,13 @@ const Dashboard: React.FC = () => {
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ mb: 3 }}>
                   <Avatar
+                    className="stat-icon"
                     sx={{
                       background: stat.gradient,
                       width: 56,
                       height: 56,
-                      boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
+                      boxShadow: '0 4px 14px rgba(20, 184, 166, 0.4)',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
                   >
                     {stat.icon}
