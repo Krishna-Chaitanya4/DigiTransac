@@ -6,11 +6,7 @@ import { detectTransactionTags } from './transactionTags';
 
 describe('Transaction Tag Detection', () => {
   it('should detect expense tags for Swiggy', () => {
-    const result = detectTransactionTags(
-      'debit',
-      'Rs 500 debited for Swiggy order',
-      'Swiggy'
-    );
+    const result = detectTransactionTags('debit', 'Rs 500 debited for Swiggy order', 'Swiggy');
     expect(result.tags).toContain('expense');
     expect(['high', 'medium', 'low']).toContain(result.confidence);
   });
@@ -56,21 +52,13 @@ describe('Transaction Tag Detection', () => {
   });
 
   it('should detect savings tags for Fixed Deposit', () => {
-    const result = detectTransactionTags(
-      'debit',
-      'Rs 100000 debited for FD opening',
-      'SBI FD'
-    );
+    const result = detectTransactionTags('debit', 'Rs 100000 debited for FD opening', 'SBI FD');
     expect(result.tags).toContain('savings');
     expect(['high', 'medium', 'low']).toContain(result.confidence);
   });
 
   it('should detect income tags for salary', () => {
-    const result = detectTransactionTags(
-      'credit',
-      'Rs 80000 credited to your account',
-      'Salary'
-    );
+    const result = detectTransactionTags('credit', 'Rs 80000 credited to your account', 'Salary');
     expect(result.tags).toContain('income');
     expect(['high', 'medium', 'low']).toContain(result.confidence);
   });
@@ -86,11 +74,7 @@ describe('Transaction Tag Detection', () => {
   });
 
   it('should detect investment tags for SIP', () => {
-    const result = detectTransactionTags(
-      'debit',
-      'Rs 5000 debited for Mutual Fund SIP',
-      'Groww'
-    );
+    const result = detectTransactionTags('debit', 'Rs 5000 debited for Mutual Fund SIP', 'Groww');
     expect(result.tags).toContain('investment');
     expect(['high', 'medium', 'low']).toContain(result.confidence);
   });
@@ -105,4 +89,3 @@ describe('Transaction Tag Detection', () => {
     expect(['high', 'medium', 'low']).toContain(result.confidence);
   });
 });
-
