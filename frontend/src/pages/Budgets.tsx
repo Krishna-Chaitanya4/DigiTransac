@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Typography,
   Box,
@@ -141,10 +141,13 @@ const Budgets: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchBudgets();
-    fetchCategories();
-    fetchTags();
-    fetchAccounts();
+    // Parallelize all API calls for faster initial load
+    Promise.all([
+      fetchBudgets(),
+      fetchCategories(),
+      fetchTags(),
+      fetchAccounts(),
+    ]);
   }, []);
 
   const fetchBudgets = async () => {
@@ -201,27 +204,40 @@ const Budgets: React.FC = () => {
     }
   };
 
-  const getCategoryName = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId);
-    return category?.name || 'Unknown';
-  };
+  // Memoized lookup maps for O(1) performance instead of O(n) array.find()
+  const categoryMap = useMemo(() => {
+    return new Map(categories.map((c) => [c.id, c]));
+  }, [categories]);
 
-  const getCategoryColor = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId);
-    return category?.color || '#667eea';
-  };
+  const tagMap = useMemo(() => {
+    return new Map(tags.map((t) => [t.id, t]));
+  }, [tags]);
 
-  const getTagName = (tagId: string) => {
-    const tag = tags.find((t) => t.id === tagId);
-    return tag?.name || 'Unknown';
-  };
+  const accountMap = useMemo(() => {
+    return new Map(accounts.map((a) => [a.id, a]));
+  }, [accounts]);
 
-  const getAccountName = (accountId: string) => {
-    const account = accounts.find((a) => a.id === accountId);
-    return account?.name || 'Unknown';
-  };
+  const getCategoryName = useCallback(
+    (categoryId: string) => categoryMap.get(categoryId)?.name || 'Unknown',
+    [categoryMap]
+  );
 
-  const handleOpenDialog = () => {
+  const getCategoryColor = useCallback(
+    (categoryId: string) => categoryMap.get(categoryId)?.color || '#667eea',
+    [categoryMap]
+  );
+
+  const getTagName = useCallback(
+    (tagId: string) => tagMap.get(tagId)?.name || 'Unknown',
+    [tagMap]
+  );
+
+  const getAccountName = useCallback(
+    (accountId: string) => accountMap.get(accountId)?.name || 'Unknown',
+    [accountMap]
+  );
+
+  const handleOpenDialog = useCallback(() => {
     setFormData({
       name: '',
       categoryIds: [],
@@ -239,9 +255,9 @@ const Budgets: React.FC = () => {
     });
     setEditingBudget(null);
     setOpenDialog(true);
-  };
+  }, []);
 
-  const handleEditBudget = (budget: Budget) => {
+  const handleEditBudget = useCallback((budget: Budget) => {
     // Handle both new and legacy format
     const categoryIds = budget.categoryIds || (budget.categoryId ? [budget.categoryId] : []);
     const accountIds = budget.accountIds || (budget.accountId ? [budget.accountId] : []);
@@ -265,14 +281,14 @@ const Budgets: React.FC = () => {
     });
     setEditingBudget(budget);
     setOpenDialog(true);
-  };
+  }, []);
 
-  const handleCloseDialog = () => {
+  const handleCloseDialog = useCallback(() => {
     setOpenDialog(false);
     setEditingBudget(null);
-  };
+  }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     try {
       const payload: any = {
         name: formData.name || undefined,
@@ -322,13 +338,13 @@ const Budgets: React.FC = () => {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to save budget';
       toast.error(errorMessage);
     }
-  };
+  }, [formData, editingBudget, token, toast, handleCloseDialog]);
 
-  const handleDeleteClick = (budgetId: string) => {
+  const handleDeleteClick = useCallback((budgetId: string) => {
     setConfirmDelete({ open: true, budgetId });
-  };
+  }, []);
 
-  const handleDeleteBudget = async () => {
+  const handleDeleteBudget = useCallback(async () => {
     if (!confirmDelete.budgetId) return;
 
     try {
@@ -342,11 +358,12 @@ const Budgets: React.FC = () => {
     } finally {
       setConfirmDelete({ open: false, budgetId: null });
     }
-  };
+  }, [confirmDelete.budgetId, token, toast]);
 
-  const formatCurrency = (amount: number) => {
-    return formatCurrencyUtil(amount, user?.currency || 'USD');
-  };
+  const formatCurrency = useCallback(
+    (amount: number) => formatCurrencyUtil(amount, user?.currency || 'USD'),
+    [user?.currency]
+  );
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
