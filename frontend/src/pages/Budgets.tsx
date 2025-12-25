@@ -42,7 +42,6 @@ import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { useToast } from '../components/Toast';
 import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
-import EmptyState from '../components/EmptyState';
 import { BudgetCardSkeleton, GridSkeleton } from '../components/Skeletons';
 import ResponsiveDialog from '../components/ResponsiveDialog';
 import { useResponsive } from '../hooks/useResponsive';
@@ -859,6 +858,31 @@ const Budgets: React.FC = () => {
     return sorted;
   }, [budgets, searchQuery, filterStatus, sortBy, getBudgetStatusColors, getCategoryName, getTagName, getAccountName]);
 
+  // Calculate summary statistics (memoized for performance)
+  const budgetSummary = useMemo(() => {
+    if (budgets.length === 0) return null;
+    
+    const totalBudgeted = budgets.reduce((sum, b) => sum + b.amount + (b.rolledOverAmount || 0), 0);
+    const totalSpent = budgets.reduce((sum, b) => sum + (b.spent || 0), 0);
+    const totalRemaining = totalBudgeted - totalSpent;
+    const overallPercent = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;
+    
+    const healthyCount = budgets.filter(b => (b.percentUsed || 0) < 70).length;
+    const warningCount = budgets.filter(b => (b.percentUsed || 0) >= 70 && (b.percentUsed || 0) < 100).length;
+    const exceededCount = budgets.filter(b => (b.percentUsed || 0) >= 100).length;
+    
+    return {
+      totalBudgeted,
+      totalSpent,
+      totalRemaining,
+      overallPercent,
+      totalCount: budgets.length,
+      healthyCount,
+      warningCount,
+      exceededCount,
+    };
+  }, [budgets]);
+
   if (loading) {
     return (
       <Box>
@@ -907,6 +931,101 @@ const Budgets: React.FC = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Budget Summary Card */}
+      {budgetSummary && (
+        <Card 
+          sx={{ 
+            mb: 3, 
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+            color: 'white',
+          }}
+        >
+          <CardContent>
+            <Grid container spacing={3}>
+              {/* Total Budgeted */}
+              <Grid item xs={6} sm={3}>
+                <Box>
+                  <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                    Total Budgeted
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700}>
+                    {formatCurrency(budgetSummary.totalBudgeted)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    {budgetSummary.totalCount} {budgetSummary.totalCount === 1 ? 'budget' : 'budgets'}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Total Spent */}
+              <Grid item xs={6} sm={3}>
+                <Box>
+                  <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                    Total Spent
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700}>
+                    {formatCurrency(budgetSummary.totalSpent)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    {budgetSummary.overallPercent}% used
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Remaining */}
+              <Grid item xs={6} sm={3}>
+                <Box>
+                  <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                    Remaining
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700}>
+                    {formatCurrency(Math.abs(budgetSummary.totalRemaining))}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    {budgetSummary.totalRemaining < 0 ? 'Over budget' : 'Available'}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Budget Health */}
+              <Grid item xs={6} sm={3}>
+                <Box>
+                  <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                    Budget Health
+                  </Typography>
+                  <Box display="flex" gap={1} mt={0.5}>
+                    {budgetSummary.healthyCount > 0 && (
+                      <Chip 
+                        label={`${budgetSummary.healthyCount} ✓`} 
+                        size="small"
+                        sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 600 }}
+                      />
+                    )}
+                    {budgetSummary.warningCount > 0 && (
+                      <Chip 
+                        label={`${budgetSummary.warningCount} ⚠️`} 
+                        size="small"
+                        sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 600 }}
+                      />
+                    )}
+                    {budgetSummary.exceededCount > 0 && (
+                      <Chip 
+                        label={`${budgetSummary.exceededCount} 🚨`} 
+                        size="small"
+                        sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 600 }}
+                      />
+                    )}
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search and Filter Bar */}
       {budgets.length > 0 && (
@@ -1010,13 +1129,79 @@ const Budgets: React.FC = () => {
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
           }}
         >
-          <EmptyState
-            icon={<SavingsIcon />}
-            title="No budgets yet"
-            description="Create budgets to track your spending limits and stay on top of your finances"
-            actionLabel="Create Budget"
-            onAction={handleOpenDialog}
-          />
+          <CardContent sx={{ textAlign: 'center', py: 6 }}>
+            <Box mb={3}>
+              <SavingsIcon sx={{ fontSize: 80, color: '#667eea', opacity: 0.8 }} />
+            </Box>
+            <Typography variant="h5" fontWeight={600} gutterBottom>
+              Start Budgeting Today
+            </Typography>
+            <Typography variant="body1" color="text.secondary" mb={4} maxWidth="500px" mx="auto">
+              Take control of your finances by setting spending limits. Choose from templates or create custom budgets to track categories, tags, and accounts.
+            </Typography>
+            
+            {/* Quick Action Buttons */}
+            <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap">
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AddIcon />}
+                onClick={() => setShowTemplates(true)}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+                  },
+                }}
+              >
+                Use Template
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<AddIcon />}
+                onClick={handleOpenDialog}
+                sx={{
+                  borderColor: '#667eea',
+                  color: '#667eea',
+                  '&:hover': {
+                    borderColor: '#5568d3',
+                    bgcolor: '#667eea10',
+                  },
+                }}
+              >
+                Create Custom
+              </Button>
+            </Box>
+
+            {/* Feature Highlights */}
+            <Grid container spacing={3} mt={4} maxWidth="800px" mx="auto">
+              <Grid item xs={12} sm={4}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>📊 Track Spending</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Monitor your expenses in real-time with visual progress bars
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>🎯 Set Goals</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Define limits for categories, tags, or specific accounts
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>⚡ Stay Alerted</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Get notified when you approach your budget limits
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
         </Card>
       ) : filteredAndSortedBudgets.length === 0 ? (
         <Card
@@ -1026,25 +1211,42 @@ const Budgets: React.FC = () => {
             backdropFilter: 'blur(10px)',
             borderRadius: 2,
             boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-            p: 4,
-            textAlign: 'center',
           }}
         >
-          <Typography variant="h6" gutterBottom>
-            No budgets match your filters
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Try adjusting your search or filters
-          </Typography>
-          <Button
-            startIcon={<ClearIcon />}
-            onClick={() => {
-              setSearchQuery('');
-              setFilterStatus('all');
-            }}
-          >
-            Clear Filters
-          </Button>
+          <CardContent sx={{ textAlign: 'center', py: 6 }}>
+            <Box mb={2}>
+              <SearchIcon sx={{ fontSize: 60, color: 'text.secondary', opacity: 0.5 }} />
+            </Box>
+            <Typography variant="h6" gutterBottom>
+              No budgets match your filters
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              {searchQuery && `No results for "${searchQuery}". `}
+              Try adjusting your search or filters to see more budgets.
+            </Typography>
+            <Box display="flex" gap={2} justifyContent="center">
+              <Button
+                variant="outlined"
+                startIcon={<ClearIcon />}
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterStatus('all');
+                }}
+              >
+                Clear All Filters
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleOpenDialog}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                }}
+              >
+                Create New Budget
+              </Button>
+            </Box>
+          </CardContent>
         </Card>
       ) : (
         <Grid container spacing={3}>
