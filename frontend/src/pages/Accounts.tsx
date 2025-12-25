@@ -627,14 +627,7 @@ const Accounts: React.FC = () => {
                   <IconComponent />
                 </Box>
                 <Box>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="h6">{account.name}</Typography>
-                    {account.isDefault && (
-                      <Tooltip title="Default Account">
-                        <StarIcon sx={{ fontSize: 18, color: 'warning.main' }} />
-                      </Tooltip>
-                    )}
-                  </Box>
+                  <Typography variant="h6">{account.name}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {config.label}
                     {account.bankName && ` • ${account.bankName}`}
@@ -642,6 +635,15 @@ const Accounts: React.FC = () => {
                 </Box>
               </Box>
               <Box display="flex" gap={0.5}>
+                <Tooltip title={account.isDefault ? "Default Account" : "Set as Default"}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleSetDefault(account.id)}
+                    color={account.isDefault ? "warning" : "default"}
+                  >
+                    {account.isDefault ? <StarIcon /> : <StarIcon sx={{ opacity: 0.3 }} />}
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Quick Actions">
                   <IconButton
                     size="small"
@@ -791,6 +793,15 @@ const Accounts: React.FC = () => {
                   onClick={() => handleTransferMoney(account)}
                 >
                   Transfer
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  sx={{ flex: 1 }}
+                  startIcon={<RefreshIcon fontSize="small" />}
+                  onClick={() => handleAdjustBalance(account)}
+                >
+                  Adjust
                 </Button>
               </Box>
             </Box>
@@ -1214,30 +1225,16 @@ const Accounts: React.FC = () => {
         <Divider />
         <MenuItem
           onClick={() => {
-            if (quickActionAccount && !quickActionAccount.isDefault) {
-              handleSetDefault(quickActionAccount.id);
-              handleQuickActionClose();
-            }
-          }}
-          disabled={quickActionAccount?.isDefault}
-        >
-          <ListItemIcon>
-            <StarIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Set as Default</ListItemText>
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
             if (quickActionAccount) {
-              handleAdjustBalance(quickActionAccount);
+              handleDeleteClick(quickActionAccount);
               handleQuickActionClose();
             }
           }}
         >
           <ListItemIcon>
-            <RefreshIcon fontSize="small" />
+            <DeleteIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Adjust Balance</ListItemText>
+          <ListItemText>Delete Account</ListItemText>
         </MenuItem>
       </Menu>
 
