@@ -113,8 +113,6 @@ export async function calculateBudgetSpending(
   let spent = 0;
   if (budget.calculationType === 'debit') {
     spent = debit;
-  } else if (budget.calculationType === 'credit') {
-    spent = credit;
   } else if (budget.calculationType === 'net') {
     spent = net;
   }

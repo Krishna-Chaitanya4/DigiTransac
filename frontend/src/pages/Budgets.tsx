@@ -83,7 +83,7 @@ interface Budget {
   accountId?: string;
   
   // Calculation type
-  calculationType: 'debit' | 'credit' | 'net';
+  calculationType: 'debit' | 'net';
   
   amount: number;
   period: 'monthly' | 'yearly' | 'custom';
@@ -130,7 +130,7 @@ const Budgets: React.FC = () => {
     includeTagIds: [] as string[],
     excludeTagIds: [] as string[],
     accountIds: [] as string[],
-    calculationType: 'debit' as 'debit' | 'credit' | 'net',
+    calculationType: 'debit' as 'debit' | 'net',
     amount: '',
     period: 'custom' as 'monthly' | 'yearly' | 'custom',
     startDate: new Date().toISOString().split('T')[0],
@@ -244,7 +244,7 @@ const Budgets: React.FC = () => {
       includeTagIds: [],
       excludeTagIds: [],
       accountIds: [],
-      calculationType: 'debit',
+      calculationType: 'debit' as 'debit' | 'net',
       amount: '',
       period: 'custom' as 'monthly' | 'yearly' | 'custom',
       startDate: new Date().toISOString().split('T')[0],
@@ -524,16 +524,12 @@ const Budgets: React.FC = () => {
                           label={
                             budget.calculationType === 'debit'
                               ? 'Expenses'
-                              : budget.calculationType === 'credit'
-                              ? 'Income'
-                              : 'Net'
+                              : 'Net (after refunds)'
                           }
                           size="small"
                           color={
                             budget.calculationType === 'debit'
                               ? 'error'
-                              : budget.calculationType === 'credit'
-                              ? 'success'
                               : 'info'
                           }
                           variant="outlined"
@@ -849,17 +845,13 @@ const Budgets: React.FC = () => {
                 <ToggleButton value="debit">
                   Expenses Only
                 </ToggleButton>
-                <ToggleButton value="credit">
-                  Income Only
-                </ToggleButton>
                 <ToggleButton value="net">
-                  Net (Income - Expenses)
+                  Net (Expenses - Refunds)
                 </ToggleButton>
               </ToggleButtonGroup>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                {formData.calculationType === 'debit' && 'Track outgoing expenses only'}
-                {formData.calculationType === 'credit' && 'Track incoming income only'}
-                {formData.calculationType === 'net' && 'Track net flow (positive = saving, negative = spending)'}
+                {formData.calculationType === 'debit' && 'Track total expenses (debits)'}
+                {formData.calculationType === 'net' && 'Track net expenses after refunds/returns (debit - credit)'}
               </Typography>
             </Box>
 

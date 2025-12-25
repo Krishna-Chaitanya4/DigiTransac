@@ -122,7 +122,7 @@ export interface Budget {
   accountId?: string; // @deprecated - use accountIds[]
   
   // Budget calculation type
-  calculationType: 'debit' | 'credit' | 'net'; // debit=expenses, credit=income, net=income-expenses
+  calculationType: 'debit' | 'net'; // debit=total expenses, net=expenses after refunds (debit-credit)
   
   amount: number;
   period: 'monthly' | 'yearly' | 'custom';
