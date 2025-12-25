@@ -128,6 +128,10 @@ const Budgets: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'healthy' | 'warning' | 'exceeded'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'amount' | 'percentUsed' | 'remaining'>('percentUsed');
+  
+  // Inline editing state
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
+  const [editingAmountValue, setEditingAmountValue] = useState<string>('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -470,6 +474,63 @@ const Budgets: React.FC = () => {
       toast.error(err.response?.data?.message || 'Failed to duplicate budget');
     }
   }, [token, toast]);
+
+  const handleAmountClick = useCallback((budget: Budget) => {
+    setEditingAmountId(budget.id);
+    setEditingAmountValue(budget.amount.toString());
+  }, []);
+
+  const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow only numbers and decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setEditingAmountValue(value);
+    }
+  }, []);
+
+  const handleAmountSave = useCallback(async (budgetId: string) => {
+    const newAmount = parseFloat(editingAmountValue);
+    
+    if (isNaN(newAmount) || newAmount <= 0) {
+      toast.error('Please enter a valid amount');
+      setEditingAmountId(null);
+      return;
+    }
+
+    try {
+      const budget = budgets.find(b => b.id === budgetId);
+      if (!budget) return;
+
+      await axios.put(
+        `/api/budgets/${budgetId}`,
+        {
+          ...budget,
+          amount: newAmount,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      toast.success('Budget amount updated');
+      fetchBudgets();
+      setEditingAmountId(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update amount');
+      setEditingAmountId(null);
+    }
+  }, [editingAmountValue, budgets, token, toast]);
+
+  const handleAmountCancel = useCallback(() => {
+    setEditingAmountId(null);
+    setEditingAmountValue('');
+  }, []);
+
+  const handleAmountKeyPress = useCallback((e: React.KeyboardEvent, budgetId: string) => {
+    if (e.key === 'Enter') {
+      handleAmountSave(budgetId);
+    } else if (e.key === 'Escape') {
+      handleAmountCancel();
+    }
+  }, [handleAmountSave, handleAmountCancel]);
 
   const handleDeleteBudget = useCallback(async () => {
     if (!confirmDelete.budgetId) return;
@@ -971,19 +1032,63 @@ const Budgets: React.FC = () => {
                           sx={{ fontSize: '0.7rem' }}
                         />
                       </Box>
-                      <Typography variant="h5" fontWeight={700}>
-                        {formatCurrency(budget.amount)}
-                        {budget.rolledOverAmount && budget.rolledOverAmount > 0 && (
-                          <Typography
-                            component="span"
-                            variant="caption"
-                            color="success.main"
-                            sx={{ ml: 1 }}
-                          >
-                            (+{formatCurrency(budget.rolledOverAmount)} rollover)
+                      
+                      {/* Budget Amount - Inline Editable */}
+                      {editingAmountId === budget.id ? (
+                        <Box display="flex" alignItems="center" gap={1} my={1}>
+                          <TextField
+                            size="small"
+                            value={editingAmountValue}
+                            onChange={handleAmountChange}
+                            onKeyDown={(e) => handleAmountKeyPress(e, budget.id)}
+                            onBlur={() => handleAmountSave(budget.id)}
+                            autoFocus
+                            type="text"
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  {user?.currency || 'USD'}
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{ width: '150px' }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            Press Enter to save, Esc to cancel
                           </Typography>
-                        )}
-                      </Typography>
+                        </Box>
+                      ) : (
+                        <Typography 
+                          variant="h5" 
+                          fontWeight={700}
+                          onClick={() => handleAmountClick(budget)}
+                          sx={{
+                            cursor: 'pointer',
+                            display: 'inline-block',
+                            borderRadius: 1,
+                            px: 0.5,
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              bgcolor: 'action.hover',
+                              transform: 'scale(1.02)',
+                            },
+                          }}
+                          title="Click to edit amount"
+                        >
+                          {formatCurrency(budget.amount)}
+                          {budget.rolledOverAmount && budget.rolledOverAmount > 0 && (
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              color="success.main"
+                              sx={{ ml: 1 }}
+                            >
+                              (+{formatCurrency(budget.rolledOverAmount)} rollover)
+                            </Typography>
+                          )}
+                        </Typography>
+                      )}
+                      
                       <Typography variant="caption" color="text.secondary">
                         {formatDate(budget.startDate)} -{' '}
                         {budget.endDate ? formatDate(budget.endDate) : 'Ongoing'}
