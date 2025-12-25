@@ -108,6 +108,7 @@ export interface RecurrencePattern {
 export interface Budget {
   id: string;
   userId: string;
+  name?: string; // Optional user-defined name for the budget
   
   // Budget scope - what to track
   scopeType: 'category' | 'tag' | 'account'; // Which dimension to track

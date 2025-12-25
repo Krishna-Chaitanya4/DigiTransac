@@ -115,6 +115,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const {
+      name,
       scopeType,
       categoryId,
       includeTagIds,
@@ -131,6 +132,23 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       enableRollover,
       rolloverLimit,
     } = req.body;
+
+    // Validate and sanitize budget name
+    let sanitizedName: string | undefined = undefined;
+    if (name && typeof name === 'string') {
+      sanitizedName = name.trim();
+      if (sanitizedName.length > 100) {
+        res.status(400).json({
+          success: false,
+          message: 'Budget name must not exceed 100 characters',
+        });
+        return;
+      }
+      // Convert empty string to undefined
+      if (sanitizedName.length === 0) {
+        sanitizedName = undefined;
+      }
+    }
 
     // Validate scope-specific fields
     if (scopeType === 'category' && categoryId) {
@@ -202,6 +220,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const newBudget: Budget = {
       id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId,
+      name: sanitizedName,
       scopeType,
       categoryId: scopeType === 'category' ? categoryId : undefined,
       includeTagIds: scopeType === 'tag' ? includeTagIds : undefined,
@@ -243,6 +262,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
     const {
+      name,
       scopeType,
       categoryId,
       includeTagIds,
@@ -259,6 +279,25 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       enableRollover,
       rolloverLimit,
     } = req.body;
+
+    // Validate and sanitize budget name
+    let sanitizedName: string | undefined = undefined;
+    if (name !== undefined) {
+      if (typeof name === 'string') {
+        sanitizedName = name.trim();
+        if (sanitizedName.length > 100) {
+          res.status(400).json({
+            success: false,
+            message: 'Budget name must not exceed 100 characters',
+          });
+          return;
+        }
+        // Convert empty string to undefined
+        if (sanitizedName.length === 0) {
+          sanitizedName = undefined;
+        }
+      }
+    }
 
     const budgetsContainer = await cosmosDBService.getBudgetsContainer();
 
@@ -312,6 +351,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       updatedAt: new Date(),
     };
 
+    if (name !== undefined) updateData.name = sanitizedName;
     if (scopeType !== undefined) updateData.scopeType = scopeType;
     if (categoryId !== undefined) {
       updateData.categoryId = categoryId;

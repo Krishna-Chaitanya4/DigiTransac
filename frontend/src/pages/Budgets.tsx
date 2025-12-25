@@ -70,6 +70,7 @@ interface Account {
 interface Budget {
   id: string;
   userId: string;
+  name?: string;
   
   // Scope configuration
   scopeType: 'category' | 'tag' | 'account';
@@ -121,6 +122,7 @@ const Budgets: React.FC = () => {
   });
 
   const [formData, setFormData] = useState({
+    name: '',
     scopeType: 'category' as 'category' | 'tag' | 'account',
     categoryId: '',
     includeTagIds: [] as string[],
@@ -219,6 +221,7 @@ const Budgets: React.FC = () => {
 
   const handleOpenDialog = () => {
     setFormData({
+      name: '',
       scopeType: 'category',
       categoryId: '',
       includeTagIds: [],
@@ -239,6 +242,7 @@ const Budgets: React.FC = () => {
 
   const handleEditBudget = (budget: Budget) => {
     setFormData({
+      name: budget.name || '',
       scopeType: budget.scopeType,
       categoryId: budget.categoryId || '',
       includeTagIds: budget.includeTagIds || [],
@@ -267,6 +271,7 @@ const Budgets: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const payload: any = {
+        name: formData.name || undefined, // Only include if provided
         scopeType: formData.scopeType,
         calculationType: formData.calculationType,
         amount: formData.amount,
@@ -424,6 +429,13 @@ const Budgets: React.FC = () => {
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
                     <Box>
+                      {/* Budget Name (if provided) */}
+                      {budget.name && (
+                        <Typography variant="h6" fontWeight="600" gutterBottom>
+                          {budget.name}
+                        </Typography>
+                      )}
+                      
                       <Box display="flex" alignItems="center" gap={0.5} mb={1} flexWrap="wrap">
                         {/* Scope chip */}
                         {budget.scopeType === 'category' && budget.categoryId && (
@@ -622,6 +634,18 @@ const Budgets: React.FC = () => {
         <DialogTitle>{editingBudget ? 'Edit Budget' : 'Create New Budget'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Budget Name */}
+            <TextField
+              label="Budget Name (Optional)"
+              fullWidth
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onBlur={(e) => setFormData({ ...formData, name: e.target.value.trim() })}
+              placeholder="e.g., Monthly Groceries, Q1 Marketing"
+              helperText="Give your budget a descriptive name for easy identification"
+              inputProps={{ maxLength: 100 }}
+            />
+
             {/* Budget Scope Type Selection */}
             <Box>
               <Typography variant="subtitle2" gutterBottom>
