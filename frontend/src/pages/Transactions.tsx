@@ -59,6 +59,7 @@ import {
   HourglassEmpty as PendingIcon,
   Block as RejectedIcon,
   Tune as TuneIcon,
+  AccountBalanceWallet,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useToast } from '../components/Toast';
@@ -1311,100 +1312,171 @@ const Transactions: React.FC = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ width: '100%', overflow: 'hidden' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-          <Box>
-            <Typography 
-              variant="h4" 
-              gutterBottom
-              sx={{
-                fontWeight: 800,
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Transactions
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {transactions.length} this month
-              {transactions.length > 0 && transactions[0] && (
-                <> • Last: {transactions[0].description || 'Untitled'} {formatUserCurrency(transactions[0].amount)} • {new Date(transactions[0].date).toLocaleDateString()}</>
-              )}
-            </Typography>
-          </Box>
-          <Box display="flex" gap={1} flexWrap="wrap">
-            <Button
-              variant="outlined"
-              startIcon={<ImportIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
-              onClick={handleImportMenuOpen}
-              size="small"
-              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
-            >
-              {isMobile ? 'Import' : 'Import'}
-            </Button>
-            <Menu
-              anchorEl={importMenuAnchor}
-              open={Boolean(importMenuAnchor)}
-              onClose={handleImportMenuClose}
-            >
-              <MenuItem onClick={handleSMSImport}>
-                <SmsIcon fontSize="small" sx={{ mr: 1 }} />
-                Import from SMS
-              </MenuItem>
-              <MenuItem onClick={handleEmailImport}>
-                <EmailIcon fontSize="small" sx={{ mr: 1 }} />
-                Import from Email
-              </MenuItem>
-            </Menu>
-            <Button
-              variant="outlined"
-              startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
-              onClick={handleExportCSV}
-              disabled={transactions.length === 0}
-              size="small"
-              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
-            >
-              Export
-            </Button>
-            <Button 
-              variant="contained" 
-              startIcon={<AddIcon />} 
-              onClick={() => handleOpenDialog()}
-              size="small"
-              sx={{ 
-                minWidth: { xs: 80, sm: 'auto' },
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                boxShadow: '0 4px 14px rgba(20, 184, 166, 0.4)',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 20px rgba(20, 184, 166, 0.6)',
-                  background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
-                },
-              }}
-            >
-              Add
-            </Button>
+        {/* Enhanced Header */}
+        <Box 
+          sx={{
+            mb: 4,
+            p: 3,
+            borderRadius: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 100%)`,
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}33`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.15) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Typography 
+                  variant="h4" 
+                  gutterBottom
+                  sx={{
+                    fontWeight: 800,
+                    color: 'white',
+                    letterSpacing: '-0.02em',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  Transactions
+                </Typography>
+                <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
+                  {transactions.length} this month
+                  {transactions.length > 0 && transactions[0] && (
+                    <> • Last: {transactions[0].description || 'Untitled'} {formatUserCurrency(transactions[0].amount)} • {new Date(transactions[0].date).toLocaleDateString()}</>
+                  )}
+                </Typography>
+              </Box>
+              <Box display="flex" gap={1} flexWrap="wrap">
+                <Button
+                  variant="outlined"
+                  startIcon={<ImportIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
+                  onClick={handleImportMenuOpen}
+                  size="small"
+                  sx={{ 
+                    minWidth: { xs: 80, sm: 'auto' },
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                    },
+                  }}
+                >
+                  {isMobile ? 'Import' : 'Import'}
+                </Button>
+                <Menu
+                  anchorEl={importMenuAnchor}
+                  open={Boolean(importMenuAnchor)}
+                  onClose={handleImportMenuClose}
+                >
+                  <MenuItem onClick={handleSMSImport}>
+                    <SmsIcon fontSize="small" sx={{ mr: 1 }} />
+                    Import from SMS
+                  </MenuItem>
+                  <MenuItem onClick={handleEmailImport}>
+                    <EmailIcon fontSize="small" sx={{ mr: 1 }} />
+                    Import from Email
+                  </MenuItem>
+                </Menu>
+                <Button
+                  variant="outlined"
+                  startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
+                  onClick={handleExportCSV}
+                  disabled={transactions.length === 0}
+                  size="small"
+                  sx={{ 
+                    minWidth: { xs: 80, sm: 'auto' },
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                    },
+                    '&.Mui-disabled': {
+                      color: 'rgba(255,255,255,0.3)',
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    },
+                  }}
+                >
+                  Export
+                </Button>
+                <Button 
+                  variant="contained" 
+                  startIcon={<AddIcon />} 
+                  onClick={() => handleOpenDialog()}
+                  size="small"
+                  sx={{ 
+                    minWidth: { xs: 80, sm: 'auto' },
+                    bgcolor: 'white',
+                    color: 'primary.main',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      bgcolor: 'rgba(255,255,255,0.95)',
+                    },
+                  }}
+                >
+                  Add
+                </Button>
+              </Box>
+            </Box>
           </Box>
         </Box>
 
         {/* Summary Cards */}
-        <Grid container spacing={2} mb={3}>
+        <Grid container spacing={3} mb={3}>
           <Grid item xs={12} md={4}>
             <Card sx={{ 
-              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-              transition: 'all 0.3s ease',
+              background: (theme) => theme.palette.gradient.success,
+              color: 'white',
+              borderRadius: 3,
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
+                transform: 'translateY(-6px)',
+                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '100px',
+                height: '100px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
               },
             }}>
-              <CardContent>
-                <Typography variant="body2" color="white" gutterBottom>
-                  Total Credits
-                </Typography>
-                <Typography variant="h4" color="white" fontWeight="bold">
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Credits
+                  </Typography>
+                  <CreditIcon sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
                   {formatUserCurrency(totalCredits)}
                 </Typography>
               </CardContent>
@@ -1412,18 +1484,37 @@ const Transactions: React.FC = () => {
           </Grid>
           <Grid item xs={12} md={4}>
             <Card sx={{ 
-              background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
-              transition: 'all 0.3s ease',
+              background: (theme) => theme.palette.gradient.error,
+              color: 'white',
+              borderRadius: 3,
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 24px rgba(244, 63, 94, 0.4)',
+                transform: 'translateY(-6px)',
+                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '100px',
+                height: '100px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
               },
             }}>
-              <CardContent>
-                <Typography variant="body2" color="white" gutterBottom>
-                  Total Debits
-                </Typography>
-                <Typography variant="h4" color="white" fontWeight="bold">
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Debits
+                  </Typography>
+                  <DebitIcon sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
                   {formatUserCurrency(totalDebits)}
                 </Typography>
               </CardContent>
@@ -1432,24 +1523,45 @@ const Transactions: React.FC = () => {
           <Grid item xs={12} md={4}>
             <Card
               sx={{
-                background:
+                background: (theme) =>
                   netAmount >= 0
-                    ? 'linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%)'
+                    ? theme.palette.gradient.info
                     : 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
-                transition: 'all 0.3s ease',
+                color: 'white',
+                borderRadius: 3,
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: netAmount >= 0 
+                  ? '0 4px 20px rgba(59, 130, 246, 0.25)'
+                  : '0 4px 20px rgba(249, 115, 22, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
                 '&:hover': {
-                  transform: 'translateY(-4px)',
+                  transform: 'translateY(-6px)',
                   boxShadow: netAmount >= 0 
-                    ? '0 8px 24px rgba(6, 182, 212, 0.4)'
-                    : '0 8px 24px rgba(249, 115, 22, 0.4)',
+                    ? '0 12px 32px rgba(59, 130, 246, 0.35)'
+                    : '0 12px 32px rgba(249, 115, 22, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '100px',
+                  height: '100px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
                 },
               }}
             >
-              <CardContent>
-                <Typography variant="body2" color="white" gutterBottom>
-                  Net Amount
-                </Typography>
-                <Typography variant="h4" color="white" fontWeight="bold">
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Net Amount
+                  </Typography>
+                  <AccountBalanceWallet sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
                   {formatUserCurrency(Math.abs(netAmount))}
                   {netAmount < 0 && ' deficit'}
                 </Typography>
