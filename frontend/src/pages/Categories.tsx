@@ -22,6 +22,11 @@ import {
   Fade,
   Zoom,
   Avatar,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
+  CardActions,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -63,8 +68,21 @@ interface CategoryNode extends Category {
   isMatch?: boolean; // Indicates if this node matches the search query
 }
 
+interface Tag {
+  id: string;
+  name: string;
+  color?: string;
+  usageCount: number;
+  lastUsed?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const Categories: React.FC = () => {
   const { token } = useAuth();
+  const [activeTab, setActiveTab] = useState(0);
+  
+  // Category state
   const [categories, setCategories] = useState<Category[]>([]);
   const [treeData, setTreeData] = useState<CategoryNode[]>([]);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -74,11 +92,26 @@ const Categories: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [parentForNew, setParentForNew] = useState<Category | null>(null);
   
-  // Search and filter state
+  // Tag state
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [openTagDialog, setOpenTagDialog] = useState(false);
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [tagFormData, setTagFormData] = useState({
+    name: '',
+    color: '#667eea',
+  });
+  
+  // Search and filter state (Categories)
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'folder' | 'category'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'usage' | 'recent'>('name');
+  
+  // Search and sort state (Tags)
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [debouncedTagSearchQuery, setDebouncedTagSearchQuery] = useState('');
+  const [tagSortBy, setTagSortBy] = useState<'name' | 'usage' | 'recent'>('name');
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -105,6 +138,14 @@ const Categories: React.FC = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Debounce tag search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTagSearchQuery(tagSearchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [tagSearchQuery]);
 
   useEffect(() => {
     if (categories.length > 0) {
@@ -391,6 +432,128 @@ const Categories: React.FC = () => {
     }
   };
 
+  // ============= TAG MANAGEMENT FUNCTIONS =============
+  
+  const fetchTags = async () => {
+    try {
+      setTagsLoading(true);
+      const response = await axios.get('/api/tags', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTags(response.data.tags || response.data);
+    } catch (err: any) {
+      console.error('Error fetching tags:', err);
+      setError('Failed to fetch tags');
+    } finally {
+      setTagsLoading(false);
+    }
+  };
+
+  const handleOpenTagDialog = (tag?: Tag) => {
+    if (tag) {
+      setEditingTag(tag);
+      setTagFormData({
+        name: tag.name,
+        color: tag.color || '#667eea',
+      });
+    } else {
+      setEditingTag(null);
+      setTagFormData({
+        name: '',
+        color: '#667eea',
+      });
+    }
+    setOpenTagDialog(true);
+  };
+
+  const handleCloseTagDialog = () => {
+    setOpenTagDialog(false);
+    setEditingTag(null);
+    setTagFormData({
+      name: '',
+      color: '#667eea',
+    });
+  };
+
+  const handleSubmitTag = async () => {
+    if (!tagFormData.name.trim()) {
+      setError('Tag name is required');
+      return;
+    }
+
+    try {
+      if (editingTag) {
+        await axios.put(`/api/tags/${editingTag.id}`, tagFormData, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post('/api/tags', tagFormData, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      handleCloseTagDialog();
+      fetchTags();
+    } catch (err: any) {
+      console.error('Error saving tag:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to save tag';
+      setError(errorMessage);
+    }
+  };
+
+  const handleDeleteTag = async (tag: Tag) => {
+    if (!window.confirm(`Are you sure you want to delete "${tag.name}"? It will be removed from ${tag.usageCount} transaction(s).`)) {
+      return;
+    }
+
+    try {
+      await axios.delete(`/api/tags/${tag.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchTags();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete tag');
+    }
+  };
+
+  // Fetch tags when switching to tags tab
+  useEffect(() => {
+    if (activeTab === 1 && tags.length === 0) {
+      fetchTags();
+    }
+  }, [activeTab]);
+
+  // Filter and sort tags
+  const getFilteredAndSortedTags = () => {
+    let filtered = [...tags];
+
+    // Search filter
+    if (debouncedTagSearchQuery) {
+      const searchLower = debouncedTagSearchQuery.toLowerCase();
+      filtered = filtered.filter((tag) =>
+        tag.name.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (tagSortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      } else if (tagSortBy === 'usage') {
+        return (b.usageCount || 0) - (a.usageCount || 0);
+      } else if (tagSortBy === 'recent') {
+        const dateA = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
+        const dateB = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
+        return dateB - dateA;
+      }
+      return 0;
+    });
+
+    return filtered;
+  };
+
+  // ============= END TAG MANAGEMENT FUNCTIONS =============
+
+
   const renderTree = (nodes: CategoryNode[]) => {
     return nodes.map((node) => (
       <Box key={node.id} onContextMenu={(e) => handleContextMenu(e, node)}>
@@ -666,7 +829,7 @@ const Categories: React.FC = () => {
                   </Typography>
                 </Box>
                 <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
-                  {categories.length} {categories.length === 1 ? 'item' : 'items'} • {categories.filter(c => c.isFolder).length} {categories.filter(c => c.isFolder).length === 1 ? 'folder' : 'folders'} • {categories.filter(c => !c.isFolder).length} {categories.filter(c => !c.isFolder).length === 1 ? 'category' : 'categories'}
+                  {categories.length + tags.length} {(categories.length + tags.length) === 1 ? 'item' : 'items'} • {categories.filter(c => c.isFolder).length} {categories.filter(c => c.isFolder).length === 1 ? 'folder' : 'folders'} • {categories.filter(c => !c.isFolder).length} {categories.filter(c => !c.isFolder).length === 1 ? 'category' : 'categories'} • {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
@@ -726,7 +889,73 @@ const Categories: React.FC = () => {
         </Alert>
       )}
 
-      {/* Search and Controls */}
+      {/* Tabs for Categories and Tags */}
+      <Box sx={{ mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, newValue) => setActiveTab(newValue)}
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontSize: '1rem',
+              fontWeight: 600,
+              minHeight: 56,
+              px: 4,
+              '&.Mui-selected': {
+                color: 'primary.main',
+              },
+            },
+            '& .MuiTabs-indicator': {
+              height: 3,
+              borderRadius: '3px 3px 0 0',
+            },
+          }}
+        >
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LabelIcon sx={{ fontSize: 20 }} />
+                Categories
+                <Chip 
+                  label={categories.length} 
+                  size="small" 
+                  sx={{ 
+                    height: 20, 
+                    minWidth: 28,
+                    bgcolor: activeTab === 0 ? 'primary.main' : 'grey.300',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                  }} 
+                />
+              </Box>
+            }
+          />
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TagIcon sx={{ fontSize: 20 }} />
+                Tags
+                <Chip 
+                  label={tags.length} 
+                  size="small" 
+                  sx={{ 
+                    height: 20,
+                    minWidth: 28,
+                    bgcolor: activeTab === 1 ? 'primary.main' : 'grey.300',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                  }} 
+                />
+              </Box>
+            }
+          />
+        </Tabs>
+      </Box>
+
+      {/* Categories Tab Content */}
+      {activeTab === 0 && (
+        <>
+          {/* Search and Controls */}
       <Fade in timeout={800}>
         <Box
           sx={{
@@ -1139,6 +1368,402 @@ const Categories: React.FC = () => {
             }}
           >
             {editingCategory ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+        </>
+      )}
+
+      {/* Tags Tab Content */}
+      {activeTab === 1 && (
+        <Box>
+          {/* Search and Sort Controls for Tags */}
+          <Box
+            sx={{
+              mb: 3,
+              p: 3,
+              borderRadius: 3,
+              bgcolor: (theme) =>
+                theme.palette.mode === 'light' ? 'rgba(102, 126, 234, 0.03)' : 'rgba(102, 126, 234, 0.08)',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* Search */}
+              <TextField
+                placeholder="Search tags..."
+                value={tagSearchQuery}
+                onChange={(e) => setTagSearchQuery(e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                  endAdornment: tagSearchQuery && (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setTagSearchQuery('')}>
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  flex: 1,
+                  minWidth: 250,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    bgcolor: 'background.paper',
+                  },
+                }}
+              />
+
+              {/* Sort */}
+              <TextField
+                select
+                value={tagSortBy}
+                onChange={(e) => setTagSortBy(e.target.value as any)}
+                size="small"
+                label="Sort by"
+                sx={{
+                  minWidth: 150,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    bgcolor: 'background.paper',
+                  },
+                }}
+              >
+                <MenuItem value="name">Name</MenuItem>
+                <MenuItem value="usage">Most Used</MenuItem>
+                <MenuItem value="recent">Recently Used</MenuItem>
+              </TextField>
+
+              {/* New Tag Button */}
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => handleOpenTagDialog()}
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  background: (theme) => theme.palette.gradient.primary,
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: 4,
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                New Tag
+              </Button>
+            </Box>
+          </Box>
+
+          {tagsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+              <CircularProgress />
+            </Box>
+          ) : tags.length === 0 ? (
+            <Box
+              sx={{
+                textAlign: 'center',
+                py: 8,
+                px: 3,
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                border: '2px dashed',
+                borderColor: 'divider',
+              }}
+            >
+              <TagIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" gutterBottom color="text.secondary">
+                No tags yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" mb={3}>
+                Create tags to organize your transactions better
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => handleOpenTagDialog()}
+                sx={{
+                  background: (theme) => theme.palette.gradient.primary,
+                }}
+              >
+                Create Your First Tag
+              </Button>
+            </Box>
+          ) : getFilteredAndSortedTags().length === 0 ? (
+            <Box
+              sx={{
+                textAlign: 'center',
+                py: 8,
+                px: 3,
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                border: '2px dashed',
+                borderColor: 'divider',
+              }}
+            >
+              <SearchIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" gutterBottom color="text.secondary">
+                No tags found
+              </Typography>
+              <Typography variant="body2" color="text.secondary" mb={3}>
+                Try adjusting your search or filters
+              </Typography>
+              <Button
+                variant="outlined"
+                onClick={() => setTagSearchQuery('')}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                }}
+              >
+                Clear Search
+              </Button>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
+              {getFilteredAndSortedTags().map((tag) => (
+                <Fade in key={tag.id}>
+                  <Card
+                    sx={{
+                      borderRadius: 2.5,
+                      transition: 'all 0.3s ease',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4,
+                        borderColor: tag.color || 'primary.main',
+                      },
+                    }}
+                  >
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box
+                          sx={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: `linear-gradient(135deg, ${tag.color || '#667eea'} 0%, ${tag.color || '#764ba2'} 100%)`,
+                            boxShadow: `0 4px 12px ${tag.color || '#667eea'}40`,
+                          }}
+                        >
+                          <TagIcon sx={{ color: 'white', fontSize: 24 }} />
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="h6" fontWeight={600}>
+                            {tag.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {tag.usageCount} {tag.usageCount === 1 ? 'transaction' : 'transactions'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                    <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleOpenTagDialog(tag)}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => handleDeleteTag(tag)}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          color: 'error.main',
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Fade>
+              ))}
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Tag Dialog */}
+      <Dialog
+        open={openTagDialog}
+        onClose={handleCloseTagDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
+              <TagIcon />
+            </Avatar>
+            <Typography variant="h5" fontWeight={700}>
+              {editingTag ? 'Edit Tag' : 'Create New Tag'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+            <TextField
+              label="Tag Name"
+              fullWidth
+              value={tagFormData.name}
+              onChange={(e) => setTagFormData({ ...tagFormData, name: e.target.value })}
+              placeholder="e.g., Work, Personal, Urgent"
+              required
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+            />
+
+            {/* Color Picker */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                Tag Color
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
+                {['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b'].map((presetColor) => (
+                  <Box
+                    key={presetColor}
+                    onClick={() => setTagFormData({ ...tagFormData, color: presetColor })}
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 1.5,
+                      bgcolor: presetColor,
+                      cursor: 'pointer',
+                      border: '3px solid',
+                      borderColor: tagFormData.color === presetColor ? 'primary.main' : 'transparent',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                      },
+                    }}
+                  />
+                ))}
+              </Box>
+
+              <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                Custom Color
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: 48,
+                    height: 48,
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    border: '3px solid',
+                    borderColor: 'background.paper',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="color"
+                    value={tagFormData.color}
+                    onChange={(e) => setTagFormData({ ...tagFormData, color: e.target.value })}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  />
+                </Box>
+                <TextField
+                  value={tagFormData.color}
+                  onChange={(e) => setTagFormData({ ...tagFormData, color: e.target.value })}
+                  size="small"
+                  sx={{
+                    flex: 1,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            bgcolor: tagFormData.color,
+                          }}
+                        />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2.5 }}>
+          <Button
+            onClick={handleCloseTagDialog}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitTag}
+            variant="contained"
+            disabled={!tagFormData.name.trim()}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+              },
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {editingTag ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
