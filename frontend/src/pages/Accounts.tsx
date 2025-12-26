@@ -22,6 +22,9 @@ import {
   InputAdornment,
   Tooltip,
   Collapse,
+  Fade,
+  Zoom,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -31,6 +34,8 @@ import {
   Savings as SavingsIcon,
   CreditCard as CreditCardIcon,
   TrendingUp as InvestmentIcon,
+  TrendingUp,
+  TrendingDown,
   Money as CashIcon,
   AccountBalanceWallet as WalletIcon,
   Star as StarIcon,
@@ -919,81 +924,155 @@ const Accounts: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            My Accounts
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {activeAccountCount} account{activeAccountCount !== 1 ? 's' : ''} • Total Balance: {formatCurrency(netWorth, user?.currency || 'USD')}
-          </Typography>
+      {/* Enhanced Animated Header */}
+      <Fade in timeout={600}>
+        <Box
+          sx={{
+            mb: 4,
+            p: 4,
+            borderRadius: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
+            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(10px)',
+                      width: 56,
+                      height: 56,
+                    }}
+                  >
+                    <BankIcon sx={{ fontSize: 32 }} />
+                  </Avatar>
+                  <Typography
+                    variant="h4"
+                    fontWeight={800}
+                    sx={{
+                      color: 'white',
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    My Accounts
+                  </Typography>
+                </Box>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
+                  {activeAccountCount} account{activeAccountCount !== 1 ? 's' : ''} • Total: {formatCurrency(netWorth, user?.currency || 'USD')}
+                </Typography>
+              </Box>
+              <Box display="flex" gap={2}>
+                <Zoom in timeout={700}>
+                  <Tooltip title="Export Accounts">
+                    <IconButton 
+                      onClick={handleExportAccounts}
+                      sx={{
+                        bgcolor: 'white',
+                        color: 'primary.main',
+                        width: 48,
+                        height: 48,
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                          bgcolor: 'rgba(255,255,255,0.95)',
+                        },
+                      }}
+                    >
+                      <DownloadIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Zoom>
+                <Zoom in timeout={800}>
+                  <Tooltip title="Refresh Balances">
+                    <IconButton 
+                      onClick={fetchAccounts}
+                      sx={{
+                        bgcolor: 'white',
+                        color: 'primary.main',
+                        width: 48,
+                        height: 48,
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                        '&:hover': {
+                          transform: 'rotate(180deg)',
+                          boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                          bgcolor: 'rgba(255,255,255,0.95)',
+                        },
+                        transition: 'all 0.4s ease',
+                      }}
+                    >
+                      <RefreshIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Zoom>
+                <Zoom in timeout={900}>
+                  <Button 
+                    variant="outlined" 
+                    startIcon={<TransferIcon />} 
+                    onClick={() => handleTransferMoney(null)}
+                    sx={{
+                      bgcolor: 'white',
+                      borderColor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    Transfer
+                  </Button>
+                </Zoom>
+                <Zoom in timeout={1000}>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<AddIcon />} 
+                    onClick={() => handleOpenDialog()}
+                    sx={{
+                      bgcolor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    Add Account
+                  </Button>
+                </Zoom>
+              </Box>
+            </Box>
+          </Box>
         </Box>
-        <Box display="flex" gap={2}>
-          <Tooltip title="Export Accounts">
-            <IconButton 
-              onClick={handleExportAccounts}
-              sx={{
-                color: '#14b8a6',
-                '&:hover': {
-                  background: 'rgba(20, 184, 166, 0.1)',
-                  transform: 'scale(1.1)',
-                },
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <DownloadIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Refresh Balances">
-            <IconButton 
-              onClick={fetchAccounts}
-              sx={{
-                color: 'primary.main',
-                '&:hover': {
-                  bgcolor: 'primary.lighter',
-                  transform: 'rotate(180deg)',
-                },
-                transition: 'all 0.4s ease',
-              }}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Button 
-            variant="outlined" 
-            startIcon={<TransferIcon />} 
-            onClick={() => handleTransferMoney(null)}
-            sx={{
-              borderColor: '#14b8a6',
-              color: '#14b8a6',
-              '&:hover': {
-                borderColor: '#0891b2',
-                background: 'rgba(20, 184, 166, 0.1)',
-                transform: 'translateY(-2px)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            Transfer
-          </Button>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />} 
-            onClick={() => handleOpenDialog()}
-            sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            Add Account
-          </Button>
-        </Box>
-      </Box>
+      </Fade>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
@@ -1008,8 +1087,22 @@ const Accounts: React.FC = () => {
       )}
 
       {/* Search and Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
+      <Fade in timeout={800}>
+        <Card sx={{
+          mb: 3,
+          borderRadius: 3,
+          background: (theme) =>
+            theme.palette.mode === 'light'
+              ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+              : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+          backdropFilter: 'blur(20px)',
+          border: (theme) =>
+            theme.palette.mode === 'light'
+              ? `1px solid ${theme.palette.primary.main}1A`
+              : `1px solid ${theme.palette.primary.main}33`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+        }}>
+          <CardContent>
           <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
             <TextField
               placeholder="Search accounts..."
@@ -1128,81 +1221,136 @@ const Accounts: React.FC = () => {
             </Box>
           </Collapse>
         </CardContent>
-      </Card>
+        </Card>
+      </Fade>
 
       {/* Summary Cards */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} md={4}>
-          <Card 
-            sx={{ 
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              transition: 'all 0.3s ease',
+          <Zoom in timeout={900}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.primary,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 12px 28px rgba(20, 184, 166, 0.4)',
+                transform: 'translateY(-8px)',
+                boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
               },
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" color="white" gutterBottom>
-                Net Worth
-              </Typography>
-              <Typography variant="h3" color="white" fontWeight="bold">
-                {formatCurrency(netWorth)}
-              </Typography>
-              <Typography variant="body2" color="rgba(255,255,255,0.8)" mt={1}>
-                Assets - Liabilities
-              </Typography>
-            </CardContent>
-          </Card>
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Net Worth
+                  </Typography>
+                  <BalanceIcon sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                  {formatCurrency(netWorth)}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
+                  Assets - Liabilities
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card 
-            sx={{ 
-              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-              transition: 'all 0.3s ease',
+          <Zoom in timeout={1000}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.success,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 12px 28px rgba(16, 185, 129, 0.4)',
+                transform: 'translateY(-8px)',
+                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
               },
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" color="white" gutterBottom>
-                Total Assets
-              </Typography>
-              <Typography variant="h3" color="white" fontWeight="bold">
-                {formatCurrency(totalAssets)}
-              </Typography>
-              <Typography variant="body2" color="rgba(255,255,255,0.8)" mt={1}>
-                {activeAccountCount} active accounts
-              </Typography>
-            </CardContent>
-          </Card>
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Assets
+                  </Typography>
+                  <TrendingUp sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                  {formatCurrency(totalAssets)}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
+                  {activeAccountCount} active accounts
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card 
-            sx={{ 
-              background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
-              transition: 'all 0.3s ease',
+          <Zoom in timeout={1100}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.error,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 12px 28px rgba(244, 63, 94, 0.4)',
+                transform: 'translateY(-8px)',
+                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
               },
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" color="white" gutterBottom>
-                Total Liabilities
-              </Typography>
-              <Typography variant="h3" color="white" fontWeight="bold">
-                {formatCurrency(totalLiabilitiesWithCreditCards)}
-              </Typography>
-              <Typography variant="body2" color="rgba(255,255,255,0.8)" mt={1}>
-                Loans + Credit Cards
-              </Typography>
-            </CardContent>
-          </Card>
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Liabilities
+                  </Typography>
+                  <TrendingDown sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                  {formatCurrency(totalLiabilitiesWithCreditCards)}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
+                  Loans + Credit Cards
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
       </Grid>
 
