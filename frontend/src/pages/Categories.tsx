@@ -833,50 +833,90 @@ const Categories: React.FC = () => {
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
-                <Zoom in timeout={800}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<FolderOpenIcon />}
-                    onClick={() => {
-                      setFormData({ name: '', color: '#14b8a6', isFolder: true, parentId: null });
-                      setParentForNew(null);
-                      setOpenDialog(true);
-                    }}
-                    sx={{
-                      bgcolor: 'white',
-                      borderColor: 'white',
-                      color: 'primary.main',
-                      fontWeight: 600,
-                      '&:hover': {
-                        borderColor: 'white',
-                        bgcolor: 'rgba(255,255,255,0.95)',
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
-                      },
-                    }}
-                  >
-                    New Folder
-                  </Button>
-                </Zoom>
-                <Zoom in timeout={900}>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpenDialog(undefined, false)}
-                    sx={{
-                      bgcolor: 'white',
-                      color: 'primary.main',
-                      fontWeight: 600,
-                      '&:hover': {
-                        bgcolor: 'rgba(255,255,255,0.95)',
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
-                      },
-                    }}
-                  >
-                    New Category
-                  </Button>
-                </Zoom>
+                {activeTab === 0 ? (
+                  <>
+                    <Zoom in timeout={800}>
+                      <Button
+                        variant="contained"
+                        startIcon={<FolderOpenIcon />}
+                        onClick={() => {
+                          setFormData({ name: '', color: '#14b8a6', isFolder: true, parentId: null });
+                          setParentForNew(null);
+                          setOpenDialog(true);
+                        }}
+                        sx={{
+                          bgcolor: 'white',
+                          color: 'primary.main',
+                          fontWeight: 600,
+                          px: 3,
+                          py: 1,
+                          borderRadius: 3,
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                          '&:hover': {
+                            bgcolor: '#ffffff',
+                            color: 'primary.main',
+                            transform: 'translateY(-3px) scale(1.02)',
+                            boxShadow: '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
+                          },
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        }}
+                      >
+                        New Folder
+                      </Button>
+                    </Zoom>
+                    <Zoom in timeout={900}>
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleOpenDialog(undefined, false)}
+                        sx={{
+                          bgcolor: 'white',
+                          color: 'primary.main',
+                          fontWeight: 600,
+                          px: 3,
+                          py: 1,
+                          borderRadius: 3,
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                          '&:hover': {
+                            bgcolor: '#ffffff',
+                            color: 'primary.main',
+                            transform: 'translateY(-3px) scale(1.02)',
+                            boxShadow: '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
+                          },
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        }}
+                      >
+                        New Category
+                      </Button>
+                    </Zoom>
+                  </>
+                ) : (
+                  <Zoom in timeout={800}>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => handleOpenTagDialog()}
+                      sx={{
+                        bgcolor: 'white',
+                        color: 'primary.main',
+                        fontWeight: 600,
+                        px: 3,
+                        py: 1,
+                        borderRadius: 3,
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                        '&:hover': {
+                          bgcolor: '#ffffff',
+                          color: 'primary.main',
+                          transform: 'translateY(-3px) scale(1.02)',
+                          boxShadow: '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
+                        },
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      New Tag
+                    </Button>
+                  </Zoom>
+                )}
               </Box>
             </Box>
           </Box>
@@ -1439,27 +1479,6 @@ const Categories: React.FC = () => {
                 <MenuItem value="usage">Most Used</MenuItem>
                 <MenuItem value="recent">Recently Used</MenuItem>
               </TextField>
-
-              {/* New Tag Button */}
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenTagDialog()}
-                sx={{
-                  borderRadius: 2,
-                  px: 3,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  background: (theme) => theme.palette.gradient.primary,
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: 4,
-                  },
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                New Tag
-              </Button>
             </Box>
           </Box>
 
