@@ -78,7 +78,7 @@ import { useIsTouchDevice } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { ModernDatePicker } from '../components/ModernDatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
@@ -1918,32 +1918,26 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="Start Date"
                     value={startDate}
                     onChange={(date) => {
                       setStartDate(date);
                       setActiveDateFilter(''); // Clear active filter on manual change
                     }}
-                    slotProps={{ 
-                      textField: { size: 'small', fullWidth: true },
-                      field: { clearable: true }
-                    }}
+                    fullWidth
                   />
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="End Date"
                     value={endDate}
                     onChange={(date) => {
                       setEndDate(date);
                       setActiveDateFilter(''); // Clear active filter on manual change
                     }}
-                    slotProps={{ 
-                      textField: { size: 'small', fullWidth: true },
-                      field: { clearable: true }
-                    }}
+                    fullWidth
                   />
                 </Grid>
 
@@ -2985,15 +2979,19 @@ const Transactions: React.FC = () => {
 
                 <Grid item xs={12} sm={6}>
                   <Box>
-                    <TextField
-                      label="Date"
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      fullWidth
-                      required
-                      InputLabelProps={{ shrink: true }}
-                    />
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <ModernDatePicker
+                        label="Date"
+                        value={formData.date ? dayjs(formData.date) : null}
+                        onChange={(newValue) => {
+                          if (newValue) {
+                            setFormData({ ...formData, date: newValue.format('YYYY-MM-DD') });
+                          }
+                        }}
+                        fullWidth
+                        required
+                      />
+                    </LocalizationProvider>
                     <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
                       <Button
                         size="small"
@@ -3686,17 +3684,20 @@ const Transactions: React.FC = () => {
                     </Grid>
 
                     <Grid item xs={12}>
-                      <TextField
-                        label="End Date (Optional)"
-                        type="date"
-                        value={formData.recurrenceEndDate}
-                        onChange={(e) =>
-                          setFormData({ ...formData, recurrenceEndDate: e.target.value })
-                        }
-                        fullWidth
-                        InputLabelProps={{ shrink: true }}
-                        helperText="Leave empty for indefinite recurrence"
-                      />
+                      <LocalizationProvider dateAdapter={AdapterDayjs}>
+                        <ModernDatePicker
+                          label="End Date (Optional)"
+                          value={formData.recurrenceEndDate ? dayjs(formData.recurrenceEndDate) : null}
+                          onChange={(newValue) =>
+                            setFormData({ 
+                              ...formData, 
+                              recurrenceEndDate: newValue ? newValue.format('YYYY-MM-DD') : '' 
+                            })
+                          }
+                          fullWidth
+                          helperText="Leave empty for indefinite recurrence"
+                        />
+                      </LocalizationProvider>
                     </Grid>
                   </>
                 )}

@@ -40,7 +40,7 @@ import {
   Email as EmailIcon,
   Phone as PhoneIcon,
 } from '@mui/icons-material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { ModernDatePicker } from '../components/ModernDatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
@@ -698,31 +698,13 @@ const Register: React.FC = () => {
               {/* Date of Birth (Optional) */}
               <Grid item xs={12}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="Date of Birth"
                     value={dateOfBirth}
                     onChange={(newValue) => setDateOfBirth(newValue)}
                     format="DD/MM/YYYY"
                     maxDate={dayjs()}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        sx: {
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 2,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                            },
-                            '&.Mui-focused': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
-                            },
-                          },
-                        },
-                      },
-                    }}
+                    fullWidth
                   />
                 </LocalizationProvider>
               </Grid>

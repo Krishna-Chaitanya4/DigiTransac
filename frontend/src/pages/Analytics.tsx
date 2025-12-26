@@ -23,8 +23,8 @@ import {
   Avatar,
   useTheme,
 } from '@mui/material';
+import { ModernDatePicker } from '../components/ModernDatePicker';
 import {
-  DatePicker,
   LocalizationProvider,
 } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -563,19 +563,19 @@ const Analytics: React.FC = () => {
             {dateRangeType === 'custom' && (
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <Grid item xs={12} md={4}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="Start Date"
                     value={startDate}
                     onChange={(newValue) => setStartDate(newValue)}
-                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    fullWidth
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="End Date"
                     value={endDate}
                     onChange={(newValue) => setEndDate(newValue)}
-                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    fullWidth
                   />
                 </Grid>
               </LocalizationProvider>

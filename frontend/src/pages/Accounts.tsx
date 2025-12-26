@@ -54,6 +54,10 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
+import { ModernDatePicker } from '../components/ModernDatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 interface Account {
   id: string;
@@ -2231,14 +2235,18 @@ const Accounts: React.FC = () => {
             />
 
             {/* Date */}
-            <TextField
-              label="Date"
-              type="date"
-              value={transferDate}
-              onChange={(e) => setTransferDate(e.target.value)}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <ModernDatePicker
+                label="Date"
+                value={transferDate ? dayjs(transferDate) : null}
+                onChange={(newValue) => {
+                  if (newValue) {
+                    setTransferDate(newValue.format('YYYY-MM-DD'));
+                  }
+                }}
+                fullWidth
+              />
+            </LocalizationProvider>
 
             {/* Notes (Optional) */}
             <TextField

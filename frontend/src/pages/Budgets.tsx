@@ -51,6 +51,10 @@ import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { BudgetCardSkeleton } from '../components/Skeletons';
 import ResponsiveDialog from '../components/ResponsiveDialog';
+import { ModernDatePicker } from '../components/ModernDatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 interface Category {
   id: string;
@@ -1775,60 +1779,54 @@ const Budgets: React.FC = () => {
             {/* Date Range */}
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
-                <TextField
-                  label="📆 Start Date"
-                  type="date"
-                  fullWidth
-                  value={formData.startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                  error={!!dateError}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'First day of this month (edit to switch to custom)'
-                      : formData.period === 'next-month'
-                      ? 'First day of next month (edit to switch to custom)'
-                      : formData.period === 'this-year'
-                      ? 'First day of this year (edit to switch to custom)'
-                      : ''
-                  }
-                  required
-                />
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <ModernDatePicker
+                    label="📆 Start Date"
+                    value={formData.startDate ? dayjs(formData.startDate) : null}
+                    onChange={(newValue) => {
+                      if (newValue) {
+                        handleStartDateChange(newValue.format('YYYY-MM-DD'));
+                      }
+                    }}
+                    fullWidth
+                    error={!!dateError}
+                    helperText={
+                      formData.period === 'this-month'
+                        ? 'First day of this month (edit to switch to custom)'
+                        : formData.period === 'next-month'
+                        ? 'First day of next month (edit to switch to custom)'
+                        : formData.period === 'this-year'
+                        ? 'First day of this year (edit to switch to custom)'
+                        : ''
+                    }
+                    required
+                  />
+                </LocalizationProvider>
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
-                  label="📆 End Date"
-                  type="date"
-                  fullWidth
-                  value={formData.endDate}
-                  onChange={(e) => handleEndDateChange(e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                  error={!!dateError}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'Last day of this month (edit to switch to custom)'
-                      : formData.period === 'next-month'
-                      ? 'Last day of next month (edit to switch to custom)'
-                      : formData.period === 'this-year'
-                      ? 'Last day of this year (edit to switch to custom)'
-                      : ''
-                  }
-                  required
-                />
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <ModernDatePicker
+                    label="📆 End Date"
+                    value={formData.endDate ? dayjs(formData.endDate) : null}
+                    onChange={(newValue) => {
+                      if (newValue) {
+                        handleEndDateChange(newValue.format('YYYY-MM-DD'));
+                      }
+                    }}
+                    fullWidth
+                    error={!!dateError}
+                    helperText={
+                      formData.period === 'this-month'
+                        ? 'Last day of this month (edit to switch to custom)'
+                        : formData.period === 'next-month'
+                        ? 'Last day of next month (edit to switch to custom)'
+                        : formData.period === 'this-year'
+                        ? 'Last day of this year (edit to switch to custom)'
+                        : ''
+                    }
+                    required
+                  />
+                </LocalizationProvider>
               </Grid>
               {dateError && (
                 <Grid item xs={12}>
@@ -1971,7 +1969,7 @@ const Budgets: React.FC = () => {
                 </Box>
               </AccordionSummary>
               <AccordionDetails sx={{ pt: 0 }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                   {/* Categories Multi-Select */}
                   <TextField
                 select
@@ -2007,7 +2005,6 @@ const Budgets: React.FC = () => {
                 }}
                 helperText="Track these categories (category1 OR category2 OR ...)"
                 sx={{ 
-                  mb: 2,
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
                   },
@@ -2030,114 +2027,6 @@ const Budgets: React.FC = () => {
                         {category.isFolder ? '📁' : '📄'} {category.name}
                       </MenuItem>
                     ))
-                )}
-              </TextField>
-
-              {/* Include Tags */}
-              <TextField
-                select
-                label="Include Tags (Optional)"
-                fullWidth
-                value={formData.includeTagIds}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({
-                    ...formData,
-                    includeTagIds: typeof value === 'string' ? [value] : value,
-                  });
-                }}
-                SelectProps={{
-                  multiple: true,
-                  renderValue: (selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {(selected as string[]).map((tagId) => (
-                        <Chip 
-                          key={tagId} 
-                          label={getTagName(tagId)} 
-                          size="small" 
-                          sx={{
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: 'white',
-                            fontWeight: 600,
-                            boxShadow: '0 2px 8px #10b98140',
-                          }}
-                        />
-                      ))}
-                    </Box>
-                  ),
-                }}
-                helperText="Transactions must have at least one of these tags (tag1 OR tag2 OR ...)"
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                  },
-                }}
-              >
-                {!tags || tags.length === 0 ? (
-                  <MenuItem value="" disabled>
-                    No tags available. Create transactions with tags first.
-                  </MenuItem>
-                ) : (
-                  tags.map((tag) => (
-                    <MenuItem key={tag.id} value={tag.id}>
-                      {tag.name} ({tag.usageCount} uses)
-                    </MenuItem>
-                  ))
-                )}
-              </TextField>
-
-              {/* Exclude Tags */}
-              <TextField
-                select
-                label="Exclude Tags (Optional)"
-                fullWidth
-                value={formData.excludeTagIds}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({
-                    ...formData,
-                    excludeTagIds: typeof value === 'string' ? [value] : value,
-                  });
-                }}
-                SelectProps={{
-                  multiple: true,
-                  renderValue: (selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {(selected as string[]).map((tagId) => (
-                        <Chip 
-                          key={tagId} 
-                          label={getTagName(tagId)} 
-                          size="small" 
-                          sx={{
-                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                            color: 'white',
-                            fontWeight: 600,
-                            boxShadow: '0 2px 8px #ef444440',
-                          }}
-                        />
-                      ))}
-                    </Box>
-                  ),
-                }}
-                helperText="Transactions must NOT have any of these tags (NOT tag3 AND NOT tag4)"
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                  },
-                }}
-              >
-                {!tags || tags.length === 0 ? (
-                  <MenuItem value="" disabled>
-                    No tags available. Create transactions with tags first.
-                  </MenuItem>
-                ) : (
-                  tags.map((tag) => (
-                    <MenuItem key={tag.id} value={tag.id}>
-                      {tag.name} ({tag.usageCount} uses)
-                    </MenuItem>
-                  ))
                 )}
               </TextField>
 
@@ -2194,6 +2083,112 @@ const Budgets: React.FC = () => {
                 )}
               </TextField>
 
+              {/* Include Tags */}
+              <TextField
+                select
+                label="Include Tags (Optional)"
+                fullWidth
+                value={formData.includeTagIds}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    includeTagIds: typeof value === 'string' ? [value] : value,
+                  });
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((tagId) => (
+                        <Chip 
+                          key={tagId} 
+                          label={getTagName(tagId)} 
+                          size="small" 
+                          sx={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #10b98140',
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  ),
+                }}
+                helperText="Transactions must have at least one of these tags (tag1 OR tag2 OR ...)"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
+              >
+                {!tags || tags.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No tags available. Create transactions with tags first.
+                  </MenuItem>
+                ) : (
+                  tags.map((tag) => (
+                    <MenuItem key={tag.id} value={tag.id}>
+                      {tag.name} ({tag.usageCount} uses)
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+
+              {/* Exclude Tags */}
+              <TextField
+                select
+                label="Exclude Tags (Optional)"
+                fullWidth
+                value={formData.excludeTagIds}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    excludeTagIds: typeof value === 'string' ? [value] : value,
+                  });
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((tagId) => (
+                        <Chip 
+                          key={tagId} 
+                          label={getTagName(tagId)} 
+                          size="small" 
+                          sx={{
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #ef444440',
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  ),
+                }}
+                helperText="Transactions must NOT have any of these tags (NOT tag3 AND NOT tag4)"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
+              >
+                {!tags || tags.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No tags available. Create transactions with tags first.
+                  </MenuItem>
+                ) : (
+                  tags.map((tag) => (
+                    <MenuItem key={tag.id} value={tag.id}>
+                      {tag.name} ({tag.usageCount} uses)
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+
               {/* Validation Alert */}
               {formData.categoryIds.length === 0 && 
                formData.includeTagIds.length === 0 && 
@@ -2202,6 +2197,7 @@ const Budgets: React.FC = () => {
                 <Alert 
                   severity="warning" 
                   sx={{ 
+                    gridColumn: '1 / -1',
                     borderRadius: 2,
                     '& .MuiAlert-icon': {
                       fontSize: 24,
