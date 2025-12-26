@@ -51,6 +51,7 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
+import { getCurrentMonthYear } from '../utils/greetings';
 import axios from 'axios';
 import ResponsiveChart from '../components/ResponsiveChart';
 
@@ -438,10 +439,10 @@ const Analytics: React.FC = () => {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              Analytics
+              Financial Insights
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Detailed financial insights and trends
+              {getCurrentMonthYear()} • Net Savings: {formatCurrency(summaryStats.net)}
             </Typography>
           </Box>
           <Tooltip title="Export to CSV">

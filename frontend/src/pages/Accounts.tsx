@@ -922,10 +922,10 @@ const Accounts: React.FC = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h4" gutterBottom>
-            Accounts
+            My Accounts
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage your financial accounts and track balances
+            {activeAccountCount} account{activeAccountCount !== 1 ? 's' : ''} • Total Balance: {formatCurrency(netWorth, user?.currency || 'USD')}
           </Typography>
         </Box>
         <Box display="flex" gap={2}>

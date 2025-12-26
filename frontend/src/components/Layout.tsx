@@ -90,16 +90,22 @@ const Layout: React.FC = () => {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ py: 2 }}>
+      <Toolbar sx={{ py: 3, px: 2.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
           <Box
             sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: 2,
-              p: 1,
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+              borderRadius: 2.5,
+              p: 1.2,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(20, 184, 166, 0.3)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'scale(1.05) rotate(-5deg)',
+                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.5)',
+              },
             }}
           >
             <AccountBalance sx={{ color: 'white', fontSize: 28 }} />
@@ -110,20 +116,21 @@ const Layout: React.FC = () => {
             component="div"
             fontWeight={800}
             sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.5px',
             }}
           >
             DigiTransac
           </Typography>
         </Box>
       </Toolbar>
-      <Divider />
-      <List sx={{ flexGrow: 1, px: 2, py: 2 }}>
+      <Divider sx={{ opacity: 0.1 }} />
+      <List sx={{ flexGrow: 1, px: 2, py: 3 }}>
         {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+          <ListItem key={item.text} disablePadding sx={{ mb: 1.5 }}>
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => {
@@ -131,34 +138,58 @@ const Layout: React.FC = () => {
                 if (isMobile) handleDrawerToggle();
               }}
               sx={{
-                borderRadius: 2,
-                transition: 'all 0.2s ease',
+                borderRadius: 2.5,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: '4px',
+                  background: 'linear-gradient(180deg, #14b8a6 0%, #06b6d4 100%)',
+                  opacity: 0,
+                  transition: 'opacity 0.3s ease',
+                },
                 '&.Mui-selected': {
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
                   color: 'white',
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                  boxShadow: '0 8px 16px rgba(20, 184, 166, 0.3)',
+                  '&::before': {
+                    opacity: 1,
+                  },
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
-                    transform: 'translateX(4px)',
+                    background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
+                    transform: 'translateX(6px) scale(1.02)',
+                    boxShadow: '0 10px 24px rgba(20, 184, 166, 0.4)',
                   },
                   '& .MuiListItemIcon-root': {
                     color: 'white',
+                    transform: 'scale(1.1)',
                   },
                 },
                 '&:hover': {
                   background: (theme) =>
                     theme.palette.mode === 'light'
-                      ? 'rgba(102, 126, 234, 0.08)'
-                      : 'rgba(102, 126, 234, 0.15)',
-                  transform: 'translateX(4px)',
+                      ? 'rgba(20, 184, 166, 0.08)'
+                      : 'rgba(20, 184, 166, 0.15)',
+                  transform: 'translateX(6px)',
+                  '& .MuiListItemIcon-root': {
+                    transform: 'scale(1.1) rotate(5deg)',
+                    color: '#14b8a6',
+                  },
                 },
-                py: 1.5,
+                py: 1.75,
+                px: 2,
               }}
             >
               <ListItemIcon
                 sx={{
                   color: location.pathname === item.path ? 'white' : 'inherit',
-                  minWidth: 40,
+                  minWidth: 44,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
                 {item.icon}
@@ -167,6 +198,7 @@ const Layout: React.FC = () => {
                 primary={item.text}
                 primaryTypographyProps={{
                   fontWeight: location.pathname === item.path ? 700 : 500,
+                  fontSize: '0.95rem',
                 }}
               />
             </ListItemButton>
@@ -180,68 +212,80 @@ const Layout: React.FC = () => {
     <Box sx={{ display: 'flex' }}>
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
           background: (theme) =>
-            theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(30, 30, 30, 0.8)',
+            theme.palette.mode === 'light' 
+              ? 'rgba(255, 255, 255, 0.85)' 
+              : 'rgba(30, 30, 30, 0.85)',
           backdropFilter: 'blur(20px)',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
           borderBottom: (theme) =>
             theme.palette.mode === 'light'
-              ? '1px solid rgba(0,0,0,0.08)'
-              : '1px solid rgba(255,255,255,0.08)',
+              ? '1px solid rgba(20, 184, 166, 0.1)'
+              : '1px solid rgba(20, 184, 166, 0.2)',
           color: 'text.primary',
         }}
       >
-        <Toolbar sx={{ py: 1.5 }}>
+        <Toolbar sx={{ py: 1.5, minHeight: '70px' }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: 'none' } }}
+            sx={{ 
+              mr: 2, 
+              display: { md: 'none' },
+              '&:hover': {
+                background: 'rgba(20, 184, 166, 0.1)',
+                transform: 'scale(1.1)',
+              },
+              transition: 'all 0.2s ease',
+            }}
           >
             <MenuIcon />
           </IconButton>
 
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            {menuItems.find((item) => item.path === location.pathname)?.text || 'Dashboard'}
-          </Typography>
+          <Box sx={{ flexGrow: 1 }} />
 
-          <Tooltip title="Toggle theme">
+          <Tooltip title={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>
             <IconButton
               onClick={toggleTheme}
               sx={{
                 mr: 2,
                 background: (theme) =>
                   theme.palette.mode === 'light'
-                    ? 'rgba(102, 126, 234, 0.1)'
-                    : 'rgba(102, 126, 234, 0.2)',
+                    ? 'rgba(20, 184, 166, 0.1)'
+                    : 'rgba(20, 184, 166, 0.2)',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
                   color: 'white',
-                  transform: 'rotate(180deg)',
+                  transform: 'rotate(180deg) scale(1.1)',
+                  boxShadow: '0 4px 12px rgba(20, 184, 166, 0.3)',
                 },
-                transition: 'all 0.3s ease',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
               {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Account">
+          <Tooltip title="Account settings">
             <IconButton onClick={handleMenuClick} sx={{ p: 0.5 }}>
               <Avatar
                 sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  width: 40,
-                  height: 40,
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                  width: 42,
+                  height: 42,
                   fontWeight: 700,
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                  transition: 'all 0.2s ease',
+                  fontSize: '1.1rem',
+                  boxShadow: '0 4px 12px rgba(20, 184, 166, 0.3)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   '&:hover': {
-                    transform: 'scale(1.1)',
+                    transform: 'scale(1.15)',
+                    boxShadow: '0 6px 20px rgba(20, 184, 166, 0.5)',
                   },
                 }}
               >
@@ -262,17 +306,35 @@ const Layout: React.FC = () => {
               vertical: 'top',
               horizontal: 'right',
             }}
+            sx={{
+              '& .MuiPaper-root': {
+                borderRadius: 2,
+                minWidth: 180,
+                mt: 1.5,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                '& .MuiMenuItem-root': {
+                  borderRadius: 1,
+                  mx: 1,
+                  my: 0.5,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    background: 'rgba(20, 184, 166, 0.1)',
+                    transform: 'translateX(4px)',
+                  },
+                },
+              },
+            }}
           >
             <MenuItem onClick={handleProfileClick}>
               <ListItemIcon>
-                <PersonIcon fontSize="small" />
+                <PersonIcon fontSize="small" sx={{ color: '#14b8a6' }} />
               </ListItemIcon>
               Profile
             </MenuItem>
-            <Divider />
+            <Divider sx={{ my: 0.5 }} />
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
-                <LogoutIcon fontSize="small" />
+                <LogoutIcon fontSize="small" sx={{ color: '#f43f5e' }} />
               </ListItemIcon>
               Logout
             </MenuItem>

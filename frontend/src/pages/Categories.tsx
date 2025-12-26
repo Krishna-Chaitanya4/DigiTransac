@@ -524,9 +524,14 @@ const Categories: React.FC = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" fontWeight={700}>
-          Categories
-        </Typography>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>
+            Categories & Tags
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mt={0.5}>
+            {categories.length} categories • {categories.filter(c => c.isFolder).length} folders • {categories.filter(c => !c.isFolder).length} items
+          </Typography>
+        </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
             variant="outlined"

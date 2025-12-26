@@ -34,6 +34,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
+import { getTimeBasedGreeting, getTimeEmoji } from '../utils/greetings';
 import PullToRefresh from '../components/PullToRefresh';
 
 // Smart tag filtering: exclude these tags from expense/income calculations
@@ -719,10 +720,15 @@ const Dashboard: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Dashboard
+            {getTimeBasedGreeting()}, {user?.firstName || user?.email?.split('@')[0] || 'User'}! {getTimeEmoji()}
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-            Welcome back, {user?.firstName || user?.email || 'User'}! Here's your expense overview.
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.05rem', mt: 0.5 }}>
+            {budgetStatus.length > 0 && budgetStatus.some(b => b.percentage >= 90) 
+              ? `⚠️ ${budgetStatus.filter(b => b.percentage >= 90).length} budget${budgetStatus.filter(b => b.percentage >= 90).length > 1 ? 's' : ''} approaching limit`
+              : (stats?.netSavings || 0) >= 0
+              ? `🎉 You're ${formatCurrency(Math.abs(stats?.netSavings || 0))} in savings this month`
+              : `Spending ${formatCurrency(Math.abs(stats?.netSavings || 0))} more than income this month`
+            }
           </Typography>
         </Box>
         <Button

@@ -1326,8 +1326,11 @@ const Transactions: React.FC = () => {
             >
               Transactions
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              Track all your income and expenses
+            <Typography variant="body2" color="text.secondary">
+              {transactions.length} this month
+              {transactions.length > 0 && transactions[0] && (
+                <> • Last: {transactions[0].description || 'Untitled'} {formatUserCurrency(transactions[0].amount)} • {new Date(transactions[0].date).toLocaleDateString()}</>
+              )}
             </Typography>
           </Box>
           <Box display="flex" gap={1} flexWrap="wrap">

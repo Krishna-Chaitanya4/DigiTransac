@@ -154,10 +154,10 @@ const Profile: React.FC = () => {
   return (
     <Box>
       <Typography variant="h4" fontWeight={700} gutterBottom>
-        Profile Settings
+        Account Settings
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={4}>
-        Manage your account and integration settings
+        Manage your preferences and security
       </Typography>
 
       {success && (

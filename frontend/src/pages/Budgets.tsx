@@ -901,20 +901,37 @@ const Budgets: React.FC = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" fontWeight={700}>
-          Budgets
-        </Typography>
+        <Box>
+          <Typography 
+            variant="h4" 
+            fontWeight={700}
+            sx={{
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            Budget Tracking
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mt={0.5}>
+            {budgets.length === 0 
+              ? 'Set spending limits to stay on track'
+              : `${budgets.length} active budget${budgets.length !== 1 ? 's' : ''} • ${budgetSummary && budgetSummary.exceededCount > 0 ? `${budgetSummary.exceededCount} exceeded` : budgetSummary && budgetSummary.warningCount > 0 ? `${budgetSummary.warningCount} approaching limit` : 'All on track'}`
+            }
+          </Typography>
+        </Box>
         <Box display="flex" gap={1}>
           <Button
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={() => setShowTemplates(true)}
             sx={{
-              borderColor: '#667eea',
-              color: '#667eea',
+              borderColor: '#14b8a6',
+              color: '#14b8a6',
               '&:hover': {
-                borderColor: '#5568d3',
-                bgcolor: '#667eea10',
+                borderColor: '#0891b2',
+                bgcolor: 'rgba(20, 184, 166, 0.1)',
               },
             }}
           >
@@ -925,10 +942,13 @@ const Budgets: React.FC = () => {
             startIcon={<AddIcon />}
             onClick={handleOpenDialog}
             sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
               '&:hover': {
-                background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
               },
+              transition: 'all 0.3s ease',
             }}
           >
             Create Budget
@@ -941,11 +961,13 @@ const Budgets: React.FC = () => {
         <Card 
           sx={{ 
             mb: 3, 
-            background: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                : 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
             color: 'white',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: '0 12px 28px rgba(20, 184, 166, 0.4)',
+            },
           }}
         >
           <CardContent>
@@ -1135,7 +1157,7 @@ const Budgets: React.FC = () => {
         >
           <CardContent sx={{ textAlign: 'center', py: 6 }}>
             <Box mb={3}>
-              <SavingsIcon sx={{ fontSize: 80, color: '#667eea', opacity: 0.8 }} />
+              <SavingsIcon sx={{ fontSize: 80, color: '#14b8a6', opacity: 0.8 }} />
             </Box>
             <Typography variant="h5" fontWeight={600} gutterBottom>
               Start Budgeting Today
@@ -1152,10 +1174,13 @@ const Budgets: React.FC = () => {
                 startIcon={<AddIcon />}
                 onClick={() => setShowTemplates(true)}
                 sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+                    background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
                   },
+                  transition: 'all 0.3s ease',
                 }}
               >
                 Use Template
@@ -1166,12 +1191,14 @@ const Budgets: React.FC = () => {
                 startIcon={<AddIcon />}
                 onClick={handleOpenDialog}
                 sx={{
-                  borderColor: '#667eea',
-                  color: '#667eea',
+                  borderColor: '#14b8a6',
+                  color: '#14b8a6',
                   '&:hover': {
-                    borderColor: '#5568d3',
-                    bgcolor: '#667eea10',
+                    borderColor: '#0891b2',
+                    bgcolor: 'rgba(20, 184, 166, 0.1)',
+                    transform: 'translateY(-2px)',
                   },
+                  transition: 'all 0.3s ease',
                 }}
               >
                 Create Custom
@@ -1244,7 +1271,10 @@ const Budgets: React.FC = () => {
                 startIcon={<AddIcon />}
                 onClick={handleOpenDialog}
                 sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
+                  },
                 }}
               >
                 Create New Budget
