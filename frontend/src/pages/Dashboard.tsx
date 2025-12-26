@@ -1176,8 +1176,8 @@ const Dashboard: React.FC = () => {
                   sx={{
                     p: 3,
                     borderRadius: 3,
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
+                    background: (theme) => theme.palette.gradient.primary,
+                    boxShadow: '0 8px 24px rgba(20, 184, 166, 0.4)',
                   }}
                 >
                   <Box
