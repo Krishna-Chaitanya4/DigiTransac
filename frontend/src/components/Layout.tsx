@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Drawer,
-  AppBar,
-  Toolbar,
   List,
   Typography,
   Divider,
@@ -19,6 +17,9 @@ import {
   useMediaQuery,
   useTheme,
   Tooltip,
+  Fade,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -33,12 +34,16 @@ import {
   AccountBalance,
   AccountBalanceWallet as AccountsIcon,
   SwapHoriz as TransactionsIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';
 import MobileBottomNav from './MobileBottomNav';
 
 const drawerWidth = 240;
+const drawerWidthCollapsed = 70;
 
 interface MenuItem {
   text: string;
@@ -58,12 +63,43 @@ const menuItems: MenuItem[] = [
 const Layout: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : isTablet;
+  });
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const { mode, toggleTheme } = useThemeContext();
+
+  // Save sidebar state to localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
+  // Keyboard shortcut: Ctrl+B (or Cmd+B) to toggle sidebar
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        if (!isMobile) {
+          setSidebarCollapsed((prev: boolean) => !prev);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isMobile]);
+
+  const currentWidth = sidebarCollapsed ? drawerWidthCollapsed : drawerWidth;
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev: boolean) => !prev);
+  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -88,261 +124,300 @@ const Layout: React.FC = () => {
     handleMenuClose();
   };
 
+  // Filter menu items based on search
+  const filteredMenuItems = menuItems.filter(item =>
+    item.text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ py: 3, px: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+      {/* Header with Logo and Toggle */}
+      <Box sx={{ 
+        p: sidebarCollapsed ? 1.5 : 2.5, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+        minHeight: 64,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box
             sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              borderRadius: 2.5,
-              p: 1.2,
+              background: '#14b8a6',
+              borderRadius: 2,
+              p: 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(20, 184, 166, 0.3)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'scale(1.05) rotate(-5deg)',
-                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.5)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <AccountBalance sx={{ color: 'white', fontSize: 24 }} />
+          </Box>
+          {!sidebarCollapsed && (
+            <Fade in={!sidebarCollapsed}>
+              <Typography
+                variant="h6"
+                noWrap
+                component="div"
+                fontWeight={700}
+                sx={{ color: 'text.primary' }}
+              >
+                DigiTransac
+              </Typography>
+            </Fade>
+          )}
+        </Box>
+        {!isMobile && !sidebarCollapsed && (
+          <IconButton
+            onClick={toggleSidebar}
+            size="small"
+            sx={{
+              color: 'text.secondary',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            <ChevronLeftIcon fontSize="small" />
+          </IconButton>
+        )}
+      </Box>
+
+      {/* Expand Button When Collapsed */}
+      {!isMobile && sidebarCollapsed && (
+        <Box sx={{ px: 1.5, pb: 2 }}>
+          <IconButton
+            onClick={toggleSidebar}
+            sx={{
+              width: '100%',
+              color: 'text.secondary',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            <ChevronRightIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      )}
+
+      {/* Search Bar */}
+      {!sidebarCollapsed && (
+        <Box sx={{ px: 2.5, pb: 2 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search or type a command..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                </InputAdornment>
+              ),
+              sx: {
+                borderRadius: 2,
+                bgcolor: 'action.hover',
+                '& fieldset': { border: 'none' },
+                '&:hover': { bgcolor: 'action.selected' },
+                '&.Mui-focused': { 
+                  bgcolor: 'action.selected',
+                  boxShadow: '0 0 0 2px rgba(20, 184, 166, 0.2)',
+                },
               },
             }}
-          >
-            <AccountBalance sx={{ color: 'white', fontSize: 28 }} />
-          </Box>
-          <Typography
-            variant="h6"
-            noWrap
-            component="div"
-            fontWeight={800}
             sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.5px',
+              '& .MuiInputBase-input': {
+                fontSize: '0.875rem',
+                py: 1.25,
+              },
             }}
-          >
-            DigiTransac
-          </Typography>
+          />
         </Box>
-      </Toolbar>
+      )}
+
       <Divider sx={{ opacity: 0.1 }} />
-      <List sx={{ flexGrow: 1, px: 2, py: 3 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 1.5 }}>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) handleDrawerToggle();
-              }}
-              sx={{
-                borderRadius: 2.5,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                position: 'relative',
-                overflow: 'hidden',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: '4px',
-                  background: 'linear-gradient(180deg, #14b8a6 0%, #06b6d4 100%)',
-                  opacity: 0,
-                  transition: 'opacity 0.3s ease',
-                },
-                '&.Mui-selected': {
-                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                  color: 'white',
-                  boxShadow: '0 8px 16px rgba(20, 184, 166, 0.3)',
-                  '&::before': {
-                    opacity: 1,
+
+      {/* Navigation Menu */}
+      <List sx={{ flexGrow: 1, px: sidebarCollapsed ? 1 : 2, py: 2 }}>
+        {filteredMenuItems.map((item) => (
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+            <Tooltip 
+              title={sidebarCollapsed ? item.text : ''} 
+              placement="right"
+              arrow
+              TransitionComponent={Fade}
+            >
+              <ListItemButton
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) handleDrawerToggle();
+                  setSearchQuery('');
+                }}
+                sx={{
+                  borderRadius: 2,
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  minHeight: sidebarCollapsed ? 48 : 44,
+                  py: 1.25,
+                  px: sidebarCollapsed ? 1.5 : 2,
+                  '&.Mui-selected': {
+                    bgcolor: '#14b8a6',
+                    color: 'white',
+                    '&:hover': {
+                      bgcolor: '#0d9488',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'white',
+                    },
                   },
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
-                    transform: 'translateX(6px) scale(1.02)',
-                    boxShadow: '0 10px 24px rgba(20, 184, 166, 0.4)',
+                    bgcolor: 'action.hover',
                   },
-                  '& .MuiListItemIcon-root': {
-                    color: 'white',
-                    transform: 'scale(1.1)',
-                  },
-                },
-                '&:hover': {
-                  background: (theme) =>
-                    theme.palette.mode === 'light'
-                      ? 'rgba(20, 184, 166, 0.08)'
-                      : 'rgba(20, 184, 166, 0.15)',
-                  transform: 'translateX(6px)',
-                  '& .MuiListItemIcon-root': {
-                    transform: 'scale(1.1) rotate(5deg)',
-                    color: '#14b8a6',
-                  },
-                },
-                py: 1.75,
-                px: 2,
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  color: location.pathname === item.path ? 'white' : 'inherit',
-                  minWidth: 44,
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.text}
-                primaryTypographyProps={{
-                  fontWeight: location.pathname === item.path ? 700 : 500,
-                  fontSize: '0.95rem',
-                }}
-              />
-            </ListItemButton>
+                <ListItemIcon
+                  sx={{
+                    color: location.pathname === item.path ? 'white' : 'text.secondary',
+                    minWidth: sidebarCollapsed ? 0 : 40,
+                    justifyContent: 'center',
+                    '& .MuiSvgIcon-root': {
+                      fontSize: '1.35rem',
+                    },
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                {!sidebarCollapsed && (
+                  <Fade in={!sidebarCollapsed}>
+                    <ListItemText
+                      primary={item.text}
+                      primaryTypographyProps={{
+                        fontWeight: location.pathname === item.path ? 600 : 500,
+                        fontSize: '0.9rem',
+                      }}
+                    />
+                  </Fade>
+                )}
+              </ListItemButton>
+            </Tooltip>
           </ListItem>
         ))}
       </List>
+
+      {/* Profile Section at Bottom */}
+      <Box sx={{ borderTop: '1px solid', borderColor: 'divider', p: 2 }}>
+        <Box
+          onClick={handleMenuClick}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            p: sidebarCollapsed ? 1.5 : 1.5,
+            borderRadius: 2,
+            cursor: 'pointer',
+            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              bgcolor: 'action.hover',
+            },
+          }}
+        >
+          <Avatar
+            sx={{
+              background: '#14b8a6',
+              width: sidebarCollapsed ? 36 : 38,
+              height: sidebarCollapsed ? 36 : 38,
+              fontWeight: 600,
+              fontSize: '0.95rem',
+            }}
+          >
+            {user?.firstName?.[0] || 'U'}
+          </Avatar>
+          {!sidebarCollapsed && (
+            <Fade in={!sidebarCollapsed}>
+              <Box sx={{ overflow: 'hidden', flex: 1 }}>
+                <Typography fontSize="0.875rem" fontWeight={600} noWrap>
+                  {user?.firstName || 'User'} {user?.lastName || ''}
+                </Typography>
+                <Typography fontSize="0.75rem" color="text.secondary" noWrap>
+                  {user?.email || 'user@example.com'}
+                </Typography>
+              </Box>
+            </Fade>
+          )}
+        </Box>
+      </Box>
     </Box>
   );
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar
-        position="fixed"
-        elevation={0}
+      {/* Mobile Menu Button - Floating */}
+      {isMobile && (
+        <IconButton
+          onClick={handleDrawerToggle}
+          sx={{
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 1300,
+            bgcolor: 'background.paper',
+            boxShadow: 2,
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+        >
+          <MenuIcon />
+        </IconButton>
+      )}
+
+      {/* Profile Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
         sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
-          background: (theme) =>
-            theme.palette.mode === 'light' 
-              ? 'rgba(255, 255, 255, 0.85)' 
-              : 'rgba(30, 30, 30, 0.85)',
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          borderBottom: (theme) =>
-            theme.palette.mode === 'light'
-              ? '1px solid rgba(20, 184, 166, 0.1)'
-              : '1px solid rgba(20, 184, 166, 0.2)',
-          color: 'text.primary',
+          '& .MuiPaper-root': {
+            borderRadius: 2,
+            minWidth: 200,
+            mt: 1,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          },
         }}
       >
-        <Toolbar sx={{ py: 1.5, minHeight: '70px' }}>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ 
-              mr: 2, 
-              display: { md: 'none' },
-              '&:hover': {
-                background: 'rgba(20, 184, 166, 0.1)',
-                transform: 'scale(1.1)',
-              },
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
+        <MenuItem onClick={handleProfileClick}>
+          <ListItemIcon>
+            <PersonIcon fontSize="small" sx={{ color: '#14b8a6' }} />
+          </ListItemIcon>
+          Profile
+        </MenuItem>
+        <MenuItem onClick={() => { toggleTheme(); handleMenuClose(); }}>
+          <ListItemIcon>
+            {mode === 'dark' ? (
+              <LightModeIcon fontSize="small" sx={{ color: '#14b8a6' }} />
+            ) : (
+              <DarkModeIcon fontSize="small" sx={{ color: '#14b8a6' }} />
+            )}
+          </ListItemIcon>
+          {mode === 'dark' ? 'Light' : 'Dark'} Mode
+        </MenuItem>
+        <Divider sx={{ my: 0.5 }} />
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon>
+            <LogoutIcon fontSize="small" sx={{ color: '#f43f5e' }} />
+          </ListItemIcon>
+          Logout
+        </MenuItem>
+      </Menu>
 
-          <Box sx={{ flexGrow: 1 }} />
-
-          <Tooltip title={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>
-            <IconButton
-              onClick={toggleTheme}
-              sx={{
-                mr: 2,
-                background: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? 'rgba(20, 184, 166, 0.1)'
-                    : 'rgba(20, 184, 166, 0.2)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                  color: 'white',
-                  transform: 'rotate(180deg) scale(1.1)',
-                  boxShadow: '0 4px 12px rgba(20, 184, 166, 0.3)',
-                },
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
-            >
-              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title="Account settings">
-            <IconButton onClick={handleMenuClick} sx={{ p: 0.5 }}>
-              <Avatar
-                sx={{
-                  background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                  width: 42,
-                  height: 42,
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  boxShadow: '0 4px 12px rgba(20, 184, 166, 0.3)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': {
-                    transform: 'scale(1.15)',
-                    boxShadow: '0 6px 20px rgba(20, 184, 166, 0.5)',
-                  },
-                }}
-              >
-                {user?.firstName?.[0] || 'U'}
-              </Avatar>
-            </IconButton>
-          </Tooltip>
-
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
-            anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right',
-            }}
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
-            }}
-            sx={{
-              '& .MuiPaper-root': {
-                borderRadius: 2,
-                minWidth: 180,
-                mt: 1.5,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                '& .MuiMenuItem-root': {
-                  borderRadius: 1,
-                  mx: 1,
-                  my: 0.5,
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    background: 'rgba(20, 184, 166, 0.1)',
-                    transform: 'translateX(4px)',
-                  },
-                },
-              },
-            }}
-          >
-            <MenuItem onClick={handleProfileClick}>
-              <ListItemIcon>
-                <PersonIcon fontSize="small" sx={{ color: '#14b8a6' }} />
-              </ListItemIcon>
-              Profile
-            </MenuItem>
-            <Divider sx={{ my: 0.5 }} />
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon>
-                <LogoutIcon fontSize="small" sx={{ color: '#f43f5e' }} />
-              </ListItemIcon>
-              Logout
-            </MenuItem>
-          </Menu>
-        </Toolbar>
-      </AppBar>
-
-      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+      <Box component="nav" sx={{ width: { md: currentWidth }, flexShrink: { md: 0 }, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -366,7 +441,9 @@ const Layout: React.FC = () => {
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width: drawerWidth,
+              width: currentWidth,
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              overflowX: 'hidden',
             },
           }}
           open
@@ -380,11 +457,10 @@ const Layout: React.FC = () => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          mt: 8,
-          mb: { xs: 8, md: 0 }, // Add bottom margin on mobile for bottom nav
+          width: { md: `calc(100% - ${currentWidth}px)` },
           minHeight: '100vh',
           backgroundColor: 'background.default',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <Outlet />
