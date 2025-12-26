@@ -9,8 +9,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  FormControlLabel,
-  Switch,
   Alert,
   CircularProgress,
   Collapse,
@@ -317,10 +315,10 @@ const Categories: React.FC = () => {
     setContextMenu(null);
   };
 
-  const handleOpenDialog = (parent?: Category) => {
+  const handleOpenDialog = (parent?: Category, isFolder: boolean = false) => {
     setFormData({
       name: '',
-      isFolder: false,
+      isFolder: isFolder,
       color: '#667eea',
       parentId: parent?.id || null,
     });
@@ -616,7 +614,7 @@ const Categories: React.FC = () => {
                   <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={() => handleOpenDialog()}
+                    onClick={() => handleOpenDialog(undefined, false)}
                     sx={{
                       bgcolor: 'white',
                       color: 'primary.main',
@@ -795,7 +793,7 @@ const Categories: React.FC = () => {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => handleOpenDialog()}
+                onClick={() => handleOpenDialog(undefined, false)}
               >
                 Create Category
               </Button>
@@ -839,10 +837,12 @@ const Categories: React.FC = () => {
             </Avatar>
             <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
               {editingCategory
-                ? 'Edit Category'
+                ? `Edit ${editingCategory.isFolder ? 'Folder' : 'Category'}`
                 : parentForNew
                   ? `Add to "${parentForNew.name}"`
-                  : 'Create New Category'}
+                  : formData.isFolder
+                    ? 'Create New Folder'
+                    : 'Create New Category'}
             </Typography>
           </Box>
         </DialogTitle>
@@ -895,62 +895,13 @@ const Categories: React.FC = () => {
                 ))}
             </TextField>
 
-            {!editingCategory && (
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  background: (theme) =>
-                    theme.palette.mode === 'light'
-                      ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
-                      : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formData.isFolder}
-                      onChange={(e) => setFormData({ ...formData, isFolder: e.target.checked })}
-                      sx={{
-                        '& .MuiSwitch-switchBase.Mui-checked': {
-                          color: (theme) => theme.palette.primary.main,
-                          '&:hover': {
-                            backgroundColor: (theme) =>
-                              `${theme.palette.primary.main}15`,
-                          },
-                        },
-                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                          background: (theme) => theme.palette.gradient.primary,
-                        },
-                      }}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>
-                        Create as Folder
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Can contain subcategories
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Box>
-            )}
-
             <Box>
               <Typography variant="body2" fontWeight={600} color="primary" gutterBottom>
                 Category Color
               </Typography>
               <Box
                 sx={{
-                  display: 'flex',
-                  gap: 2,
-                  alignItems: 'center',
-                  p: 2,
+                  p: 2.5,
                   borderRadius: 2,
                   background: (theme) =>
                     theme.palette.mode === 'light'
@@ -960,65 +911,102 @@ const Categories: React.FC = () => {
                   borderColor: 'divider',
                 }}
               >
-                <Box
-                  sx={{
-                    position: 'relative',
-                    width: 64,
-                    height: 64,
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                    border: '3px solid',
-                    borderColor: 'background.paper',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'scale(1.05)',
-                      boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
-                    },
-                  }}
-                >
-                  <input
-                    type="color"
+                {/* Preset Colors */}
+                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                  Quick Select
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                  {[
+                    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+                    '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
+                    '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b',
+                  ].map((presetColor) => (
+                    <Box
+                      key={presetColor}
+                      onClick={() => setFormData({ ...formData, color: presetColor })}
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 1.5,
+                        bgcolor: presetColor,
+                        cursor: 'pointer',
+                        border: '3px solid',
+                        borderColor: formData.color === presetColor ? 'primary.main' : 'transparent',
+                        transition: 'all 0.2s ease',
+                        boxShadow: formData.color === presetColor ? '0 0 0 2px rgba(20, 184, 166, 0.2)' : 'none',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+
+                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                  Custom Color
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      border: '3px solid',
+                      borderColor: 'background.paper',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'scale(1.05)',
+                        boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
+                      },
+                    }}
+                  >
+                    <input
+                      type="color"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    />
+                  </Box>
+                  <TextField
+                    size="small"
                     value={formData.color}
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      border: 'none',
-                      cursor: 'pointer',
+                    placeholder="#667eea"
+                    sx={{
+                      flex: 1,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                      },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            bgcolor: formData.color,
+                            mr: 1,
+                            border: '2px solid',
+                            borderColor: 'divider',
+                          }}
+                        />
+                      ),
                     }}
                   />
                 </Box>
-                <TextField
-                  size="small"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  placeholder="#667eea"
-                  sx={{
-                    flex: 1,
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      fontFamily: 'monospace',
-                      fontWeight: 600,
-                    },
-                  }}
-                  InputProps={{
-                    startAdornment: (
-                      <Box
-                        sx={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 1,
-                          bgcolor: formData.color,
-                          mr: 1,
-                          border: '2px solid',
-                          borderColor: 'divider',
-                        }}
-                      />
-                    ),
-                  }}
-                />
               </Box>
             </Box>
           </Box>

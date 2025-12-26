@@ -1525,6 +1525,121 @@ const Accounts: React.FC = () => {
               <MenuItem value="JPY">JPY - Japanese Yen</MenuItem>
             </TextField>
 
+            <Box>
+              <Typography variant="body2" fontWeight={600} color="primary" gutterBottom>
+                Account Color (Optional)
+              </Typography>
+              <Box
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2,
+                  background: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? 'rgba(248, 250, 252, 0.8)'
+                      : 'rgba(30, 30, 30, 0.5)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                {/* Preset Colors */}
+                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                  Quick Select
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                  {[
+                    '#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#689f38', '#d32f2f',
+                    '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
+                    '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#64748b', '#475569',
+                  ].map((presetColor) => (
+                    <Box
+                      key={presetColor}
+                      onClick={() => setFormData({ ...formData, color: presetColor })}
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 1.5,
+                        bgcolor: presetColor,
+                        cursor: 'pointer',
+                        border: '3px solid',
+                        borderColor: formData.color === presetColor ? 'primary.main' : 'transparent',
+                        transition: 'all 0.2s ease',
+                        boxShadow: formData.color === presetColor ? '0 0 0 2px rgba(20, 184, 166, 0.2)' : 'none',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+
+                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                  Custom Color
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      border: '3px solid',
+                      borderColor: 'background.paper',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'scale(1.05)',
+                        boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
+                      },
+                    }}
+                  >
+                    <input
+                      type="color"
+                      value={formData.color || accountTypeConfig[formData.type].color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    />
+                  </Box>
+                  <TextField
+                    size="small"
+                    value={formData.color || accountTypeConfig[formData.type].color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    placeholder="#1976d2"
+                    sx={{
+                      flex: 1,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                      },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            bgcolor: formData.color || accountTypeConfig[formData.type].color,
+                            mr: 1,
+                            border: '2px solid',
+                            borderColor: 'divider',
+                          }}
+                        />
+                      ),
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Box>
+
             {!editingAccount && (
               <TextField
                 label="Initial Balance"
@@ -1539,16 +1654,13 @@ const Accounts: React.FC = () => {
                     <InputAdornment position="start">{formData.currency}</InputAdornment>
                   ),
                 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               />
             )}
-
-            <TextField
-              label="Color"
-              type="color"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              fullWidth
-            />
 
             <TextField
               label="Notes"
@@ -1557,6 +1669,11 @@ const Accounts: React.FC = () => {
               multiline
               rows={3}
               fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
             <Box
