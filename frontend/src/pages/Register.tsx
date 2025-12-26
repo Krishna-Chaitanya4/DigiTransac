@@ -274,7 +274,8 @@ const Register: React.FC = () => {
       if (contactMethod === 'email') {
         registerData.email = formData.email;
       } else {
-        registerData.phone = formData.phone;
+        // Remove spaces and hyphens from phone number before sending
+        registerData.phone = formData.phone.replace(/[\s-]/g, '');
       }
 
       // Add optional date of birth
