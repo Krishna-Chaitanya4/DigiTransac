@@ -8,13 +8,15 @@ import {
   Paper,
   Avatar,
   Chip,
-  CircularProgress,
   Alert,
   Button,
   LinearProgress,
   List,
   ListItem,
   ListItemText,
+  Fade,
+  Zoom,
+  Skeleton,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -652,8 +654,46 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
+      <Box>
+        {/* Animated Header Skeleton */}
+        <Box sx={{ mb: 4 }}>
+          <Skeleton variant="text" width="60%" height={60} sx={{ mb: 1 }} />
+          <Skeleton variant="text" width="40%" height={30} />
+        </Box>
+
+        {/* Stats Cards Skeleton */}
+        <Grid container spacing={3} mb={3}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Grid item xs={12} sm={6} md={4} lg={2.4} key={i}>
+              <Skeleton 
+                variant="rectangular" 
+                height={180} 
+                sx={{ borderRadius: 3 }}
+                animation="wave"
+              />
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* Content Skeleton */}
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={7}>
+            <Skeleton 
+              variant="rectangular" 
+              height={450} 
+              sx={{ borderRadius: 3 }}
+              animation="wave"
+            />
+          </Grid>
+          <Grid item xs={12} md={5}>
+            <Skeleton 
+              variant="rectangular" 
+              height={450} 
+              sx={{ borderRadius: 3 }}
+              animation="wave"
+            />
+          </Grid>
+        </Grid>
       </Box>
     );
   }
@@ -706,54 +746,103 @@ const Dashboard: React.FC = () => {
 
   const content = (
     <>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography 
-            variant="h3" 
-            fontWeight={800} 
-            gutterBottom 
-            sx={{ 
-              letterSpacing: '-0.02em',
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            {getTimeBasedGreeting()}, {user?.fullName || user?.username || 'User'}! {getTimeEmoji()}
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.05rem', mt: 0.5 }}>
-            {budgetStatus.length > 0 && budgetStatus.some(b => b.percentage >= 90) 
-              ? `⚠️ ${budgetStatus.filter(b => b.percentage >= 90).length} budget${budgetStatus.filter(b => b.percentage >= 90).length > 1 ? 's' : ''} approaching limit`
-              : (stats?.netSavings || 0) >= 0
-              ? `🎉 You're ${formatCurrency(Math.abs(stats?.netSavings || 0))} in savings this month`
-              : `Spending ${formatCurrency(Math.abs(stats?.netSavings || 0))} more than income this month`
-            }
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/transactions')}
+      {/* Animated Gradient Header */}
+      <Fade in timeout={600}>
+        <Box
           sx={{
-            borderRadius: 2,
-            textTransform: 'none',
-            px: 3,
-            py: 1.5,
-            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-            boxShadow: '0 4px 14px rgba(20, 184, 166, 0.4)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-2px)',
-              boxShadow: '0 6px 20px rgba(20, 184, 166, 0.6)',
-              background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
+            mb: 4,
+            p: 4,
+            borderRadius: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
+            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
             },
           }}
         >
-          <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>New Transaction</Box>
-          <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>New</Box>
-        </Button>
-      </Box>
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ flex: 1, minWidth: 250 }}>
+                <Typography
+                  variant="h3"
+                  fontWeight={800}
+                  gutterBottom
+                  sx={{
+                    letterSpacing: '-0.02em',
+                    color: 'white',
+                    textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  {getTimeBasedGreeting()}, {user?.fullName || user?.username || 'User'}! {getTimeEmoji()}
+                </Typography>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    color: 'rgba(255,255,255,0.95)',
+                    fontWeight: 500,
+                    mt: 1,
+                    textShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  {budgetStatus.length > 0 && budgetStatus.some(b => b.percentage >= 90)
+                    ? `⚠️ ${budgetStatus.filter(b => b.percentage >= 90).length} budget${budgetStatus.filter(b => b.percentage >= 90).length > 1 ? 's' : ''} approaching limit`
+                    : (stats?.netSavings || 0) >= 0
+                    ? `🎉 You're ${formatCurrency(Math.abs(stats?.netSavings || 0))} in savings this month`
+                    : `Spending ${formatCurrency(Math.abs(stats?.netSavings || 0))} more than income this month`}
+                </Typography>
+              </Box>
+              <Zoom in timeout={800}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate('/transactions')}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    px: 4,
+                    py: 1.5,
+                    bgcolor: 'white',
+                    color: 'primary.main',
+                    fontWeight: 700,
+                    fontSize: '1rem',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      bgcolor: 'rgba(255,255,255,0.95)',
+                    },
+                  }}
+                >
+                  <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                    New Transaction
+                  </Box>
+                  <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                    New
+                  </Box>
+                </Button>
+              </Zoom>
+            </Box>
+          </Box>
+        </Box>
+      </Fade>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
@@ -784,98 +873,152 @@ const Dashboard: React.FC = () => {
       <Grid container spacing={3} mb={3}>
         {statCards.map((stat, index) => (
           <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
-            <Card
-              sx={{
-                height: '100%',
-                position: 'relative',
-                overflow: 'hidden',
-                borderRadius: 3,
-                background: (theme) =>
-                  theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
-                backdropFilter: 'blur(10px)',
-                border: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? '1px solid rgba(0,0,0,0.05)'
-                    : '1px solid rgba(255,255,255,0.1)',
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&:hover': {
-                  transform: 'translateY(-8px) scale(1.02)',
-                  boxShadow: '0 16px 48px rgba(20, 184, 166, 0.25)',
-                  '& .stat-icon': {
-                    transform: 'scale(1.1) rotate(5deg)',
+            <Zoom in timeout={400 + index * 100}>
+              <Card
+                sx={{
+                  height: '100%',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  borderRadius: 3,
+                  background: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                      : 'linear-gradient(135deg, rgba(30, 30, 30, 0.9) 0%, rgba(20, 20, 20, 0.9) 100%)',
+                  backdropFilter: 'blur(20px)',
+                  border: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? `1px solid ${theme.palette.primary.main}1A`
+                      : `1px solid ${theme.palette.primary.main}33`,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    transform: 'translateY(-12px)',
+                    boxShadow: (theme) => `0 20px 40px ${theme.palette.primary.main}33`,
+                    border: (theme) =>
+                      theme.palette.mode === 'light'
+                        ? `1px solid ${theme.palette.primary.main}4D`
+                        : `1px solid ${theme.palette.primary.main}66`,
+                    '& .stat-icon': {
+                      transform: 'scale(1.1) rotate(5deg)',
+                    },
+                    '& .stat-value': {
+                      transform: 'scale(1.02)',
+                    },
+                    '&::before': {
+                      opacity: 1,
+                    },
                   },
-                },
-                '&::before': {
-                  content: '\"\"',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: stat.gradient,
-                },
-              }}
-            >
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ mb: 3 }}>
-                  <Avatar
-                    className="stat-icon"
-                    sx={{
-                      background: stat.gradient,
-                      width: 56,
-                      height: 56,
-                      boxShadow: '0 4px 14px rgba(20, 184, 166, 0.4)',
-                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
-                  >
-                    {stat.icon}
-                  </Avatar>
-                </Box>
-                <Typography
-                  variant="h4"
-                  fontWeight={800}
-                  sx={{
-                    mb: 0.5,
-                    letterSpacing: '-0.02em',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {stat.value}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                  sx={{
-                    mb: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {stat.title}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  {stat.trend === 'up' ? (
-                    <TrendingUp sx={{ fontSize: 16, color: 'success.main' }} />
-                  ) : (
-                    <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
-                  )}
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: stat.gradient,
+                    opacity: 0.8,
+                    transition: 'opacity 0.4s ease',
+                  },
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: '60px',
+                    height: '60px',
+                    background: stat.gradient,
+                    opacity: 0.05,
+                    borderRadius: '0 0 0 100%',
+                  },
+                }}
+              >
+                <CardContent sx={{ p: 3, position: 'relative', zIndex: 1 }}>
+                  <Box sx={{ mb: 3 }}>
+                    <Avatar
+                      className="stat-icon"
+                      sx={{
+                        background: stat.gradient,
+                        width: 60,
+                        height: 60,
+                        boxShadow: (theme) => `0 8px 16px ${theme.palette.primary.main}4D`,
+                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      {stat.icon}
+                    </Avatar>
+                  </Box>
                   <Typography
-                    variant="caption"
+                    className="stat-value"
+                    variant="h4"
+                    fontWeight={800}
                     sx={{
-                      color: stat.trend === 'up' ? 'success.main' : 'error.main',
-                      fontWeight: 600,
-                      fontSize: '0.75rem',
+                      mb: 0.5,
+                      letterSpacing: '-0.02em',
+                      background: stat.gradient,
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      transition: 'transform 0.4s ease',
                     }}
                   >
-                    {stat.change}
+                    {stat.value}
                   </Typography>
-                </Box>
-              </CardContent>
-            </Card>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    fontWeight={600}
+                    sx={{
+                      mb: 1.5,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {stat.title}
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      p: 1,
+                      borderRadius: 1.5,
+                      bgcolor: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? stat.trend === 'up'
+                            ? 'rgba(16, 185, 129, 0.1)'
+                            : 'rgba(239, 68, 68, 0.1)'
+                          : stat.trend === 'up'
+                          ? 'rgba(16, 185, 129, 0.2)'
+                          : 'rgba(239, 68, 68, 0.2)',
+                    }}
+                  >
+                    {stat.trend === 'up' ? (
+                      <TrendingUp sx={{ fontSize: 16, color: 'success.main' }} />
+                    ) : (
+                      <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
+                    )}
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: stat.trend === 'up' ? 'success.main' : 'error.main',
+                        fontWeight: 700,
+                        fontSize: '0.7rem',
+                      }}
+                    >
+                      {stat.change}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Zoom>
           </Grid>
         ))}
       </Grid>
@@ -1208,75 +1351,24 @@ const Dashboard: React.FC = () => {
         <Grid item xs={12} md={6}>
           <Paper
             sx={{
-              p: 3,
-              borderRadius: 3,
+              p: 4,
+              borderRadius: 4,
               background: (theme) =>
                 theme.palette.mode === 'light'
-                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                  : 'linear-gradient(135deg, #434343 0%, #000000 100%)',
+                  ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                  : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
               color: 'white',
               position: 'relative',
               overflow: 'hidden',
+              boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}4D`,
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: (theme) => `0 12px 40px ${theme.palette.primary.main}66`,
+              },
             }}
           >
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <TrendingUp sx={{ fontSize: 28 }} />
-                <Typography variant="h5" fontWeight={700}>
-                  Financial Health Score
-                </Typography>
-              </Box>
-              <Box display="flex" alignItems="baseline" gap={2} mb={3}>
-                <Typography variant="h1" fontWeight={800}>
-                  {smartInsights?.budgetHealthScore || 0}
-                </Typography>
-                <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                  / 100
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                    Top Spending
-                  </Typography>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Box
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        bgcolor: 'rgba(255,255,255,0.8)',
-                      }}
-                    />
-                    <Typography variant="body1" fontWeight={600}>
-                      {smartInsights?.highestCategory.name || 'N/A'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.8, ml: 'auto' }}>
-                      {formatCurrency(smartInsights?.highestCategory.amount || 0)}
-                    </Typography>
-                  </Box>
-                </Box>
-                {smartInsights?.savingsTrend && (
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                      Savings Trend
-                    </Typography>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      {smartInsights.savingsTrend === 'improving' ? (
-                        <TrendingUp fontSize="small" />
-                      ) : smartInsights.savingsTrend === 'declining' ? (
-                        <TrendingDown fontSize="small" />
-                      ) : (
-                        <Remove fontSize="small" />
-                      )}
-                      <Typography variant="body1" fontWeight={600} sx={{ textTransform: 'capitalize' }}>
-                        {smartInsights.savingsTrend}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-              </Box>
-            </Box>
+            {/* Animated background elements */}
             <Box
               sx={{
                 position: 'absolute',
@@ -1285,9 +1377,121 @@ const Dashboard: React.FC = () => {
                 width: 200,
                 height: 200,
                 borderRadius: '50%',
-                background: 'rgba(255,255,255,0.1)',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                animation: 'pulse 4s ease-in-out infinite',
+                '@keyframes pulse': {
+                  '0%, 100%': { opacity: 0.5, transform: 'scale(1)' },
+                  '50%': { opacity: 1, transform: 'scale(1.1)' },
+                },
               }}
             />
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: -30,
+                left: -30,
+                width: 150,
+                height: 150,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+              }}
+            />
+            
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Box display="flex" alignItems="center" gap={1.5} mb={3}>
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                    width: 48,
+                    height: 48,
+                  }}
+                >
+                  <TrendingUp sx={{ fontSize: 28 }} />
+                </Avatar>
+                <Typography variant="h5" fontWeight={700} sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                  Financial Health Score
+                </Typography>
+              </Box>
+              <Box display="flex" alignItems="baseline" gap={2} mb={4}>
+                <Typography 
+                  variant="h1" 
+                  fontWeight={800}
+                  sx={{ 
+                    fontSize: { xs: '3.5rem', sm: '4rem' },
+                    textShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  {smartInsights?.budgetHealthScore || 0}
+                </Typography>
+                <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 600 }}>
+                  / 100
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.85, mb: 1, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Top Spending
+                  </Typography>
+                  <Box 
+                    display="flex" 
+                    alignItems="center" 
+                    gap={1.5}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.15)',
+                      backdropFilter: 'blur(10px)',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        bgcolor: 'white',
+                        boxShadow: '0 0 8px rgba(255,255,255,0.8)',
+                      }}
+                    />
+                    <Typography variant="body1" fontWeight={700}>
+                      {smartInsights?.highestCategory.name || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9, ml: 'auto', fontWeight: 600 }}>
+                      {formatCurrency(smartInsights?.highestCategory.amount || 0)}
+                    </Typography>
+                  </Box>
+                </Box>
+                {smartInsights?.savingsTrend && (
+                  <Box>
+                    <Typography variant="body2" sx={{ opacity: 0.85, mb: 1, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                      Savings Trend
+                    </Typography>
+                    <Box 
+                      display="flex" 
+                      alignItems="center" 
+                      gap={1.5}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 2,
+                        bgcolor: 'rgba(255,255,255,0.15)',
+                        backdropFilter: 'blur(10px)',
+                      }}
+                    >
+                      {smartInsights.savingsTrend === 'improving' ? (
+                        <TrendingUp fontSize="small" sx={{ fontWeight: 'bold' }} />
+                      ) : smartInsights.savingsTrend === 'declining' ? (
+                        <TrendingDown fontSize="small" sx={{ fontWeight: 'bold' }} />
+                      ) : (
+                        <Remove fontSize="small" sx={{ fontWeight: 'bold' }} />
+                      )}
+                      <Typography variant="body1" fontWeight={700} sx={{ textTransform: 'capitalize' }}>
+                        {smartInsights.savingsTrend}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            </Box>
           </Paper>
         </Grid>
 
