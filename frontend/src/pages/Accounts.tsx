@@ -1411,8 +1411,35 @@ const Accounts: React.FC = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingAccount ? 'Edit Account' : 'Add Account'}</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '120px',
+              height: '120px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+              borderRadius: '50%',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
+              <BankIcon />
+            </Avatar>
+            <Typography variant="h5" fontWeight={700}>
+              {editingAccount ? 'Edit Account' : 'Add Account'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="Account Name"
@@ -1529,9 +1556,47 @@ const Accounts: React.FC = () => {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={!formData.name}>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button 
+            onClick={handleCloseDialog}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            disabled={!formData.name}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+              },
+              transition: 'all 0.2s ease',
+            }}
+          >
             {editingAccount ? 'Update' : 'Create'}
           </Button>
         </DialogActions>

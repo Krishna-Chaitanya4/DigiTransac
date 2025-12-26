@@ -34,6 +34,7 @@ import {
   Tooltip,
   Alert,
   Snackbar,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -2840,25 +2841,50 @@ const Transactions: React.FC = () => {
 
         {/* Add/Edit Dialog */}
         <ResponsiveDialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-          <DialogTitle>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <DialogTitle
+            sx={{
+              background: (theme) => theme.palette.gradient.primary,
+              color: 'white',
+              py: 3,
+              position: 'relative',
+              overflow: 'hidden',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '150px',
+                height: '150px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
               <Box>
-                <span>{approveMode ? 'Complete Transaction to Approve' : (editingTransaction ? 'Edit Transaction' : 'Add Transaction')}</span>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                  <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
+                    {formData.type === 'credit' ? '💰' : '💸'}
+                  </Avatar>
+                  <Typography variant="h5" fontWeight={700}>
+                    {approveMode ? 'Complete Transaction to Approve' : (editingTransaction ? 'Edit Transaction' : 'Add Transaction')}
+                  </Typography>
+                </Box>
                 {approveMode && (
                   <Chip 
                     label="Approval Required" 
                     color="warning" 
                     size="small" 
-                    sx={{ ml: 1 }}
+                    sx={{ ml: 7 }}
                   />
                 )}
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'normal' }}>
+              <Typography variant="caption" sx={{ opacity: 0.9, fontStyle: 'italic' }}>
                 Ctrl+Enter to save • Ctrl+S to toggle mode
               </Typography>
             </Box>
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ pt: 3 }}>
             <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <ToggleButtonGroup
                 value={formData.type}
@@ -3453,8 +3479,30 @@ const Transactions: React.FC = () => {
               </Grid>
             </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
+          <DialogActions
+            sx={{
+              px: 3,
+              py: 2.5,
+              gap: 1.5,
+              borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'rgba(248, 250, 252, 0.8)'
+                  : 'rgba(15, 15, 15, 0.8)',
+            }}
+          >
+            <Button 
+              onClick={handleCloseDialog}
+              variant="outlined"
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleSubmit}
               variant="contained"
@@ -3468,6 +3516,20 @@ const Transactions: React.FC = () => {
                     formData.splits.some((s) => !s.categoryId || !s.amount)
                   : !formData.categoryId)
               }
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                textTransform: 'none',
+                fontWeight: 600,
+                background: approveMode
+                  ? undefined
+                  : (theme) => theme.palette.gradient.primary,
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                  boxShadow: 4,
+                },
+                transition: 'all 0.2s ease',
+              }}
             >
               {approveMode ? 'Complete & Approve' : (editingTransaction ? 'Update' : 'Create')}
             </Button>

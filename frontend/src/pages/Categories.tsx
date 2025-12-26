@@ -808,14 +808,45 @@ const Categories: React.FC = () => {
 
       {/* Create/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingCategory
-            ? 'Edit Category'
-            : parentForNew
-              ? `Add to "${parentForNew.name}"`
-              : 'Create New Category'}
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 48,
+                height: 48,
+              }}
+            >
+              <LabelIcon />
+            </Avatar>
+            <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
+              {editingCategory
+                ? 'Edit Category'
+                : parentForNew
+                  ? `Add to "${parentForNew.name}"`
+                  : 'Create New Category'}
+            </Typography>
+          </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {parentForNew && (
               <Alert severity="info" sx={{ mb: 1 }}>
@@ -903,9 +934,48 @@ const Categories: React.FC = () => {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={!formData.name}>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={handleCloseDialog}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={!formData.name}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+                transition: 'all 0.2s ease',
+              },
+            }}
+          >
             {editingCategory ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
