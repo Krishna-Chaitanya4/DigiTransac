@@ -19,6 +19,7 @@ import {
   Stack,
   Paper,
   Skeleton,
+  CircularProgress,
 } from '@mui/material';
 import {
   Email as EmailIcon,
@@ -35,6 +36,9 @@ import {
   Phone as PhoneIcon,
   Cake as CakeIcon,
   AttachMoney as AttachMoneyIcon,
+  Sync as SyncIcon,
+  AccessTime as AccessTimeIcon,
+  Notifications as NotificationsIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -64,6 +68,10 @@ const Profile: React.FC = () => {
     dateOfBirth: user?.dateOfBirth || '',
   });
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
+  const [pendingCount, setPendingCount] = useState(0);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchUserProfile();
@@ -84,7 +92,16 @@ const Profile: React.FC = () => {
           totalEmailsProcessed: response.data.emailIntegration.totalEmailsProcessed || 0,
           lastProcessedAt: response.data.emailIntegration.lastProcessedAt || null,
         });
+        
+        // Set last sync time if available
+        if (response.data.emailIntegration.lastProcessedAt) {
+          setLastSyncTime(new Date(response.data.emailIntegration.lastProcessedAt));
+        }
       }
+      
+      // TODO: Fetch pending transaction count from review queue API
+      // For now, hardcoded as 0
+      setPendingCount(0);
     } catch (err) {
       console.error('Failed to fetch user profile:', err);
     } finally {
@@ -92,25 +109,64 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleConnectGmail = () => {
-    const width = 600;
-    const height = 700;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
+  const handleConnectGmail = async () => {
+    try {
+      console.log('Connecting to Gmail...');
+      
+      // Get OAuth URL from backend
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/connect`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    const popup = window.open(
-      `${import.meta.env.VITE_API_BASE_URL}/api/gmail/auth?token=${token}`,
-      'Gmail Authorization',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
+      console.log('Got auth URL:', response.data);
+      const { authUrl } = response.data;
+      
+      // Open OAuth in popup
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
 
-    const checkPopup = setInterval(() => {
-      if (popup?.closed) {
-        clearInterval(checkPopup);
-        fetchUserProfile();
-        setSuccess('Gmail account connected successfully!');
+      const popup = window.open(
+        authUrl,
+        '_blank',
+        `width=${width},height=${height},left=${left},top=${top},popup=1`
+      );
+
+      if (!popup) {
+        setError('Popup blocked! Please allow popups for this site and try again.');
+        return;
       }
-    }, 500);
+
+      console.log('Popup opened, monitoring...');
+
+      // Check for URL changes in popup (for callback detection)
+      const checkPopup = setInterval(() => {
+        try {
+          // Check if popup was redirected back to our domain
+          if (popup?.location?.href?.includes(window.location.origin)) {
+            console.log('Popup returned to our domain, closing...');
+            popup.close();
+            clearInterval(checkPopup);
+            fetchUserProfile();
+            setSuccess('Gmail account connected successfully!');
+          }
+        } catch (e) {
+          // Cross-origin error means still on Google OAuth page
+        }
+        
+        // Check if popup was closed
+        if (popup?.closed) {
+          console.log('Popup closed, refreshing profile...');
+          clearInterval(checkPopup);
+          fetchUserProfile();
+        }
+      }, 500);
+    } catch (err: any) {
+      console.error('Gmail connect error:', err);
+      setError(err.response?.data?.error || 'Failed to initiate Gmail connection');
+    }
   };
 
   const handleDisconnectGmail = async () => {
@@ -201,6 +257,32 @@ const Profile: React.FC = () => {
       };
       reader.readAsDataURL(file);
       // TODO: Upload to server
+    }
+  };
+
+  const handleManualSync = async () => {
+    try {
+      setSyncing(true);
+      setSyncStatus('syncing');
+      
+      // Trigger manual sync
+      await axios.post(
+        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      setSyncStatus('idle');
+      setLastSyncTime(new Date());
+      setSuccess('Email sync completed successfully!');
+      
+      // Refresh profile to get updated stats
+      await fetchUserProfile();
+    } catch (err: any) {
+      setSyncStatus('error');
+      setError(err.response?.data?.error || 'Failed to sync emails');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -496,6 +578,7 @@ const Profile: React.FC = () => {
           </Button>
         ) : (
           <>
+            {/* Connection Status */}
             <Box
               sx={{
                 p: 2,
@@ -506,17 +589,34 @@ const Profile: React.FC = () => {
                 mb: 2,
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <CheckCircleIcon sx={{ color: theme.palette.primary.main }} />
-                <Typography variant="body2" fontWeight={600}>
-                  Connected to Gmail
-                </Typography>
-              </Box>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CheckCircleIcon sx={{ color: theme.palette.primary.main }} />
+                  <Typography variant="body2" fontWeight={600}>
+                    Connected to Gmail
+                  </Typography>
+                </Box>
+                <Chip
+                  label={syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Error' : 'Idle'}
+                  size="small"
+                  color={syncStatus === 'syncing' ? 'info' : syncStatus === 'error' ? 'error' : 'default'}
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Stack>
               <Typography variant="body2" color="text.secondary">
                 {emailIntegration.email}
               </Typography>
+              {lastSyncTime && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                  <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary">
+                    Last checked: {lastSyncTime.toLocaleTimeString()}
+                  </Typography>
+                </Box>
+              )}
             </Box>
 
+            {/* Stats Cards */}
             {emailIntegration.totalEmailsProcessed > 0 && (
               <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
                 <Paper
@@ -526,6 +626,7 @@ const Profile: React.FC = () => {
                     p: 2,
                     textAlign: 'center',
                     background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.primary.light}10 100%)`,
+                    borderRadius: 2,
                   }}
                 >
                   <Typography
@@ -541,7 +642,7 @@ const Profile: React.FC = () => {
                     {emailIntegration.totalEmailsProcessed}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Emails Processed
+                    Processed
                   </Typography>
                 </Paper>
                 <Paper
@@ -551,19 +652,51 @@ const Profile: React.FC = () => {
                     p: 2,
                     textAlign: 'center',
                     background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.primary.light}10 100%)`,
+                    borderRadius: 2,
+                    position: 'relative',
                   }}
                 >
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Last Sync
-                  </Typography>
-                  <Typography variant="caption" fontWeight={600}>
-                    {emailIntegration.lastProcessedAt
-                      ? new Date(emailIntegration.lastProcessedAt).toLocaleString()
-                      : 'Never'}
+                  {pendingCount > 0 && (
+                    <Chip
+                      label={pendingCount}
+                      size="small"
+                      color="warning"
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        height: 20,
+                        minWidth: 20,
+                        fontSize: '0.7rem',
+                      }}
+                    />
+                  )}
+                  <NotificationsIcon sx={{ fontSize: 32, color: theme.palette.primary.main, mb: 0.5 }} />
+                  <Typography variant="caption" color="text.secondary">
+                    Pending Review
                   </Typography>
                 </Paper>
               </Stack>
             )}
+
+            {/* Action Buttons */}
+            <Stack spacing={2} sx={{ mb: 2 }}>
+              <Button
+                variant="contained"
+                startIcon={syncing ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <SyncIcon />}
+                onClick={handleManualSync}
+                disabled={syncing || !emailIntegration.enabled}
+                fullWidth
+                sx={{
+                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                  '&:hover': {
+                    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                  },
+                }}
+              >
+                {syncing ? 'Syncing...' : 'Sync Now'}
+              </Button>
+            </Stack>
 
             <FormControlLabel
               control={
@@ -573,7 +706,14 @@ const Profile: React.FC = () => {
                   disabled={loading}
                 />
               }
-              label="Enable Automatic Email Polling"
+              label={
+                <Box>
+                  <Typography variant="body2">Enable Automatic Polling</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Checks every 5 minutes
+                  </Typography>
+                </Box>
+              }
               sx={{ mb: 2 }}
             />
 

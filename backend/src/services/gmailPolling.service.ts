@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { cosmosDBService } from '../config/cosmosdb';
 import { emailParserService } from './emailParser.service';
+import { encryptionService } from './encryption.service';
 import { Transaction, TransactionSplit, Category } from '../models/types';
 import { randomUUID } from 'crypto';
 
@@ -20,11 +21,17 @@ class GmailPollingService {
         `${process.env.BACKEND_URL}/api/gmail/callback`
       );
 
+      // Decrypt refresh token before using
+      const decryptedRefreshToken = encryptionService.decrypt(user.emailIntegration.refreshToken);
+
       oauth2Client.setCredentials({
-        refresh_token: user.emailIntegration.refreshToken,
+        refresh_token: decryptedRefreshToken,
       });
 
       const { credentials } = await oauth2Client.refreshAccessToken();
+
+      // Encrypt new access token before storing
+      const encryptedAccessToken = encryptionService.encrypt(credentials.access_token!);
 
       // Update tokens in database
       const userContainer = await cosmosDBService.getUsersContainer();
@@ -32,7 +39,7 @@ class GmailPollingService {
         { id: user.id },
         {
           $set: {
-            'emailIntegration.accessToken': credentials.access_token!,
+            'emailIntegration.accessToken': encryptedAccessToken,
             'emailIntegration.tokenExpiry': new Date(credentials.expiry_date!),
           },
         }
@@ -41,7 +48,8 @@ class GmailPollingService {
       return credentials.access_token!;
     }
 
-    return user.emailIntegration.accessToken;
+    // Decrypt stored access token
+    return encryptionService.decrypt(user.emailIntegration.accessToken);
   }
 
   /**

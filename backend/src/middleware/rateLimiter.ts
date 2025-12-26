@@ -105,3 +105,29 @@ export const apiLimiter = rateLimit({
     });
   },
 });
+
+// OAuth rate limiter - prevent OAuth abuse
+export const oauthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 OAuth attempts per windowMs
+  message: 'Too many OAuth attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+
+  handler: (req: Request, res: Response) => {
+    logger.warn(
+      {
+        ip: req.ip,
+        url: req.url,
+        method: req.method,
+      },
+      'OAuth rate limit exceeded - potential abuse'
+    );
+
+    res.status(429).json({
+      success: false,
+      error: 'Too many OAuth connection attempts. Please try again after 15 minutes.',
+      retryAfter: res.getHeader('Retry-After'),
+    });
+  },
+});
