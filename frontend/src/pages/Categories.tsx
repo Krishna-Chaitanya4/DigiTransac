@@ -21,6 +21,9 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
+  Fade,
+  Zoom,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -523,55 +526,116 @@ const Categories: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            Categories & Tags
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mt={0.5}>
-            {categories.length} categories • {categories.filter(c => c.isFolder).length} folders • {categories.filter(c => !c.isFolder).length} items
-          </Typography>
+      {/* Enhanced Animated Header */}
+      <Fade in timeout={600}>
+        <Box
+          sx={{
+            mb: 4,
+            p: 4,
+            borderRadius: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
+            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(10px)',
+                      width: 56,
+                      height: 56,
+                    }}
+                  >
+                    <LabelIcon sx={{ fontSize: 32 }} />
+                  </Avatar>
+                  <Typography
+                    variant="h4"
+                    fontWeight={800}
+                    sx={{
+                      color: 'white',
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    Categories & Tags
+                  </Typography>
+                </Box>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
+                  {categories.length} categories • {categories.filter(c => c.isFolder).length} folders • {categories.filter(c => !c.isFolder).length} items
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Zoom in timeout={800}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<FolderOpenIcon />}
+                    onClick={() => {
+                      setFormData({ name: '', color: '#14b8a6', isFolder: true, parentId: null });
+                      setParentForNew(null);
+                      setOpenDialog(true);
+                    }}
+                    sx={{
+                      bgcolor: 'white',
+                      borderColor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    New Folder
+                  </Button>
+                </Zoom>
+                <Zoom in timeout={900}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => handleOpenDialog()}
+                    sx={{
+                      bgcolor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    New Category
+                  </Button>
+                </Zoom>
+              </Box>
+            </Box>
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<FolderOpenIcon />}
-            onClick={() => {
-              setFormData({ name: '', color: '#14b8a6', isFolder: true, parentId: null });
-              setParentForNew(null);
-              setOpenDialog(true);
-            }}
-            sx={{
-              borderColor: '#14b8a6',
-              color: '#14b8a6',
-              '&:hover': {
-                borderColor: '#0891b2',
-                background: 'rgba(20, 184, 166, 0.1)',
-                transform: 'translateY(-2px)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            New Folder
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-            sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            New Category
-          </Button>
-        </Box>
-      </Box>
+      </Fade>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
@@ -580,17 +644,24 @@ const Categories: React.FC = () => {
       )}
 
       {/* Search and Controls */}
-      <Box
-        sx={{
-          mb: 2,
-          p: 2,
-          background: (theme) =>
-            theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 30, 30, 0.9)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: 2,
-          boxShadow: '0 4px 16px 0 rgba(31, 38, 135, 0.1)',
-        }}
-      >
+      <Fade in timeout={800}>
+        <Box
+          sx={{
+            mb: 2,
+            p: 2,
+            borderRadius: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: (theme) =>
+              theme.palette.mode === 'light'
+                ? `1px solid ${theme.palette.primary.main}1A`
+                : `1px solid ${theme.palette.primary.main}33`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+          }}
+        >
         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
           {/* Search */}
           <TextField
@@ -666,7 +737,8 @@ const Categories: React.FC = () => {
             </Tooltip>
           </Box>
         </Box>
-      </Box>
+        </Box>
+      </Fade>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
