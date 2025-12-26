@@ -24,6 +24,9 @@ import {
   Fade,
   Zoom,
   Avatar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,6 +40,7 @@ import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
   Clear as ClearIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
@@ -1709,14 +1713,203 @@ const Budgets: React.FC = () => {
               placeholder="e.g., Groceries, Q1 Marketing, Annual Insurance"
               helperText="Give your budget a descriptive name for easy identification"
               inputProps={{ maxLength: 100 }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+            />
+
+            {/* Budget Amount and Period */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="💰 Budget Amount"
+                  type="number"
+                  fullWidth
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  select
+                  label="📅 Period"
+                  fullWidth
+                  value={formData.period}
+                  onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  helperText={
+                    formData.period === 'this-month'
+                      ? 'Auto-sets to current month dates'
+                      : formData.period === 'next-month'
+                      ? 'Auto-sets to next month dates'
+                      : formData.period === 'this-year'
+                      ? 'Auto-sets to current year dates'
+                      : 'Choose custom date range'
+                  }
+                >
+                  <MenuItem value="this-month">This Month</MenuItem>
+                  <MenuItem value="next-month">Next Month</MenuItem>
+                  <MenuItem value="this-year">This Year</MenuItem>
+                  <MenuItem value="custom">Custom</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+
+            {/* Date Range */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="📆 Start Date"
+                  type="date"
+                  fullWidth
+                  value={formData.startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  error={!!dateError}
+                  helperText={
+                    formData.period === 'this-month'
+                      ? 'First day of this month (edit to switch to custom)'
+                      : formData.period === 'next-month'
+                      ? 'First day of next month (edit to switch to custom)'
+                      : formData.period === 'this-year'
+                      ? 'First day of this year (edit to switch to custom)'
+                      : ''
+                  }
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="📆 End Date"
+                  type="date"
+                  fullWidth
+                  value={formData.endDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  error={!!dateError}
+                  helperText={
+                    formData.period === 'this-month'
+                      ? 'Last day of this month (edit to switch to custom)'
+                      : formData.period === 'next-month'
+                      ? 'Last day of next month (edit to switch to custom)'
+                      : formData.period === 'this-year'
+                      ? 'Last day of this year (edit to switch to custom)'
+                      : ''
+                  }
+                  required
+                />
+              </Grid>
+              {dateError && (
+                <Grid item xs={12}>
+                  <Alert severity="error" sx={{ mt: -1 }}>
+                    {dateError}
+                  </Alert>
+                </Grid>
+              )}
+            </Grid>
+
+            {/* Calculation Type */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                💳 Budget Type
+              </Typography>
+              <ToggleButtonGroup
+                value={formData.calculationType}
+                exclusive
+                onChange={(_, newType) => {
+                  if (newType !== null) {
+                    setFormData({ ...formData, calculationType: newType });
+                  }
+                }}
+                fullWidth
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    borderRadius: 2,
+                    py: 1.5,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    border: '1.5px solid',
+                    borderColor: 'divider',
+                    '&.Mui-selected': {
+                      background: (theme) => theme.palette.gradient.primary,
+                      color: 'white',
+                      borderColor: 'transparent',
+                      '&:hover': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    },
+                  },
+                }}
+              >
+                <ToggleButton value="debit">
+                  📉 Expenses Only
+                </ToggleButton>
+                <ToggleButton value="net">
+                  ⚖️ Net (Expenses - Refunds)
+                </ToggleButton>
+              </ToggleButtonGroup>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                {formData.calculationType === 'debit' && 'Track total expenses (debits)'}
+                {formData.calculationType === 'net' && 'Track net expenses after refunds/returns (debit - credit)'}
+              </Typography>
+            </Box>
+
+            {/* Alert Configuration */}
+            <TextField
+              label="🔔 Alert Threshold (%)"
+              type="number"
+              fullWidth
+              value={formData.alertThreshold}
+              onChange={(e) => setFormData({ ...formData, alertThreshold: e.target.value })}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">%</InputAdornment>,
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+              helperText="Get notified when spending reaches this percentage"
+              required
             />
 
             <Divider />
 
-            {/* Multi-Select Filters Section */}
-            <Box
+            {/* Multi-Select Filters Section - Collapsible */}
+            <Accordion
+              defaultExpanded
               sx={{
-                p: 3,
                 borderRadius: 2.5,
                 background: (theme) =>
                   theme.palette.mode === 'light'
@@ -1725,9 +1918,25 @@ const Budgets: React.FC = () => {
                 border: '1px solid',
                 borderColor: 'divider',
                 backdropFilter: 'blur(10px)',
+                boxShadow: 'none',
+                '&:before': {
+                  display: 'none',
+                },
+                '&.Mui-expanded': {
+                  margin: 0,
+                },
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                sx={{
+                  '& .MuiAccordionSummary-content': {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                  },
+                }}
+              >
                 <Box
                   sx={{
                     width: 36,
@@ -1744,16 +1953,27 @@ const Budgets: React.FC = () => {
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" fontWeight={600}>
-                    Budget Filters
+                    Budget Filters {formData.categoryIds.length === 0 && 
+                     formData.includeTagIds.length === 0 && 
+                     formData.excludeTagIds.length === 0 && 
+                     formData.accountIds.length === 0 && (
+                      <Chip 
+                        label="Required" 
+                        size="small" 
+                        color="warning" 
+                        sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} 
+                      />
+                    )}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Select what transactions to track (at least one filter required)
+                    Select what transactions to track
                   </Typography>
                 </Box>
-              </Box>
-
-              {/* Categories Multi-Select */}
-              <TextField
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Categories Multi-Select */}
+                  <TextField
                 select
                 label="Categories (Optional)"
                 fullWidth
@@ -1982,7 +2202,6 @@ const Budgets: React.FC = () => {
                 <Alert 
                   severity="warning" 
                   sx={{ 
-                    mt: 2,
                     borderRadius: 2,
                     '& .MuiAlert-icon': {
                       fontSize: 24,
@@ -1992,197 +2211,11 @@ const Budgets: React.FC = () => {
                   Please select at least one filter (categories, tags, or accounts)
                 </Alert>
               )}
-            </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
 
             <Divider />
-
-            {/* Calculation Type */}
-            <Box>
-              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
-                💳 Budget Type
-              </Typography>
-              <ToggleButtonGroup
-                value={formData.calculationType}
-                exclusive
-                onChange={(_, newType) => {
-                  if (newType !== null) {
-                    setFormData({ ...formData, calculationType: newType });
-                  }
-                }}
-                fullWidth
-                sx={{
-                  '& .MuiToggleButton-root': {
-                    borderRadius: 2,
-                    py: 1.5,
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    border: '1.5px solid',
-                    borderColor: 'divider',
-                    '&.Mui-selected': {
-                      background: (theme) => theme.palette.gradient.primary,
-                      color: 'white',
-                      borderColor: 'transparent',
-                      '&:hover': {
-                        background: (theme) => theme.palette.gradient.primary,
-                      },
-                    },
-                  },
-                }}
-              >
-                <ToggleButton value="debit">
-                  📉 Expenses Only
-                </ToggleButton>
-                <ToggleButton value="net">
-                  ⚖️ Net (Expenses - Refunds)
-                </ToggleButton>
-              </ToggleButtonGroup>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                {formData.calculationType === 'debit' && 'Track total expenses (debits)'}
-                {formData.calculationType === 'net' && 'Track net expenses after refunds/returns (debit - credit)'}
-              </Typography>
-            </Box>
-
-            <Divider />
-
-            {/* Budget Amount and Period */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="💰 Budget Amount"
-                  type="number"
-                  fullWidth
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  select
-                  label="📅 Period"
-                  fullWidth
-                  value={formData.period}
-                  onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'Auto-sets to current month dates'
-                      : formData.period === 'next-month'
-                      ? 'Auto-sets to next month dates'
-                      : formData.period === 'this-year'
-                      ? 'Auto-sets to current year dates'
-                      : 'Choose custom date range'
-                  }
-                >
-                  <MenuItem value="this-month">This Month</MenuItem>
-                  <MenuItem value="next-month">Next Month</MenuItem>
-                  <MenuItem value="this-year">This Year</MenuItem>
-                  <MenuItem value="custom">Custom</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
-
-            {/* Date Range */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="📆 Start Date"
-                  type="date"
-                  fullWidth
-                  value={formData.startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                  error={!!dateError}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'First day of this month (edit to switch to custom)'
-                      : formData.period === 'next-month'
-                      ? 'First day of next month (edit to switch to custom)'
-                      : formData.period === 'this-year'
-                      ? 'First day of this year (edit to switch to custom)'
-                      : ''
-                  }
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="📆 End Date"
-                  type="date"
-                  fullWidth
-                  value={formData.endDate}
-                  onChange={(e) => handleEndDateChange(e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                  error={!!dateError}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'Last day of this month (edit to switch to custom)'
-                      : formData.period === 'next-month'
-                      ? 'Last day of next month (edit to switch to custom)'
-                      : formData.period === 'this-year'
-                      ? 'Last day of this year (edit to switch to custom)'
-                      : ''
-                  }
-                  required
-                />
-              </Grid>
-              {dateError && (
-                <Grid item xs={12}>
-                  <Alert severity="error" sx={{ mt: -1 }}>
-                    {dateError}
-                  </Alert>
-                </Grid>
-              )}
-            </Grid>
-
-            <Divider />
-
-            {/* Alert Configuration */}
-            <TextField
-              label="🔔 Alert Threshold (%)"
-              type="number"
-              fullWidth
-              value={formData.alertThreshold}
-              onChange={(e) => setFormData({ ...formData, alertThreshold: e.target.value })}
-              InputProps={{
-                endAdornment: <InputAdornment position="end">%</InputAdornment>,
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                },
-              }}
-              helperText="Get notified when spending reaches this percentage"
-              required
-            />
 
             {/* Rollover Configuration */}
             <Box
