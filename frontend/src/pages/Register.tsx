@@ -40,6 +40,10 @@ import {
   Email as EmailIcon,
   Phone as PhoneIcon,
 } from '@mui/icons-material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { detectCurrency, availableCurrencies } from '../utils/currencyDetection';
 import { detectCountry } from '../utils/countryDetection';
@@ -70,11 +74,11 @@ const Register: React.FC = () => {
     phone: `+${getCountryCallingCode(detectCountry())} `, // Auto-fill country code
     username: '',
     fullName: '',
-    dateOfBirth: '',
     password: '',
     confirmPassword: '',
     currency: detectCurrency(), // Auto-detect currency
   });
+  const [dateOfBirth, setDateOfBirth] = useState<Dayjs | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -274,8 +278,8 @@ const Register: React.FC = () => {
       }
 
       // Add optional date of birth
-      if (formData.dateOfBirth) {
-        registerData.dateOfBirth = formData.dateOfBirth;
+      if (dateOfBirth) {
+        registerData.dateOfBirth = dateOfBirth.format('YYYY-MM-DD');
       }
 
       await register(registerData);
@@ -572,7 +576,7 @@ const Register: React.FC = () => {
                     autoComplete="email"
                     autoFocus
                     error={!!emailError}
-                    helperText={emailError || 'We\'ll use this to sign you in'}
+                    helperText={emailError}
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         borderRadius: 2,
@@ -673,7 +677,6 @@ const Register: React.FC = () => {
                   value={formData.fullName}
                   onChange={handleChange}
                   required
-                  helperText="Your full name as you'd like it displayed"
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
@@ -693,21 +696,34 @@ const Register: React.FC = () => {
 
               {/* Date of Birth (Optional) */}
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Date of Birth (Optional)"
-                  name="dateOfBirth"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={handleChange}
-                  InputLabelProps={{ shrink: true }}
-                  helperText="Optional: Helps us provide personalized insights"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                />
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    label="Date of Birth"
+                    value={dateOfBirth}
+                    onChange={(newValue) => setDateOfBirth(newValue)}
+                    format="DD/MM/YYYY"
+                    maxDate={dayjs()}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        sx: {
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            },
+                            '&.Mui-focused': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
+                            },
+                          },
+                        },
+                      },
+                    }}
+                  />
+                </LocalizationProvider>
               </Grid>
               {/* Currency */}
               <Grid item xs={12}>
