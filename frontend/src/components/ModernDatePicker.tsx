@@ -31,6 +31,7 @@ interface ModernDatePickerProps extends Omit<DatePickerProps<Dayjs>, 'renderInpu
   helperText?: string;
   fullWidth?: boolean;
   required?: boolean;
+  format?: string;
 }
 
 export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
@@ -39,12 +40,14 @@ export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
   helperText,
   fullWidth = false,
   required = false,
+  format = 'DD/MM/YYYY',
   ...props
 }) => {
   return (
     <StyledDatePicker
       {...props}
       label={label}
+      format={format}
       slotProps={{
         textField: {
           error,

@@ -702,7 +702,6 @@ const Register: React.FC = () => {
                     label="Date of Birth"
                     value={dateOfBirth}
                     onChange={(newValue) => setDateOfBirth(newValue)}
-                    format="DD/MM/YYYY"
                     maxDate={dayjs()}
                     fullWidth
                   />
