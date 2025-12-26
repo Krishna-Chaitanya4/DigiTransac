@@ -1714,13 +1714,43 @@ const Budgets: React.FC = () => {
             <Divider />
 
             {/* Multi-Select Filters Section */}
-            <Box>
-              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
-                Budget Filters (AND logic between sections, OR within each)
-              </Typography>
-              <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                Select filters to define what transactions this budget tracks. At least one filter is required.
-              </Typography>
+            <Box
+              sx={{
+                p: 3,
+                borderRadius: 2.5,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.06) 100%)'
+                    : 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: 'divider',
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: (theme) => theme.palette.gradient.primary,
+                    color: 'white',
+                  }}
+                >
+                  <FilterListIcon sx={{ fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Budget Filters
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Select what transactions to track (at least one filter required)
+                  </Typography>
+                </Box>
+              </Box>
 
               {/* Categories Multi-Select */}
               <TextField
@@ -1745,8 +1775,10 @@ const Budgets: React.FC = () => {
                           label={getCategoryName(catId)} 
                           size="small" 
                           sx={{ 
-                            bgcolor: `${getCategoryColor(catId)}20`,
+                            background: `linear-gradient(135deg, ${getCategoryColor(catId)}20 0%, ${getCategoryColor(catId)}30 100%)`,
                             color: getCategoryColor(catId),
+                            fontWeight: 600,
+                            border: `1px solid ${getCategoryColor(catId)}50`,
                           }} 
                         />
                       ))}
@@ -1754,7 +1786,12 @@ const Budgets: React.FC = () => {
                   ),
                 }}
                 helperText="Track these categories (category1 OR category2 OR ...)"
-                sx={{ mb: 2 }}
+                sx={{ 
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               >
                 {!categories || categories.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -1794,13 +1831,28 @@ const Budgets: React.FC = () => {
                   renderValue: (selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {(selected as string[]).map((tagId) => (
-                        <Chip key={tagId} label={getTagName(tagId)} size="small" color="success" />
+                        <Chip 
+                          key={tagId} 
+                          label={getTagName(tagId)} 
+                          size="small" 
+                          sx={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #10b98140',
+                          }}
+                        />
                       ))}
                     </Box>
                   ),
                 }}
                 helperText="Transactions must have at least one of these tags (tag1 OR tag2 OR ...)"
-                sx={{ mb: 2 }}
+                sx={{ 
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               >
                 {!tags || tags.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -1833,13 +1885,28 @@ const Budgets: React.FC = () => {
                   renderValue: (selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {(selected as string[]).map((tagId) => (
-                        <Chip key={tagId} label={getTagName(tagId)} size="small" color="error" />
+                        <Chip 
+                          key={tagId} 
+                          label={getTagName(tagId)} 
+                          size="small" 
+                          sx={{
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #ef444440',
+                          }}
+                        />
                       ))}
                     </Box>
                   ),
                 }}
                 helperText="Transactions must NOT have any of these tags (NOT tag3 AND NOT tag4)"
-                sx={{ mb: 2 }}
+                sx={{ 
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               >
                 {!tags || tags.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -1876,13 +1943,23 @@ const Budgets: React.FC = () => {
                           key={accId} 
                           label={getAccountName(accId)} 
                           size="small" 
-                          color="info"
+                          sx={{
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #3b82f640',
+                          }}
                         />
                       ))}
                     </Box>
                   ),
                 }}
                 helperText="Track these accounts (account1 OR account2 OR ...)"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               >
                 {!accounts || accounts.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -1902,7 +1979,16 @@ const Budgets: React.FC = () => {
                formData.includeTagIds.length === 0 && 
                formData.excludeTagIds.length === 0 && 
                formData.accountIds.length === 0 && (
-                <Alert severity="info" sx={{ mt: 2 }}>
+                <Alert 
+                  severity="warning" 
+                  sx={{ 
+                    mt: 2,
+                    borderRadius: 2,
+                    '& .MuiAlert-icon': {
+                      fontSize: 24,
+                    },
+                  }}
+                >
                   Please select at least one filter (categories, tags, or accounts)
                 </Alert>
               )}
@@ -1912,8 +1998,8 @@ const Budgets: React.FC = () => {
 
             {/* Calculation Type */}
             <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Budget Type
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                💳 Budget Type
               </Typography>
               <ToggleButtonGroup
                 value={formData.calculationType}
@@ -1924,13 +2010,30 @@ const Budgets: React.FC = () => {
                   }
                 }}
                 fullWidth
-                size="small"
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    borderRadius: 2,
+                    py: 1.5,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    border: '1.5px solid',
+                    borderColor: 'divider',
+                    '&.Mui-selected': {
+                      background: (theme) => theme.palette.gradient.primary,
+                      color: 'white',
+                      borderColor: 'transparent',
+                      '&:hover': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    },
+                  },
+                }}
               >
                 <ToggleButton value="debit">
-                  Expenses Only
+                  📉 Expenses Only
                 </ToggleButton>
                 <ToggleButton value="net">
-                  Net (Expenses - Refunds)
+                  ⚖️ Net (Expenses - Refunds)
                 </ToggleButton>
               </ToggleButtonGroup>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
@@ -1945,7 +2048,7 @@ const Budgets: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Budget Amount"
+                  label="💰 Budget Amount"
                   type="number"
                   fullWidth
                   value={formData.amount}
@@ -1955,16 +2058,26 @@ const Budgets: React.FC = () => {
                       <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
                     ),
                   }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
                   required
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
                   select
-                  label="Period"
+                  label="📅 Period"
                   fullWidth
                   value={formData.period}
                   onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
                   helperText={
                     formData.period === 'this-month'
                       ? 'Auto-sets to current month dates'
@@ -1987,13 +2100,18 @@ const Budgets: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Start Date"
+                  label="📆 Start Date"
                   type="date"
                   fullWidth
                   value={formData.startDate}
                   onChange={(e) => handleStartDateChange(e.target.value)}
                   InputLabelProps={{
                     shrink: true,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
                   }}
                   error={!!dateError}
                   helperText={
@@ -2010,13 +2128,18 @@ const Budgets: React.FC = () => {
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="End Date"
+                  label="📆 End Date"
                   type="date"
                   fullWidth
                   value={formData.endDate}
                   onChange={(e) => handleEndDateChange(e.target.value)}
                   InputLabelProps={{
                     shrink: true,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
                   }}
                   error={!!dateError}
                   helperText={
@@ -2044,13 +2167,18 @@ const Budgets: React.FC = () => {
 
             {/* Alert Configuration */}
             <TextField
-              label="Alert Threshold (%)"
+              label="🔔 Alert Threshold (%)"
               type="number"
               fullWidth
               value={formData.alertThreshold}
               onChange={(e) => setFormData({ ...formData, alertThreshold: e.target.value })}
               InputProps={{
                 endAdornment: <InputAdornment position="end">%</InputAdornment>,
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
               }}
               helperText="Get notified when spending reaches this percentage"
               required
@@ -2104,7 +2232,7 @@ const Budgets: React.FC = () => {
               
               {formData.enableRollover && (
                 <TextField
-                  label="Rollover Limit (optional)"
+                  label="💵 Rollover Limit (optional)"
                   type="number"
                   fullWidth
                   value={formData.rolloverLimit}
@@ -2115,7 +2243,12 @@ const Budgets: React.FC = () => {
                     ),
                   }}
                   helperText="Maximum amount that can roll over (leave empty for no limit)"
-                  sx={{ mt: 2 }}
+                  sx={{ 
+                    mt: 2,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
                 />
               )}
             </Box>
