@@ -1,10 +1,14 @@
 export interface User {
   id: string;
-  email: string;
+  email?: string; // Optional - at least email or phone required
+  phone?: string; // Optional - at least email or phone required
+  username: string; // Required - unique identifier
   password: string;
-  firstName: string;
-  lastName: string;
+  fullName: string; // Replaces firstName/lastName
+  dateOfBirth?: Date; // Optional
   currency: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
   emailIntegration?: EmailIntegration;
 
   createdAt: Date;

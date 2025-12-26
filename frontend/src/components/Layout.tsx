@@ -344,16 +344,16 @@ const Layout: React.FC = () => {
               fontSize: '0.95rem',
             }}
           >
-            {user?.firstName?.[0] || 'U'}
+            {user?.fullName?.[0] || user?.username?.[0] || 'U'}
           </Avatar>
           {!sidebarCollapsed && (
             <Fade in={!sidebarCollapsed}>
               <Box sx={{ overflow: 'hidden', flex: 1 }}>
                 <Typography fontSize="0.875rem" fontWeight={600} noWrap>
-                  {user?.firstName || 'User'} {user?.lastName || ''}
+                  {user?.fullName || user?.username || 'User'}
                 </Typography>
                 <Typography fontSize="0.75rem" color="text.secondary" noWrap>
-                  {user?.email || 'user@example.com'}
+                  @{user?.username || user?.email || user?.phone || 'user'}
                 </Typography>
               </Box>
             </Fade>

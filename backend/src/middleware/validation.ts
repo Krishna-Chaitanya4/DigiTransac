@@ -100,16 +100,27 @@ export const schemas = {
 
   // User registration
   register: Joi.object({
-    email: Joi.string().email().required(),
+    email: Joi.string().email().optional(),
+    phone: Joi.string()
+      .pattern(/^\+?[1-9]\d{1,14}$/) // E.164 format
+      .optional(),
+    username: Joi.string()
+      .min(3)
+      .max(30)
+      .pattern(/^[a-z0-9._]+$/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Username can only contain lowercase letters, numbers, dots and underscores',
+      }),
     password: Joi.string().min(8).required(),
-    firstName: Joi.string().min(1).max(50).required(),
-    lastName: Joi.string().min(1).max(50).required(),
+    fullName: Joi.string().min(1).max(100).required(),
+    dateOfBirth: Joi.date().iso().max('now').optional(),
     currency: Joi.string().length(3).uppercase().required(),
-  }),
+  }).or('email', 'phone'), // At least one of email or phone must be provided
 
   // User login
   login: Joi.object({
-    email: Joi.string().email().required(),
+    identifier: Joi.string().required(), // Can be email, phone, or username
     password: Joi.string().required(),
   }),
 

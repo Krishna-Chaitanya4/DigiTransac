@@ -7,16 +7,20 @@ import { isDevelopmentEnvironment } from '../utils/environment';
 
 interface User {
   id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
+  email?: string;
+  phone?: string;
+  username: string;
+  fullName: string;
+  dateOfBirth?: string;
   currency: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -24,10 +28,12 @@ interface AuthContextType {
 }
 
 interface RegisterData {
-  email: string;
+  email?: string;
+  phone?: string;
+  username: string;
+  fullName: string;
+  dateOfBirth?: string;
   password: string;
-  firstName: string;
-  lastName: string;
   currency: string;
 }
 
@@ -142,7 +148,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string) => {
     try {
       // Use relative URL to let Vite proxy handle it
       const loginUrl = '/api/auth/login';
@@ -153,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       }).catch((fetchError) => {
         throw new Error(`Network request failed: ${fetchError.message}`);
       });

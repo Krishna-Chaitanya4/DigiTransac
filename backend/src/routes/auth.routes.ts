@@ -10,15 +10,17 @@ import { logger } from '../utils/logger';
 const router = Router();
 
 interface RegisterBody {
-  email: string;
+  email?: string;
+  phone?: string;
+  username: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
+  dateOfBirth?: string;
   currency: string;
 }
 
 interface LoginBody {
-  email: string;
+  identifier: string; // email, phone, or username
   password: string;
 }
 
@@ -31,19 +33,42 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { email, password, firstName, lastName, currency } = req.body;
+      const { email, phone, username, password, fullName, dateOfBirth, currency } = req.body;
 
       const usersContainer = await cosmosDBService.getUsersContainer();
 
-      // Check if user already exists
-      const existingUser = await usersContainer.findOne({ email: email.toLowerCase() });
-
-      if (existingUser) {
+      // Check if username already exists
+      const existingUsername = await usersContainer.findOne({ username: username.toLowerCase() });
+      if (existingUsername) {
         res.status(409).json({
           success: false,
-          message: 'User with this email already exists',
+          message: 'Username already taken',
         });
         return;
+      }
+
+      // Check if email already exists (if provided)
+      if (email) {
+        const existingEmail = await usersContainer.findOne({ email: email.toLowerCase() });
+        if (existingEmail) {
+          res.status(409).json({
+            success: false,
+            message: 'Email already registered',
+          });
+          return;
+        }
+      }
+
+      // Check if phone already exists (if provided)
+      if (phone) {
+        const existingPhone = await usersContainer.findOne({ phone });
+        if (existingPhone) {
+          res.status(409).json({
+            success: false,
+            message: 'Phone number already registered',
+          });
+          return;
+        }
       }
 
       // Hash password
@@ -52,11 +77,15 @@ router.post(
       // Create user object
       const newUser: User = {
         id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        email: email.toLowerCase(),
+        email: email ? email.toLowerCase() : undefined,
+        phone: phone || undefined,
+        username: username.toLowerCase(),
         password: hashedPassword,
-        firstName,
-        lastName,
+        fullName,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
         currency,
+        emailVerified: false,
+        phoneVerified: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -66,7 +95,7 @@ router.post(
 
       // Generate JWT token
       const token = jwt.sign(
-        { userId: newUser.id, email: newUser.email },
+        { userId: newUser.id, username: newUser.username },
         process.env.JWT_SECRET as jwt.Secret,
         { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
       );
@@ -100,17 +129,23 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { email, password } = req.body;
+      const { identifier, password } = req.body;
 
       const usersContainer = await cosmosDBService.getUsersContainer();
 
-      // Find user by email
-      const user = (await usersContainer.findOne({ email: email.toLowerCase() })) as User | null;
+      // Find user by email, phone, or username
+      const user = (await usersContainer.findOne({
+        $or: [
+          { email: identifier.toLowerCase() },
+          { phone: identifier },
+          { username: identifier.toLowerCase() },
+        ],
+      })) as User | null;
 
       if (!user) {
         res.status(401).json({
           success: false,
-          message: 'Invalid email or password',
+          message: 'Invalid credentials',
         });
         return;
       }
@@ -120,14 +155,14 @@ router.post(
       if (!isPasswordValid) {
         res.status(401).json({
           success: false,
-          message: 'Invalid email or password',
+          message: 'Invalid credentials',
         });
         return;
       }
 
       // Generate JWT token
       const token = jwt.sign(
-        { userId: user.id, email: user.email },
+        { userId: user.id, username: user.username },
         process.env.JWT_SECRET as jwt.Secret,
         { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
       );
@@ -136,7 +171,7 @@ router.post(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password: _password, ...userWithoutPassword } = user;
 
-      logger.info(`User logged in successfully: ${user.email}`);
+      logger.info(`User logged in successfully: ${user.username}`);
 
       res.json({
         success: true,

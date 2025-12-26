@@ -720,7 +720,7 @@ const Dashboard: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            {getTimeBasedGreeting()}, {user?.firstName || user?.email?.split('@')[0] || 'User'}! {getTimeEmoji()}
+            {getTimeBasedGreeting()}, {user?.fullName || user?.username || 'User'}! {getTimeEmoji()}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.05rem', mt: 0.5 }}>
             {budgetStatus.length > 0 && budgetStatus.some(b => b.percentage >= 90) 

@@ -12,18 +12,27 @@ import {
   Grid,
   Divider,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   Email as EmailIcon,
   CheckCircle as CheckCircleIcon,
   Google as GoogleIcon,
   LinkOff as LinkOffIcon,
+  DeleteForever as DeleteForeverIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Profile: React.FC = () => {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const navigate = useNavigate();
   const [emailIntegration, setEmailIntegration] = useState({
     enabled: false,
     provider: null as 'gmail' | 'outlook' | null,
@@ -34,6 +43,8 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   useEffect(() => {
     fetchUserProfile();
@@ -151,6 +162,29 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      setError('Please type DELETE to confirm');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      await axios.delete(`/api/users/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Logout and redirect
+      logout();
+      navigate('/login');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete account');
+      setLoading(false);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h4" fontWeight={700} gutterBottom>
@@ -191,23 +225,37 @@ const Profile: React.FC = () => {
               <Divider sx={{ my: 2 }} />
 
               <TextField
-                label="First Name"
+                label="Username"
                 fullWidth
-                value={user?.firstName || ''}
+                value={user?.username || ''}
                 disabled
                 margin="normal"
               />
               <TextField
-                label="Last Name"
+                label="Full Name"
                 fullWidth
-                value={user?.lastName || ''}
+                value={user?.fullName || ''}
                 disabled
                 margin="normal"
               />
               <TextField
                 label="Email"
                 fullWidth
-                value={user?.email || ''}
+                value={user?.email || 'Not provided'}
+                disabled
+                margin="normal"
+              />
+              <TextField
+                label="Phone"
+                fullWidth
+                value={user?.phone || 'Not provided'}
+                disabled
+                margin="normal"
+              />
+              <TextField
+                label="Date of Birth"
+                fullWidth
+                value={user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString() : 'Not provided'}
                 disabled
                 margin="normal"
               />
@@ -411,7 +459,139 @@ const Profile: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Danger Zone - Delete Account */}
+        <Grid item xs={12}>
+          <Card
+            sx={{
+              borderLeft: 4,
+              borderColor: 'error.main',
+              backgroundColor: 'rgba(211, 47, 47, 0.05)',
+            }}
+          >
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <WarningIcon color="error" />
+                <Typography variant="h6" fontWeight={600} color="error">
+                  Danger Zone
+                </Typography>
+              </Box>
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="body2" color="text.secondary" mb={2}>
+                Once you delete your account, there is no going back. This action will permanently delete:
+              </Typography>
+
+              <Box component="ul" sx={{ pl: 2, mb: 3 }}>
+                <Typography component="li" variant="body2" color="text.secondary">
+                  All your transactions and financial data
+                </Typography>
+                <Typography component="li" variant="body2" color="text.secondary">
+                  Your budgets, categories, and tags
+                </Typography>
+                <Typography component="li" variant="body2" color="text.secondary">
+                  Email integration settings and processed emails
+                </Typography>
+                <Typography component="li" variant="body2" color="text.secondary">
+                  Your account information and preferences
+                </Typography>
+              </Box>
+
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteForeverIcon />}
+                onClick={() => setDeleteDialogOpen(true)}
+                sx={{
+                  borderWidth: 2,
+                  '&:hover': {
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                  },
+                }}
+              >
+                Delete Account
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setDeleteConfirmation('');
+          setError('');
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <WarningIcon color="error" />
+            <Typography variant="h6" fontWeight={600}>
+              Delete Account
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 3 }}>
+            This action <strong>cannot be undone</strong>. This will permanently delete your account
+            and remove all your data from our servers.
+          </DialogContentText>
+
+          <Alert severity="error" sx={{ mb: 3 }}>
+            <Typography variant="body2" fontWeight={600} gutterBottom>
+              You are about to delete:
+            </Typography>
+            <Typography variant="caption" component="div">
+              • Username: <strong>{user?.username}</strong>
+              <br />
+              • Full Name: <strong>{user?.fullName}</strong>
+              <br />
+              • Email: <strong>{user?.email || 'Not provided'}</strong>
+              <br />
+              • Phone: <strong>{user?.phone || 'Not provided'}</strong>
+            </Typography>
+          </Alert>
+
+          <Typography variant="body2" color="text.secondary" mb={1}>
+            Please type <strong>DELETE</strong> to confirm:
+          </Typography>
+          <TextField
+            fullWidth
+            value={deleteConfirmation}
+            onChange={(e) => setDeleteConfirmation(e.target.value)}
+            placeholder="Type DELETE to confirm"
+            error={error !== '' && deleteConfirmation !== 'DELETE'}
+            helperText={error}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setDeleteConfirmation('');
+              setError('');
+            }}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteAccount}
+            color="error"
+            variant="contained"
+            disabled={loading || deleteConfirmation !== 'DELETE'}
+            startIcon={<DeleteForeverIcon />}
+          >
+            {loading ? 'Deleting...' : 'Delete My Account'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

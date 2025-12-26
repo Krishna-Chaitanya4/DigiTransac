@@ -24,6 +24,8 @@ import {
   Zoom,
   FormControlLabel,
   Checkbox,
+  Tab,
+  Tabs,
 } from '@mui/material';
 import { 
   Visibility, 
@@ -35,35 +37,33 @@ import {
   Speed,
   Insights,
   CloudSync,
+  Email as EmailIcon,
+  Phone as PhoneIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-
-const currencies = [
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
-  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-];
+import { detectCurrency, availableCurrencies } from '../utils/currencyDetection';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
   
+  const [contactMethod, setContactMethod] = useState<'email' | 'phone'>('email');
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
     email: '',
+    phone: '',
+    username: '',
+    fullName: '',
+    dateOfBirth: '',
     password: '',
     confirmPassword: '',
-    currency: 'USD',
+    currency: detectCurrency(), // Auto-detect currency
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -83,6 +83,18 @@ const Register: React.FC = () => {
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    // E.164 format: +[country code][number]
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    return phoneRegex.test(phone.replace(/[\s-]/g, ''));
+  };
+
+  const validateUsername = (username: string): boolean => {
+    // 3-30 characters, lowercase letters, numbers, dots, underscores
+    const usernameRegex = /^[a-z0-9._]{3,30}$/;
+    return usernameRegex.test(username);
   };
 
   const calculatePasswordStrength = (password: string) => {
@@ -128,6 +140,26 @@ const Register: React.FC = () => {
       }
     }
 
+    // Real-time phone validation
+    if (name === 'phone') {
+      if (value && !validatePhone(value)) {
+        setPhoneError('Please enter a valid phone number with country code (e.g., +1234567890)');
+      } else {
+        setPhoneError('');
+      }
+    }
+
+    // Real-time username validation
+    if (name === 'username') {
+      const lowerValue = value.toLowerCase();
+      setFormData({ ...formData, [name]: lowerValue }); // Force lowercase
+      if (value && !validateUsername(lowerValue)) {
+        setUsernameError('Username must be 3-30 characters, lowercase letters, numbers, . or _');
+      } else {
+        setUsernameError('');
+      }
+    }
+
     // Real-time password validation
     if (name === 'password') {
       calculatePasswordStrength(value);
@@ -158,9 +190,28 @@ const Register: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    // Validate email
-    if (!validateEmail(formData.email)) {
-      setError('Please enter a valid email address');
+    // Validate contact method (email or phone)
+    if (contactMethod === 'email') {
+      if (!formData.email || !validateEmail(formData.email)) {
+        setError('Please enter a valid email address');
+        return;
+      }
+    } else {
+      if (!formData.phone || !validatePhone(formData.phone)) {
+        setError('Please enter a valid phone number with country code');
+        return;
+      }
+    }
+
+    // Validate username
+    if (!formData.username || !validateUsername(formData.username)) {
+      setError('Please enter a valid username (3-30 characters, lowercase, numbers, . or _)');
+      return;
+    }
+
+    // Validate full name
+    if (!formData.fullName || formData.fullName.trim().length < 1) {
+      setError('Please enter your full name');
       return;
     }
 
@@ -191,13 +242,26 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await register({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
+      const registerData: any = {
+        username: formData.username,
+        fullName: formData.fullName,
         password: formData.password,
         currency: formData.currency,
-      });
+      };
+
+      // Add email or phone based on contact method
+      if (contactMethod === 'email') {
+        registerData.email = formData.email;
+      } else {
+        registerData.phone = formData.phone;
+      }
+
+      // Add optional date of birth
+      if (formData.dateOfBirth) {
+        registerData.dateOfBirth = formData.dateOfBirth;
+      }
+
+      await register(registerData);
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
@@ -447,67 +511,165 @@ const Register: React.FC = () => {
 
           <form onSubmit={handleSubmit}>
             <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  required
-                  autoFocus
+              {/* Contact Method Tabs */}
+              <Grid item xs={12}>
+                <Tabs
+                  value={contactMethod}
+                  onChange={(_, newValue) => setContactMethod(newValue)}
+                  variant="fullWidth"
                   sx={{
-                    '& .MuiOutlinedInput-root': {
+                    mb: 1,
+                    '& .MuiTab-root': {
                       borderRadius: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      },
-                      '&.Mui-focused': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                      },
+                      textTransform: 'none',
+                      fontWeight: 600,
                     },
                   }}
-                />
+                >
+                  <Tab
+                    value="email"
+                    label="Email"
+                    icon={<EmailIcon />}
+                    iconPosition="start"
+                  />
+                  <Tab
+                    value="phone"
+                    label="Phone"
+                    icon={<PhoneIcon />}
+                    iconPosition="start"
+                  />
+                </Tabs>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  required
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+
+              {/* Email or Phone Field */}
+              {contactMethod === 'email' ? (
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Email Address"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    autoComplete="email"
+                    autoFocus
+                    error={!!emailError}
+                    helperText={emailError || 'We\'ll use this to sign you in'}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        },
+                        '&.Mui-focused': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                        },
                       },
-                      '&.Mui-focused': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                    }}
+                  />
+                </Grid>
+              ) : (
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Phone Number"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    required
+                    autoFocus
+                    error={!!phoneError}
+                    helperText={phoneError || 'Include country code (e.g., +1234567890)'}
+                    placeholder="+1234567890"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        },
+                        '&.Mui-focused': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                        },
                       },
-                    },
-                  }}
-                />
-              </Grid>
+                    }}
+                  />
+                </Grid>
+              )}
+
+              {/* Username */}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Email Address"
-                  name="email"
-                  type="email"
-                  value={formData.email}
+                  label="Username"
+                  name="username"
+                  value={formData.username}
                   onChange={handleChange}
                   required
-                  autoComplete="email"
-                  error={!!emailError}
-                  helperText={emailError}
+                  error={!!usernameError}
+                  helperText={usernameError || 'Lowercase, 3-30 characters, letters, numbers, . or _'}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      },
+                      '&.Mui-focused': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                      },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* Full Name */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Full Name"
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  required
+                  helperText="Your full name as you'd like it displayed"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      },
+                      '&.Mui-focused': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                      },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* Date of Birth (Optional) */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Date of Birth (Optional)"
+                  name="dateOfBirth"
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={handleChange}
+                  InputLabelProps={{ shrink: true }}
+                  helperText="Optional: Helps us provide personalized insights"
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
@@ -515,6 +677,7 @@ const Register: React.FC = () => {
                   }}
                 />
               </Grid>
+              {/* Currency */}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -524,8 +687,14 @@ const Register: React.FC = () => {
                   value={formData.currency}
                   onChange={handleChange}
                   required
+                  helperText={`Auto-detected from your location. You can change this.`}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
                 >
-                  {currencies.map((currency) => (
+                  {availableCurrencies.map((currency) => (
                     <MenuItem key={currency.code} value={currency.code}>
                       {currency.symbol} - {currency.name} ({currency.code})
                     </MenuItem>

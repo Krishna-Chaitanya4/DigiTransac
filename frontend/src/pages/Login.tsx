@@ -36,28 +36,24 @@ import { useAuth } from '../context/AuthContext';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
+  const [identifierFocused, setIdentifierFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const [emailError, setEmailError] = useState('');
+  const [identifierError, setIdentifierError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setEmail(value);
-    if (value && !validateEmail(value)) {
-      setEmailError('Please enter a valid email address');
+    setIdentifier(value);
+    // No specific validation needed - can be email, phone, or username
+    if (value && value.length < 3) {
+      setIdentifierError('Please enter your email, phone, or username');
     } else {
-      setEmailError('');
+      setIdentifierError('');
     }
   };
 
@@ -76,8 +72,8 @@ const Login: React.FC = () => {
     setError('');
     
     // Validate before submitting
-    if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address');
+    if (!identifier || identifier.length < 3) {
+      setIdentifierError('Please enter your email, phone, or username');
       return;
     }
     
@@ -89,7 +85,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(identifier, password);
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.');
@@ -521,23 +517,22 @@ const Login: React.FC = () => {
             <Box sx={{ mb: 2 }}>
               <TextField
                 fullWidth
-                label="Email Address"
-                type="email"
-                value={email}
-                onChange={handleEmailChange}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
+                label="Email, Phone, or Username"
+                value={identifier}
+                onChange={handleIdentifierChange}
+                onFocus={() => setIdentifierFocused(true)}
+                onBlur={() => setIdentifierFocused(false)}
                 required
-                autoComplete="email"
+                autoComplete="username"
                 autoFocus
-                error={!!emailError}
-                helperText={emailError}
+                error={!!identifierError}
+                helperText={identifierError || 'Enter your email, phone number, or username'}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
                       <Email 
                         sx={{ 
-                          color: emailFocused ? 'primary.main' : 'action.disabled',
+                          color: identifierFocused ? 'primary.main' : 'action.disabled',
                           transition: 'color 0.3s ease',
                         }} 
                       />
@@ -548,7 +543,7 @@ const Login: React.FC = () => {
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    backgroundColor: emailFocused ? 'action.hover' : 'transparent',
+                    backgroundColor: identifierFocused ? 'action.hover' : 'transparent',
                     '& fieldset': {
                       borderWidth: 2,
                       transition: 'border-color 0.3s ease',
@@ -665,7 +660,7 @@ const Login: React.FC = () => {
               fullWidth
               variant="contained"
               size="large"
-              disabled={isLoading || !email || !password || !!emailError || !!passwordError}
+              disabled={isLoading || !identifier || !password || !!identifierError || !!passwordError}
               endIcon={!isLoading && <ArrowForward />}
               sx={{
                 mt: 1,
