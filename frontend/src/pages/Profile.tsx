@@ -175,7 +175,15 @@ const Profile: React.FC = () => {
       <Grid container spacing={3}>
         {/* Account Information */}
         <Grid item xs={12} md={6}>
-          <Card>
+          <Card
+            sx={{
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 8px 24px rgba(20, 184, 166, 0.15)',
+              },
+            }}
+          >
             <CardContent>
               <Typography variant="h6" fontWeight={600} gutterBottom>
                 Account Information
@@ -219,7 +227,14 @@ const Profile: React.FC = () => {
           <Card
             sx={{
               borderLeft: emailIntegration.enabled ? 4 : 0,
-              borderColor: 'success.main',
+              borderColor: '#14b8a6',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: emailIntegration.enabled 
+                  ? '0 8px 24px rgba(20, 184, 166, 0.25)'
+                  : '0 8px 24px rgba(20, 184, 166, 0.15)',
+              },
             }}
           >
             <CardContent>
@@ -260,15 +275,15 @@ const Profile: React.FC = () => {
                   <Box
                     sx={{
                       p: 2,
-                      bgcolor: 'success.light',
+                      background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
                       borderRadius: 2,
                       border: 1,
-                      borderColor: 'success.main',
+                      borderColor: '#14b8a6',
                       mb: 2,
                     }}
                   >
                     <Box display="flex" alignItems="center" gap={1} mb={1}>
-                      <CheckCircleIcon color="success" />
+                      <CheckCircleIcon sx={{ color: '#14b8a6' }} />
                       <Typography variant="body2" fontWeight={600}>
                         Connected to Gmail
                       </Typography>
@@ -306,7 +321,16 @@ const Profile: React.FC = () => {
                       <Grid container spacing={2}>
                         <Grid item xs={6}>
                           <Box textAlign="center">
-                            <Typography variant="h4" fontWeight={700} color="primary">
+                            <Typography 
+                              variant="h4" 
+                              fontWeight={700}
+                              sx={{
+                                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                                backgroundClip: 'text',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                              }}
+                            >
                               {emailIntegration.totalEmailsProcessed}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">

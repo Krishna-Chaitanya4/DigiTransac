@@ -537,17 +537,19 @@ const Categories: React.FC = () => {
             variant="outlined"
             startIcon={<FolderOpenIcon />}
             onClick={() => {
-              setFormData({ name: '', color: '#667eea', isFolder: true, parentId: null });
+              setFormData({ name: '', color: '#14b8a6', isFolder: true, parentId: null });
               setParentForNew(null);
               setOpenDialog(true);
             }}
             sx={{
-              borderColor: '#667eea',
-              color: '#667eea',
+              borderColor: '#14b8a6',
+              color: '#14b8a6',
               '&:hover': {
-                borderColor: '#5568d3',
-                bgcolor: 'rgba(102, 126, 234, 0.05)',
+                borderColor: '#0891b2',
+                background: 'rgba(20, 184, 166, 0.1)',
+                transform: 'translateY(-2px)',
               },
+              transition: 'all 0.3s ease',
             }}
           >
             New Folder
@@ -557,10 +559,13 @@ const Categories: React.FC = () => {
             startIcon={<AddIcon />}
             onClick={() => handleOpenDialog()}
             sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
               '&:hover': {
-                background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
               },
+              transition: 'all 0.3s ease',
             }}
           >
             New Category

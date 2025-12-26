@@ -930,19 +930,66 @@ const Accounts: React.FC = () => {
         </Box>
         <Box display="flex" gap={2}>
           <Tooltip title="Export Accounts">
-            <IconButton onClick={handleExportAccounts} color="primary">
+            <IconButton 
+              onClick={handleExportAccounts}
+              sx={{
+                color: '#14b8a6',
+                '&:hover': {
+                  background: 'rgba(20, 184, 166, 0.1)',
+                  transform: 'scale(1.1)',
+                },
+                transition: 'all 0.2s ease',
+              }}
+            >
               <DownloadIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Refresh Balances">
-            <IconButton onClick={fetchAccounts} color="primary">
+            <IconButton 
+              onClick={fetchAccounts}
+              sx={{
+                color: '#14b8a6',
+                '&:hover': {
+                  background: 'rgba(20, 184, 166, 0.1)',
+                  transform: 'rotate(180deg)',
+                },
+                transition: 'all 0.4s ease',
+              }}
+            >
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Button variant="outlined" startIcon={<TransferIcon />} onClick={() => handleTransferMoney(null)}>
+          <Button 
+            variant="outlined" 
+            startIcon={<TransferIcon />} 
+            onClick={() => handleTransferMoney(null)}
+            sx={{
+              borderColor: '#14b8a6',
+              color: '#14b8a6',
+              '&:hover': {
+                borderColor: '#0891b2',
+                background: 'rgba(20, 184, 166, 0.1)',
+                transform: 'translateY(-2px)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+          >
             Transfer
           </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={() => handleOpenDialog()}
+            sx={{
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+          >
             Add Account
           </Button>
         </Box>
@@ -1086,7 +1133,16 @@ const Accounts: React.FC = () => {
       {/* Summary Cards */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} md={4}>
-          <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <Card 
+            sx={{ 
+              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 28px rgba(20, 184, 166, 0.4)',
+              },
+            }}
+          >
             <CardContent>
               <Typography variant="h6" color="white" gutterBottom>
                 Net Worth
@@ -1101,7 +1157,16 @@ const Accounts: React.FC = () => {
           </Card>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card sx={{ background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' }}>
+          <Card 
+            sx={{ 
+              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 28px rgba(16, 185, 129, 0.4)',
+              },
+            }}
+          >
             <CardContent>
               <Typography variant="h6" color="white" gutterBottom>
                 Total Assets
@@ -1116,7 +1181,16 @@ const Accounts: React.FC = () => {
           </Card>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+          <Card 
+            sx={{ 
+              background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 28px rgba(244, 63, 94, 0.4)',
+              },
+            }}
+          >
             <CardContent>
               <Typography variant="h6" color="white" gutterBottom>
                 Total Liabilities
