@@ -3592,23 +3592,59 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={formData.isRecurring}
-                        onChange={(e) => {
-                          const isRecurring = e.target.checked;
-                          const updatedTags = isRecurring
-                            ? [...formData.tags, 'recurring'].filter(
-                                (tag, index, self) => self.indexOf(tag) === index
-                              ) // Add and dedupe
-                            : formData.tags.filter((tag) => tag !== 'recurring'); // Remove tag
-                          setFormData({ ...formData, isRecurring, tags: updatedTags });
-                        }}
-                      />
-                    }
-                    label="Recurring Transaction"
-                  />
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 2,
+                      background: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%)'
+                          : 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                      border: '1px solid',
+                      borderColor: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'rgba(139, 92, 246, 0.2)'
+                          : 'rgba(139, 92, 246, 0.3)',
+                    }}
+                  >
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formData.isRecurring}
+                          onChange={(e) => {
+                            const isRecurring = e.target.checked;
+                            const updatedTags = isRecurring
+                              ? [...formData.tags, 'recurring'].filter(
+                                  (tag, index, self) => self.indexOf(tag) === index
+                                ) // Add and dedupe
+                              : formData.tags.filter((tag) => tag !== 'recurring'); // Remove tag
+                            setFormData({ ...formData, isRecurring, tags: updatedTags });
+                          }}
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': {
+                              color: '#8b5cf6',
+                              '&:hover': {
+                                backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                              },
+                            },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                            },
+                          }}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            🔄 Recurring Transaction
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Automatically repeat this transaction
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </Box>
                 </Grid>
 
                 {formData.isRecurring && (

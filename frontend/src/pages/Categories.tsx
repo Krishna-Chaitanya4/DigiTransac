@@ -896,39 +896,128 @@ const Categories: React.FC = () => {
             </TextField>
 
             {!editingCategory && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.isFolder}
-                    onChange={(e) => setFormData({ ...formData, isFolder: e.target.checked })}
-                  />
-                }
-                label="Create as Folder (can contain subcategories)"
-              />
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  background: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                      : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.isFolder}
+                      onChange={(e) => setFormData({ ...formData, isFolder: e.target.checked })}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: (theme) => theme.palette.primary.main,
+                          '&:hover': {
+                            backgroundColor: (theme) =>
+                              `${theme.palette.primary.main}15`,
+                          },
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          background: (theme) => theme.palette.gradient.primary,
+                        },
+                      }}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>
+                        Create as Folder
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Can contain subcategories
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
             )}
 
             <Box>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Color
+              <Typography variant="body2" fontWeight={600} color="primary" gutterBottom>
+                Category Color
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <input
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  style={{
-                    width: '60px',
-                    height: '40px',
-                    border: 'none',
-                    borderRadius: '4px',
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 2,
+                  alignItems: 'center',
+                  p: 2,
+                  borderRadius: 2,
+                  background: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? 'rgba(248, 250, 252, 0.8)'
+                      : 'rgba(30, 30, 30, 0.5)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: 64,
+                    height: 64,
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    border: '3px solid',
+                    borderColor: 'background.paper',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                     cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'scale(1.05)',
+                      boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
+                    },
                   }}
-                />
+                >
+                  <input
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  />
+                </Box>
                 <TextField
                   size="small"
                   value={formData.color}
                   onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  sx={{ flex: 1 }}
+                  placeholder="#667eea"
+                  sx={{
+                    flex: 1,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      fontFamily: 'monospace',
+                      fontWeight: 600,
+                    },
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <Box
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 1,
+                          bgcolor: formData.color,
+                          mr: 1,
+                          border: '2px solid',
+                          borderColor: 'divider',
+                        }}
+                      />
+                    ),
+                  }}
                 />
               </Box>
             </Box>

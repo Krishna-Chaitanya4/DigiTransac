@@ -2057,7 +2057,18 @@ const Budgets: React.FC = () => {
             />
 
             {/* Rollover Configuration */}
-            <Box>
+            <Box
+              sx={{
+                p: 2.5,
+                borderRadius: 2,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                    : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
               <FormControlLabel
                 control={
                   <Switch
@@ -2065,13 +2076,31 @@ const Budgets: React.FC = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, enableRollover: e.target.checked })
                     }
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: (theme) => theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: (theme) =>
+                            `${theme.palette.primary.main}15`,
+                        },
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    }}
                   />
                 }
-                label="Enable Rollover"
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      💰 Enable Rollover
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Allow unused budget to carry over to the next period
+                    </Typography>
+                  </Box>
+                }
               />
-              <Typography variant="caption" color="text.secondary" display="block">
-                Allow unused budget to carry over to the next period
-              </Typography>
               
               {formData.enableRollover && (
                 <TextField

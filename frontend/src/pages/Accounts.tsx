@@ -1559,24 +1559,79 @@ const Accounts: React.FC = () => {
               fullWidth
             />
 
-            <Box display="flex" gap={2}>
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 3,
+                p: 2,
+                borderRadius: 2,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                    : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
               <FormControlLabel
                 control={
                   <Switch
                     checked={formData.isDefault}
                     onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: (theme) => theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: (theme) =>
+                            `${theme.palette.primary.main}15`,
+                        },
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    }}
                   />
                 }
-                label="Set as Default"
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      Set as Default
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Primary account for transactions
+                    </Typography>
+                  </Box>
+                }
               />
               <FormControlLabel
                 control={
                   <Switch
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: (theme) => theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: (theme) =>
+                            `${theme.palette.primary.main}15`,
+                        },
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    }}
                   />
                 }
-                label="Active"
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      Active
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Include in transactions
+                    </Typography>
+                  </Box>
+                }
               />
             </Box>
           </Box>
