@@ -666,7 +666,7 @@ const Categories: React.FC = () => {
                   </Typography>
                 </Box>
                 <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
-                  {categories.length} categories • {categories.filter(c => c.isFolder).length} folders • {categories.filter(c => !c.isFolder).length} items
+                  {categories.length} {categories.length === 1 ? 'item' : 'items'} • {categories.filter(c => c.isFolder).length} {categories.filter(c => c.isFolder).length === 1 ? 'folder' : 'folders'} • {categories.filter(c => !c.isFolder).length} {categories.filter(c => !c.isFolder).length === 1 ? 'category' : 'categories'}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
