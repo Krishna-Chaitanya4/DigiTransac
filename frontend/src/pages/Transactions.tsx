@@ -2885,22 +2885,66 @@ const Transactions: React.FC = () => {
             </Box>
           </DialogTitle>
           <DialogContent sx={{ pt: 3 }}>
-            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <ToggleButtonGroup
-                value={formData.type}
-                exclusive
-                onChange={(_, value) => value && handleTypeChange(value as 'credit' | 'debit')}
-                fullWidth
+            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Credit/Debit Type Toggle */}
+              <Box
+                sx={{
+                  p: 0.5,
+                  borderRadius: 3,
+                  background: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+                      : 'linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.8) 100%)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
               >
-                <ToggleButton value="credit" color="success">
-                  <CreditIcon sx={{ mr: 1 }} />
-                  Credit (Money IN)
-                </ToggleButton>
-                <ToggleButton value="debit" color="error">
-                  <DebitIcon sx={{ mr: 1 }} />
-                  Debit (Money OUT)
-                </ToggleButton>
-              </ToggleButtonGroup>
+                <ToggleButtonGroup
+                  value={formData.type}
+                  exclusive
+                  onChange={(_, value) => value && handleTypeChange(value as 'credit' | 'debit')}
+                  fullWidth
+                  sx={{
+                    '& .MuiToggleButton-root': {
+                      border: 'none',
+                      borderRadius: 2.5,
+                      py: 1.5,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                      },
+                      '&.Mui-selected': {
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      },
+                      '&.Mui-selected.MuiToggleButton-success': {
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        },
+                      },
+                      '&.Mui-selected.MuiToggleButton-error': {
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: 'white',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                        },
+                      },
+                    },
+                  }}
+                >
+                  <ToggleButton value="credit" color="success">
+                    <CreditIcon sx={{ mr: 1 }} />
+                    Credit (Money IN)
+                  </ToggleButton>
+                  <ToggleButton value="debit" color="error">
+                    <DebitIcon sx={{ mr: 1 }} />
+                    Debit (Money OUT)
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
 
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
@@ -2953,25 +2997,67 @@ const Transactions: React.FC = () => {
                     <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
                       <Button
                         size="small"
-                        variant="text"
+                        variant="outlined"
                         onClick={setDateToToday}
-                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                        sx={{
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          borderColor: (theme) => theme.palette.primary.main,
+                          color: (theme) => theme.palette.primary.main,
+                          '&:hover': {
+                            background: (theme) => theme.palette.primary.main,
+                            color: 'white',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
                       >
                         Today
                       </Button>
                       <Button
                         size="small"
-                        variant="text"
+                        variant="outlined"
                         onClick={setDateToYesterday}
-                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                        sx={{
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          borderColor: (theme) => theme.palette.primary.main,
+                          color: (theme) => theme.palette.primary.main,
+                          '&:hover': {
+                            background: (theme) => theme.palette.primary.main,
+                            color: 'white',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
                       >
                         Yesterday
                       </Button>
                       <Button
                         size="small"
-                        variant="text"
+                        variant="outlined"
                         onClick={setDateToStartOfMonth}
-                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                        sx={{
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          borderColor: (theme) => theme.palette.primary.main,
+                          color: (theme) => theme.palette.primary.main,
+                          '&:hover': {
+                            background: (theme) => theme.palette.primary.main,
+                            color: 'white',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
                       >
                         Month Start
                       </Button>
@@ -3010,67 +3096,105 @@ const Transactions: React.FC = () => {
                 <Grid item xs={12}>
                   <Box
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      p: 2,
-                      bgcolor: 'action.hover',
-                      borderRadius: 1,
+                      p: 2.5,
+                      borderRadius: 3,
+                      background: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                          : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                      border: '1px solid',
+                      borderColor: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'rgba(20, 184, 166, 0.2)'
+                          : 'rgba(20, 184, 166, 0.3)',
+                      backdropFilter: 'blur(10px)',
                     }}
                   >
-                    <Typography variant="body2" fontWeight="medium">
-                      Transaction Mode:
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={useSplitMode}
-                      exclusive
-                      onChange={(_, value) => {
-                        if (value !== null) {
-                          setUseSplitMode(value);
-                          if (!value) {
-                            // Quick add mode - sync first split with form data
-                            const amount = parseFloat(formData.amount) || 0;
-                            setFormData({
-                              ...formData,
-                              splits: [
-                                {
-                                  categoryId: formData.categoryId,
-                                  amount: amount,
-                                  tags: formData.tags,
-                                  notes: '',
-                                  order: 1,
-                                },
-                              ],
-                            });
-                          } else {
-                            // Split mode - ensure splits array has at least one entry
-                            if (formData.splits.length === 0) {
-                              setFormData({
-                                ...formData,
-                                splits: [
-                                  {
-                                    categoryId: '',
-                                    amount: 0,
-                                    tags: [],
-                                    notes: '',
-                                    order: 1,
-                                  },
-                                ],
-                              });
-                            }
-                          }
-                        }
-                      }}
-                      size="small"
-                    >
-                      <ToggleButton value={false}>Quick Add (Single Category)</ToggleButton>
-                      <ToggleButton value={true}>Split (Multiple Categories)</ToggleButton>
-                    </ToggleButtonGroup>
-                    {useSplitMode && (
-                      <Typography variant="caption" color="text.secondary">
-                        Split this transaction across multiple categories
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Typography variant="body2" fontWeight="600" color="primary">
+                        Transaction Mode:
                       </Typography>
-                    )}
+                      <Box
+                        sx={{
+                          p: 0.5,
+                          borderRadius: 2,
+                          background: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? 'rgba(255,255,255,0.8)'
+                              : 'rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        <ToggleButtonGroup
+                          value={useSplitMode}
+                          exclusive
+                          onChange={(_, value) => {
+                            if (value !== null) {
+                              setUseSplitMode(value);
+                              if (!value) {
+                                // Quick add mode - sync first split with form data
+                                const amount = parseFloat(formData.amount) || 0;
+                                setFormData({
+                                  ...formData,
+                                  splits: [
+                                    {
+                                      categoryId: formData.categoryId,
+                                      amount: amount,
+                                      tags: formData.tags,
+                                      notes: '',
+                                      order: 1,
+                                    },
+                                  ],
+                                });
+                              } else {
+                                // Split mode - ensure splits array has at least one entry
+                                if (formData.splits.length === 0) {
+                                  setFormData({
+                                    ...formData,
+                                    splits: [
+                                      {
+                                        categoryId: '',
+                                        amount: 0,
+                                        tags: [],
+                                        notes: '',
+                                        order: 1,
+                                      },
+                                    ],
+                                  });
+                                }
+                              }
+                            }
+                          }}
+                          fullWidth
+                          sx={{
+                            '& .MuiToggleButton-root': {
+                              border: 'none',
+                              borderRadius: 1.5,
+                              py: 1,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.875rem',
+                              transition: 'all 0.3s ease',
+                              '&.Mui-selected': {
+                                background: (theme) => theme.palette.gradient.primary,
+                                color: 'white',
+                                boxShadow: '0 2px 8px rgba(20, 184, 166, 0.3)',
+                                '&:hover': {
+                                  background: (theme) => theme.palette.gradient.primary,
+                                },
+                              },
+                            },
+                          }}
+                        >
+                          <ToggleButton value={false}>Quick Add (Single Category)</ToggleButton>
+                          <ToggleButton value={true}>Split (Multiple Categories)</ToggleButton>
+                        </ToggleButtonGroup>
+                      </Box>
+                      {useSplitMode && (
+                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          💡 Split this transaction across multiple categories
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
                 </Grid>
 
@@ -3159,19 +3283,31 @@ const Transactions: React.FC = () => {
                 {/* Split Mode - Multiple Splits */}
                 {useSplitMode && (
                   <Grid item xs={12}>
-                    <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                    <Box
+                      sx={{
+                        borderRadius: 3,
+                        p: 3,
+                        background: (theme) =>
+                          theme.palette.mode === 'light'
+                            ? 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)'
+                            : 'linear-gradient(135deg, rgba(30, 30, 30, 0.5) 0%, rgba(20, 20, 20, 0.5) 100%)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        backdropFilter: 'blur(10px)',
+                      }}
+                    >
                       <Box
                         sx={{
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          mb: 2,
+                          mb: 3,
                           flexWrap: 'wrap',
                           gap: 1,
                         }}
                       >
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          Split Details
+                        <Typography variant="subtitle1" fontWeight="700" color="primary">
+                          📊 Split Details
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           <Button
@@ -3179,10 +3315,33 @@ const Transactions: React.FC = () => {
                             variant="outlined"
                             onClick={distributeEqually}
                             disabled={!formData.amount || formData.splits.length === 0}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              '&:hover': {
+                                transform: 'translateY(-1px)',
+                              },
+                            }}
                           >
                             Distribute Equally
                           </Button>
-                          <Button size="small" startIcon={<AddIcon />} onClick={addSplit}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={addSplit}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              background: (theme) => theme.palette.gradient.primary,
+                              '&:hover': {
+                                transform: 'translateY(-1px)',
+                                boxShadow: 4,
+                              },
+                            }}
+                          >
                             Add Split
                           </Button>
                         </Box>
@@ -3191,24 +3350,53 @@ const Transactions: React.FC = () => {
                       {formData.splits.map((split, index) => (
                         <Box
                           key={index}
-                          sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}
+                          sx={{
+                            mb: 2,
+                            p: 2.5,
+                            borderRadius: 2.5,
+                            background: (theme) =>
+                              theme.palette.mode === 'light'
+                                ? 'rgba(255, 255, 255, 0.9)'
+                                : 'rgba(40, 40, 40, 0.6)',
+                            border: '1px solid',
+                            borderColor: (theme) =>
+                              theme.palette.mode === 'light'
+                                ? 'rgba(0, 0, 0, 0.06)'
+                                : 'rgba(255, 255, 255, 0.06)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                              transform: 'translateY(-2px)',
+                            },
+                          }}
                         >
                           <Box
                             sx={{
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
-                              mb: 1,
+                              mb: 1.5,
                             }}
                           >
-                            <Typography variant="caption" color="text.secondary">
-                              Split {index + 1}
-                            </Typography>
+                            <Chip
+                              label={`Split ${index + 1}`}
+                              size="small"
+                              sx={{
+                                background: (theme) => theme.palette.gradient.primary,
+                                color: 'white',
+                                fontWeight: 600,
+                              }}
+                            />
                             {formData.splits.length > 1 && (
                               <IconButton
                                 size="small"
                                 onClick={() => removeSplit(index)}
-                                color="error"
+                                sx={{
+                                  color: 'error.main',
+                                  '&:hover': {
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                  },
+                                }}
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>

@@ -1440,13 +1440,18 @@ const Accounts: React.FC = () => {
           </Box>
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <TextField
               label="Account Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               fullWidth
               required
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
             <TextField
@@ -1463,6 +1468,11 @@ const Accounts: React.FC = () => {
               }}
               fullWidth
               required
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             >
               {Object.entries(accountTypeConfig).map(([value, config]) => (
                 <MenuItem key={value} value={value}>
@@ -1476,6 +1486,11 @@ const Accounts: React.FC = () => {
               value={formData.bankName}
               onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
               fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
             <TextField
@@ -1484,6 +1499,11 @@ const Accounts: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
               fullWidth
               inputProps={{ maxLength: 4 }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
             <TextField
@@ -1492,6 +1512,11 @@ const Accounts: React.FC = () => {
               value={formData.currency}
               onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
               fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             >
               <MenuItem value="USD">USD - US Dollar</MenuItem>
               <MenuItem value="EUR">EUR - Euro</MenuItem>
@@ -1603,9 +1628,42 @@ const Accounts: React.FC = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Delete Account</DialogTitle>
-        <DialogContent>
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle
+          sx={{
+            background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '100px',
+              height: '100px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 40,
+                height: 40,
+              }}
+            >
+              <DeleteIcon />
+            </Avatar>
+            <Typography variant="h6" component="div" sx={{ fontWeight: 700 }}>
+              Delete Account
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Typography>
             Are you sure you want to delete "{accountToDelete?.name}"?
             {accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount ? (
@@ -1620,15 +1678,49 @@ const Accounts: React.FC = () => {
             )}
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={() => setDeleteConfirmOpen(false)}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleDeleteConfirm}
-            color="error"
             variant="contained"
             disabled={
               !!(accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount)
             }
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+                transition: 'all 0.2s ease',
+              },
+            }}
           >
             Delete
           </Button>
@@ -1642,8 +1734,41 @@ const Accounts: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Adjust Account Balance</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 48,
+                height: 48,
+              }}
+            >
+              <BalanceIcon />
+            </Avatar>
+            <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
+              Adjust Account Balance
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ pt: 2 }}>
             {adjustingAccount && (
               <>
@@ -1733,8 +1858,31 @@ const Accounts: React.FC = () => {
             )}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAdjustBalanceOpen(false)}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={() => setAdjustBalanceOpen(false)}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleSaveAdjustment}
             variant="contained"
@@ -1745,6 +1893,18 @@ const Accounts: React.FC = () => {
                   adjustingAccount?.balance ||
                   0)
             }
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+                transition: 'all 0.2s ease',
+              },
+            }}
           >
             Adjust Balance
           </Button>
@@ -1766,8 +1926,41 @@ const Accounts: React.FC = () => {
         maxWidth="sm" 
         fullWidth
       >
-        <DialogTitle>Transfer Money</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 48,
+                height: 48,
+              }}
+            >
+              <TransferIcon />
+            </Avatar>
+            <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
+              Transfer Money
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* From Account - Selectable if not pre-filled */}
             {transferFromPreFilled ? (
@@ -1888,20 +2081,55 @@ const Accounts: React.FC = () => {
             {error && <Alert severity="error">{error}</Alert>}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setTransferDialogOpen(false);
-            setTransferFromAccount(null);
-            setTransferFromPreFilled(false);
-            setTransferToAccountId('');
-            setTransferAmount('');
-            setTransferNotes('');
-            setError('');
-          }}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={() => {
+              setTransferDialogOpen(false);
+              setTransferFromAccount(null);
+              setTransferFromPreFilled(false);
+              setTransferToAccountId('');
+              setTransferAmount('');
+              setTransferNotes('');
+              setError('');
+            }}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
           <Button 
             onClick={handleTransferSubmit} 
             variant="contained" 
             disabled={!transferFromAccount || !transferToAccountId || !transferAmount}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+                transition: 'all 0.2s ease',
+              },
+            }}
           >
             Transfer
           </Button>
