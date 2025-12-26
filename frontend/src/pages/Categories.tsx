@@ -25,8 +25,10 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
+  Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,
   Label as LabelIcon,
+  LocalOffer as TagIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
@@ -425,9 +427,50 @@ const Categories: React.FC = () => {
           {/* Icon */}
           <Box sx={{ mr: 1.5, display: 'flex', alignItems: 'center', ml: !node.isFolder ? 4 : 0 }}>
             {node.isFolder ? (
-              <FolderOpenIcon sx={{ color: node.color || '#667eea' }} />
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: `linear-gradient(135deg, ${node.color || '#667eea'} 0%, ${node.color || '#764ba2'} 100%)`,
+                  boxShadow: `0 4px 12px ${node.color || '#667eea'}40`,
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: `0 6px 16px ${node.color || '#667eea'}60`,
+                  },
+                }}
+              >
+                {expandedNodes.has(node.id) ? (
+                  <FolderOpenIcon sx={{ color: 'white', fontSize: 22 }} />
+                ) : (
+                  <FolderIcon sx={{ color: 'white', fontSize: 22 }} />
+                )}
+              </Box>
             ) : (
-              <LabelIcon sx={{ color: node.color || '#667eea' }} />
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: `linear-gradient(135deg, ${node.color || '#667eea'}15 0%, ${node.color || '#667eea'}25 100%)`,
+                  border: `2px solid ${node.color || '#667eea'}`,
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px) scale(1.05)',
+                    boxShadow: `0 4px 12px ${node.color || '#667eea'}40`,
+                  },
+                }}
+              >
+                <TagIcon sx={{ color: node.color || '#667eea', fontSize: 20 }} />
+              </Box>
             )}
           </Box>
 
@@ -471,34 +514,76 @@ const Categories: React.FC = () => {
           </Box>
 
           {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
             {node.isFolder && (
-              <Tooltip title="Add subcategory">
+              <Tooltip title="Add subcategory" arrow>
                 <IconButton
                   size="small"
                   onClick={() => handleOpenDialog(node)}
-                  sx={{ color: '#667eea' }}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px #667eea60',
+                    },
+                  }}
                 >
-                  <CreateNewFolderIcon fontSize="small" />
+                  <CreateNewFolderIcon sx={{ fontSize: 18 }} />
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Edit">
+            <Tooltip title="Edit" arrow>
               <IconButton
                 size="small"
                 onClick={() => handleEditCategory(node)}
-                sx={{ color: '#667eea' }}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  background: 'linear-gradient(135deg, #667eea15 0%, #667eea25 100%)',
+                  border: '1.5px solid #667eea',
+                  color: '#667eea',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    borderColor: 'transparent',
+                    transform: 'translateY(-2px) rotate(5deg)',
+                    boxShadow: '0 4px 12px #667eea60',
+                  },
+                }}
               >
-                <EditIcon fontSize="small" />
+                <EditIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Delete">
+            <Tooltip title="Delete" arrow>
               <IconButton
                 size="small"
                 onClick={() => handleDeleteCategory(node)}
-                sx={{ color: '#f44336' }}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  background: 'linear-gradient(135deg, #f4433615 0%, #f4433625 100%)',
+                  border: '1.5px solid #f44336',
+                  color: '#f44336',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+                    color: 'white',
+                    borderColor: 'transparent',
+                    transform: 'translateY(-2px) scale(1.1)',
+                    boxShadow: '0 4px 12px #f4433660',
+                  },
+                }}
               >
-                <DeleteIcon fontSize="small" />
+                <DeleteIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
           </Box>
