@@ -139,7 +139,20 @@ const Layout: React.FC = () => {
         justifyContent: sidebarCollapsed ? 'center' : 'space-between',
         minHeight: 64,
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box 
+          onClick={() => navigate('/dashboard')}
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1.5,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              opacity: 0.8,
+              transform: 'scale(1.02)',
+            },
+          }}
+        >
           <Box
             sx={{
               background: '#14b8a6',
