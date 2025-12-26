@@ -102,6 +102,25 @@ const Categories: React.FC = () => {
     color: '#667eea',
   });
   
+  // Tag deletion state
+  const [deleteTagDialog, setDeleteTagDialog] = useState<{
+    open: boolean;
+    tag: Tag | null;
+    usage: {
+      transactions: number;
+      budgets: number;
+      budgetNames: string[];
+      canDelete: boolean;
+    } | null;
+    loading: boolean;
+  }>({
+    open: false,
+    tag: null,
+    usage: null,
+    loading: false,
+  });
+  const [replaceTagId, setReplaceTagId] = useState<string>('');
+  
   // Search and filter state (Categories)
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -129,6 +148,7 @@ const Categories: React.FC = () => {
 
   useEffect(() => {
     fetchCategories();
+    fetchTags(); // Fetch tags on page load for accurate count
   }, []);
 
   // Debounce search query (performance optimization - industry standard)
@@ -501,13 +521,50 @@ const Categories: React.FC = () => {
   };
 
   const handleDeleteTag = async (tag: Tag) => {
-    if (!window.confirm(`Are you sure you want to delete "${tag.name}"? It will be removed from ${tag.usageCount} transaction(s).`)) {
-      return;
-    }
+    // Open dialog and check usage
+    setDeleteTagDialog({
+      open: true,
+      tag,
+      usage: null,
+      loading: true,
+    });
+    setReplaceTagId('');
 
     try {
-      await axios.delete(`/api/tags/${tag.id}`, {
+      const response = await axios.get(`/api/tags/${tag.id}/usage`, {
         headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      setDeleteTagDialog({
+        open: true,
+        tag,
+        usage: response.data.usage,
+        loading: false,
+      });
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to check tag usage');
+      setDeleteTagDialog({
+        open: false,
+        tag: null,
+        usage: null,
+        loading: false,
+      });
+    }
+  };
+
+  const handleConfirmDeleteTag = async () => {
+    if (!deleteTagDialog.tag) return;
+
+    try {
+      await axios.delete(`/api/tags/${deleteTagDialog.tag.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      setDeleteTagDialog({
+        open: false,
+        tag: null,
+        usage: null,
+        loading: false,
       });
       fetchTags();
     } catch (err: any) {
@@ -515,12 +572,34 @@ const Categories: React.FC = () => {
     }
   };
 
-  // Fetch tags when switching to tags tab
-  useEffect(() => {
-    if (activeTab === 1 && tags.length === 0) {
+  const handleReplaceTag = async () => {
+    if (!deleteTagDialog.tag || !replaceTagId) return;
+
+    try {
+      const response = await axios.post(
+        `/api/tags/${deleteTagDialog.tag.id}/replace`,
+        { replacementTagId: replaceTagId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      setDeleteTagDialog({
+        open: false,
+        tag: null,
+        usage: null,
+        loading: false,
+      });
+      setReplaceTagId('');
       fetchTags();
+      
+      // Show success message
+      setError(''); // Clear any previous errors
+      setTimeout(() => {
+        setError(response.data.message);
+      }, 100);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to replace tag');
     }
-  }, [activeTab]);
+  };
 
   // Filter and sort tags
   const getFilteredAndSortedTags = () => {
@@ -1784,6 +1863,209 @@ const Categories: React.FC = () => {
           >
             {editingTag ? 'Update' : 'Create'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Smart Tag Deletion Dialog */}
+      <Dialog
+        open={deleteTagDialog.open}
+        onClose={() => setDeleteTagDialog({ open: false, tag: null, usage: null, loading: false })}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: (theme) => deleteTagDialog.usage?.canDelete 
+              ? theme.palette.gradient.primary 
+              : 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+            color: 'white',
+            pb: 2,
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1}>
+            <DeleteIcon />
+            <Typography variant="h6" fontWeight={600}>
+              {deleteTagDialog.loading ? 'Checking Tag Usage...' : 'Delete Tag'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3 }}>
+          {deleteTagDialog.loading ? (
+            <Box display="flex" flexDirection="column" alignItems="center" py={3}>
+              <CircularProgress />
+              <Typography variant="body2" color="text.secondary" mt={2}>
+                Checking where this tag is used...
+              </Typography>
+            </Box>
+          ) : deleteTagDialog.usage?.canDelete ? (
+            // Tag is not in use - simple confirmation
+            <Box>
+              <Alert severity="success" sx={{ mb: 2 }}>
+                This tag is not currently in use and can be safely deleted.
+              </Alert>
+              <Typography variant="body1" gutterBottom>
+                Are you sure you want to delete the tag{' '}
+                <Chip
+                  label={deleteTagDialog.tag?.name}
+                  size="small"
+                  sx={{
+                    bgcolor: deleteTagDialog.tag?.color || '#667eea',
+                    color: 'white',
+                    fontWeight: 600,
+                  }}
+                />
+                ?
+              </Typography>
+            </Box>
+          ) : (
+            // Tag is in use - show usage and offer replacement
+            <Box>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This tag cannot be deleted because it's currently in use.
+              </Alert>
+              
+              <Typography variant="body1" gutterBottom fontWeight={600}>
+                Tag{' '}
+                <Chip
+                  label={deleteTagDialog.tag?.name}
+                  size="small"
+                  sx={{
+                    bgcolor: deleteTagDialog.tag?.color || '#667eea',
+                    color: 'white',
+                    fontWeight: 600,
+                  }}
+                />{' '}
+                is used in:
+              </Typography>
+              
+              <Box sx={{ pl: 2, mt: 2, mb: 3 }}>
+                {deleteTagDialog.usage && deleteTagDialog.usage.transactions > 0 && (
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    • {deleteTagDialog.usage.transactions} transaction{deleteTagDialog.usage.transactions !== 1 ? 's' : ''}
+                  </Typography>
+                )}
+                {deleteTagDialog.usage && deleteTagDialog.usage.budgets > 0 && (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      • {deleteTagDialog.usage.budgets} budget{deleteTagDialog.usage.budgets !== 1 ? 's' : ''}:
+                    </Typography>
+                    <Box sx={{ pl: 2 }}>
+                      {deleteTagDialog.usage.budgetNames.map((name) => (
+                        <Typography key={name} variant="caption" color="text.secondary" display="block">
+                          - {name}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+
+              <Box
+                sx={{
+                  p: 2,
+                  bgcolor: 'background.default',
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography variant="body2" fontWeight={600} gutterBottom>
+                  Replace with another tag:
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+                  Select a tag to replace all occurrences of "{deleteTagDialog.tag?.name}" in your transactions and budgets.
+                </Typography>
+                <TextField
+                  select
+                  fullWidth
+                  value={replaceTagId}
+                  onChange={(e) => setReplaceTagId(e.target.value)}
+                  size="small"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    Select a tag...
+                  </MenuItem>
+                  {tags
+                    .filter((t) => t.id !== deleteTagDialog.tag?.id)
+                    .map((tag) => (
+                      <MenuItem key={tag.id} value={tag.id}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              bgcolor: tag.color || '#667eea',
+                            }}
+                          />
+                          {tag.name}
+                          <Typography variant="caption" color="text.secondary" ml="auto">
+                            ({tag.usageCount} uses)
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                </TextField>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2.5 }}>
+          <Button
+            onClick={() => setDeleteTagDialog({ open: false, tag: null, usage: null, loading: false })}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
+          {deleteTagDialog.usage?.canDelete ? (
+            <Button
+              onClick={handleConfirmDeleteTag}
+              variant="contained"
+              color="error"
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
+              Delete Tag
+            </Button>
+          ) : (
+            <Button
+              onClick={handleReplaceTag}
+              variant="contained"
+              disabled={!replaceTagId}
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                textTransform: 'none',
+                fontWeight: 600,
+                background: (theme) => theme.palette.gradient.primary,
+              }}
+            >
+              Replace & Delete
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

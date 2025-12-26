@@ -459,15 +459,16 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     );
 
     // Update tag usage counts from all splits
+    // Count unique tags across all splits, but increment by 1 per transaction (not per split)
     const allTags = splitRecords.flatMap((split) => split.tags);
     const uniqueTags = [...new Set(allTags)];
 
     for (const tagName of uniqueTags) {
-      const count = allTags.filter((t) => t === tagName).length;
+      // Increment by 1 for this transaction, regardless of how many splits use it
       await tagsContainer.updateOne(
         { userId, name: tagName },
         {
-          $inc: { usageCount: count },
+          $inc: { usageCount: 1 },
           $setOnInsert: {
             id: uuidv4(),
             userId,
@@ -828,6 +829,7 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
     const transactionsContainer = await cosmosDBService.getTransactionsContainer();
     const accountsContainer = await cosmosDBService.getAccountsContainer();
     const tagsContainer = await cosmosDBService.getTagsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
 
     // Get all transactions to delete
     const transactions = (await transactionsContainer
@@ -842,22 +844,43 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
       return;
     }
 
-    const accountBalanceChanges: { [accountId: string]: number } = {};
-    const tagUpdates: { [tagName: string]: number } = {};
+    // Get splits for these transactions to update tag counts
+    const splits = await splitsContainer
+      .find({ transactionId: { $in: ids }, userId })
+      .toArray();
 
-    // Calculate reverse changes
+    const accountBalanceChanges: { [accountId: string]: number } = {};
+    const transactionTagsMap: { [transactionId: string]: Set<string> } = {};
+
+    // Calculate reverse changes and collect tags per transaction
     for (const txn of transactions) {
       const balanceChange = txn.type === 'credit' ? -txn.amount : txn.amount;
       accountBalanceChanges[txn.accountId] =
         (accountBalanceChanges[txn.accountId] || 0) + balanceChange;
+    }
 
-      if (txn.tags) {
-        for (const tag of txn.tags) {
-          tagUpdates[tag] = (tagUpdates[tag] || 0) - 1;
-        }
+    // Collect unique tags per transaction from splits
+    for (const split of splits) {
+      const txId = split.transactionId as string;
+      if (!transactionTagsMap[txId]) {
+        transactionTagsMap[txId] = new Set();
+      }
+      if (split.tags) {
+        split.tags.forEach((tag: string) => transactionTagsMap[txId].add(tag));
       }
     }
 
+    // Count how many transactions use each tag
+    const tagUpdates: { [tagName: string]: number } = {};
+    for (const tagSet of Object.values(transactionTagsMap)) {
+      for (const tag of tagSet) {
+        tagUpdates[tag] = (tagUpdates[tag] || 0) - 1; // Decrement by 1 per transaction
+      }
+    }
+
+    // Delete splits first
+    await splitsContainer.deleteMany({ transactionId: { $in: ids }, userId });
+    
     // Delete transactions
     await transactionsContainer.deleteMany({ id: { $in: ids }, userId });
 
