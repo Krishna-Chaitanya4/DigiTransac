@@ -21,6 +21,9 @@ import {
   Switch,
   Divider,
   Alert,
+  Fade,
+  Zoom,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -900,77 +903,144 @@ const Budgets: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography 
-            variant="h4" 
-            fontWeight={700}
-            sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            Budget Tracking
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mt={0.5}>
-            {budgets.length === 0 
-              ? 'Set spending limits to stay on track'
-              : `${budgets.length} active budget${budgets.length !== 1 ? 's' : ''} • ${budgetSummary && budgetSummary.exceededCount > 0 ? `${budgetSummary.exceededCount} exceeded` : budgetSummary && budgetSummary.warningCount > 0 ? `${budgetSummary.warningCount} approaching limit` : 'All on track'}`
-            }
-          </Typography>
-        </Box>
-        <Box display="flex" gap={1}>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setShowTemplates(true)}
-            sx={{
-              borderColor: '#14b8a6',
-              color: '#14b8a6',
-              '&:hover': {
-                borderColor: '#0891b2',
-                bgcolor: 'rgba(20, 184, 166, 0.1)',
-              },
-            }}
-          >
-            From Template
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleOpenDialog}
-            sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            Create Budget
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Budget Summary Card */}
-      {budgetSummary && (
-        <Card 
-          sx={{ 
-            mb: 3, 
-            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-            color: 'white',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: '0 12px 28px rgba(20, 184, 166, 0.4)',
+      {/* Enhanced Animated Header */}
+      <Fade in timeout={600}>
+        <Box
+          sx={{
+            mb: 4,
+            p: 4,
+            borderRadius: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
+            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
             },
           }}
         >
-          <CardContent>
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(10px)',
+                      width: 56,
+                      height: 56,
+                    }}
+                  >
+                    <SavingsIcon sx={{ fontSize: 32 }} />
+                  </Avatar>
+                  <Typography
+                    variant="h4"
+                    fontWeight={800}
+                    sx={{
+                      color: 'white',
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    Budget Tracking
+                  </Typography>
+                </Box>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
+                  {budgets.length === 0 
+                    ? 'Set spending limits to stay on track'
+                    : `${budgets.length} active budget${budgets.length !== 1 ? 's' : ''} • ${budgetSummary && budgetSummary.exceededCount > 0 ? `${budgetSummary.exceededCount} exceeded` : budgetSummary && budgetSummary.warningCount > 0 ? `${budgetSummary.warningCount} approaching limit` : 'All on track'}`
+                  }
+                </Typography>
+              </Box>
+              <Box display="flex" gap={2}>
+                <Zoom in timeout={800}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={() => setShowTemplates(true)}
+                    sx={{
+                      bgcolor: 'white',
+                      borderColor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    From Template
+                  </Button>
+                </Zoom>
+                <Zoom in timeout={900}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenDialog}
+                    sx={{
+                      bgcolor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    Create Budget
+                  </Button>
+                </Zoom>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      </Fade>
+
+      {/* Budget Summary Card */}
+      {budgetSummary && (
+        <Fade in timeout={800}>
+          <Card sx={{
+            mb: 3,
+            borderRadius: 3,
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            overflow: 'hidden',
+            position: 'relative',
+            boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
+            },
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '120px',
+              height: '120px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+              borderRadius: '50%',
+            },
+          }}>
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
             <Grid container spacing={3}>
               {/* Total Budgeted */}
               <Grid item xs={6} sm={3}>
@@ -1050,12 +1120,28 @@ const Budgets: React.FC = () => {
               </Grid>
             </Grid>
           </CardContent>
-        </Card>
+          </Card>
+        </Fade>
       )}
 
       {/* Search and Filter Bar */}
       {budgets.length > 0 && (
-        <Card sx={{ mb: 3, p: 2 }}>
+        <Fade in timeout={1000}>
+          <Card sx={{
+            mb: 3,
+            p: 2,
+            borderRadius: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: (theme) =>
+              theme.palette.mode === 'light'
+                ? `1px solid ${theme.palette.primary.main}1A`
+                : `1px solid ${theme.palette.primary.main}33`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+          }}>
           <Grid container spacing={2} alignItems="center">
             {/* Search */}
             <Grid item xs={12} md={4}>
@@ -1142,7 +1228,8 @@ const Budgets: React.FC = () => {
               </Button>
             )}
           </Box>
-        </Card>
+          </Card>
+        </Fade>
       )}
 
       {budgets.length === 0 ? (
