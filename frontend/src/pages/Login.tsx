@@ -106,17 +106,17 @@ const Login: React.FC = () => {
         py: { xs: 3, sm: 4 },
         background: (theme) =>
           theme.palette.mode === 'light'
-            ? '#0ea5e9' // Base sky blue
+            ? theme.palette.primary.main
             : 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)',
         // Multiple overlapping gradients for mesh effect
         backgroundImage: (theme) =>
           theme.palette.mode === 'light'
             ? `
-              radial-gradient(at 0% 0%, #06b6d4 0%, transparent 50%),
-              radial-gradient(at 100% 0%, #14b8a6 0%, transparent 50%),
-              radial-gradient(at 100% 100%, #0891b2 0%, transparent 50%),
-              radial-gradient(at 0% 100%, #0d9488 0%, transparent 50%),
-              radial-gradient(at 50% 50%, #22d3ee 0%, transparent 50%)
+              radial-gradient(at 0% 0%, ${theme.palette.primary.light} 0%, transparent 50%),
+              radial-gradient(at 100% 0%, ${theme.palette.primary.main} 0%, transparent 50%),
+              radial-gradient(at 100% 100%, ${theme.palette.primary.dark} 0%, transparent 50%),
+              radial-gradient(at 0% 100%, ${theme.palette.primary.dark} 0%, transparent 50%),
+              radial-gradient(at 50% 50%, ${theme.palette.primary.light} 0%, transparent 50%)
             `
             : 'none',
         '&::before': {
@@ -126,7 +126,7 @@ const Login: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(45deg, rgba(20, 184, 166, 0.4) 0%, rgba(6, 182, 212, 0.4) 50%, rgba(8, 145, 178, 0.4) 100%)',
+          background: (theme) => `linear-gradient(45deg, ${theme.palette.primary.main}66 0%, ${theme.palette.primary.light}66 50%, ${theme.palette.primary.dark}66 100%)`,
           animation: 'waveMove 15s ease-in-out infinite',
         },
         '&::after': {
@@ -167,7 +167,7 @@ const Login: React.FC = () => {
           position: 'absolute',
           width: '600px',
           height: '600px',
-          background: 'radial-gradient(circle, rgba(20, 184, 166, 0.25) 0%, transparent 70%)',
+          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.main}40 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '-200px',
           left: '-200px',
@@ -190,7 +190,7 @@ const Login: React.FC = () => {
           position: 'absolute',
           width: '500px',
           height: '500px',
-          background: 'radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, transparent 70%)',
+          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.light}33 0%, transparent 70%)`,
           borderRadius: '50%',
           bottom: '-150px',
           right: '-150px',
@@ -213,7 +213,7 @@ const Login: React.FC = () => {
           position: 'absolute',
           width: '400px',
           height: '400px',
-          background: 'radial-gradient(circle, rgba(8, 145, 178, 0.18) 0%, transparent 70%)',
+          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.dark}2E 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '40%',
           right: '10%',
@@ -249,7 +249,7 @@ const Login: React.FC = () => {
                         backdropFilter: 'blur(10px)',
                         border: '1px solid rgba(255, 255, 255, 0.2)',
                         mb: 3,
-                        boxShadow: '0 8px 32px rgba(20, 184, 166, 0.3)',
+                        boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}4D`,
                         animation: 'float 3s ease-in-out infinite',
                         '@keyframes float': {
                           '0%, 100%': { transform: 'translateY(0px)' },
@@ -352,7 +352,7 @@ const Login: React.FC = () => {
                               background: 'rgba(255, 255, 255, 0.2)',
                               display: 'flex',
                               color: 'white',
-                              boxShadow: '0 4px 12px rgba(20, 184, 166, 0.2)',
+                              boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}33`,
                             }}
                           >
                             {feature.icon}
@@ -455,9 +455,9 @@ const Login: React.FC = () => {
                     display: { xs: 'inline-flex', md: 'none' },
                     p: { xs: 1.5, sm: 2 },
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
                     mb: 2,
-                    boxShadow: '0 4px 20px rgba(20, 184, 166, 0.4)',
+                    boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
                     animation: 'float 3s ease-in-out infinite',
                     '@keyframes float': {
                       '0%, 100%': { transform: 'translateY(0px)' },
@@ -473,7 +473,7 @@ const Login: React.FC = () => {
                   gutterBottom
                   sx={{
                     fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' },
-                    background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
                     backgroundClip: 'text',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
@@ -556,7 +556,7 @@ const Login: React.FC = () => {
                     },
                     '&.Mui-focused': {
                       transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(20, 184, 166, 0.25)',
+                      boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
                     },
                   },
                   '& .MuiInputLabel-root': {
@@ -625,7 +625,7 @@ const Login: React.FC = () => {
                     },
                     '&.Mui-focused': {
                       transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(20, 184, 166, 0.25)',
+                      boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
                     },
                   },
                   '& .MuiInputLabel-root': {
@@ -669,8 +669,8 @@ const Login: React.FC = () => {
                 fontSize: { xs: '1rem', sm: '1.1rem' },
                 fontWeight: 700,
                 borderRadius: 2,
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                boxShadow: '0 4px 20px rgba(20, 184, 166, 0.4)',
+              background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+              boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 position: 'relative',
                 overflow: 'hidden',
@@ -686,8 +686,8 @@ const Login: React.FC = () => {
                 },
                 '&:hover': {
                   transform: 'translateY(-3px)',
-                  boxShadow: '0 8px 30px rgba(20, 184, 166, 0.6)',
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%)',
+                  boxShadow: (theme) => `0 8px 30px ${theme.palette.primary.main}99`,
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
                   '&::before': {
                     left: '100%',
                   },
@@ -696,7 +696,8 @@ const Login: React.FC = () => {
                   transform: 'translateY(-1px)',
                 },
                 '&:disabled': {
-                  background: 'rgba(20, 184, 166, 0.5)',
+                  background: (theme) => theme.palette.primary.main,
+                  opacity: 0.5,
                   transform: 'none',
                 },
               }}
@@ -719,7 +720,7 @@ const Login: React.FC = () => {
                   sx={{
                     fontWeight: 700,
                     textDecoration: 'none',
-                    background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
                     backgroundClip: 'text',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',

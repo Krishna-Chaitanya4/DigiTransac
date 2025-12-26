@@ -101,7 +101,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
         }}
       >
         {isRefreshing ? (
-          <CircularProgress size={24} />
+          <CircularProgress size={24} sx={{ color: 'primary.main' }} />
         ) : (
           <RefreshIcon
             sx={{

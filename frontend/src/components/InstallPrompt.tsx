@@ -122,11 +122,11 @@ export const InstallPrompt: React.FC = () => {
                 width: 56,
                 height: 56,
                 borderRadius: 2,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: theme.palette.gradient.primary,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                boxShadow: `0 4px 12px ${theme.palette.primary.main}66`,
               }}
             >
               <GetAppIcon sx={{ fontSize: 32, color: 'white' }} />
@@ -171,7 +171,7 @@ export const InstallPrompt: React.FC = () => {
             sx={{
               py: 1.5,
               borderRadius: 2,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: theme.palette.gradient.primary,
               textTransform: 'none',
               fontWeight: 600,
               fontSize: '1rem',
@@ -188,6 +188,12 @@ export const InstallPrompt: React.FC = () => {
               borderRadius: 2,
               textTransform: 'none',
               fontWeight: 600,
+              borderColor: 'primary.main',
+              color: 'primary.main',
+              '&:hover': {
+                borderColor: 'primary.dark',
+                bgcolor: 'primary.lighter',
+              },
             }}
           >
             Maybe Later

@@ -11,7 +11,7 @@ const Loading: React.FC = () => {
         minHeight: '100vh',
         background: (theme) =>
           theme.palette.mode === 'light'
-            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+            ? theme.palette.gradient.primary
             : 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
       }}
     >

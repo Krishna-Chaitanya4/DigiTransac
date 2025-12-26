@@ -295,7 +295,7 @@ const Register: React.FC = () => {
         alignItems: 'center',
         position: 'relative',
         overflow: 'hidden',
-        background: '#0ea5e9',
+        background: (theme) => theme.palette.primary.main,
         py: { xs: 3, sm: 4 },
         '&::before': {
           content: '""',
@@ -304,12 +304,12 @@ const Register: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: `
-            radial-gradient(circle at 0% 0%, rgba(20, 184, 166, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 100% 100%, rgba(8, 145, 178, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 0% 100%, rgba(13, 148, 136, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 50% 50%, rgba(20, 184, 166, 0.2) 0%, transparent 50%)
+          background: (theme) => `
+            radial-gradient(circle at 0% 0%, ${theme.palette.primary.main}4D 0%, transparent 50%),
+            radial-gradient(circle at 100% 0%, ${theme.palette.primary.light}4D 0%, transparent 50%),
+            radial-gradient(circle at 100% 100%, ${theme.palette.primary.dark}4D 0%, transparent 50%),
+            radial-gradient(circle at 0% 100%, ${theme.palette.primary.dark}4D 0%, transparent 50%),
+            radial-gradient(circle at 50% 50%, ${theme.palette.primary.main}33 0%, transparent 50%)
           `,
           animation: 'meshMove 20s ease-in-out infinite',
         },
@@ -324,7 +324,7 @@ const Register: React.FC = () => {
           position: 'absolute',
           width: '400px',
           height: '400px',
-          background: 'radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, transparent 70%)',
+          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.main}26 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '-200px',
           right: '-200px',
@@ -343,7 +343,7 @@ const Register: React.FC = () => {
           position: 'absolute',
           width: '300px',
           height: '300px',
-          background: 'radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, transparent 70%)',
+          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.light}26 0%, transparent 70%)`,
           borderRadius: '50%',
           bottom: '-150px',
           left: '-150px',
@@ -360,7 +360,7 @@ const Register: React.FC = () => {
           position: 'absolute',
           width: '350px',
           height: '350px',
-          background: 'radial-gradient(circle, rgba(8, 145, 178, 0.12) 0%, transparent 70%)',
+          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.dark}1F 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '50%',
           right: '10%',
@@ -496,7 +496,7 @@ const Register: React.FC = () => {
                 display: 'inline-flex',
                 p: 2,
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
                 mb: 2,
               }}
             >
@@ -507,7 +507,7 @@ const Register: React.FC = () => {
               fontWeight={800}
               gutterBottom
               sx={{
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -610,7 +610,7 @@ const Register: React.FC = () => {
                     autoFocus
                     placeholder="9876543210"
                     error={!!phoneError}
-                    helperText={phoneError || 'Country code auto-detected. You can edit if needed.'}
+                    helperText={phoneError}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
@@ -719,7 +719,6 @@ const Register: React.FC = () => {
                   value={formData.currency}
                   onChange={handleChange}
                   required
-                  helperText={`Auto-detected from your location. You can change this.`}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
@@ -852,9 +851,9 @@ const Register: React.FC = () => {
                       checked={agreedToTerms}
                       onChange={(e) => setAgreedToTerms(e.target.checked)}
                       sx={{
-                        color: '#14b8a6',
+                        color: 'primary.main',
                         '&.Mui-checked': {
-                          color: '#14b8a6',
+                          color: 'primary.main',
                         },
                       }}
                     />
@@ -862,11 +861,11 @@ const Register: React.FC = () => {
                   label={
                     <Typography variant="body2" color="text.secondary">
                       I agree to the{' '}
-                      <Link href="#" sx={{ color: '#14b8a6', textDecoration: 'none' }}>
+                      <Link href="#" sx={{ color: 'primary.main', textDecoration: 'none' }}>
                         Terms of Service
                       </Link>{' '}
                       and{' '}
-                      <Link href="#" sx={{ color: '#14b8a6', textDecoration: 'none' }}>
+                      <Link href="#" sx={{ color: 'primary.main', textDecoration: 'none' }}>
                         Privacy Policy
                       </Link>
                     </Typography>
@@ -888,16 +887,17 @@ const Register: React.FC = () => {
                 fontSize: '1.1rem',
                 fontWeight: 700,
                 borderRadius: 2,
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                boxShadow: '0 4px 20px rgba(20, 184, 166, 0.4)',
+                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
                 transition: 'all 0.3s ease',
                 '&:hover': {
                   transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 30px rgba(20, 184, 166, 0.6)',
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%)',
+                  boxShadow: (theme) => `0 8px 30px ${theme.palette.primary.main}99`,
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
                 },
                 '&:disabled': {
-                  background: 'rgba(20, 184, 166, 0.5)',
+                  background: (theme) => theme.palette.primary.main,
+                  opacity: 0.5,
                 },
               }}
             >
@@ -913,9 +913,9 @@ const Register: React.FC = () => {
                   sx={{ 
                     fontWeight: 600, 
                     textDecoration: 'none',
-                    color: '#14b8a6',
+                    color: 'primary.main',
                     '&:hover': {
-                      color: '#06b6d4',
+                      color: 'primary.light',
                     },
                   }}
                 >

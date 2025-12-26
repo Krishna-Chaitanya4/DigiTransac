@@ -200,7 +200,19 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size="small" onClick={handleReset} title="Reset Filters">
+          <IconButton 
+            size="small" 
+            onClick={handleReset} 
+            title="Reset Filters"
+            sx={{
+              color: 'primary.main',
+              '&:hover': {
+                bgcolor: 'primary.lighter',
+                transform: 'rotate(-180deg)',
+              },
+              transition: 'all 0.4s ease',
+            }}
+          >
             <RefreshIcon />
           </IconButton>
           <IconButton size="small" onClick={() => setExpanded(!expanded)}>

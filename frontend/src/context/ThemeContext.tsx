@@ -2,6 +2,34 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { ThemeProvider as MUIThemeProvider, createTheme, Theme } from '@mui/material/styles';
 import { PaletteMode } from '@mui/material';
 
+// Extend MUI theme types
+declare module '@mui/material/styles' {
+  interface Palette {
+    gradient: {
+      primary: string;
+      primaryReverse: string;
+      success: string;
+      error: string;
+      info: string;
+    };
+  }
+  interface PaletteOptions {
+    gradient?: {
+      primary?: string;
+      primaryReverse?: string;
+      success?: string;
+      error?: string;
+      info?: string;
+    };
+  }
+  interface PaletteColor {
+    lighter?: string;
+  }
+  interface SimplePaletteColorOptions {
+    lighter?: string;
+  }
+}
+
 interface ThemeContextType {
   mode: PaletteMode;
   toggleTheme: () => void;
@@ -39,38 +67,49 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     palette: {
       mode,
       primary: {
-        main: '#1976d2',
-        light: '#42a5f5',
-        dark: '#1565c0',
+        main: '#14b8a6', // Teal - your brand color
+        light: '#06b6d4', // Cyan - lighter variant
+        dark: '#0891b2', // Dark cyan
+        lighter: '#5eead4', // Extra light for hover states
+        contrastText: '#ffffff',
       },
       secondary: {
-        main: '#9c27b0',
-        light: '#ba68c8',
-        dark: '#7b1fa2',
+        main: '#8b5cf6', // Purple accent
+        light: '#a78bfa',
+        dark: '#7c3aed',
+        lighter: '#c4b5fd',
       },
       success: {
-        main: '#2e7d32',
-        light: '#4caf50',
-        dark: '#1b5e20',
+        main: '#10b981',
+        light: '#34d399',
+        dark: '#059669',
       },
       error: {
-        main: '#d32f2f',
-        light: '#ef5350',
-        dark: '#c62828',
+        main: '#ef4444',
+        light: '#f87171',
+        dark: '#dc2626',
       },
       warning: {
-        main: '#ed6c02',
-        light: '#ff9800',
-        dark: '#e65100',
+        main: '#f59e0b',
+        light: '#fbbf24',
+        dark: '#d97706',
       },
       info: {
-        main: '#0288d1',
-        light: '#03a9f4',
-        dark: '#01579b',
+        main: '#3b82f6',
+        light: '#60a5fa',
+        dark: '#2563eb',
       },
       background: {
         default: mode === 'light' ? '#f5f5f5' : '#121212',
         paper: mode === 'light' ? '#ffffff' : '#1e1e1e',
+      },
+      // Custom gradients for consistent use across the app
+      gradient: {
+        primary: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+        primaryReverse: 'linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%)',
+        success: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+        error: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)',
+        info: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
       },
     },
     typography: {

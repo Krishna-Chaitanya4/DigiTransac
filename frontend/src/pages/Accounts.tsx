@@ -948,9 +948,9 @@ const Accounts: React.FC = () => {
             <IconButton 
               onClick={fetchAccounts}
               sx={{
-                color: '#14b8a6',
+                color: 'primary.main',
                 '&:hover': {
-                  background: 'rgba(20, 184, 166, 0.1)',
+                  bgcolor: 'primary.lighter',
                   transform: 'rotate(180deg)',
                 },
                 transition: 'all 0.4s ease',
