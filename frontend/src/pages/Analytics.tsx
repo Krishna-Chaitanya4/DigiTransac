@@ -67,15 +67,15 @@ const DATE_RANGES = [
 
 // Chart colors
 const COLORS = {
-  primary: '#667eea',
-  success: '#4caf50',
-  error: '#f44336',
-  warning: '#ff9800',
-  info: '#2196f3',
+  primary: '#14b8a6',
+  success: '#10b981',
+  error: '#f43f5e',
+  warning: '#f97316',
+  info: '#06b6d4',
   categoryColors: [
-    '#667eea', '#764ba2', '#f093fb', '#4facfe',
-    '#43e97b', '#fa709a', '#fee140', '#30cfd0',
-    '#a8edea', '#fed6e3', '#a6c1ee', '#fbc2eb',
+    '#14b8a6', '#06b6d4', '#0891b2', '#22d3ee',
+    '#10b981', '#34d399', '#f59e0b', '#fbbf24',
+    '#8b5cf6', '#a78bfa', '#ec4899', '#f472b6',
   ],
 };
 
@@ -427,7 +427,17 @@ const Analytics: React.FC = () => {
       <Box sx={{ mb: 4 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Box>
-            <Typography variant="h4" fontWeight={800} gutterBottom>
+            <Typography 
+              variant="h4" 
+              fontWeight={800} 
+              gutterBottom
+              sx={{
+                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
               Analytics
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -435,7 +445,16 @@ const Analytics: React.FC = () => {
             </Typography>
           </Box>
           <Tooltip title="Export to CSV">
-            <IconButton onClick={exportData} color="primary" size="large">
+            <IconButton 
+              onClick={exportData} 
+              size="large"
+              sx={{
+                color: '#14b8a6',
+                '&:hover': {
+                  background: 'rgba(20, 184, 166, 0.1)',
+                },
+              }}
+            >
               <Download />
             </IconButton>
           </Tooltip>
@@ -493,52 +512,84 @@ const Analytics: React.FC = () => {
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3 }}>
+          <Card sx={{ 
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
+            },
+          }}>
             <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
+              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
                 Total Income
               </Typography>
-              <Typography variant="h5" fontWeight={700} color="success.main">
+              <Typography variant="h5" fontWeight={700} color="white">
                 {formatCurrency(summaryStats.income)}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3 }}>
+          <Card sx={{ 
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: '0 8px 24px rgba(244, 63, 94, 0.4)',
+            },
+          }}>
             <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
+              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
                 Total Expenses
               </Typography>
-              <Typography variant="h5" fontWeight={700} color="error.main">
+              <Typography variant="h5" fontWeight={700} color="white">
                 {formatCurrency(summaryStats.expenses)}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3 }}>
+          <Card sx={{ 
+            borderRadius: 3,
+            background: summaryStats.net >= 0 
+              ? 'linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%)'
+              : 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: summaryStats.net >= 0
+                ? '0 8px 24px rgba(6, 182, 212, 0.4)'
+                : '0 8px 24px rgba(249, 115, 22, 0.4)',
+            },
+          }}>
             <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
+              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
                 Net Savings
               </Typography>
-              <Typography
-                variant="h5"
-                fontWeight={700}
-                color={summaryStats.net >= 0 ? 'success.main' : 'error.main'}
-              >
+              <Typography variant="h5" fontWeight={700} color="white">
                 {formatCurrency(summaryStats.net)}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3 }}>
+          <Card sx={{ 
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: '0 8px 24px rgba(20, 184, 166, 0.4)',
+            },
+          }}>
             <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
+              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
                 Avg Daily Spending
               </Typography>
-              <Typography variant="h5" fontWeight={700}>
+              <Typography variant="h5" fontWeight={700} color="white">
                 {formatCurrency(summaryStats.avgDailySpending)}
               </Typography>
             </CardContent>
