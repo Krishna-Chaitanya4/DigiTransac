@@ -96,29 +96,111 @@ export const availableCurrencies: CurrencyInfo[] = [
 
 /**
  * Detect currency from browser locale
+ * Uses: Timezone → Locale/Country Code → Fallback
  */
 export const detectCurrency = (): string => {
   try {
-    // Get all browser languages
+    // METHOD 1: Timezone-based detection (Most Reliable)
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      const timezoneToCurrency: Record<string, string> = {
+        // Asia
+        'Asia/Kolkata': 'INR',
+        'Asia/Calcutta': 'INR',
+        'Asia/Mumbai': 'INR',
+        'Asia/Delhi': 'INR',
+        'Asia/Tokyo': 'JPY',
+        'Asia/Shanghai': 'CNY',
+        'Asia/Hong_Kong': 'HKD',
+        'Asia/Singapore': 'SGD',
+        'Asia/Seoul': 'KRW',
+        'Asia/Bangkok': 'THB',
+        'Asia/Jakarta': 'IDR',
+        'Asia/Manila': 'PHP',
+        'Asia/Kuala_Lumpur': 'MYR',
+        'Asia/Dubai': 'AED',
+        'Asia/Riyadh': 'SAR',
+        'Asia/Tel_Aviv': 'ILS',
+        'Asia/Istanbul': 'TRY',
+        // Americas
+        'America/New_York': 'USD',
+        'America/Chicago': 'USD',
+        'America/Denver': 'USD',
+        'America/Los_Angeles': 'USD',
+        'America/Toronto': 'CAD',
+        'America/Vancouver': 'CAD',
+        'America/Mexico_City': 'MXN',
+        'America/Sao_Paulo': 'BRL',
+        'America/Buenos_Aires': 'ARS',
+        // Europe
+        'Europe/London': 'GBP',
+        'Europe/Paris': 'EUR',
+        'Europe/Berlin': 'EUR',
+        'Europe/Rome': 'EUR',
+        'Europe/Madrid': 'EUR',
+        'Europe/Amsterdam': 'EUR',
+        'Europe/Brussels': 'EUR',
+        'Europe/Vienna': 'EUR',
+        'Europe/Zurich': 'CHF',
+        'Europe/Moscow': 'RUB',
+        'Europe/Warsaw': 'PLN',
+        // Oceania
+        'Australia/Sydney': 'AUD',
+        'Australia/Melbourne': 'AUD',
+        'Pacific/Auckland': 'NZD',
+        // Africa
+        'Africa/Johannesburg': 'ZAR',
+        'Africa/Lagos': 'NGN',
+        'Africa/Nairobi': 'KES',
+      };
+      
+      if (timezoneToCurrency[timezone]) {
+        return timezoneToCurrency[timezone];
+      }
+    } catch (tzError) {
+      // Timezone detection failed, continue to fallback
+    }
+    
+    // METHOD 2: Locale-based detection with country code extraction
     const languages = navigator.languages || [navigator.language];
     
-    // Try to match locale to currency
     for (const lang of languages) {
+      // Try exact locale match
       if (localeToCurrency[lang]) {
         return localeToCurrency[lang];
       }
       
-      // Try with just country code (e.g., "en-US" -> "en")
-      const baseLocale = lang.split('-')[0];
-      if (localeToCurrency[baseLocale]) {
-        return localeToCurrency[baseLocale];
+      // Extract country code (e.g., "en-IN" → "IN")
+      if (lang.includes('-')) {
+        const countryCode = lang.split('-')[1]?.toUpperCase();
+        
+        const countryToCurrency: Record<string, string> = {
+          'IN': 'INR', 'US': 'USD', 'GB': 'GBP', 'CA': 'CAD',
+          'AU': 'AUD', 'JP': 'JPY', 'CN': 'CNY', 'SG': 'SGD',
+          'MY': 'MYR', 'PH': 'PHP', 'TH': 'THB', 'ID': 'IDR',
+          'VN': 'VND', 'KR': 'KRW', 'HK': 'HKD', 'TW': 'TWD',
+          'BR': 'BRL', 'MX': 'MXN', 'ZA': 'ZAR', 'SA': 'SAR',
+          'AE': 'AED', 'TR': 'TRY', 'RU': 'RUB', 'PL': 'PLN',
+          'NG': 'NGN', 'KE': 'KES', 'AR': 'ARS', 'CL': 'CLP',
+          'CO': 'COP', 'NZ': 'NZD', 'IL': 'ILS', 'CH': 'CHF',
+        };
+        
+        // Eurozone countries
+        const eurozone = ['DE', 'FR', 'ES', 'IT', 'NL', 'PT', 'BE', 'AT', 'IE', 'FI', 'GR'];
+        if (eurozone.includes(countryCode)) {
+          return 'EUR';
+        }
+        
+        if (countryCode && countryToCurrency[countryCode]) {
+          return countryToCurrency[countryCode];
+        }
       }
     }
     
     // Fallback to USD
     return 'USD';
   } catch (error) {
-    console.warn('Currency detection failed, defaulting to USD', error);
     return 'USD';
   }
 };
