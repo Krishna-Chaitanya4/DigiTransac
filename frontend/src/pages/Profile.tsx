@@ -39,16 +39,21 @@ import {
   Sync as SyncIcon,
   AccessTime as AccessTimeIcon,
   Notifications as NotificationsIcon,
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
+import { useThemeContext } from '../context/ThemeContext';
 
 const Profile: React.FC = () => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { mode, toggleTheme } = useThemeContext();
   
   const [emailIntegration, setEmailIntegration] = useState({
     enabled: false,
@@ -758,6 +763,72 @@ const Profile: React.FC = () => {
             <Chip key={bank} label={bank} variant="outlined" size="small" />
           ))}
         </Box>
+      </Paper>
+
+      {/* Preferences Section */}
+      <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+        <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 3 }}>
+          Preferences
+        </Typography>
+
+        {/* Theme Toggle */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
+            borderRadius: 2,
+            bgcolor: 'action.hover',
+            mb: 2,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {mode === 'dark' ? (
+              <DarkModeIcon sx={{ color: '#14b8a6', fontSize: 28 }} />
+            ) : (
+              <LightModeIcon sx={{ color: '#14b8a6', fontSize: 28 }} />
+            )}
+            <Box>
+              <Typography variant="body1" fontWeight={600}>
+                {mode === 'dark' ? 'Dark' : 'Light'} Mode
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Switch between light and dark theme
+              </Typography>
+            </Box>
+          </Box>
+          <Switch
+            checked={mode === 'dark'}
+            onChange={toggleTheme}
+            color="primary"
+          />
+        </Box>
+
+        {/* Logout Button */}
+        <Button
+          variant="outlined"
+          fullWidth
+          onClick={() => {
+            logout();
+            navigate('/login');
+          }}
+          startIcon={<LogoutIcon />}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            py: 1.5,
+            borderColor: 'error.main',
+            color: 'error.main',
+            '&:hover': {
+              borderColor: 'error.dark',
+              bgcolor: 'error.main',
+              color: 'white',
+            },
+          }}
+        >
+          Sign Out
+        </Button>
       </Paper>
 
       {/* Delete Account */}

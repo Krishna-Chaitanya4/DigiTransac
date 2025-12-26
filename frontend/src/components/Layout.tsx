@@ -26,7 +26,6 @@ import {
   Category as CategoryIcon,
   AccountBalance as BudgetIcon,
   Analytics as AnalyticsIcon,
-  Person as PersonIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   Menu as MenuIcon,
@@ -37,6 +36,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Search as SearchIcon,
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';
@@ -121,7 +121,6 @@ const Layout: React.FC = () => {
 
   const handleProfileClick = () => {
     navigate('/profile');
-    handleMenuClose();
   };
 
   // Filter menu items based on search
@@ -320,43 +319,94 @@ const Layout: React.FC = () => {
       {/* Profile Section at Bottom */}
       <Box sx={{ borderTop: '1px solid', borderColor: 'divider', p: 2 }}>
         <Box
-          onClick={handleMenuClick}
           sx={{
             display: 'flex',
             alignItems: 'center',
-            gap: 1.5,
-            p: sidebarCollapsed ? 1.5 : 1.5,
+            gap: 1,
             borderRadius: 2,
-            cursor: 'pointer',
-            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              bgcolor: 'action.hover',
-            },
+            position: 'relative',
           }}
         >
-          <Avatar
+          {/* Profile Info - Clickable to navigate */}
+          <Box
+            onClick={handleProfileClick}
             sx={{
-              background: '#14b8a6',
-              width: sidebarCollapsed ? 36 : 38,
-              height: sidebarCollapsed ? 36 : 38,
-              fontWeight: 600,
-              fontSize: '0.95rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              p: sidebarCollapsed ? 1.5 : 1.5,
+              borderRadius: 2,
+              cursor: 'pointer',
+              flex: 1,
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
             }}
           >
-            {user?.fullName?.[0] || user?.username?.[0] || 'U'}
-          </Avatar>
+            <Avatar
+              sx={{
+                background: '#14b8a6',
+                width: sidebarCollapsed ? 36 : 38,
+                height: sidebarCollapsed ? 36 : 38,
+                fontWeight: 600,
+                fontSize: '0.95rem',
+              }}
+            >
+              {user?.fullName?.[0] || user?.username?.[0] || 'U'}
+            </Avatar>
+            {!sidebarCollapsed && (
+              <Fade in={!sidebarCollapsed}>
+                <Box sx={{ overflow: 'hidden', flex: 1 }}>
+                  <Typography fontSize="0.875rem" fontWeight={600} noWrap>
+                    {user?.fullName || user?.username || 'User'}
+                  </Typography>
+                  <Typography fontSize="0.75rem" color="text.secondary" noWrap>
+                    @{user?.username || user?.email || user?.phone || 'user'}
+                  </Typography>
+                </Box>
+              </Fade>
+            )}
+          </Box>
+
+          {/* Settings Menu Icon - Always visible when not collapsed */}
           {!sidebarCollapsed && (
-            <Fade in={!sidebarCollapsed}>
-              <Box sx={{ overflow: 'hidden', flex: 1 }}>
-                <Typography fontSize="0.875rem" fontWeight={600} noWrap>
-                  {user?.fullName || user?.username || 'User'}
-                </Typography>
-                <Typography fontSize="0.75rem" color="text.secondary" noWrap>
-                  @{user?.username || user?.email || user?.phone || 'user'}
-                </Typography>
-              </Box>
-            </Fade>
+            <Tooltip title="Settings" placement="top" arrow>
+              <IconButton
+                onClick={handleMenuClick}
+                size="small"
+                sx={{
+                  color: 'text.secondary',
+                  mr: 0.5,
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                    color: 'text.primary',
+                  },
+                }}
+              >
+                <MoreVertIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* For collapsed sidebar, show menu icon on hover */}
+          {sidebarCollapsed && (
+            <Tooltip title="Settings" placement="right" arrow>
+              <IconButton
+                onClick={handleMenuClick}
+                size="small"
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                    color: 'text.primary',
+                  },
+                }}
+              >
+                <MoreVertIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           )}
         </Box>
       </Box>
@@ -405,12 +455,6 @@ const Layout: React.FC = () => {
           },
         }}
       >
-        <MenuItem onClick={handleProfileClick}>
-          <ListItemIcon>
-            <PersonIcon fontSize="small" sx={{ color: '#14b8a6' }} />
-          </ListItemIcon>
-          Profile
-        </MenuItem>
         <MenuItem onClick={() => { toggleTheme(); handleMenuClose(); }}>
           <ListItemIcon>
             {mode === 'dark' ? (
