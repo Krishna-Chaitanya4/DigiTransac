@@ -317,7 +317,13 @@ const Layout: React.FC = () => {
       </List>
 
       {/* Profile Section at Bottom */}
-      <Box sx={{ borderTop: '1px solid', borderColor: 'divider', p: 2 }}>
+      <Box sx={{ 
+        borderTop: '1px solid', 
+        borderColor: 'divider', 
+        p: sidebarCollapsed ? 1 : 2,
+        display: 'flex',
+        justifyContent: 'center',
+      }}>
         <Box
           sx={{
             display: 'flex',
@@ -337,7 +343,7 @@ const Layout: React.FC = () => {
               p: sidebarCollapsed ? 1.5 : 1.5,
               borderRadius: 2,
               cursor: 'pointer',
-              flex: 1,
+              flex: sidebarCollapsed ? 'none' : 1,
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
               transition: 'all 0.2s ease',
               '&:hover': {
@@ -379,25 +385,6 @@ const Layout: React.FC = () => {
                 sx={{
                   color: 'text.secondary',
                   mr: 0.5,
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                    color: 'text.primary',
-                  },
-                }}
-              >
-                <MoreVertIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-
-          {/* For collapsed sidebar, show menu icon on hover */}
-          {sidebarCollapsed && (
-            <Tooltip title="Settings" placement="right" arrow>
-              <IconButton
-                onClick={handleMenuClick}
-                size="small"
-                sx={{
-                  color: 'text.secondary',
                   '&:hover': {
                     bgcolor: 'action.hover',
                     color: 'text.primary',
