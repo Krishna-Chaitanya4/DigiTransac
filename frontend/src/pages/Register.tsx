@@ -42,6 +42,23 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { detectCurrency, availableCurrencies } from '../utils/currencyDetection';
+import { detectCountry } from '../utils/countryDetection';
+
+// Helper function to get country calling code
+const getCountryCallingCode = (countryCode: string): string => {
+  const codes: Record<string, string> = {
+    'IN': '91', 'US': '1', 'GB': '44', 'CA': '1', 'AU': '61',
+    'JP': '81', 'CN': '86', 'SG': '65', 'MY': '60', 'PH': '63',
+    'TH': '66', 'ID': '62', 'VN': '84', 'KR': '82', 'HK': '852',
+    'TW': '886', 'BR': '55', 'MX': '52', 'ZA': '27', 'SA': '966',
+    'AE': '971', 'TR': '90', 'RU': '7', 'PL': '48', 'NG': '234',
+    'KE': '254', 'AR': '54', 'CL': '56', 'CO': '57', 'NZ': '64',
+    'IL': '972', 'CH': '41', 'DE': '49', 'FR': '33', 'ES': '34',
+    'IT': '39', 'NL': '31', 'PT': '351', 'BE': '32', 'AT': '43',
+    'IE': '353', 'FI': '358', 'GR': '30',
+  };
+  return codes[countryCode] || '1';
+};
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -50,7 +67,7 @@ const Register: React.FC = () => {
   const [contactMethod, setContactMethod] = useState<'email' | 'phone'>('email');
   const [formData, setFormData] = useState({
     email: '',
-    phone: '',
+    phone: `+${getCountryCallingCode(detectCountry())} `, // Auto-fill country code
     username: '',
     fullName: '',
     dateOfBirth: '',
@@ -580,12 +597,27 @@ const Register: React.FC = () => {
                     name="phone"
                     type="tel"
                     value={formData.phone}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, phone: value });
+                      if (value && !validatePhone(value)) {
+                        setPhoneError('Please enter a valid phone number with country code');
+                      } else {
+                        setPhoneError('');
+                      }
+                    }}
                     required
                     autoFocus
+                    placeholder="9876543210"
                     error={!!phoneError}
-                    helperText={phoneError || 'Include country code (e.g., +1234567890)'}
-                    placeholder="+1234567890"
+                    helperText={phoneError || 'Country code auto-detected. You can edit if needed.'}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <PhoneIcon />
+                        </InputAdornment>
+                      ),
+                    }}
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         borderRadius: 2,
