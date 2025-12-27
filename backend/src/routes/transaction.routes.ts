@@ -845,9 +845,7 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
     }
 
     // Get splits for these transactions to update tag counts
-    const splits = await splitsContainer
-      .find({ transactionId: { $in: ids }, userId })
-      .toArray();
+    const splits = await splitsContainer.find({ transactionId: { $in: ids }, userId }).toArray();
 
     const accountBalanceChanges: { [accountId: string]: number } = {};
     const transactionTagsMap: { [transactionId: string]: Set<string> } = {};
@@ -880,7 +878,7 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
 
     // Delete splits first
     await splitsContainer.deleteMany({ transactionId: { $in: ids }, userId });
-    
+
     // Delete transactions
     await transactionsContainer.deleteMany({ id: { $in: ids }, userId });
 

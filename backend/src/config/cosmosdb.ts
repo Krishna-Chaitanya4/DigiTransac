@@ -27,7 +27,8 @@ class CosmosDBService {
     try {
       // Get connection string from Key Vault
       const connectionString = await this.getConnectionString();
-      const dbName = process.env.MONGODB_DATABASE_NAME || process.env.COSMOS_DATABASE_NAME || 'DigiTransacDB';
+      const dbName =
+        process.env.MONGODB_DATABASE_NAME || process.env.COSMOS_DATABASE_NAME || 'DigiTransacDB';
 
       // Initialize MongoDB client with secure options
       this.client = new MongoClient(connectionString, {
@@ -40,16 +41,22 @@ class CosmosDBService {
       await this.client.connect();
       this.db = this.client.db(dbName);
 
-      logger.info({
-        env: process.env.NODE_ENV,
-        service: 'digitransac-backend',
-      }, `📚 Database "${dbName}" connected`);
+      logger.info(
+        {
+          env: process.env.NODE_ENV,
+          service: 'digitransac-backend',
+        },
+        `📚 Database "${dbName}" connected`
+      );
 
       await this.initializeCollections();
-      logger.info({
-        env: process.env.NODE_ENV,
-        service: 'digitransac-backend',
-      }, '✅ All Cosmos DB collections are ready');
+      logger.info(
+        {
+          env: process.env.NODE_ENV,
+          service: 'digitransac-backend',
+        },
+        '✅ All Cosmos DB collections are ready'
+      );
     } catch (error) {
       logger.error({ error }, 'Failed to initialize Cosmos DB');
       throw error;

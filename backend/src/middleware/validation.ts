@@ -110,7 +110,8 @@ export const schemas = {
       .pattern(/^[a-z0-9._]+$/)
       .required()
       .messages({
-        'string.pattern.base': 'Username can only contain lowercase letters, numbers, dots and underscores',
+        'string.pattern.base':
+          'Username can only contain lowercase letters, numbers, dots and underscores',
       }),
     password: Joi.string().min(8).required(),
     fullName: Joi.string().min(1).max(100).required(),

@@ -9,17 +9,17 @@ class KeyVaultService {
 
   private initializeClient() {
     if (this.initialized) return;
-    
+
     try {
       const keyVaultUrl = process.env.AZURE_KEY_VAULT_URL || process.env.KEY_VAULT_URL;
-      
+
       if (!keyVaultUrl) {
         throw new Error(
           '❌ AZURE_KEY_VAULT_URL is required for secure secret management.\n' +
-          '📋 Setup instructions:\n' +
-          '  1. Run: az login\n' +
-          '  2. Set: AZURE_KEY_VAULT_URL=https://digitransac-kv-3895.vault.azure.net/\n' +
-          '  3. Restart the application'
+            '📋 Setup instructions:\n' +
+            '  1. Run: az login\n' +
+            '  2. Set: AZURE_KEY_VAULT_URL=https://digitransac-kv-3895.vault.azure.net/\n' +
+            '  3. Restart the application'
         );
       }
 
@@ -28,13 +28,16 @@ class KeyVaultService {
       // - Production: Uses Managed Identity
       const credential = new DefaultAzureCredential();
       this.client = new SecretClient(keyVaultUrl, credential);
-      
+
       const env = process.env.NODE_ENV || 'development';
-      logger.info({
-        keyVaultUrl,
-        authMethod: env === 'production' ? 'Managed Identity' : 'Azure CLI (az login)'
-      }, '🔐 Key Vault client initialized');
-      
+      logger.info(
+        {
+          keyVaultUrl,
+          authMethod: env === 'production' ? 'Managed Identity' : 'Azure CLI (az login)',
+        },
+        '🔐 Key Vault client initialized'
+      );
+
       this.initialized = true;
     } catch (error) {
       logger.error({ error }, 'Failed to initialize Key Vault client');
@@ -59,7 +62,7 @@ class KeyVaultService {
       }
 
       const secret = await this.client.getSecret(secretName);
-      
+
       if (!secret.value) {
         throw new Error(`Secret ${secretName} has no value in Key Vault`);
       }
@@ -67,7 +70,7 @@ class KeyVaultService {
       // Cache the secret
       this.secretCache.set(secretName, secret.value);
       logger.info(`✅ Retrieved secret: ${secretName} from Key Vault`);
-      
+
       return secret.value;
     } catch (error) {
       logger.error({ error, secretName }, `Failed to get secret ${secretName} from Key Vault`);

@@ -106,11 +106,9 @@ router.post(
 
       // Generate JWT token with secret from Key Vault
       const jwtSecret = await getJWTSecret();
-      const token = jwt.sign(
-        { userId: newUser.id, username: newUser.username },
-        jwtSecret,
-        { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
-      );
+      const token = jwt.sign({ userId: newUser.id, username: newUser.username }, jwtSecret, {
+        expiresIn: process.env.JWT_EXPIRE || '7d',
+      } as jwt.SignOptions);
 
       // Return user without password
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -174,11 +172,9 @@ router.post(
 
       // Generate JWT token with secret from Key Vault
       const jwtSecret = await getJWTSecret();
-      const token = jwt.sign(
-        { userId: user.id, username: user.username },
-        jwtSecret,
-        { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
-      );
+      const token = jwt.sign({ userId: user.id, username: user.username }, jwtSecret, {
+        expiresIn: process.env.JWT_EXPIRE || '7d',
+      } as jwt.SignOptions);
 
       // Return user without password
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -211,11 +207,9 @@ router.post('/refresh', authenticate, async (req: any, res: Response): Promise<v
 
     // Generate new JWT token with secret from Key Vault
     const jwtSecret = await getJWTSecret();
-    const token = jwt.sign(
-      { userId, email },
-      jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
-    );
+    const token = jwt.sign({ userId, email }, jwtSecret, {
+      expiresIn: process.env.JWT_EXPIRE || '7d',
+    } as jwt.SignOptions);
 
     logger.info(`Token refreshed for user: ${email}`);
 

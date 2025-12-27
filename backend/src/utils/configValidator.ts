@@ -3,7 +3,7 @@ import { logger } from './logger';
 /**
  * Validates required environment variables on startup
  * Throws error if critical configuration is missing
- * 
+ *
  * Note: Secrets (MongoDB connection, JWT secret, encryption key) are now
  * stored in Azure Key Vault and validated at runtime, not here.
  */
@@ -22,7 +22,7 @@ export const validateConfig = (): void => {
     logger.error({ missing }, '❌ Missing required environment variables');
     throw new Error(
       `Missing required environment variables: ${missing.join(', ')}\n` +
-      'Run "az login" and set AZURE_KEY_VAULT_URL=https://digitransac-kv-3895.vault.azure.net/'
+        'Run "az login" and set AZURE_KEY_VAULT_URL=https://digitransac-kv-3895.vault.azure.net/'
     );
   }
 

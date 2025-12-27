@@ -21,12 +21,16 @@ const getOAuth2Client = () => {
 const csrfTokens = new Map<string, { userId: string; timestamp: number }>();
 
 // Clean up expired tokens every 15 minutes
-setInterval(() => {
-  const now = Date.now();
-  const expired = Array.from(csrfTokens.entries())
-    .filter(([_, data]) => now - data.timestamp > 15 * 60 * 1000);
-  expired.forEach(([token]) => csrfTokens.delete(token));
-}, 15 * 60 * 1000);
+setInterval(
+  () => {
+    const now = Date.now();
+    const expired = Array.from(csrfTokens.entries()).filter(
+      ([_, data]) => now - data.timestamp > 15 * 60 * 1000
+    );
+    expired.forEach(([token]) => csrfTokens.delete(token));
+  },
+  15 * 60 * 1000
+);
 
 /**
  * Step 1: Generate OAuth URL with CSRF token
