@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Application Constants
  * Central location for all magic numbers, strings, and configuration values
  */

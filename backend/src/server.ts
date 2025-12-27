@@ -1,4 +1,4 @@
-import express, { Application } from 'express';
+﻿import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -12,7 +12,7 @@ import { globalLimiter } from './middleware/rateLimiter';
 import { validateConfig } from './utils/configValidator';
 import { validateEnv } from './utils/envValidator';
 import { setupSwagger } from './config/swagger';
-import { cosmosDBService } from './config/cosmosdb';
+import { mongoDBService } from './config/mongodb';
 import { encryptionService } from './services/encryption.service';
 import configRoutes from './routes/config.routes';
 import v1Routes from './routes/v1';
@@ -56,7 +56,7 @@ app.get('/health', async (_req, res) => {
 
   try {
     // Simple check: just verify DB service is initialized
-    const isInitialized = cosmosDBService.usersContainer !== null;
+    const isInitialized = mongoDBService.usersContainer !== null;
 
     clearTimeout(healthCheckTimeout);
     res.status(isInitialized ? 200 : 503).json({
@@ -168,11 +168,11 @@ app.use('/api/sms', (req, res) => res.redirect(308, `/api/v1/sms${req.url}`));
 // Error handling
 app.use(errorHandler);
 
-// Initialize Cosmos DB and start server
+// Initialize MongoDB and start server
 const startServer = async () => {
   try {
-    // Initialize Cosmos DB connection
-    await cosmosDBService.initialize();
+    // Initialize MongoDB connection
+    await mongoDBService.initialize();
 
     // Initialize encryption service
     await encryptionService.initialize();
@@ -187,7 +187,7 @@ const startServer = async () => {
     app.listen(PORT, '0.0.0.0', () => {
       logger.info(`🚀 Server is running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
-      logger.info(`✅ Cosmos DB connected and ready`);
+      logger.info(`✅ MongoDB connected and ready`);
       logger.info(`📱 Network: http://192.168.0.11:${PORT}`);
     });
   } catch (error) {
@@ -204,7 +204,7 @@ const gracefulShutdown = async (signal: string) => {
 
   try {
     // Close database connection
-    await cosmosDBService.close();
+    await mongoDBService.close();
 
     logger.info('✅ Graceful shutdown completed');
     process.exit(0);

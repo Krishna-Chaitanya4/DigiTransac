@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Transaction Filter Utilities
  *
  * Centralized utilities for building MongoDB filters following industry best practices:

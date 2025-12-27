@@ -1,4 +1,4 @@
-import { DefaultAzureCredential } from '@azure/identity';
+﻿import { DefaultAzureCredential } from '@azure/identity';
 import { SecretClient } from '@azure/keyvault-secrets';
 import { logger } from '../utils/logger';
 

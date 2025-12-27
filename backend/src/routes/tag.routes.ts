@@ -1,6 +1,6 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { Tag, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -10,7 +10,7 @@ router.use(authenticate);
 
 // Helper function to ensure default tags exist
 async function ensureDefaultTags(userId: string): Promise<void> {
-  const tagsContainer = await cosmosDBService.getTagsContainer();
+  const tagsContainer = await mongoDBService.getTagsContainer();
 
   const defaultTags = [
     { name: 'expense', color: '#f44336' },
@@ -46,8 +46,8 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     // Ensure default tags exist
     await ensureDefaultTags(userId);
 
-    const tagsContainer = await cosmosDBService.getTagsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     const tags = (await tagsContainer.find({ userId }).toArray()) as unknown as Tag[];
 
@@ -106,7 +106,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     // Check if tag already exists
     const existingTag = await tagsContainer.findOne({
@@ -155,7 +155,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = req.params;
     const { name, color } = req.body;
 
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     const tag = await tagsContainer.findOne({ id, userId });
     if (!tag) {
@@ -193,7 +193,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // If name changed, update all transactions using this tag
     if (name && name !== tag.name) {
-      const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+      const transactionsContainer = await mongoDBService.getTransactionsContainer();
       await transactionsContainer.updateMany(
         { userId, tags: tag.name },
         { $set: { 'tags.$': name.trim() } }
@@ -222,7 +222,7 @@ router.get('/:id/usage', async (req: AuthRequest, res: Response): Promise<void> 
     const userId = req.userId!;
     const { id } = req.params;
 
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
     const tag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
 
     if (!tag) {
@@ -235,7 +235,7 @@ router.get('/:id/usage', async (req: AuthRequest, res: Response): Promise<void> 
 
     // Count transactions using this tag
     // Tags are stored in the transactionSplits collection, not in transactions
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     // Find all splits that have this tag
     const splitsWithTag = await splitsContainer
@@ -250,7 +250,7 @@ router.get('/:id/usage', async (req: AuthRequest, res: Response): Promise<void> 
     const transactionCount = transactionIds.length;
 
     // Count budgets using this tag in include/exclude filters
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = await budgetsContainer.find({ userId }).toArray();
 
     const budgetsUsingTag = budgets.filter((budget: any) => {
@@ -292,7 +292,7 @@ router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     // Get both tags
     const oldTag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
@@ -310,7 +310,7 @@ router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<voi
     }
 
     // Replace in transactions (via splits collection)
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
     const splitsWithOldTag = await splitsContainer
       .find({
         userId,
@@ -335,7 +335,7 @@ router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<voi
     const transactionIds = [...new Set(splitsWithOldTag.map((split: any) => split.transactionId))];
 
     // Replace in budgets
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = await budgetsContainer.find({ userId }).toArray();
 
     for (const budget of budgets) {
@@ -399,7 +399,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const userId = req.userId!;
     const { id } = req.params;
 
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     const tag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
     if (!tag) {
@@ -412,7 +412,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
     // Check if tag is in use
     // Tags are stored in the transactionSplits collection
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     const splitsWithTag = await splitsContainer
       .find({
@@ -424,7 +424,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
     const transactionCount = transactionIds.length;
 
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = await budgetsContainer.find({ userId }).toArray();
 
     const budgetsUsingTag = budgets.filter((budget: any) => {
@@ -468,7 +468,7 @@ router.get('/suggestions', async (req: AuthRequest, res: Response): Promise<void
     const userId = req.userId!;
     const { query } = req.query;
 
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     const filter: MongoFilter<Tag> = { userId };
 

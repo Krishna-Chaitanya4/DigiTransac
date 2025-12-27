@@ -1,4 +1,4 @@
-export interface User {
+﻿export interface User {
   id: string;
   email?: string; // Optional - at least email or phone required
   phone?: string; // Optional - at least email or phone required

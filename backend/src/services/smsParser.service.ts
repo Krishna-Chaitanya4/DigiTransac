@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SMS Parser Service
  * Parses bank SMS messages and extracts transaction details
  * Supports major Indian banks with confidence scoring
@@ -7,7 +7,7 @@
 import { detectTransactionTags } from '../utils/transactionTags';
 import { getLearnedMapping } from './merchantLearning.service';
 import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 
 export interface ParsedTransaction {
   amount: number;
@@ -435,7 +435,7 @@ export class SMSParserService {
 
           if (userId && (parsed.bankName || parsed.accountNumber)) {
             try {
-              const accountsContainer = await cosmosDBService.getAccountsContainer();
+              const accountsContainer = await mongoDBService.getAccountsContainer();
               matchedAccountId =
                 (await matchAccount(
                   userId,

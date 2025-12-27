@@ -1,6 +1,6 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { Transaction, TransactionSplit, MongoFilter } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 import { learnFromTransaction } from '../services/merchantLearning.service';
@@ -60,8 +60,8 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       includeSplits = 'true', // Option to include splits
     } = req.query;
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     // Build filter
     const filter: MongoFilter<Transaction> = { userId };
@@ -276,8 +276,8 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     const transaction = await transactionsContainer.findOne({ id, userId });
 
@@ -390,10 +390,10 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     // Verify account exists
     const account = await accountsContainer.findOne({ id: accountId, userId });
@@ -522,9 +522,9 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       splits, // Add splits support
     } = req.body;
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     const existingTransaction = (await transactionsContainer.findOne({
       id,
@@ -617,7 +617,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Update splits if provided
     if (splits && Array.isArray(splits)) {
-      const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+      const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
       // Delete old splits
       await splitsContainer.deleteMany({ transactionId: id, userId });
@@ -666,9 +666,9 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const userId = req.userId!;
     const { id } = req.params;
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     const transaction = (await transactionsContainer.findOne({
       id,
@@ -728,9 +728,9 @@ router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     const newTransactions: Transaction[] = [];
     const accountBalanceChanges: { [accountId: string]: number } = {};
@@ -826,10 +826,10 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
       return;
     }
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const tagsContainer = await cosmosDBService.getTagsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     // Get all transactions to delete
     const transactions = (await transactionsContainer
@@ -915,7 +915,7 @@ router.delete('/bulk', async (req: AuthRequest, res: Response): Promise<void> =>
 router.get('/pending/count', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     const count = await transactionsContainer.countDocuments({
       userId,
@@ -934,7 +934,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response): Promise<vo
   try {
     const userId = req.userId!;
     const { id } = req.params;
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Find the transaction
     const existingTransaction = (await transactionsContainer.findOne({
@@ -972,7 +972,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response): Promise<vo
     // Learn from approval: Save merchant → category/account mapping
     if (updatedTransaction.merchantName && updatedTransaction.accountId) {
       // Get the category from the first split or legacy categoryId
-      const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+      const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
       const splits = (await splitsContainer
         .find({ transactionId: id })
         .toArray()) as unknown as TransactionSplit[];
@@ -1002,7 +1002,7 @@ router.patch('/:id/reject', async (req: AuthRequest, res: Response): Promise<voi
     const userId = req.userId!;
     const { id } = req.params;
     const { reason } = req.body;
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Find the transaction
     const existingTransaction = (await transactionsContainer.findOne({
@@ -1051,7 +1051,7 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response): Promise<voi
     const userId = req.userId!;
     const { id } = req.params;
     const { status, reason } = req.body;
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Validate status
     const validStatuses = ['pending', 'approved', 'rejected'];
@@ -1103,7 +1103,7 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response): Promise<voi
     // Learn from approval: Save merchant → category/account mapping
     if (status === 'approved' && updatedTransaction.merchantName && updatedTransaction.accountId) {
       // Get the category from the first split or legacy categoryId
-      const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+      const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
       const splits = (await splitsContainer
         .find({ transactionId: id })
         .toArray()) as unknown as TransactionSplit[];
@@ -1138,7 +1138,7 @@ router.post('/bulk-approve', async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Update all transactions
     const result = await transactionsContainer.updateMany(
@@ -1178,7 +1178,7 @@ router.post('/bulk-reject', async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Update all transactions
     const result = await transactionsContainer.updateMany(
@@ -1239,10 +1239,10 @@ router.post('/transfer', async (req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     // Verify both accounts exist
     const fromAccount = await accountsContainer.findOne({ id: fromAccountId, userId });

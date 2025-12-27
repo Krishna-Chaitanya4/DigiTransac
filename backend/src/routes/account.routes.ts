@@ -1,6 +1,6 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { Account } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 import { buildApprovedTransactionsFilter } from '../utils/transactionFilters';
@@ -14,7 +14,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
 
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
     const accounts = (await accountsContainer.find({ userId }).toArray()) as unknown as Account[];
 
     // Sort in memory to avoid composite index requirement
@@ -63,7 +63,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
 
     // If this is set as default, unset other defaults
     if (isDefault) {
@@ -116,7 +116,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const { name, type, bankName, accountNumber, icon, color, isDefault, isActive, notes } =
       req.body;
 
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
 
     const account = await accountsContainer.findOne({ id, userId });
     if (!account) {
@@ -172,8 +172,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const userId = req.userId!;
     const { id } = req.params;
 
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     const account = await accountsContainer.findOne({ id, userId });
     if (!account) {
@@ -215,8 +215,8 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
     const userId = req.userId!;
     const { id } = req.params;
 
-    const accountsContainer = await cosmosDBService.getAccountsContainer();
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     const account = (await accountsContainer.findOne({ id, userId })) as unknown as Account;
     if (!account) {

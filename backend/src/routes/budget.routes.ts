@@ -1,6 +1,6 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { Budget, Category } from '../models/types';
 import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 import { calculateBudgetSpending } from '../utils/budgetHelpers';
@@ -14,7 +14,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
 
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
     if (budgets.length === 0) {
@@ -23,7 +23,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     // Fetch all categories once
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     const categories = (await categoriesContainer
       .find({ userId })
@@ -204,7 +204,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate categories exist
     if (hasCategoryFilter) {
-      const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+      const categoriesContainer = await mongoDBService.getCategoriesContainer();
       const categories = await categoriesContainer
         .find({ id: { $in: categoryIds }, userId })
         .toArray();
@@ -219,7 +219,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate tags exist
     if (hasTagFilter) {
-      const tagsContainer = await cosmosDBService.getTagsContainer();
+      const tagsContainer = await mongoDBService.getTagsContainer();
       const allTagIds = [...(includeTagIds || []), ...(excludeTagIds || [])];
       if (allTagIds.length > 0) {
         const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
@@ -235,7 +235,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate accounts exist
     if (hasAccountFilter) {
-      const accountsContainer = await cosmosDBService.getAccountsContainer();
+      const accountsContainer = await mongoDBService.getAccountsContainer();
       const accounts = await accountsContainer.find({ id: { $in: accountIds }, userId }).toArray();
       if (accounts.length !== accountIds.length) {
         res.status(404).json({
@@ -246,7 +246,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       }
     }
 
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
     const newBudget: Budget = {
       id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -293,7 +293,7 @@ router.post('/:id/duplicate', async (req: AuthRequest, res: Response): Promise<v
     const { id } = req.params;
     const { shiftMonths = 1, newName } = req.body; // Optional: shift dates forward by N months
 
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
     const originalBudget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
     if (!originalBudget) {
@@ -398,7 +398,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       }
     }
 
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
     const budget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
     if (!budget) {
@@ -411,7 +411,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate categories if provided
     if (categoryIds !== undefined && categoryIds.length > 0) {
-      const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+      const categoriesContainer = await mongoDBService.getCategoriesContainer();
       const categories = await categoriesContainer
         .find({ id: { $in: categoryIds }, userId })
         .toArray();
@@ -426,7 +426,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate tags if provided
     if (includeTagIds !== undefined || excludeTagIds !== undefined) {
-      const tagsContainer = await cosmosDBService.getTagsContainer();
+      const tagsContainer = await mongoDBService.getTagsContainer();
       const allTagIds = [...(includeTagIds || []), ...(excludeTagIds || [])];
       if (allTagIds.length > 0) {
         const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
@@ -442,7 +442,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Validate accounts if provided
     if (accountIds !== undefined && accountIds.length > 0) {
-      const accountsContainer = await cosmosDBService.getAccountsContainer();
+      const accountsContainer = await mongoDBService.getAccountsContainer();
       const accounts = await accountsContainer.find({ id: { $in: accountIds }, userId }).toArray();
       if (accounts.length !== accountIds.length) {
         res.status(404).json({
@@ -534,7 +534,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const userId = req.userId!;
     const { id } = req.params;
 
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
     const budget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
     if (!budget) {
@@ -565,7 +565,7 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
   try {
     const userId = req.userId!;
 
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
     if (budgets.length === 0) {
@@ -573,7 +573,7 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
       return;
     }
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     // Fetch all categories and expenses once
     const categories = (await categoriesContainer

@@ -1,6 +1,6 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { Category } from '../models/types';
 
 const router = Router();
@@ -11,7 +11,7 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     const categories = (await categoriesContainer
       .find({ userId })
@@ -45,7 +45,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     // Build path array
     let path: string[] = [];
@@ -110,7 +110,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = req.params;
     const { name, icon, color, parentId } = req.body;
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     const category = (await categoriesContainer.findOne({ id, userId })) as Category | null;
     if (!category) {
@@ -272,7 +272,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     const userId = req.userId!;
     const { id } = req.params;
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     const category = (await categoriesContainer.findOne({ id, userId })) as Category | null;
     if (!category) {
@@ -296,7 +296,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     }
 
     // Check if category has expenses (transaction splits)
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
     const expenseCount = await splitsContainer.countDocuments({ categoryId: id, userId });
     if (expenseCount > 0) {
       res.status(400).json({
@@ -328,7 +328,7 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
     const { id } = req.params;
     const { newParentId } = req.body;
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     const category = (await categoriesContainer.findOne({ id, userId })) as Category | null;
     if (!category) {
@@ -431,8 +431,8 @@ router.post('/:id/move', async (req: AuthRequest, res: Response): Promise<void> 
 router.get('/stats', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Fetch all categories
     const categories = (await categoriesContainer

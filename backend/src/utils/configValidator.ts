@@ -1,4 +1,4 @@
-import { logger } from './logger';
+﻿import { logger } from './logger';
 
 /**
  * Validates required environment variables on startup

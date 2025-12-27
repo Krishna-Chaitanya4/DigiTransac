@@ -1,4 +1,4 @@
-import { encryptionService } from '../services/encryption.service';
+﻿import { encryptionService } from '../services/encryption.service';
 import { Transaction } from '../models/types';
 import { logger } from './logger';
 

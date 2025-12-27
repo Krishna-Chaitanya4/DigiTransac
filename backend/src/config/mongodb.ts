@@ -1,11 +1,11 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+﻿import { MongoClient, Db, Collection } from 'mongodb';
 import dotenv from 'dotenv';
 import { logger } from '../utils/logger';
 import { keyVaultService } from './keyVault';
 
 dotenv.config();
 
-class CosmosDBService {
+class MongoDBService {
   private client: MongoClient;
   private db: Db | null = null;
 
@@ -55,10 +55,10 @@ class CosmosDBService {
           env: process.env.NODE_ENV,
           service: 'digitransac-backend',
         },
-        '✅ All Cosmos DB collections are ready'
+        '✅ All MongoDB collections are ready'
       );
     } catch (error) {
-      logger.error({ error }, 'Failed to initialize Cosmos DB');
+      logger.error({ error }, 'Failed to initialize MongoDB');
       throw error;
     }
   }
@@ -94,7 +94,9 @@ class CosmosDBService {
 
   private async createIndexes(): Promise<void> {
     // Users collection indexes
-    await this.usersContainer!.createIndex({ email: 1 }, { unique: true });
+    await this.usersContainer!.createIndex({ email: 1 }, { unique: true, sparse: true });
+    await this.usersContainer!.createIndex({ phone: 1 }, { unique: true, sparse: true });
+    await this.usersContainer!.createIndex({ username: 1 }, { unique: true });
 
     // Categories collection indexes
     await this.categoriesContainer!.createIndex({ userId: 1 });
@@ -110,7 +112,7 @@ class CosmosDBService {
     await this.transactionsContainer!.createIndex({ accountId: 1 });
     await this.transactionsContainer!.createIndex({ date: 1 });
     await this.transactionsContainer!.createIndex({ type: 1 });
-    // Compound indexes for userId + various sort fields (required for Cosmos DB)
+    // Compound indexes for userId + various sort fields (required for MongoDB)
     await this.transactionsContainer!.createIndex({ userId: 1, date: -1 });
     await this.transactionsContainer!.createIndex({ userId: 1, date: 1 });
     await this.transactionsContainer!.createIndex({ userId: 1, amount: -1 });
@@ -140,64 +142,64 @@ class CosmosDBService {
 
   async getUsersContainer(): Promise<Collection> {
     if (!this.usersContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.usersContainer;
   }
 
   async getCategoriesContainer(): Promise<Collection> {
     if (!this.categoriesContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.categoriesContainer;
   }
 
   async getBudgetsContainer(): Promise<Collection> {
     if (!this.budgetsContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.budgetsContainer;
   }
 
   async getPaymentMethodsContainer(): Promise<Collection> {
     if (!this.paymentMethodsContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.paymentMethodsContainer;
   }
 
   async getTransactionsContainer(): Promise<Collection> {
     if (!this.transactionsContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.transactionsContainer;
   }
 
   async getAccountsContainer(): Promise<Collection> {
     if (!this.accountsContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.accountsContainer;
   }
 
   async getTagsContainer(): Promise<Collection> {
     if (!this.tagsContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.tagsContainer;
   }
 
   async getTransactionSplitsContainer(): Promise<Collection> {
     if (!this.transactionSplitsContainer) {
-      throw new Error('Cosmos DB not initialized. Call initialize() first.');
+      throw new Error('MongoDB not initialized. Call initialize() first.');
     }
     return this.transactionSplitsContainer;
   }
 
   async close(): Promise<void> {
     await this.client.close();
-    logger.info('✅ Cosmos DB connection closed');
+    logger.info('✅ MongoDB connection closed');
   }
 }
 
-export const cosmosDBService = new CosmosDBService();
+export const mongoDBService = new MongoDBService();

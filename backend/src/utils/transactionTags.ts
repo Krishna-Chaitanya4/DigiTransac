@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Transaction Tag Detection Utility
  * Auto-assigns tags based on transaction type and keywords
  * Consistent with frontend CATEGORY_TAG_SUGGESTIONS

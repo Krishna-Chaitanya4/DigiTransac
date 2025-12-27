@@ -1,4 +1,4 @@
-import { Collection } from 'mongodb';
+﻿import { Collection } from 'mongodb';
 import { Account } from '../models/types';
 import { logger } from './logger';
 

@@ -1,4 +1,4 @@
-import { Budget, Category } from '../models/types';
+﻿import { Budget, Category } from '../models/types';
 
 /**
  * Calculate budget spending with multi-filter logic:
