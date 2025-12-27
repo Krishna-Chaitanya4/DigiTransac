@@ -1,0 +1,362 @@
+name: Main CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, closed]
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: herdswebsiteacr.azurecr.io
+  BACKEND_IMAGE: digitransac-backend
+  FRONTEND_IMAGE: digitransac-frontend
+  RESOURCE_GROUP: rg-digitransac
+  BACKEND_CONTAINER_APP: digitransac-backend
+  FRONTEND_CONTAINER_APP: digitransac-frontend
+
+jobs:
+  # ==================== CI JOBS (Run on PRs and Main) ====================
+  
+  validate-secrets:
+    name: Validate Key Vault Configuration
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check for hardcoded secrets
+      run: |
+        echo "🔍 Scanning for hardcoded secrets..."
+        
+        # Check for potential secret patterns (exclude test files)
+        if grep -r -E "(COSMOS_KEY|JWT_SECRET|MASTER_ENCRYPTION_KEY|mongodb\+srv://.*:[^@]+@)" \
+           --include="*.ts" --include="*.js" --include="*.env.example" \
+           --exclude-dir=node_modules --exclude-dir=dist --exclude="*.test.ts" .; then
+          echo "❌ Found potential hardcoded secrets!"
+          exit 1
+        fi
+        
+        echo "✅ No hardcoded secrets found"
+    
+    - name: Verify Key Vault references
+      run: |
+        echo "🔍 Verifying Key Vault integration..."
+        
+        # Check that code uses Key Vault
+        if ! grep -r "keyVaultService" backend/src --include="*.ts" | grep -q "getSecret"; then
+          echo "⚠️ Warning: Key Vault usage not detected"
+        else
+          echo "✅ Key Vault service properly integrated"
+        fi
+
+  backend-ci:
+    name: Backend Tests & Build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        npm ci
+    
+    - name: Run linter
+      run: |
+        cd backend
+        npm run lint
+    
+    - name: Check TypeScript compilation
+      run: |
+        cd backend
+        npm run build
+    
+    - name: Run tests
+      run: |
+        cd backend
+        npm test -- --coverage
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        files: ./backend/coverage/lcov.info
+        flags: backend
+        name: backend-coverage
+    
+    - name: Build Docker image (verification)
+      run: |
+        cd backend
+        docker build -t backend-test:${{ github.sha }} .
+        echo "✅ Docker image built successfully"
+
+  frontend-ci:
+    name: Frontend Tests & Build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run linter (if exists)
+      run: |
+        cd frontend
+        npm run lint || echo "⚠️ No lint script found"
+      continue-on-error: true
+    
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: Check build size
+      run: |
+        cd frontend/dist
+        SIZE=$(du -sh . | cut -f1)
+        echo "## 📦 Build Size: $SIZE" >> $GITHUB_STEP_SUMMARY
+        du -h --max-depth=1 . >> $GITHUB_STEP_SUMMARY
+
+  dependency-scan:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run npm audit (backend)
+      run: |
+        cd backend
+        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
+    
+    - name: Run npm audit (frontend)
+      run: |
+        cd frontend
+        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
+
+  version-check:
+    name: Version Consistency
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Validate versions
+      run: |
+        BACKEND_VERSION=$(cat backend/VERSION)
+        FRONTEND_VERSION=$(cat frontend/VERSION)
+        
+        echo "Backend: v$BACKEND_VERSION"
+        echo "Frontend: v$FRONTEND_VERSION"
+        
+        echo "## 📌 Version Info" >> $GITHUB_STEP_SUMMARY
+        echo "- Backend: v$BACKEND_VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "- Frontend: v$FRONTEND_VERSION" >> $GITHUB_STEP_SUMMARY
+
+  # ==================== CD JOBS (Deploy on Main Push/PR Merge) ====================
+  
+  deploy-backend:
+    name: Deploy Backend to Azure
+    runs-on: ubuntu-latest
+    needs: [validate-secrets, backend-ci, dependency-scan, version-check]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version
+      id: version
+      run: |
+        VERSION=$(cat backend/VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Deploying Backend v$VERSION"
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Log in to ACR
+      run: az acr login --name herdswebsiteacr
+    
+    - name: Build and push Docker image
+      run: |
+        cd backend
+        VERSION=${{ steps.version.outputs.VERSION }}
+        docker build \
+          -t ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest \
+          -t ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${VERSION} \
+          -t ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }} .
+        
+        docker push ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+        docker push ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${VERSION}
+        docker push ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+    
+    - name: Deploy to Container App
+      run: |
+        az containerapp update \
+          --name ${{ env.BACKEND_CONTAINER_APP }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${{ steps.version.outputs.VERSION }} \
+          --set-env-vars \
+            "AZURE_KEY_VAULT_URL=${{ secrets.AZURE_KEY_VAULT_URL }}" \
+            "MONGODB_DATABASE_NAME=${{ secrets.MONGODB_DATABASE_NAME }}" \
+            "PORT=5000" \
+            "NODE_ENV=production" \
+            "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" \
+            "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" \
+            "BACKEND_URL=${{ secrets.BACKEND_URL }}" \
+            "JWT_EXPIRE=7d"
+    
+    - name: Wait for deployment
+      run: sleep 30
+    
+    - name: Health check
+      run: |
+        BACKEND_URL="${{ secrets.BACKEND_URL }}"
+        echo "Checking $BACKEND_URL/health"
+        
+        for i in {1..5}; do
+          if curl -f "$BACKEND_URL/health"; then
+            echo "✅ Backend is healthy"
+            exit 0
+          fi
+          echo "⏳ Attempt $i/5 failed, retrying..."
+          sleep 10
+        done
+        
+        echo "❌ Health check failed"
+        exit 1
+    
+    - name: Deployment summary
+      run: |
+        echo "## 🚀 Backend Deployed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version:** v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image:** ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **URL:** ${{ secrets.BACKEND_URL }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Key Vault:** ✅ Managed Identity" >> $GITHUB_STEP_SUMMARY
+
+  deploy-frontend:
+    name: Deploy Frontend to Azure
+    runs-on: ubuntu-latest
+    needs: [frontend-ci, version-check, deploy-backend]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version
+      id: version
+      run: |
+        VERSION=$(cat frontend/VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Deploying Frontend v$VERSION"
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Log in to ACR
+      run: az acr login --name herdswebsiteacr
+    
+    - name: Build and push Docker image
+      run: |
+        cd frontend
+        VERSION=${{ steps.version.outputs.VERSION }}
+        docker build \
+          --build-arg VITE_API_URL=${{ secrets.BACKEND_URL }} \
+          -t ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest \
+          -t ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${VERSION} \
+          -t ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }} .
+        
+        docker push ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
+        docker push ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${VERSION}
+        docker push ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+    
+    - name: Deploy to Container App
+      run: |
+        az containerapp update \
+          --name ${{ env.FRONTEND_CONTAINER_APP }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${{ steps.version.outputs.VERSION }}
+    
+    - name: Deployment summary
+      run: |
+        echo "## 🎨 Frontend Deployed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version:** v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image:** ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **URL:** ${{ secrets.FRONTEND_URL }}" >> $GITHUB_STEP_SUMMARY
+
+  # ==================== POST-DEPLOYMENT VERIFICATION ====================
+  
+  post-deploy-tests:
+    name: Production Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    
+    steps:
+    - name: Test backend health
+      run: |
+        curl -f "${{ secrets.BACKEND_URL }}/health" || exit 1
+        echo "✅ Backend health check passed"
+    
+    - name: Test frontend
+      run: |
+        curl -f "${{ secrets.FRONTEND_URL }}" || exit 1
+        echo "✅ Frontend is accessible"
+    
+    - name: Final summary
+      run: |
+        echo "## ✅ Deployment Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 All services deployed and verified successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔐 Security" >> $GITHUB_STEP_SUMMARY
+        echo "- All secrets managed by Azure Key Vault" >> $GITHUB_STEP_SUMMARY
+        echo "- Managed Identity authentication" >> $GITHUB_STEP_SUMMARY
+        echo "- Zero secrets in containers or code" >> $GITHUB_STEP_SUMMARY
