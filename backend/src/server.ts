@@ -18,6 +18,18 @@ import configRoutes from './routes/config.routes';
 import v1Routes from './routes/v1';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
 import { startRecurringTransactionsJob } from './jobs/recurringTransactions.job';
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
+import categoryRoutes from './routes/category.routes';
+import budgetRoutes from './routes/budget.routes';
+import analyticsRoutes from './routes/analytics.routes';
+import emailRoutes from './routes/email.routes';
+import gmailRoutes from './routes/gmail.routes';
+import accountRoutes from './routes/account.routes';
+import tagRoutes from './routes/tag.routes';
+import transactionRoutes from './routes/transaction.routes';
+import smsRoutes from './routes/sms.routes';
+import { authLimiter } from './middleware/rateLimiter';
 
 // Load environment variables
 dotenv.config();
@@ -152,18 +164,18 @@ app.use('/api/config', configRoutes);
 // v1 API Routes
 app.use('/api/v1', v1Routes);
 
-// Legacy routes (backward compatibility) - redirect to v1
-app.use('/api/auth', (req, res) => res.redirect(308, `/api/v1/auth${req.url}`));
-app.use('/api/users', (req, res) => res.redirect(308, `/api/v1/users${req.url}`));
-app.use('/api/categories', (req, res) => res.redirect(308, `/api/v1/categories${req.url}`));
-app.use('/api/budgets', (req, res) => res.redirect(308, `/api/v1/budgets${req.url}`));
-app.use('/api/analytics', (req, res) => res.redirect(308, `/api/v1/analytics${req.url}`));
-app.use('/api/email', (req, res) => res.redirect(308, `/api/v1/email${req.url}`));
-app.use('/api/gmail', (req, res) => res.redirect(308, `/api/v1/gmail${req.url}`));
-app.use('/api/accounts', (req, res) => res.redirect(308, `/api/v1/accounts${req.url}`));
-app.use('/api/tags', (req, res) => res.redirect(308, `/api/v1/tags${req.url}`));
-app.use('/api/transactions', (req, res) => res.redirect(308, `/api/v1/transactions${req.url}`));
-app.use('/api/sms', (req, res) => res.redirect(308, `/api/v1/sms${req.url}`));
+// Legacy routes (backward compatibility) - mount routes directly
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/budgets', budgetRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/email', emailRoutes);
+app.use('/api/gmail', gmailRoutes);
+app.use('/api/accounts', accountRoutes);
+app.use('/api/tags', tagRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/sms', smsRoutes);
 
 // Error handling
 app.use(errorHandler);

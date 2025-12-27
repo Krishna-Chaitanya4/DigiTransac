@@ -166,13 +166,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!fetchResponse.ok) {
         const errorData = await fetchResponse.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${fetchResponse.status}`);
+        const errorMessage = errorData.message || 
+          (fetchResponse.status === 401 ? 'Invalid username/email/phone or password' :
+           fetchResponse.status === 404 ? 'Login service is currently unavailable' :
+           fetchResponse.status === 429 ? 'Too many login attempts. Please try again later' :
+           `Login failed (Error ${fetchResponse.status})`);
+        throw new Error(errorMessage);
       }
 
       const data = await fetchResponse.json();
 
       if (!data.success) {
-        throw new Error(data.message || 'Login failed');
+        throw new Error(data.message || 'Login failed. Please try again.');
       }
 
       const { token: newToken, user: userData } = data;
@@ -204,8 +209,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('auth-user', JSON.stringify(userData));
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Registration failed';
-      throw new Error(errorMessage);
+      // Handle different error scenarios with user-friendly messages
+      if (error.response) {
+        const status = error.response.status;
+        const serverMessage = error.response.data?.message;
+        
+        if (status === 409) {
+          // Conflict - duplicate data
+          throw new Error(serverMessage || 'This username, email, or phone number is already registered');
+        } else if (status === 400) {
+          // Validation error
+          throw new Error(serverMessage || 'Please check your information and try again');
+        } else if (status === 429) {
+          // Rate limit
+          throw new Error('Too many registration attempts. Please try again later');
+        } else if (status >= 500) {
+          // Server error
+          throw new Error('Server error. Please try again later');
+        }
+        
+        throw new Error(serverMessage || `Registration failed (Error ${status})`);
+      } else if (error.request) {
+        // Network error
+        throw new Error('Network error. Please check your connection and try again');
+      } else {
+        // Other errors
+        throw new Error(error.message || 'Registration failed. Please try again');
+      }
     }
   };
 
