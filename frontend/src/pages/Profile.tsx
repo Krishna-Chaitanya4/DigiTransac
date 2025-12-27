@@ -48,6 +48,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import { useThemeContext } from '../context/ThemeContext';
+import { ModernDatePicker } from '../components/ModernDatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 const Profile: React.FC = () => {
   const { user, token, logout } = useAuth();
@@ -506,13 +510,18 @@ const Profile: React.FC = () => {
               </Typography>
             </Box>
             {isEditing ? (
-              <TextField
-                fullWidth
-                type="date"
-                value={editedData.dateOfBirth ? new Date(editedData.dateOfBirth).toISOString().split('T')[0] : ''}
-                onChange={(e) => setEditedData({ ...editedData, dateOfBirth: e.target.value })}
-                size="small"
-              />
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <ModernDatePicker
+                  value={editedData.dateOfBirth ? dayjs(editedData.dateOfBirth) : null}
+                  onChange={(newValue) => {
+                    setEditedData({
+                      ...editedData,
+                      dateOfBirth: newValue ? newValue.format('YYYY-MM-DD') : ''
+                    });
+                  }}
+                  fullWidth
+                />
+              </LocalizationProvider>
             ) : (
               <Typography variant="body1" fontWeight={600}>
                 {user?.dateOfBirth

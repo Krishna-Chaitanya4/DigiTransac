@@ -21,6 +21,12 @@ import {
   Switch,
   Divider,
   Alert,
+  Fade,
+  Zoom,
+  Avatar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,6 +40,7 @@ import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
   Clear as ClearIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
@@ -44,6 +51,10 @@ import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { BudgetCardSkeleton } from '../components/Skeletons';
 import ResponsiveDialog from '../components/ResponsiveDialog';
+import { ModernDatePicker } from '../components/ModernDatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 interface Category {
   id: string;
@@ -900,77 +911,144 @@ const Budgets: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography 
-            variant="h4" 
-            fontWeight={700}
-            sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            Budget Tracking
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mt={0.5}>
-            {budgets.length === 0 
-              ? 'Set spending limits to stay on track'
-              : `${budgets.length} active budget${budgets.length !== 1 ? 's' : ''} • ${budgetSummary && budgetSummary.exceededCount > 0 ? `${budgetSummary.exceededCount} exceeded` : budgetSummary && budgetSummary.warningCount > 0 ? `${budgetSummary.warningCount} approaching limit` : 'All on track'}`
-            }
-          </Typography>
-        </Box>
-        <Box display="flex" gap={1}>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setShowTemplates(true)}
-            sx={{
-              borderColor: '#14b8a6',
-              color: '#14b8a6',
-              '&:hover': {
-                borderColor: '#0891b2',
-                bgcolor: 'rgba(20, 184, 166, 0.1)',
-              },
-            }}
-          >
-            From Template
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleOpenDialog}
-            sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            Create Budget
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Budget Summary Card */}
-      {budgetSummary && (
-        <Card 
-          sx={{ 
-            mb: 3, 
-            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-            color: 'white',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: '0 12px 28px rgba(20, 184, 166, 0.4)',
+      {/* Enhanced Animated Header */}
+      <Fade in timeout={600}>
+        <Box
+          sx={{
+            mb: 4,
+            p: 4,
+            borderRadius: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
+            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
             },
           }}
         >
-          <CardContent>
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(10px)',
+                      width: 56,
+                      height: 56,
+                    }}
+                  >
+                    <SavingsIcon sx={{ fontSize: 32 }} />
+                  </Avatar>
+                  <Typography
+                    variant="h4"
+                    fontWeight={800}
+                    sx={{
+                      color: 'white',
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    Budget Tracking
+                  </Typography>
+                </Box>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
+                  {budgets.length === 0 
+                    ? 'Set spending limits to stay on track'
+                    : `${budgets.length} active budget${budgets.length !== 1 ? 's' : ''} • ${budgetSummary && budgetSummary.exceededCount > 0 ? `${budgetSummary.exceededCount} exceeded` : budgetSummary && budgetSummary.warningCount > 0 ? `${budgetSummary.warningCount} approaching limit` : 'All on track'}`
+                  }
+                </Typography>
+              </Box>
+              <Box display="flex" gap={2}>
+                <Zoom in timeout={800}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={() => setShowTemplates(true)}
+                    sx={{
+                      bgcolor: 'white',
+                      borderColor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    From Template
+                  </Button>
+                </Zoom>
+                <Zoom in timeout={900}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenDialog}
+                    sx={{
+                      bgcolor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    Create Budget
+                  </Button>
+                </Zoom>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      </Fade>
+
+      {/* Budget Summary Card */}
+      {budgetSummary && (
+        <Fade in timeout={800}>
+          <Card sx={{
+            mb: 3,
+            borderRadius: 3,
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            overflow: 'hidden',
+            position: 'relative',
+            boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
+            },
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '120px',
+              height: '120px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+              borderRadius: '50%',
+            },
+          }}>
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
             <Grid container spacing={3}>
               {/* Total Budgeted */}
               <Grid item xs={6} sm={3}>
@@ -1050,12 +1128,28 @@ const Budgets: React.FC = () => {
               </Grid>
             </Grid>
           </CardContent>
-        </Card>
+          </Card>
+        </Fade>
       )}
 
       {/* Search and Filter Bar */}
       {budgets.length > 0 && (
-        <Card sx={{ mb: 3, p: 2 }}>
+        <Fade in timeout={1000}>
+          <Card sx={{
+            mb: 3,
+            p: 2,
+            borderRadius: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: (theme) =>
+              theme.palette.mode === 'light'
+                ? `1px solid ${theme.palette.primary.main}1A`
+                : `1px solid ${theme.palette.primary.main}33`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+          }}>
           <Grid container spacing={2} alignItems="center">
             {/* Search */}
             <Grid item xs={12} md={4}>
@@ -1142,7 +1236,8 @@ const Budgets: React.FC = () => {
               </Button>
             )}
           </Box>
-        </Card>
+          </Card>
+        </Fade>
       )}
 
       {budgets.length === 0 ? (
@@ -1582,8 +1677,35 @@ const Budgets: React.FC = () => {
 
       {/* Create/Edit Dialog */}
       <ResponsiveDialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editingBudget ? 'Edit Budget' : 'Create New Budget'}</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '120px',
+              height: '120px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+              borderRadius: '50%',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
+              <SavingsIcon />
+            </Avatar>
+            <Typography variant="h5" fontWeight={700}>
+              {editingBudget ? 'Edit Budget' : 'Create New Budget'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Budget Name */}
             <TextField
@@ -1595,21 +1717,261 @@ const Budgets: React.FC = () => {
               placeholder="e.g., Groceries, Q1 Marketing, Annual Insurance"
               helperText="Give your budget a descriptive name for easy identification"
               inputProps={{ maxLength: 100 }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+            />
+
+            {/* Budget Amount and Period */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="💰 Budget Amount"
+                  type="number"
+                  fullWidth
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  select
+                  label="📅 Period"
+                  fullWidth
+                  value={formData.period}
+                  onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
+                  helperText={
+                    formData.period === 'this-month'
+                      ? 'Auto-sets to current month dates'
+                      : formData.period === 'next-month'
+                      ? 'Auto-sets to next month dates'
+                      : formData.period === 'this-year'
+                      ? 'Auto-sets to current year dates'
+                      : 'Choose custom date range'
+                  }
+                >
+                  <MenuItem value="this-month">This Month</MenuItem>
+                  <MenuItem value="next-month">Next Month</MenuItem>
+                  <MenuItem value="this-year">This Year</MenuItem>
+                  <MenuItem value="custom">Custom</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+
+            {/* Date Range */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <ModernDatePicker
+                    label="📆 Start Date"
+                    value={formData.startDate ? dayjs(formData.startDate) : null}
+                    onChange={(newValue) => {
+                      if (newValue) {
+                        handleStartDateChange(newValue.format('YYYY-MM-DD'));
+                      }
+                    }}
+                    fullWidth
+                    error={!!dateError}
+                    helperText={
+                      formData.period === 'this-month'
+                        ? 'First day of this month (edit to switch to custom)'
+                        : formData.period === 'next-month'
+                        ? 'First day of next month (edit to switch to custom)'
+                        : formData.period === 'this-year'
+                        ? 'First day of this year (edit to switch to custom)'
+                        : ''
+                    }
+                    required
+                  />
+                </LocalizationProvider>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <ModernDatePicker
+                    label="📆 End Date"
+                    value={formData.endDate ? dayjs(formData.endDate) : null}
+                    onChange={(newValue) => {
+                      if (newValue) {
+                        handleEndDateChange(newValue.format('YYYY-MM-DD'));
+                      }
+                    }}
+                    fullWidth
+                    error={!!dateError}
+                    helperText={
+                      formData.period === 'this-month'
+                        ? 'Last day of this month (edit to switch to custom)'
+                        : formData.period === 'next-month'
+                        ? 'Last day of next month (edit to switch to custom)'
+                        : formData.period === 'this-year'
+                        ? 'Last day of this year (edit to switch to custom)'
+                        : ''
+                    }
+                    required
+                  />
+                </LocalizationProvider>
+              </Grid>
+              {dateError && (
+                <Grid item xs={12}>
+                  <Alert severity="error" sx={{ mt: -1 }}>
+                    {dateError}
+                  </Alert>
+                </Grid>
+              )}
+            </Grid>
+
+            {/* Calculation Type */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                💳 Budget Type
+              </Typography>
+              <ToggleButtonGroup
+                value={formData.calculationType}
+                exclusive
+                onChange={(_, newType) => {
+                  if (newType !== null) {
+                    setFormData({ ...formData, calculationType: newType });
+                  }
+                }}
+                fullWidth
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    borderRadius: 2,
+                    py: 1.5,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    border: '1.5px solid',
+                    borderColor: 'divider',
+                    '&.Mui-selected': {
+                      background: (theme) => theme.palette.gradient.primary,
+                      color: 'white',
+                      borderColor: 'transparent',
+                      '&:hover': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    },
+                  },
+                }}
+              >
+                <ToggleButton value="debit">
+                  📉 Expenses Only
+                </ToggleButton>
+                <ToggleButton value="net">
+                  ⚖️ Net (Expenses - Refunds)
+                </ToggleButton>
+              </ToggleButtonGroup>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                {formData.calculationType === 'debit' && 'Track total expenses (debits)'}
+                {formData.calculationType === 'net' && 'Track net expenses after refunds/returns (debit - credit)'}
+              </Typography>
+            </Box>
+
+            {/* Alert Configuration */}
+            <TextField
+              label="🔔 Alert Threshold (%)"
+              type="number"
+              fullWidth
+              value={formData.alertThreshold}
+              onChange={(e) => setFormData({ ...formData, alertThreshold: e.target.value })}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">%</InputAdornment>,
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+              helperText="Get notified when spending reaches this percentage"
+              required
             />
 
             <Divider />
 
-            {/* Multi-Select Filters Section */}
-            <Box>
-              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
-                Budget Filters (AND logic between sections, OR within each)
-              </Typography>
-              <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                Select filters to define what transactions this budget tracks. At least one filter is required.
-              </Typography>
-
-              {/* Categories Multi-Select */}
-              <TextField
+            {/* Multi-Select Filters Section - Collapsible */}
+            <Accordion
+              defaultExpanded
+              sx={{
+                borderRadius: 2.5,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.06) 100%)'
+                    : 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: 'divider',
+                backdropFilter: 'blur(10px)',
+                boxShadow: 'none',
+                '&:before': {
+                  display: 'none',
+                },
+                '&.Mui-expanded': {
+                  margin: 0,
+                },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                sx={{
+                  '& .MuiAccordionSummary-content': {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: (theme) => theme.palette.gradient.primary,
+                    color: 'white',
+                  }}
+                >
+                  <FilterListIcon sx={{ fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Budget Filters {formData.categoryIds.length === 0 && 
+                     formData.includeTagIds.length === 0 && 
+                     formData.excludeTagIds.length === 0 && 
+                     formData.accountIds.length === 0 && (
+                      <Chip 
+                        label="Required" 
+                        size="small" 
+                        color="warning" 
+                        sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} 
+                      />
+                    )}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Select what transactions to track
+                  </Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+                  {/* Categories Multi-Select */}
+                  <TextField
                 select
                 label="Categories (Optional)"
                 fullWidth
@@ -1631,8 +1993,10 @@ const Budgets: React.FC = () => {
                           label={getCategoryName(catId)} 
                           size="small" 
                           sx={{ 
-                            bgcolor: `${getCategoryColor(catId)}20`,
+                            background: `linear-gradient(135deg, ${getCategoryColor(catId)}20 0%, ${getCategoryColor(catId)}30 100%)`,
                             color: getCategoryColor(catId),
+                            fontWeight: 600,
+                            border: `1px solid ${getCategoryColor(catId)}50`,
                           }} 
                         />
                       ))}
@@ -1640,7 +2004,11 @@ const Budgets: React.FC = () => {
                   ),
                 }}
                 helperText="Track these categories (category1 OR category2 OR ...)"
-                sx={{ mb: 2 }}
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               >
                 {!categories || categories.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -1662,6 +2030,59 @@ const Budgets: React.FC = () => {
                 )}
               </TextField>
 
+              {/* Accounts Multi-Select */}
+              <TextField
+                select
+                label="Accounts (Optional)"
+                fullWidth
+                value={formData.accountIds}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    accountIds: typeof value === 'string' ? [value] : value,
+                  });
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((accId) => (
+                        <Chip 
+                          key={accId} 
+                          label={getAccountName(accId)} 
+                          size="small" 
+                          sx={{
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #3b82f640',
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  ),
+                }}
+                helperText="Track these accounts (account1 OR account2 OR ...)"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
+              >
+                {!accounts || accounts.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No accounts available. Create one first.
+                  </MenuItem>
+                ) : (
+                  accounts.map((account) => (
+                    <MenuItem key={account.id} value={account.id}>
+                      {account.name} ({account.type})
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+
               {/* Include Tags */}
               <TextField
                 select
@@ -1680,13 +2101,27 @@ const Budgets: React.FC = () => {
                   renderValue: (selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {(selected as string[]).map((tagId) => (
-                        <Chip key={tagId} label={getTagName(tagId)} size="small" color="success" />
+                        <Chip 
+                          key={tagId} 
+                          label={getTagName(tagId)} 
+                          size="small" 
+                          sx={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #10b98140',
+                          }}
+                        />
                       ))}
                     </Box>
                   ),
                 }}
                 helperText="Transactions must have at least one of these tags (tag1 OR tag2 OR ...)"
-                sx={{ mb: 2 }}
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               >
                 {!tags || tags.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -1719,13 +2154,27 @@ const Budgets: React.FC = () => {
                   renderValue: (selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {(selected as string[]).map((tagId) => (
-                        <Chip key={tagId} label={getTagName(tagId)} size="small" color="error" />
+                        <Chip 
+                          key={tagId} 
+                          label={getTagName(tagId)} 
+                          size="small" 
+                          sx={{
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 8px #ef444440',
+                          }}
+                        />
                       ))}
                     </Box>
                   ),
                 }}
                 helperText="Transactions must NOT have any of these tags (NOT tag3 AND NOT tag4)"
-                sx={{ mb: 2 }}
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               >
                 {!tags || tags.length === 0 ? (
                   <MenuItem value="" disabled>
@@ -1740,210 +2189,43 @@ const Budgets: React.FC = () => {
                 )}
               </TextField>
 
-              {/* Accounts Multi-Select */}
-              <TextField
-                select
-                label="Accounts (Optional)"
-                fullWidth
-                value={formData.accountIds}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({
-                    ...formData,
-                    accountIds: typeof value === 'string' ? [value] : value,
-                  });
-                }}
-                SelectProps={{
-                  multiple: true,
-                  renderValue: (selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {(selected as string[]).map((accId) => (
-                        <Chip 
-                          key={accId} 
-                          label={getAccountName(accId)} 
-                          size="small" 
-                          color="info"
-                        />
-                      ))}
-                    </Box>
-                  ),
-                }}
-                helperText="Track these accounts (account1 OR account2 OR ...)"
-              >
-                {!accounts || accounts.length === 0 ? (
-                  <MenuItem value="" disabled>
-                    No accounts available. Create one first.
-                  </MenuItem>
-                ) : (
-                  accounts.map((account) => (
-                    <MenuItem key={account.id} value={account.id}>
-                      {account.name} ({account.type})
-                    </MenuItem>
-                  ))
-                )}
-              </TextField>
-
               {/* Validation Alert */}
               {formData.categoryIds.length === 0 && 
                formData.includeTagIds.length === 0 && 
                formData.excludeTagIds.length === 0 && 
                formData.accountIds.length === 0 && (
-                <Alert severity="info" sx={{ mt: 2 }}>
+                <Alert 
+                  severity="warning" 
+                  sx={{ 
+                    gridColumn: '1 / -1',
+                    borderRadius: 2,
+                    '& .MuiAlert-icon': {
+                      fontSize: 24,
+                    },
+                  }}
+                >
                   Please select at least one filter (categories, tags, or accounts)
                 </Alert>
               )}
-            </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
 
             <Divider />
-
-            {/* Calculation Type */}
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Budget Type
-              </Typography>
-              <ToggleButtonGroup
-                value={formData.calculationType}
-                exclusive
-                onChange={(_, newType) => {
-                  if (newType !== null) {
-                    setFormData({ ...formData, calculationType: newType });
-                  }
-                }}
-                fullWidth
-                size="small"
-              >
-                <ToggleButton value="debit">
-                  Expenses Only
-                </ToggleButton>
-                <ToggleButton value="net">
-                  Net (Expenses - Refunds)
-                </ToggleButton>
-              </ToggleButtonGroup>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                {formData.calculationType === 'debit' && 'Track total expenses (debits)'}
-                {formData.calculationType === 'net' && 'Track net expenses after refunds/returns (debit - credit)'}
-              </Typography>
-            </Box>
-
-            <Divider />
-
-            {/* Budget Amount and Period */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Budget Amount"
-                  type="number"
-                  fullWidth
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">{user?.currency || 'USD'}</InputAdornment>
-                    ),
-                  }}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  select
-                  label="Period"
-                  fullWidth
-                  value={formData.period}
-                  onChange={(e) => setFormData({ ...formData, period: e.target.value as any })}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'Auto-sets to current month dates'
-                      : formData.period === 'next-month'
-                      ? 'Auto-sets to next month dates'
-                      : formData.period === 'this-year'
-                      ? 'Auto-sets to current year dates'
-                      : 'Choose custom date range'
-                  }
-                >
-                  <MenuItem value="this-month">This Month</MenuItem>
-                  <MenuItem value="next-month">Next Month</MenuItem>
-                  <MenuItem value="this-year">This Year</MenuItem>
-                  <MenuItem value="custom">Custom</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
-
-            {/* Date Range */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Start Date"
-                  type="date"
-                  fullWidth
-                  value={formData.startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  error={!!dateError}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'First day of this month (edit to switch to custom)'
-                      : formData.period === 'next-month'
-                      ? 'First day of next month (edit to switch to custom)'
-                      : formData.period === 'this-year'
-                      ? 'First day of this year (edit to switch to custom)'
-                      : ''
-                  }
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="End Date"
-                  type="date"
-                  fullWidth
-                  value={formData.endDate}
-                  onChange={(e) => handleEndDateChange(e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  error={!!dateError}
-                  helperText={
-                    formData.period === 'this-month'
-                      ? 'Last day of this month (edit to switch to custom)'
-                      : formData.period === 'next-month'
-                      ? 'Last day of next month (edit to switch to custom)'
-                      : formData.period === 'this-year'
-                      ? 'Last day of this year (edit to switch to custom)'
-                      : ''
-                  }
-                  required
-                />
-              </Grid>
-              {dateError && (
-                <Grid item xs={12}>
-                  <Alert severity="error" sx={{ mt: -1 }}>
-                    {dateError}
-                  </Alert>
-                </Grid>
-              )}
-            </Grid>
-
-            <Divider />
-
-            {/* Alert Configuration */}
-            <TextField
-              label="Alert Threshold (%)"
-              type="number"
-              fullWidth
-              value={formData.alertThreshold}
-              onChange={(e) => setFormData({ ...formData, alertThreshold: e.target.value })}
-              InputProps={{
-                endAdornment: <InputAdornment position="end">%</InputAdornment>,
-              }}
-              helperText="Get notified when spending reaches this percentage"
-              required
-            />
 
             {/* Rollover Configuration */}
-            <Box>
+            <Box
+              sx={{
+                p: 2.5,
+                borderRadius: 2,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                    : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
               <FormControlLabel
                 control={
                   <Switch
@@ -1951,17 +2233,35 @@ const Budgets: React.FC = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, enableRollover: e.target.checked })
                     }
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: (theme) => theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: (theme) =>
+                            `${theme.palette.primary.main}15`,
+                        },
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    }}
                   />
                 }
-                label="Enable Rollover"
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      💰 Enable Rollover
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Allow unused budget to carry over to the next period
+                    </Typography>
+                  </Box>
+                }
               />
-              <Typography variant="caption" color="text.secondary" display="block">
-                Allow unused budget to carry over to the next period
-              </Typography>
               
               {formData.enableRollover && (
                 <TextField
-                  label="Rollover Limit (optional)"
+                  label="💵 Rollover Limit (optional)"
                   type="number"
                   fullWidth
                   value={formData.rolloverLimit}
@@ -1972,14 +2272,41 @@ const Budgets: React.FC = () => {
                     ),
                   }}
                   helperText="Maximum amount that can roll over (leave empty for no limit)"
-                  sx={{ mt: 2 }}
+                  sx={{ 
+                    mt: 2,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
                 />
               )}
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button 
+            onClick={handleCloseDialog}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleSubmit}
             variant="contained"
@@ -1993,6 +2320,18 @@ const Budgets: React.FC = () => {
                formData.excludeTagIds.length === 0 && 
                formData.accountIds.length === 0)
             }
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+              },
+              transition: 'all 0.2s ease',
+            }}
           >
             {editingBudget ? 'Update' : 'Create'}
           </Button>
@@ -2021,13 +2360,42 @@ const Budgets: React.FC = () => {
         maxWidth="md" 
         fullWidth
       >
-        <DialogTitle>
-          <Box display="flex" alignItems="center" gap={1}>
-            <span style={{ fontSize: '24px' }}>📋</span>
-            <Typography variant="h6">Choose a Budget Template</Typography>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 48,
+                height: 48,
+                fontSize: '24px',
+              }}
+            >
+              📋
+            </Avatar>
+            <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
+              Choose a Budget Template
+            </Typography>
           </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           <Typography variant="body2" color="text.secondary" mb={3}>
             Quick-start your budget with pre-configured templates. You can customize amounts and filters after selection.
           </Typography>
@@ -2077,8 +2445,30 @@ const Budgets: React.FC = () => {
             ))}
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowTemplates(false)}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={() => setShowTemplates(false)}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
         </DialogActions>
       </ResponsiveDialog>
     </Box>

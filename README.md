@@ -1,279 +1,142 @@
 # DigiTransac
 
-A modern, full-stack transaction management application built with React, Node.js, and Azure Cosmos DB.
+Modern transaction management application with AI-powered categorization, budget tracking, and analytics.
 
-## 🚀 Features
+## Features
 
-- **Multi-user Support**: Secure authentication with JWT
-- **Unlimited Category Nesting**: Organize expenses in folder-like hierarchies
-- **Budget Management**: Set budgets at any folder level with alerts
-- **Recurring Expenses**: Support for daily, weekly, monthly, yearly, and custom patterns
-- **Analytics Dashboard**: Beautiful drill-down visualizations
-- **Export Data**: CSV and PDF export capabilities
-- **Dark Mode**: Eye-friendly theme switching
-- **Responsive Design**: Perfect on desktop, tablet, and mobile
-- **🆕 Offline Support**: Work without internet - changes sync automatically
-- **🆕 PWA Install**: Install as native app on mobile and desktop
-- **🆕 Background Sync**: Automatic sync when connection restored
+- Multi-user authentication (JWT)
+- Unlimited category nesting
+- Budget management with alerts
+- Recurring transactions
+- Analytics dashboard
+- PWA with offline support
+- Dark mode
 
-## 🏗️ Architecture
+## Tech Stack
 
-### Tech Stack
+- **Frontend**: React 18, TypeScript, Material-UI, Vite
+- **Backend**: Node.js, Express, TypeScript
+- **Database**: Azure DocumentDB M10 (FREE tier)
+- **Security**: Azure Key Vault, Managed Identity
+- **Infrastructure**: Docker, Azure Container Apps, GitHub Actions
 
-**Frontend:**
-- React 18 with TypeScript
-- Material-UI (MUI) for beautiful components
-- Vite for fast development
-- React Router for navigation
-- Recharts for data visualization
-- Formik & Yup for form validation
+**Cost**: ₹50/month (~$0.60/month)
 
-**Backend:**
-- Node.js with Express
-- TypeScript
-- Azure Cosmos DB (MongoDB API)
-- JWT Authentication
-- Helmet for security
-
-**Infrastructure:**
-- Docker & Docker Compose
-- Azure Container Registry
-- Azure Container Apps
-- GitHub Actions for CI/CD
-
-### Cost Optimization
-- **Monthly Cost**: ~$5-7/month
-- Azure Cosmos DB Free Tier (25GB, 1000 RU/s)
-- Azure Container Apps (Consumption plan - scales to zero)
-- Azure Container Registry Basic ($5/month)
-
-## 📁 Project Structure
-
-```
-DigiTransac/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   └── cosmosdb.ts
-│   │   ├── middleware/
-│   │   │   ├── auth.ts
-│   │   │   └── errorHandler.ts
-│   │   ├── models/
-│   │   │   └── types.ts
-│   │   ├── routes/
-│   │   │   ├── auth.routes.ts
-│   │   │   ├── user.routes.ts
-│   │   │   ├── category.routes.ts
-│   │   │   ├── expense.routes.ts
-│   │   │   ├── budget.routes.ts
-│   │   │   └── analytics.routes.ts
-│   │   └── server.ts
-│   ├── Dockerfile
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Layout.tsx
-│   │   │   └── Loading.tsx
-│   │   ├── context/
-│   │   │   ├── AuthContext.tsx
-│   │   │   └── ThemeContext.tsx
-│   │   ├── pages/
-│   │   │   ├── Login.tsx
-│   │   │   ├── Register.tsx
-│   │   │   ├── Dashboard.tsx
-│   │   │   ├── Expenses.tsx
-│   │   │   ├── Categories.tsx
-│   │   │   ├── Budgets.tsx
-│   │   │   ├── Analytics.tsx
-│   │   │   └── Profile.tsx
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── index.css
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   ├── package.json
-│   └── vite.config.ts
-├── docs/
-├── docker-compose.yml
-└── README.md
-```
-
-## 🚦 Getting Started
+## Quick Start
 
 ### Prerequisites
-
-- Node.js 20+ 
+- Node.js 20+
 - Docker & Docker Compose
-- Azure Account (for Cosmos DB)
-- Git
+- Azure account (for Key Vault & DocumentDB)
 
 ### Local Development
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd DigiTransac
-   ```
+```bash
+# 1. Clone repository
+git clone <repo-url>
+cd DigiTransac
 
-2. **Setup Backend**
-   ```bash
-   cd backend
-   cp .env.example .env
-   # Edit .env with your Azure Cosmos DB credentials
-   npm install
-   npm run dev
-   ```
+# 2. Login to Azure (for Key Vault access)
+az login
 
-3. **Setup Frontend**
-   ```bash
-   cd frontend
-   cp .env.example .env
-   npm install
-   npm run dev
-   ```
+# 3. Setup environment
+cd backend
+cp .env.example .env
+# Edit .env with your Azure Key Vault URL
 
-4. **Using Docker Compose**
-   ```bash
-   # From project root
-   docker-compose up --build
-   ```
+cd ../frontend
+cp .env.example .env
 
-   Access the application:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-
-### Environment Variables
-
-**Backend (.env)**
-```env
-PORT=5000
-NODE_ENV=development
-COSMOS_ENDPOINT=https://your-account.documents.azure.com:443/
-COSMOS_KEY=your-cosmos-key
-COSMOS_DATABASE_NAME=DigiTransacDB
-JWT_SECRET=your-secret-key
-JWT_EXPIRE=7d
-CORS_ORIGIN=http://localhost:3000
+# 4. Run with Docker
+cd ..
+docker-compose up --build
 ```
 
-**Frontend (.env)**
+**Access**:
+- Frontend: http://localhost:3000
+- Backend: http://localhost:5000
+
+## Configuration
+
+### Backend Environment Variables
+
+```env
+# Azure Key Vault (stores all secrets)
+AZURE_KEY_VAULT_URL=https://digitransac-kv-3895.vault.azure.net/
+
+# Database
+MONGODB_DATABASE_NAME=DigiTransacDB
+
+# Server
+PORT=5000
+NODE_ENV=development
+
+# URLs
+CORS_ORIGIN=http://localhost:3000
+FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://localhost:5000
+```
+
+**Secrets in Key Vault**:
+- `MongoDB-ConnectionString`
+- `JWT-Secret`
+- `Master-Encryption-Key`
+
+### Frontend Environment Variables
+
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
 
-## 🐳 Docker Deployment
+## Deployment
 
-### Build Images
+### CI/CD Pipeline
+
+**Automatic deployment on PR merge to `main`**:
+1. Create feature branch
+2. Push changes
+3. Create Pull Request
+4. Merge → Auto-deploy to Azure
+
+### GitHub Secrets Setup
+
+Run automated script:
+```powershell
+.\scripts\setup-github-secrets.ps1
+```
+
+Required secrets:
+- `AZURE_CREDENTIALS`
+- `AZURE_KEY_VAULT_URL`
+- `MONGODB_DATABASE_NAME`
+- `BACKEND_URL`, `FRONTEND_URL`, `CORS_ORIGIN`
+
+### Manual Deployment
 
 ```bash
-# Build backend
-docker build -t your-acr.azurecr.io/expense-tracker-backend:latest ./backend
+# Build images
+docker build -t <acr>.azurecr.io/digitransac-backend:latest ./backend
+docker build -t <acr>.azurecr.io/digitransac-frontend:latest ./frontend
 
-# Build frontend
-docker build -t your-acr.azurecr.io/expense-tracker-frontend:latest ./frontend
+# Push to ACR
+az acr login --name <acr>
+docker push <acr>.azurecr.io/digitransac-backend:latest
+docker push <acr>.azurecr.io/digitransac-frontend:latest
 ```
 
-### Push to Azure Container Registry
+## Security
 
-```bash
-# Login to ACR
-az acr login --name your-acr
+- **Azure Key Vault**: All secrets centralized
+- **Managed Identity**: Passwordless authentication
+- **JWT Authentication**: Secure user sessions
+- **TLS 1.2+**: Encrypted communication
+- **RBAC**: Role-based access control
+- **Multi-stage Docker**: Minimal attack surface
 
-# Push images
-docker push your-acr.azurecr.io/expense-tracker-backend:latest
-docker push your-acr.azurecr.io/expense-tracker-frontend:latest
-```
+## License
 
-## 📊 Database Schema
+MIT
 
-### Collections
+---
 
-1. **users**: User accounts and profiles
-2. **categories**: Hierarchical folder/category structure
-3. **expenses**: All expense records
-4. **budgets**: Budget definitions and thresholds
-
-### Key Models
-
-```typescript
-interface Category {
-  id: string;
-  userId: string;
-  name: string;
-  parentId: string | null;  // null for root folders
-  isFolder: boolean;         // false for leaf categories only
-  icon?: string;
-  color?: string;
-  path: string[];            // Full path for drill-down
-}
-
-interface Expense {
-  id: string;
-  userId: string;
-  categoryId: string;        // Must be a leaf category
-  amount: number;
-  description: string;
-  date: Date;
-  isRecurring: boolean;
-  recurrencePattern?: RecurrencePattern;
-}
-
-interface Budget {
-  id: string;
-  userId: string;
-  categoryId: string;        // Can be folder or category
-  amount: number;
-  period: 'monthly' | 'yearly' | 'custom';
-  alertThreshold: number;    // Percentage (e.g., 80%)
-}
-```
-
-## 🔒 Security
-
-- JWT-based authentication
-- Helmet.js for HTTP headers security
-- CORS protection
-- Password hashing with bcrypt
-- Input validation with Joi
-- SQL injection prevention (Cosmos DB parameterized queries)
-
-## 🎨 UI/UX Features
-
-- Modern Material Design
-- Smooth animations and transitions
-- Dark/Light mode toggle
-- Responsive layout (mobile-first)
-- Beautiful data visualizations
-- Drag-and-drop category management
-- Real-time budget alerts
-
-## 📈 Future Enhancements
-
-- Receipt upload and OCR
-- Multi-currency support
-- Shared budgets (family/team)
-- Mobile app (React Native)
-- AI-powered expense categorization
-- Bank account integration
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
-## 📝 License
-
-MIT License - feel free to use this project for personal or commercial purposes.
-
-## 👤 Author
-
-Built with ❤️ by a Microsoft Software Engineer
-
-## 🆘 Support
-
-For issues or questions, please open an issue on GitHub.
+See [DEV-GUIDE.md](DEV-GUIDE.md) for detailed development documentation.

@@ -17,7 +17,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { ModernDatePicker } from './ModernDatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
@@ -160,7 +160,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
           {datePreset === 'custom' && (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DatePicker
+              <ModernDatePicker
                 label="Start Date"
                 value={filters.dateRange.start}
                 onChange={(newValue) => {
@@ -171,9 +171,8 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                     });
                   }
                 }}
-                slotProps={{ textField: { size: 'small' } }}
               />
-              <DatePicker
+              <ModernDatePicker
                 label="End Date"
                 value={filters.dateRange.end}
                 onChange={(newValue) => {
@@ -184,7 +183,6 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                     });
                   }
                 }}
-                slotProps={{ textField: { size: 'small' } }}
               />
             </LocalizationProvider>
           )}

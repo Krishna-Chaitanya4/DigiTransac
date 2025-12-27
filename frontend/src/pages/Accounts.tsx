@@ -22,6 +22,9 @@ import {
   InputAdornment,
   Tooltip,
   Collapse,
+  Fade,
+  Zoom,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -31,6 +34,8 @@ import {
   Savings as SavingsIcon,
   CreditCard as CreditCardIcon,
   TrendingUp as InvestmentIcon,
+  TrendingUp,
+  TrendingDown,
   Money as CashIcon,
   AccountBalanceWallet as WalletIcon,
   Star as StarIcon,
@@ -49,6 +54,10 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
+import { ModernDatePicker } from '../components/ModernDatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 interface Account {
   id: string;
@@ -919,81 +928,155 @@ const Accounts: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            My Accounts
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {activeAccountCount} account{activeAccountCount !== 1 ? 's' : ''} • Total Balance: {formatCurrency(netWorth, user?.currency || 'USD')}
-          </Typography>
+      {/* Enhanced Animated Header */}
+      <Fade in timeout={600}>
+        <Box
+          sx={{
+            mb: 4,
+            p: 4,
+            borderRadius: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
+            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(10px)',
+                      width: 56,
+                      height: 56,
+                    }}
+                  >
+                    <BankIcon sx={{ fontSize: 32 }} />
+                  </Avatar>
+                  <Typography
+                    variant="h4"
+                    fontWeight={800}
+                    sx={{
+                      color: 'white',
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    My Accounts
+                  </Typography>
+                </Box>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
+                  {activeAccountCount} account{activeAccountCount !== 1 ? 's' : ''} • Total: {formatCurrency(netWorth, user?.currency || 'USD')}
+                </Typography>
+              </Box>
+              <Box display="flex" gap={2}>
+                <Zoom in timeout={700}>
+                  <Tooltip title="Export Accounts">
+                    <IconButton 
+                      onClick={handleExportAccounts}
+                      sx={{
+                        bgcolor: 'white',
+                        color: 'primary.main',
+                        width: 48,
+                        height: 48,
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                          bgcolor: 'rgba(255,255,255,0.95)',
+                        },
+                      }}
+                    >
+                      <DownloadIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Zoom>
+                <Zoom in timeout={800}>
+                  <Tooltip title="Refresh Balances">
+                    <IconButton 
+                      onClick={fetchAccounts}
+                      sx={{
+                        bgcolor: 'white',
+                        color: 'primary.main',
+                        width: 48,
+                        height: 48,
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                        '&:hover': {
+                          transform: 'rotate(180deg)',
+                          boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                          bgcolor: 'rgba(255,255,255,0.95)',
+                        },
+                        transition: 'all 0.4s ease',
+                      }}
+                    >
+                      <RefreshIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Zoom>
+                <Zoom in timeout={900}>
+                  <Button 
+                    variant="outlined" 
+                    startIcon={<TransferIcon />} 
+                    onClick={() => handleTransferMoney(null)}
+                    sx={{
+                      bgcolor: 'white',
+                      borderColor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    Transfer
+                  </Button>
+                </Zoom>
+                <Zoom in timeout={1000}>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<AddIcon />} 
+                    onClick={() => handleOpenDialog()}
+                    sx={{
+                      bgcolor: 'white',
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      },
+                    }}
+                  >
+                    Add Account
+                  </Button>
+                </Zoom>
+              </Box>
+            </Box>
+          </Box>
         </Box>
-        <Box display="flex" gap={2}>
-          <Tooltip title="Export Accounts">
-            <IconButton 
-              onClick={handleExportAccounts}
-              sx={{
-                color: '#14b8a6',
-                '&:hover': {
-                  background: 'rgba(20, 184, 166, 0.1)',
-                  transform: 'scale(1.1)',
-                },
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <DownloadIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Refresh Balances">
-            <IconButton 
-              onClick={fetchAccounts}
-              sx={{
-                color: 'primary.main',
-                '&:hover': {
-                  bgcolor: 'primary.lighter',
-                  transform: 'rotate(180deg)',
-                },
-                transition: 'all 0.4s ease',
-              }}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Button 
-            variant="outlined" 
-            startIcon={<TransferIcon />} 
-            onClick={() => handleTransferMoney(null)}
-            sx={{
-              borderColor: '#14b8a6',
-              color: '#14b8a6',
-              '&:hover': {
-                borderColor: '#0891b2',
-                background: 'rgba(20, 184, 166, 0.1)',
-                transform: 'translateY(-2px)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            Transfer
-          </Button>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />} 
-            onClick={() => handleOpenDialog()}
-            sx={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 20px rgba(20, 184, 166, 0.4)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            Add Account
-          </Button>
-        </Box>
-      </Box>
+      </Fade>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
@@ -1008,8 +1091,22 @@ const Accounts: React.FC = () => {
       )}
 
       {/* Search and Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
+      <Fade in timeout={800}>
+        <Card sx={{
+          mb: 3,
+          borderRadius: 3,
+          background: (theme) =>
+            theme.palette.mode === 'light'
+              ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+              : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+          backdropFilter: 'blur(20px)',
+          border: (theme) =>
+            theme.palette.mode === 'light'
+              ? `1px solid ${theme.palette.primary.main}1A`
+              : `1px solid ${theme.palette.primary.main}33`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+        }}>
+          <CardContent>
           <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
             <TextField
               placeholder="Search accounts..."
@@ -1128,81 +1225,136 @@ const Accounts: React.FC = () => {
             </Box>
           </Collapse>
         </CardContent>
-      </Card>
+        </Card>
+      </Fade>
 
       {/* Summary Cards */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} md={4}>
-          <Card 
-            sx={{ 
-              background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-              transition: 'all 0.3s ease',
+          <Zoom in timeout={900}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.primary,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 12px 28px rgba(20, 184, 166, 0.4)',
+                transform: 'translateY(-8px)',
+                boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
               },
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" color="white" gutterBottom>
-                Net Worth
-              </Typography>
-              <Typography variant="h3" color="white" fontWeight="bold">
-                {formatCurrency(netWorth)}
-              </Typography>
-              <Typography variant="body2" color="rgba(255,255,255,0.8)" mt={1}>
-                Assets - Liabilities
-              </Typography>
-            </CardContent>
-          </Card>
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Net Worth
+                  </Typography>
+                  <BalanceIcon sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                  {formatCurrency(netWorth)}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
+                  Assets - Liabilities
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card 
-            sx={{ 
-              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-              transition: 'all 0.3s ease',
+          <Zoom in timeout={1000}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.success,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 12px 28px rgba(16, 185, 129, 0.4)',
+                transform: 'translateY(-8px)',
+                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
               },
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" color="white" gutterBottom>
-                Total Assets
-              </Typography>
-              <Typography variant="h3" color="white" fontWeight="bold">
-                {formatCurrency(totalAssets)}
-              </Typography>
-              <Typography variant="body2" color="rgba(255,255,255,0.8)" mt={1}>
-                {activeAccountCount} active accounts
-              </Typography>
-            </CardContent>
-          </Card>
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Assets
+                  </Typography>
+                  <TrendingUp sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                  {formatCurrency(totalAssets)}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
+                  {activeAccountCount} active accounts
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card 
-            sx={{ 
-              background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
-              transition: 'all 0.3s ease',
+          <Zoom in timeout={1100}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.error,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 12px 28px rgba(244, 63, 94, 0.4)',
+                transform: 'translateY(-8px)',
+                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
               },
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" color="white" gutterBottom>
-                Total Liabilities
-              </Typography>
-              <Typography variant="h3" color="white" fontWeight="bold">
-                {formatCurrency(totalLiabilitiesWithCreditCards)}
-              </Typography>
-              <Typography variant="body2" color="rgba(255,255,255,0.8)" mt={1}>
-                Loans + Credit Cards
-              </Typography>
-            </CardContent>
-          </Card>
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Liabilities
+                  </Typography>
+                  <TrendingDown sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                  {formatCurrency(totalLiabilitiesWithCreditCards)}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
+                  Loans + Credit Cards
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
       </Grid>
 
@@ -1263,15 +1415,47 @@ const Accounts: React.FC = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingAccount ? 'Edit Account' : 'Add Account'}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '120px',
+              height: '120px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+              borderRadius: '50%',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
+              <BankIcon />
+            </Avatar>
+            <Typography variant="h5" fontWeight={700}>
+              {editingAccount ? 'Edit Account' : 'Add Account'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <TextField
               label="Account Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               fullWidth
               required
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
             <TextField
@@ -1288,6 +1472,11 @@ const Accounts: React.FC = () => {
               }}
               fullWidth
               required
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             >
               {Object.entries(accountTypeConfig).map(([value, config]) => (
                 <MenuItem key={value} value={value}>
@@ -1301,6 +1490,11 @@ const Accounts: React.FC = () => {
               value={formData.bankName}
               onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
               fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
             <TextField
@@ -1309,6 +1503,11 @@ const Accounts: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
               fullWidth
               inputProps={{ maxLength: 4 }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
             <TextField
@@ -1317,6 +1516,11 @@ const Accounts: React.FC = () => {
               value={formData.currency}
               onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
               fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             >
               <MenuItem value="USD">USD - US Dollar</MenuItem>
               <MenuItem value="EUR">EUR - Euro</MenuItem>
@@ -1324,6 +1528,121 @@ const Accounts: React.FC = () => {
               <MenuItem value="INR">INR - Indian Rupee</MenuItem>
               <MenuItem value="JPY">JPY - Japanese Yen</MenuItem>
             </TextField>
+
+            <Box>
+              <Typography variant="body2" fontWeight={600} color="primary" gutterBottom>
+                Account Color (Optional)
+              </Typography>
+              <Box
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2,
+                  background: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? 'rgba(248, 250, 252, 0.8)'
+                      : 'rgba(30, 30, 30, 0.5)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                {/* Preset Colors */}
+                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                  Quick Select
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                  {[
+                    '#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#689f38', '#d32f2f',
+                    '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
+                    '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#64748b', '#475569',
+                  ].map((presetColor) => (
+                    <Box
+                      key={presetColor}
+                      onClick={() => setFormData({ ...formData, color: presetColor })}
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 1.5,
+                        bgcolor: presetColor,
+                        cursor: 'pointer',
+                        border: '3px solid',
+                        borderColor: formData.color === presetColor ? 'primary.main' : 'transparent',
+                        transition: 'all 0.2s ease',
+                        boxShadow: formData.color === presetColor ? '0 0 0 2px rgba(20, 184, 166, 0.2)' : 'none',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+
+                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                  Custom Color
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      border: '3px solid',
+                      borderColor: 'background.paper',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'scale(1.05)',
+                        boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
+                      },
+                    }}
+                  >
+                    <input
+                      type="color"
+                      value={formData.color || accountTypeConfig[formData.type].color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    />
+                  </Box>
+                  <TextField
+                    size="small"
+                    value={formData.color || accountTypeConfig[formData.type].color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    placeholder="#1976d2"
+                    sx={{
+                      flex: 1,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                      },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            bgcolor: formData.color || accountTypeConfig[formData.type].color,
+                            mr: 1,
+                            border: '2px solid',
+                            borderColor: 'divider',
+                          }}
+                        />
+                      ),
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Box>
 
             {!editingAccount && (
               <TextField
@@ -1339,16 +1658,13 @@ const Accounts: React.FC = () => {
                     <InputAdornment position="start">{formData.currency}</InputAdornment>
                   ),
                 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
               />
             )}
-
-            <TextField
-              label="Color"
-              type="color"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              fullWidth
-            />
 
             <TextField
               label="Notes"
@@ -1357,42 +1673,173 @@ const Accounts: React.FC = () => {
               multiline
               rows={3}
               fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
             />
 
-            <Box display="flex" gap={2}>
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 3,
+                p: 2,
+                borderRadius: 2,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                    : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
               <FormControlLabel
                 control={
                   <Switch
                     checked={formData.isDefault}
                     onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: (theme) => theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: (theme) =>
+                            `${theme.palette.primary.main}15`,
+                        },
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    }}
                   />
                 }
-                label="Set as Default"
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      Set as Default
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Primary account for transactions
+                    </Typography>
+                  </Box>
+                }
               />
               <FormControlLabel
                 control={
                   <Switch
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: (theme) => theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: (theme) =>
+                            `${theme.palette.primary.main}15`,
+                        },
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        background: (theme) => theme.palette.gradient.primary,
+                      },
+                    }}
                   />
                 }
-                label="Active"
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      Active
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Include in transactions
+                    </Typography>
+                  </Box>
+                }
               />
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={!formData.name}>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button 
+            onClick={handleCloseDialog}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            disabled={!formData.name}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+              },
+              transition: 'all 0.2s ease',
+            }}
+          >
             {editingAccount ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Delete Account</DialogTitle>
-        <DialogContent>
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle
+          sx={{
+            background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '100px',
+              height: '100px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 40,
+                height: 40,
+              }}
+            >
+              <DeleteIcon />
+            </Avatar>
+            <Typography variant="h6" component="div" sx={{ fontWeight: 700 }}>
+              Delete Account
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Typography>
             Are you sure you want to delete "{accountToDelete?.name}"?
             {accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount ? (
@@ -1407,15 +1854,49 @@ const Accounts: React.FC = () => {
             )}
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={() => setDeleteConfirmOpen(false)}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleDeleteConfirm}
-            color="error"
             variant="contained"
             disabled={
               !!(accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount)
             }
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+                transition: 'all 0.2s ease',
+              },
+            }}
           >
             Delete
           </Button>
@@ -1429,8 +1910,41 @@ const Accounts: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Adjust Account Balance</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 48,
+                height: 48,
+              }}
+            >
+              <BalanceIcon />
+            </Avatar>
+            <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
+              Adjust Account Balance
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ pt: 2 }}>
             {adjustingAccount && (
               <>
@@ -1520,8 +2034,31 @@ const Accounts: React.FC = () => {
             )}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAdjustBalanceOpen(false)}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={() => setAdjustBalanceOpen(false)}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleSaveAdjustment}
             variant="contained"
@@ -1532,6 +2069,18 @@ const Accounts: React.FC = () => {
                   adjustingAccount?.balance ||
                   0)
             }
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+                transition: 'all 0.2s ease',
+              },
+            }}
           >
             Adjust Balance
           </Button>
@@ -1553,8 +2102,41 @@ const Accounts: React.FC = () => {
         maxWidth="sm" 
         fullWidth
       >
-        <DialogTitle>Transfer Money</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            background: (theme) => theme.palette.gradient.primary,
+            color: 'white',
+            py: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              right: '-10%',
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                width: 48,
+                height: 48,
+              }}
+            >
+              <TransferIcon />
+            </Avatar>
+            <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
+              Transfer Money
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* From Account - Selectable if not pre-filled */}
             {transferFromPreFilled ? (
@@ -1653,14 +2235,18 @@ const Accounts: React.FC = () => {
             />
 
             {/* Date */}
-            <TextField
-              label="Date"
-              type="date"
-              value={transferDate}
-              onChange={(e) => setTransferDate(e.target.value)}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <ModernDatePicker
+                label="Date"
+                value={transferDate ? dayjs(transferDate) : null}
+                onChange={(newValue) => {
+                  if (newValue) {
+                    setTransferDate(newValue.format('YYYY-MM-DD'));
+                  }
+                }}
+                fullWidth
+              />
+            </LocalizationProvider>
 
             {/* Notes (Optional) */}
             <TextField
@@ -1675,20 +2261,55 @@ const Accounts: React.FC = () => {
             {error && <Alert severity="error">{error}</Alert>}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setTransferDialogOpen(false);
-            setTransferFromAccount(null);
-            setTransferFromPreFilled(false);
-            setTransferToAccountId('');
-            setTransferAmount('');
-            setTransferNotes('');
-            setError('');
-          }}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2.5,
+            gap: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'rgba(248, 250, 252, 0.8)'
+                : 'rgba(15, 15, 15, 0.8)',
+          }}
+        >
+          <Button
+            onClick={() => {
+              setTransferDialogOpen(false);
+              setTransferFromAccount(null);
+              setTransferFromPreFilled(false);
+              setTransferToAccountId('');
+              setTransferAmount('');
+              setTransferNotes('');
+              setError('');
+            }}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </Button>
           <Button 
             onClick={handleTransferSubmit} 
             variant="contained" 
             disabled={!transferFromAccount || !transferToAccountId || !transferAmount}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              textTransform: 'none',
+              fontWeight: 600,
+              background: (theme) => theme.palette.gradient.primary,
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 4,
+                transition: 'all 0.2s ease',
+              },
+            }}
           >
             Transfer
           </Button>

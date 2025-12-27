@@ -47,10 +47,32 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     await ensureDefaultTags(userId);
 
     const tagsContainer = await cosmosDBService.getTagsContainer();
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+
     const tags = (await tagsContainer.find({ userId }).toArray()) as unknown as Tag[];
 
-    // Sort in memory for now to avoid index issues
-    tags.sort((a, b) => {
+    // Calculate correct usage count for each tag from splits collection
+    const tagsWithCorrectCount = await Promise.all(
+      tags.map(async (tag) => {
+        const splitsWithTag = await splitsContainer
+          .find({
+            userId,
+            tags: tag.name,
+          })
+          .toArray();
+
+        // Get unique transaction IDs
+        const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
+
+        return {
+          ...tag,
+          usageCount: transactionIds.length,
+        };
+      })
+    );
+
+    // Sort by usage count
+    tagsWithCorrectCount.sort((a, b) => {
       if (a.usageCount !== b.usageCount) {
         return b.usageCount - a.usageCount;
       }
@@ -59,7 +81,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     res.json({
       success: true,
-      tags,
+      tags: tagsWithCorrectCount,
     });
   } catch (error) {
     console.error('Error fetching tags:', error);
@@ -194,7 +216,184 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   }
 });
 
-// DELETE /api/tags/:id - Delete a tag
+// GET /api/tags/:id/usage - Check tag usage in transactions and budgets
+router.get('/:id/usage', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    const tagsContainer = await cosmosDBService.getTagsContainer();
+    const tag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
+
+    if (!tag) {
+      res.status(404).json({
+        success: false,
+        message: 'Tag not found',
+      });
+      return;
+    }
+
+    // Count transactions using this tag
+    // Tags are stored in the transactionSplits collection, not in transactions
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+
+    // Find all splits that have this tag
+    const splitsWithTag = await splitsContainer
+      .find({
+        userId,
+        tags: tag.name,
+      })
+      .toArray();
+
+    // Get unique transaction IDs from splits
+    const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
+    const transactionCount = transactionIds.length;
+
+    // Count budgets using this tag in include/exclude filters
+    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgets = await budgetsContainer.find({ userId }).toArray();
+
+    const budgetsUsingTag = budgets.filter((budget: any) => {
+      const includeTags = budget.filters?.includeTags || [];
+      const excludeTags = budget.filters?.excludeTags || [];
+      return includeTags.includes(tag.name) || excludeTags.includes(tag.name);
+    });
+
+    res.json({
+      success: true,
+      usage: {
+        transactions: transactionCount,
+        budgets: budgetsUsingTag.length,
+        budgetNames: budgetsUsingTag.map((b: any) => b.name),
+        canDelete: transactionCount === 0 && budgetsUsingTag.length === 0,
+      },
+    });
+  } catch (error) {
+    console.error('Error checking tag usage:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking tag usage',
+    });
+  }
+});
+
+// POST /api/tags/:id/replace - Replace a tag with another tag
+router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { replacementTagId } = req.body;
+
+    if (!replacementTagId) {
+      res.status(400).json({
+        success: false,
+        message: 'Replacement tag ID is required',
+      });
+      return;
+    }
+
+    const tagsContainer = await cosmosDBService.getTagsContainer();
+
+    // Get both tags
+    const oldTag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
+    const newTag = (await tagsContainer.findOne({
+      id: replacementTagId,
+      userId,
+    })) as unknown as Tag;
+
+    if (!oldTag || !newTag) {
+      res.status(404).json({
+        success: false,
+        message: 'Tag not found',
+      });
+      return;
+    }
+
+    // Replace in transactions (via splits collection)
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const splitsWithOldTag = await splitsContainer
+      .find({
+        userId,
+        tags: oldTag.name,
+      })
+      .toArray();
+
+    for (const split of splitsWithOldTag) {
+      const tags = split.tags || [];
+      const updatedTags = tags
+        .filter((t: string) => t !== oldTag.name)
+        .concat(newTag.name)
+        .filter((t: string, index: number, self: string[]) => self.indexOf(t) === index); // Remove duplicates
+
+      await splitsContainer.updateOne(
+        { _id: split._id },
+        { $set: { tags: updatedTags, updatedAt: new Date() } }
+      );
+    }
+
+    // Get unique transaction count for response
+    const transactionIds = [...new Set(splitsWithOldTag.map((split: any) => split.transactionId))];
+
+    // Replace in budgets
+    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgets = await budgetsContainer.find({ userId }).toArray();
+
+    for (const budget of budgets) {
+      let updated = false;
+      const filters = budget.filters || {};
+
+      if (filters.includeTags?.includes(oldTag.name)) {
+        filters.includeTags = filters.includeTags
+          .filter((t: string) => t !== oldTag.name)
+          .concat(newTag.name)
+          .filter((t: string, index: number, self: string[]) => self.indexOf(t) === index);
+        updated = true;
+      }
+
+      if (filters.excludeTags?.includes(oldTag.name)) {
+        filters.excludeTags = filters.excludeTags
+          .filter((t: string) => t !== oldTag.name)
+          .concat(newTag.name)
+          .filter((t: string, index: number, self: string[]) => self.indexOf(t) === index);
+        updated = true;
+      }
+
+      if (updated) {
+        await budgetsContainer.updateOne({ _id: budget._id }, { $set: { filters } });
+      }
+    }
+
+    // Update usage counts
+    await tagsContainer.updateOne(
+      { id: newTag.id },
+      { $inc: { usageCount: splitsWithOldTag.length } as any }
+    );
+
+    // Delete old tag
+    await tagsContainer.deleteOne({ id: oldTag.id, userId });
+
+    res.json({
+      success: true,
+      message: `Tag "${oldTag.name}" replaced with "${newTag.name}"`,
+      replaced: {
+        transactions: transactionIds.length,
+        budgets: budgets.filter((b: any) => {
+          const includeTags = b.filters?.includeTags || [];
+          const excludeTags = b.filters?.excludeTags || [];
+          return includeTags.includes(oldTag.name) || excludeTags.includes(oldTag.name);
+        }).length,
+      },
+    });
+  } catch (error) {
+    console.error('Error replacing tag:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error replacing tag',
+    });
+  }
+});
+
+// DELETE /api/tags/:id - Delete a tag (only if not in use)
 router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
@@ -211,13 +410,43 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
       return;
     }
 
-    // Remove tag from all transactions
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    await transactionsContainer.updateMany(
-      { userId, tags: tag.name },
-      { $pull: { tags: tag.name } as any }
-    );
+    // Check if tag is in use
+    // Tags are stored in the transactionSplits collection
+    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
 
+    const splitsWithTag = await splitsContainer
+      .find({
+        userId,
+        tags: tag.name,
+      })
+      .toArray();
+
+    const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
+    const transactionCount = transactionIds.length;
+
+    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgets = await budgetsContainer.find({ userId }).toArray();
+
+    const budgetsUsingTag = budgets.filter((budget: any) => {
+      const includeTags = budget.filters?.includeTags || [];
+      const excludeTags = budget.filters?.excludeTags || [];
+      return includeTags.includes(tag.name) || excludeTags.includes(tag.name);
+    });
+
+    if (transactionCount > 0 || budgetsUsingTag.length > 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Cannot delete tag that is in use',
+        usage: {
+          transactions: transactionCount,
+          budgets: budgetsUsingTag.length,
+          budgetNames: budgetsUsingTag.map((b: any) => b.name),
+        },
+      });
+      return;
+    }
+
+    // Tag is not in use, safe to delete
     await tagsContainer.deleteOne({ id, userId });
 
     res.json({

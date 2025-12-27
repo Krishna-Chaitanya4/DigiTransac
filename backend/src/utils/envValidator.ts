@@ -4,16 +4,13 @@ import { logger } from './logger';
 interface EnvConfig {
   PORT: number;
   NODE_ENV: string;
-  COSMOS_ENDPOINT: string;
-  COSMOS_KEY: string;
-  COSMOS_DATABASE_NAME: string;
-  JWT_SECRET: string;
+  AZURE_KEY_VAULT_URL: string;
+  MONGODB_DATABASE_NAME?: string;
+  COSMOS_DATABASE_NAME?: string; // Legacy support
   JWT_EXPIRE: string;
   CORS_ORIGIN: string;
   FRONTEND_URL: string;
   BACKEND_URL: string;
-  MASTER_ENCRYPTION_KEY?: string;
-  KEY_VAULT_URL?: string;
   GMAIL_CLIENT_ID?: string;
   GMAIL_CLIENT_SECRET?: string;
 }
@@ -21,18 +18,32 @@ interface EnvConfig {
 const envSchema = Joi.object({
   PORT: Joi.number().default(5000),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
-  COSMOS_ENDPOINT: Joi.string().uri().required(),
-  COSMOS_KEY: Joi.string().required(),
-  COSMOS_DATABASE_NAME: Joi.string().required(),
-  JWT_SECRET: Joi.string().min(32).required(),
+
+  // Key Vault is required for all secrets
+  AZURE_KEY_VAULT_URL: Joi.string().uri().required().messages({
+    'string.uri': 'AZURE_KEY_VAULT_URL must be a valid URI',
+    'any.required': 'AZURE_KEY_VAULT_URL is required. Run "az login" and set this variable.',
+  }),
+  KEY_VAULT_URL: Joi.string().uri().optional(), // Legacy alias
+
+  // Database configuration
+  MONGODB_DATABASE_NAME: Joi.string().optional(),
+  COSMOS_DATABASE_NAME: Joi.string().optional(), // Legacy support
+
   JWT_EXPIRE: Joi.string().default('7d'),
   CORS_ORIGIN: Joi.string().required(),
   FRONTEND_URL: Joi.string().uri().required(),
   BACKEND_URL: Joi.string().uri().required(),
-  MASTER_ENCRYPTION_KEY: Joi.string().optional(),
-  KEY_VAULT_URL: Joi.string().allow('', null).optional(),
+
+  // Optional integrations
   GMAIL_CLIENT_ID: Joi.string().optional(),
   GMAIL_CLIENT_SECRET: Joi.string().optional(),
+
+  // Legacy variables (ignored)
+  COSMOS_ENDPOINT: Joi.string().optional(),
+  COSMOS_KEY: Joi.string().optional(),
+  JWT_SECRET: Joi.string().optional(),
+  MASTER_ENCRYPTION_KEY: Joi.string().optional(),
 }).unknown(true);
 
 export function validateEnv(): EnvConfig {

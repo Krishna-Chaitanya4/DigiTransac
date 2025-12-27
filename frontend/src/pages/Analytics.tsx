@@ -18,9 +18,13 @@ import {
   CardContent,
   IconButton,
   Tooltip,
+  Fade,
+  Zoom,
+  Avatar,
+  useTheme,
 } from '@mui/material';
+import { ModernDatePicker } from '../components/ModernDatePicker';
 import {
-  DatePicker,
   LocalizationProvider,
 } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -33,6 +37,8 @@ import {
   Category as CategoryIcon,
   Store,
   AccountBalanceWallet,
+  AccountBalance,
+  CalendarMonth,
 } from '@mui/icons-material';
 import {
   LineChart,
@@ -66,19 +72,25 @@ const DATE_RANGES = [
   { label: 'Custom', value: 'custom' },
 ];
 
-// Chart colors
-const COLORS = {
-  primary: '#14b8a6',
-  success: '#10b981',
-  error: '#f43f5e',
-  warning: '#f97316',
-  info: '#06b6d4',
+// Chart colors - using centralized theme function
+const getChartColors = (theme: any) => ({
+  primary: theme.palette.primary.main,
+  success: theme.palette.success.main,
+  error: theme.palette.error.main,
+  warning: theme.palette.warning.main,
+  info: theme.palette.info.main,
   categoryColors: [
-    '#14b8a6', '#06b6d4', '#0891b2', '#22d3ee',
-    '#10b981', '#34d399', '#f59e0b', '#fbbf24',
+    theme.palette.primary.main,
+    theme.palette.info.main,
+    theme.palette.info.dark,
+    theme.palette.info.light,
+    theme.palette.success.main,
+    theme.palette.success.light,
+    theme.palette.warning.main,
+    theme.palette.warning.light,
     '#8b5cf6', '#a78bfa', '#ec4899', '#f472b6',
   ],
-};
+});
 
 interface Transaction {
   id: string;
@@ -107,6 +119,8 @@ interface MonthlyData {
 
 const Analytics: React.FC = () => {
   const { user } = useAuth();
+  const theme = useTheme();
+  const COLORS = useMemo(() => getChartColors(theme), [theme]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -424,45 +438,111 @@ const Analytics: React.FC = () => {
 
   return (
     <Box>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Box>
-            <Typography 
-              variant="h4" 
-              fontWeight={800} 
-              gutterBottom
-              sx={{
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Financial Insights
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {getCurrentMonthYear()} • Net Savings: {formatCurrency(summaryStats.net)}
-            </Typography>
+      {/* Enhanced Animated Header */}
+      <Fade in timeout={600}>
+        <Box
+          sx={{
+            mb: 4,
+            p: 4,
+            borderRadius: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
+            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(10px)',
+                      width: 56,
+                      height: 56,
+                    }}
+                  >
+                    <Assessment sx={{ fontSize: 32 }} />
+                  </Avatar>
+                  <Typography
+                    variant="h4"
+                    fontWeight={800}
+                    sx={{
+                      color: 'white',
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    Financial Insights
+                  </Typography>
+                </Box>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
+                  {getCurrentMonthYear()} • Net Savings: {formatCurrency(summaryStats.net)}
+                </Typography>
+              </Box>
+              <Zoom in timeout={800}>
+                <Tooltip title="Export to CSV">
+                  <IconButton
+                    onClick={exportData}
+                    sx={{
+                      bgcolor: 'white',
+                      color: 'primary.main',
+                      width: 48,
+                      height: 48,
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                      },
+                    }}
+                  >
+                    <Download />
+                  </IconButton>
+                </Tooltip>
+              </Zoom>
+            </Box>
           </Box>
-          <Tooltip title="Export to CSV">
-            <IconButton 
-              onClick={exportData} 
-              size="large"
-              sx={{
-                color: '#14b8a6',
-                '&:hover': {
-                  background: 'rgba(20, 184, 166, 0.1)',
-                },
-              }}
-            >
-              <Download />
-            </IconButton>
-          </Tooltip>
         </Box>
+      </Fade>
 
-        {/* Date Range Filter */}
-        <Paper sx={{ p: 3, borderRadius: 3 }}>
+      {/* Date Range Filter */}
+      <Box sx={{ mb: 4 }}>
+        <Fade in timeout={800}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? `1px solid ${theme.palette.primary.main}1A`
+                  : `1px solid ${theme.palette.primary.main}33`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            }}
+          >
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={4}>
               <TextField
@@ -483,25 +563,26 @@ const Analytics: React.FC = () => {
             {dateRangeType === 'custom' && (
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <Grid item xs={12} md={4}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="Start Date"
                     value={startDate}
                     onChange={(newValue) => setStartDate(newValue)}
-                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    fullWidth
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="End Date"
                     value={endDate}
                     onChange={(newValue) => setEndDate(newValue)}
-                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    fullWidth
                   />
                 </Grid>
               </LocalizationProvider>
             )}
           </Grid>
-        </Paper>
+          </Paper>
+        </Fade>
       </Box>
 
       {error && (
@@ -513,99 +594,201 @@ const Analytics: React.FC = () => {
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
-            },
-          }}>
-            <CardContent>
-              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
-                Total Income
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="white">
-                {formatCurrency(summaryStats.income)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <Zoom in timeout={400}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.success,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Income
+                  </Typography>
+                  <TrendingUp sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
+                  {formatCurrency(summaryStats.income)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: '0 8px 24px rgba(244, 63, 94, 0.4)',
-            },
-          }}>
-            <CardContent>
-              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
-                Total Expenses
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="white">
-                {formatCurrency(summaryStats.expenses)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <Zoom in timeout={500}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.error,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Expenses
+                  </Typography>
+                  <TrendingDown sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
+                  {formatCurrency(summaryStats.expenses)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            borderRadius: 3,
-            background: summaryStats.net >= 0 
-              ? 'linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%)'
-              : 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-4px)',
+          <Zoom in timeout={600}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => summaryStats.net >= 0
+                ? theme.palette.gradient.info
+                : theme.palette.gradient.error,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
               boxShadow: summaryStats.net >= 0
-                ? '0 8px 24px rgba(6, 182, 212, 0.4)'
-                : '0 8px 24px rgba(249, 115, 22, 0.4)',
-            },
-          }}>
-            <CardContent>
-              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
-                Net Savings
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="white">
-                {formatCurrency(summaryStats.net)}
-              </Typography>
-            </CardContent>
-          </Card>
+                ? '0 4px 20px rgba(6, 182, 212, 0.25)'
+                : '0 4px 20px rgba(249, 115, 22, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: summaryStats.net >= 0
+                  ? '0 12px 32px rgba(6, 182, 212, 0.35)'
+                  : '0 12px 32px rgba(249, 115, 22, 0.35)',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Net Savings
+                  </Typography>
+                  <AccountBalance sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
+                  {formatCurrency(summaryStats.net)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: '0 8px 24px rgba(20, 184, 166, 0.4)',
-            },
-          }}>
-            <CardContent>
-              <Typography variant="body2" color="rgba(255,255,255,0.9)" gutterBottom>
-                Avg Daily Spending
-              </Typography>
-              <Typography variant="h5" fontWeight={700} color="white">
-                {formatCurrency(summaryStats.avgDailySpending)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <Zoom in timeout={700}>
+            <Card sx={{
+              borderRadius: 3,
+              background: (theme) => theme.palette.gradient.primary,
+              color: 'white',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-8px)',
+                boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '80px',
+                height: '80px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}>
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Avg Daily Spending
+                  </Typography>
+                  <CalendarMonth sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
+                  {formatCurrency(summaryStats.avgDailySpending)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
         </Grid>
       </Grid>
 
       {/* 1. Income vs Expense Trend */}
-      <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-        <Box display="flex" alignItems="center" gap={1} mb={3}>
-          <TrendingUp color="primary" />
-          <Typography variant="h6" fontWeight={700}>
-            Income vs Expenses Over Time
-          </Typography>
-        </Box>
+      <Fade in timeout={1000}>
+        <Paper sx={{
+          p: 3,
+          borderRadius: 3,
+          mb: 3,
+          background: (theme) =>
+            theme.palette.mode === 'light'
+              ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+              : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+          backdropFilter: 'blur(20px)',
+          border: (theme) =>
+            theme.palette.mode === 'light'
+              ? `1px solid ${theme.palette.primary.main}0D`
+              : `1px solid ${theme.palette.primary.main}1A`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+        }}>
+          <Box display="flex" alignItems="center" gap={1} mb={3}>
+            <Avatar
+              sx={{
+                bgcolor: (theme) => `${theme.palette.primary.main}1A`,
+                color: 'primary.main',
+                width: 40,
+                height: 40,
+              }}
+            >
+              <TrendingUp />
+            </Avatar>
+            <Typography variant="h6" fontWeight={700}>
+              Income vs Expenses Over Time
+            </Typography>
+          </Box>
         {incomeExpenseData.length > 0 ? (
           <ResponsiveChart>
             <ResponsiveContainer width="100%" height={350}>
@@ -654,19 +837,44 @@ const Analytics: React.FC = () => {
             <Typography color="text.secondary">No data available</Typography>
           </Box>
         )}
-      </Paper>
+        </Paper>
+      </Fade>
 
       {/* 2 & 3: Category Breakdown and Daily Spending */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {/* Category Breakdown Pie */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: 3, height: '100%' }}>
-            <Box display="flex" alignItems="center" gap={1} mb={3}>
-              <CategoryIcon color="primary" />
-              <Typography variant="h6" fontWeight={700}>
-                Spending by Category
-              </Typography>
-            </Box>
+          <Fade in timeout={1200}>
+            <Paper sx={{
+              p: 3,
+              borderRadius: 3,
+              height: '100%',
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? `1px solid ${theme.palette.primary.main}0D`
+                  : `1px solid ${theme.palette.primary.main}1A`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            }}>
+              <Box display="flex" alignItems="center" gap={1} mb={3}>
+                <Avatar
+                  sx={{
+                    bgcolor: (theme) => `${theme.palette.primary.main}1A`,
+                    color: 'primary.main',
+                    width: 40,
+                    height: 40,
+                  }}
+                >
+                  <CategoryIcon />
+                </Avatar>
+                <Typography variant="h6" fontWeight={700}>
+                  Spending by Category
+                </Typography>
+              </Box>
             {categoryBreakdown.length > 0 ? (
               <>
                 <ResponsiveChart>
@@ -711,18 +919,43 @@ const Analytics: React.FC = () => {
                 <Typography color="text.secondary">No category data</Typography>
               </Box>
             )}
-          </Paper>
+            </Paper>
+          </Fade>
         </Grid>
 
         {/* Daily Spending Bar Chart */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: 3, height: '100%' }}>
-            <Box display="flex" alignItems="center" gap={1} mb={3}>
-              <Assessment color="primary" />
-              <Typography variant="h6" fontWeight={700}>
-                Daily Spending Trend
-              </Typography>
-            </Box>
+          <Fade in timeout={1300}>
+            <Paper sx={{
+              p: 3,
+              borderRadius: 3,
+              height: '100%',
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? `1px solid ${theme.palette.primary.main}0D`
+                  : `1px solid ${theme.palette.primary.main}1A`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            }}>
+              <Box display="flex" alignItems="center" gap={1} mb={3}>
+                <Avatar
+                  sx={{
+                    bgcolor: (theme) => `${theme.palette.primary.main}1A`,
+                    color: 'primary.main',
+                    width: 40,
+                    height: 40,
+                  }}
+                >
+                  <Assessment />
+                </Avatar>
+                <Typography variant="h6" fontWeight={700}>
+                  Daily Spending Trend
+                </Typography>
+              </Box>
             {dailySpendingData.length > 0 ? (
               <ResponsiveChart>
                 <ResponsiveContainer width="100%" height={300}>
@@ -746,19 +979,44 @@ const Analytics: React.FC = () => {
                 <Typography color="text.secondary">No spending data</Typography>
               </Box>
             )}
-          </Paper>
+            </Paper>
+          </Fade>
         </Grid>
       </Grid>
 
       {/* 4. Budget vs Actual */}
       {budgetComparisonData.length > 0 && (
-        <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-          <Box display="flex" alignItems="center" gap={1} mb={3}>
-            <AccountBalanceWallet color="primary" />
-            <Typography variant="h6" fontWeight={700}>
-              Budget vs Actual Spending
-            </Typography>
-          </Box>
+        <Fade in timeout={1400}>
+          <Paper sx={{
+            p: 3,
+            borderRadius: 3,
+            mb: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: (theme) =>
+              theme.palette.mode === 'light'
+                ? `1px solid ${theme.palette.primary.main}0D`
+                : `1px solid ${theme.palette.primary.main}1A`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+          }}>
+            <Box display="flex" alignItems="center" gap={1} mb={3}>
+              <Avatar
+                sx={{
+                  bgcolor: (theme) => `${theme.palette.primary.main}1A`,
+                  color: 'primary.main',
+                  width: 40,
+                  height: 40,
+                }}
+              >
+                <AccountBalanceWallet />
+              </Avatar>
+              <Typography variant="h6" fontWeight={700}>
+                Budget vs Actual Spending
+              </Typography>
+            </Box>
           <ResponsiveChart>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={budgetComparisonData}>
@@ -778,20 +1036,44 @@ const Analytics: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </ResponsiveChart>
-        </Paper>
+          </Paper>
+        </Fade>
       )}
 
       {/* 5 & 6: Tables */}
       <Grid container spacing={3}>
         {/* Top Merchants */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: 3 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={3}>
-              <Store color="primary" />
-              <Typography variant="h6" fontWeight={700}>
-                Top Merchants
-              </Typography>
-            </Box>
+          <Fade in timeout={1500}>
+            <Paper sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? `1px solid ${theme.palette.primary.main}0D`
+                  : `1px solid ${theme.palette.primary.main}1A`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            }}>
+              <Box display="flex" alignItems="center" gap={1} mb={3}>
+                <Avatar
+                  sx={{
+                    bgcolor: (theme) => `${theme.palette.primary.main}1A`,
+                    color: 'primary.main',
+                    width: 40,
+                    height: 40,
+                  }}
+                >
+                  <Store />
+                </Avatar>
+                <Typography variant="h6" fontWeight={700}>
+                  Top Merchants
+                </Typography>
+              </Box>
             {topMerchants.length > 0 ? (
               <TableContainer>
                 <Table size="small">
@@ -820,18 +1102,42 @@ const Analytics: React.FC = () => {
                 <Typography color="text.secondary">No merchant data</Typography>
               </Box>
             )}
-          </Paper>
+            </Paper>
+          </Fade>
         </Grid>
 
         {/* Month-over-Month */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: 3 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={3}>
-              <TrendingUp color="primary" />
-              <Typography variant="h6" fontWeight={700}>
-                Month-over-Month Comparison
-              </Typography>
-            </Box>
+          <Fade in timeout={1600}>
+            <Paper sx={{
+              p: 3,
+              borderRadius: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? `1px solid ${theme.palette.primary.main}0D`
+                  : `1px solid ${theme.palette.primary.main}1A`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            }}>
+              <Box display="flex" alignItems="center" gap={1} mb={3}>
+                <Avatar
+                  sx={{
+                    bgcolor: (theme) => `${theme.palette.primary.main}1A`,
+                    color: 'primary.main',
+                    width: 40,
+                    height: 40,
+                  }}
+                >
+                  <TrendingUp />
+                </Avatar>
+                <Typography variant="h6" fontWeight={700}>
+                  Month-over-Month Comparison
+                </Typography>
+              </Box>
             {monthOverMonthData.length > 0 ? (
               <TableContainer>
                 <Table size="small">
@@ -880,7 +1186,8 @@ const Analytics: React.FC = () => {
                 <Typography color="text.secondary">No monthly data</Typography>
               </Box>
             )}
-          </Paper>
+            </Paper>
+          </Fade>
         </Grid>
       </Grid>
     </Box>

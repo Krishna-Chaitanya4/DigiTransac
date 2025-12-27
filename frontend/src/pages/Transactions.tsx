@@ -34,6 +34,7 @@ import {
   Tooltip,
   Alert,
   Snackbar,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -59,6 +60,7 @@ import {
   HourglassEmpty as PendingIcon,
   Block as RejectedIcon,
   Tune as TuneIcon,
+  AccountBalanceWallet,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useToast } from '../components/Toast';
@@ -76,7 +78,7 @@ import { useIsTouchDevice } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { ModernDatePicker } from '../components/ModernDatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
@@ -1311,100 +1313,171 @@ const Transactions: React.FC = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ width: '100%', overflow: 'hidden' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-          <Box>
-            <Typography 
-              variant="h4" 
-              gutterBottom
-              sx={{
-                fontWeight: 800,
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Transactions
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {transactions.length} this month
-              {transactions.length > 0 && transactions[0] && (
-                <> • Last: {transactions[0].description || 'Untitled'} {formatUserCurrency(transactions[0].amount)} • {new Date(transactions[0].date).toLocaleDateString()}</>
-              )}
-            </Typography>
-          </Box>
-          <Box display="flex" gap={1} flexWrap="wrap">
-            <Button
-              variant="outlined"
-              startIcon={<ImportIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
-              onClick={handleImportMenuOpen}
-              size="small"
-              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
-            >
-              {isMobile ? 'Import' : 'Import'}
-            </Button>
-            <Menu
-              anchorEl={importMenuAnchor}
-              open={Boolean(importMenuAnchor)}
-              onClose={handleImportMenuClose}
-            >
-              <MenuItem onClick={handleSMSImport}>
-                <SmsIcon fontSize="small" sx={{ mr: 1 }} />
-                Import from SMS
-              </MenuItem>
-              <MenuItem onClick={handleEmailImport}>
-                <EmailIcon fontSize="small" sx={{ mr: 1 }} />
-                Import from Email
-              </MenuItem>
-            </Menu>
-            <Button
-              variant="outlined"
-              startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
-              onClick={handleExportCSV}
-              disabled={transactions.length === 0}
-              size="small"
-              sx={{ minWidth: { xs: 80, sm: 'auto' } }}
-            >
-              Export
-            </Button>
-            <Button 
-              variant="contained" 
-              startIcon={<AddIcon />} 
-              onClick={() => handleOpenDialog()}
-              size="small"
-              sx={{ 
-                minWidth: { xs: 80, sm: 'auto' },
-                background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-                boxShadow: '0 4px 14px rgba(20, 184, 166, 0.4)',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 20px rgba(20, 184, 166, 0.6)',
-                  background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
-                },
-              }}
-            >
-              Add
-            </Button>
+        {/* Enhanced Header */}
+        <Box 
+          sx={{
+            mb: 4,
+            p: 3,
+            borderRadius: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 100%)`,
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}33`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.15) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': { opacity: 0.6 },
+              '50%': { opacity: 1 },
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+              <Box>
+                <Typography 
+                  variant="h4" 
+                  gutterBottom
+                  sx={{
+                    fontWeight: 800,
+                    color: 'white',
+                    letterSpacing: '-0.02em',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  Transactions
+                </Typography>
+                <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
+                  {transactions.length} this month
+                  {transactions.length > 0 && transactions[0] && (
+                    <> • Last: {transactions[0].description || 'Untitled'} {formatUserCurrency(transactions[0].amount)} • {new Date(transactions[0].date).toLocaleDateString()}</>
+                  )}
+                </Typography>
+              </Box>
+              <Box display="flex" gap={1} flexWrap="wrap">
+                <Button
+                  variant="outlined"
+                  startIcon={<ImportIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
+                  onClick={handleImportMenuOpen}
+                  size="small"
+                  sx={{ 
+                    minWidth: { xs: 80, sm: 'auto' },
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                    },
+                  }}
+                >
+                  {isMobile ? 'Import' : 'Import'}
+                </Button>
+                <Menu
+                  anchorEl={importMenuAnchor}
+                  open={Boolean(importMenuAnchor)}
+                  onClose={handleImportMenuClose}
+                >
+                  <MenuItem onClick={handleSMSImport}>
+                    <SmsIcon fontSize="small" sx={{ mr: 1 }} />
+                    Import from SMS
+                  </MenuItem>
+                  <MenuItem onClick={handleEmailImport}>
+                    <EmailIcon fontSize="small" sx={{ mr: 1 }} />
+                    Import from Email
+                  </MenuItem>
+                </Menu>
+                <Button
+                  variant="outlined"
+                  startIcon={<FileDownloadIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
+                  onClick={handleExportCSV}
+                  disabled={transactions.length === 0}
+                  size="small"
+                  sx={{ 
+                    minWidth: { xs: 80, sm: 'auto' },
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                    },
+                    '&.Mui-disabled': {
+                      color: 'rgba(255,255,255,0.3)',
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    },
+                  }}
+                >
+                  Export
+                </Button>
+                <Button 
+                  variant="contained" 
+                  startIcon={<AddIcon />} 
+                  onClick={() => handleOpenDialog()}
+                  size="small"
+                  sx={{ 
+                    minWidth: { xs: 80, sm: 'auto' },
+                    bgcolor: 'white',
+                    color: 'primary.main',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      bgcolor: 'rgba(255,255,255,0.95)',
+                    },
+                  }}
+                >
+                  Add
+                </Button>
+              </Box>
+            </Box>
           </Box>
         </Box>
 
         {/* Summary Cards */}
-        <Grid container spacing={2} mb={3}>
+        <Grid container spacing={3} mb={3}>
           <Grid item xs={12} md={4}>
             <Card sx={{ 
-              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-              transition: 'all 0.3s ease',
+              background: (theme) => theme.palette.gradient.success,
+              color: 'white',
+              borderRadius: 3,
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
+                transform: 'translateY(-6px)',
+                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '100px',
+                height: '100px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
               },
             }}>
-              <CardContent>
-                <Typography variant="body2" color="white" gutterBottom>
-                  Total Credits
-                </Typography>
-                <Typography variant="h4" color="white" fontWeight="bold">
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Credits
+                  </Typography>
+                  <CreditIcon sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
                   {formatUserCurrency(totalCredits)}
                 </Typography>
               </CardContent>
@@ -1412,18 +1485,37 @@ const Transactions: React.FC = () => {
           </Grid>
           <Grid item xs={12} md={4}>
             <Card sx={{ 
-              background: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
-              transition: 'all 0.3s ease',
+              background: (theme) => theme.palette.gradient.error,
+              color: 'white',
+              borderRadius: 3,
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 24px rgba(244, 63, 94, 0.4)',
+                transform: 'translateY(-6px)',
+                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '100px',
+                height: '100px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
               },
             }}>
-              <CardContent>
-                <Typography variant="body2" color="white" gutterBottom>
-                  Total Debits
-                </Typography>
-                <Typography variant="h4" color="white" fontWeight="bold">
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Total Debits
+                  </Typography>
+                  <DebitIcon sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
                   {formatUserCurrency(totalDebits)}
                 </Typography>
               </CardContent>
@@ -1432,24 +1524,45 @@ const Transactions: React.FC = () => {
           <Grid item xs={12} md={4}>
             <Card
               sx={{
-                background:
+                background: (theme) =>
                   netAmount >= 0
-                    ? 'linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%)'
+                    ? theme.palette.gradient.info
                     : 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
-                transition: 'all 0.3s ease',
+                color: 'white',
+                borderRadius: 3,
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: netAmount >= 0 
+                  ? '0 4px 20px rgba(59, 130, 246, 0.25)'
+                  : '0 4px 20px rgba(249, 115, 22, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
                 '&:hover': {
-                  transform: 'translateY(-4px)',
+                  transform: 'translateY(-6px)',
                   boxShadow: netAmount >= 0 
-                    ? '0 8px 24px rgba(6, 182, 212, 0.4)'
-                    : '0 8px 24px rgba(249, 115, 22, 0.4)',
+                    ? '0 12px 32px rgba(59, 130, 246, 0.35)'
+                    : '0 12px 32px rgba(249, 115, 22, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '100px',
+                  height: '100px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
                 },
               }}
             >
-              <CardContent>
-                <Typography variant="body2" color="white" gutterBottom>
-                  Net Amount
-                </Typography>
-                <Typography variant="h4" color="white" fontWeight="bold">
+              <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    Net Amount
+                  </Typography>
+                  <AccountBalanceWallet sx={{ opacity: 0.7 }} />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
                   {formatUserCurrency(Math.abs(netAmount))}
                   {netAmount < 0 && ' deficit'}
                 </Typography>
@@ -1805,32 +1918,26 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="Start Date"
                     value={startDate}
                     onChange={(date) => {
                       setStartDate(date);
                       setActiveDateFilter(''); // Clear active filter on manual change
                     }}
-                    slotProps={{ 
-                      textField: { size: 'small', fullWidth: true },
-                      field: { clearable: true }
-                    }}
+                    fullWidth
                   />
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                  <DatePicker
+                  <ModernDatePicker
                     label="End Date"
                     value={endDate}
                     onChange={(date) => {
                       setEndDate(date);
                       setActiveDateFilter(''); // Clear active filter on manual change
                     }}
-                    slotProps={{ 
-                      textField: { size: 'small', fullWidth: true },
-                      field: { clearable: true }
-                    }}
+                    fullWidth
                   />
                 </Grid>
 
@@ -2728,41 +2835,110 @@ const Transactions: React.FC = () => {
 
         {/* Add/Edit Dialog */}
         <ResponsiveDialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-          <DialogTitle>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <DialogTitle
+            sx={{
+              background: (theme) => theme.palette.gradient.primary,
+              color: 'white',
+              py: 3,
+              position: 'relative',
+              overflow: 'hidden',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '150px',
+                height: '150px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+                borderRadius: '50%',
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
               <Box>
-                <span>{approveMode ? 'Complete Transaction to Approve' : (editingTransaction ? 'Edit Transaction' : 'Add Transaction')}</span>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                  <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
+                    {formData.type === 'credit' ? '💰' : '💸'}
+                  </Avatar>
+                  <Typography variant="h5" fontWeight={700}>
+                    {approveMode ? 'Complete Transaction to Approve' : (editingTransaction ? 'Edit Transaction' : 'Add Transaction')}
+                  </Typography>
+                </Box>
                 {approveMode && (
                   <Chip 
                     label="Approval Required" 
                     color="warning" 
                     size="small" 
-                    sx={{ ml: 1 }}
+                    sx={{ ml: 7 }}
                   />
                 )}
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'normal' }}>
+              <Typography variant="caption" sx={{ opacity: 0.9, fontStyle: 'italic' }}>
                 Ctrl+Enter to save • Ctrl+S to toggle mode
               </Typography>
             </Box>
           </DialogTitle>
-          <DialogContent>
-            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <ToggleButtonGroup
-                value={formData.type}
-                exclusive
-                onChange={(_, value) => value && handleTypeChange(value as 'credit' | 'debit')}
-                fullWidth
+          <DialogContent sx={{ pt: 3 }}>
+            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Credit/Debit Type Toggle */}
+              <Box
+                sx={{
+                  p: 0.5,
+                  borderRadius: 3,
+                  background: (theme) =>
+                    theme.palette.mode === 'light'
+                      ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+                      : 'linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.8) 100%)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
               >
-                <ToggleButton value="credit" color="success">
-                  <CreditIcon sx={{ mr: 1 }} />
-                  Credit (Money IN)
-                </ToggleButton>
-                <ToggleButton value="debit" color="error">
-                  <DebitIcon sx={{ mr: 1 }} />
-                  Debit (Money OUT)
-                </ToggleButton>
-              </ToggleButtonGroup>
+                <ToggleButtonGroup
+                  value={formData.type}
+                  exclusive
+                  onChange={(_, value) => value && handleTypeChange(value as 'credit' | 'debit')}
+                  fullWidth
+                  sx={{
+                    '& .MuiToggleButton-root': {
+                      border: 'none',
+                      borderRadius: 2.5,
+                      py: 1.5,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                      },
+                      '&.Mui-selected': {
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      },
+                      '&.Mui-selected.MuiToggleButton-success': {
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        },
+                      },
+                      '&.Mui-selected.MuiToggleButton-error': {
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: 'white',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                        },
+                      },
+                    },
+                  }}
+                >
+                  <ToggleButton value="credit" color="success">
+                    <CreditIcon sx={{ mr: 1 }} />
+                    Credit (Money IN)
+                  </ToggleButton>
+                  <ToggleButton value="debit" color="error">
+                    <DebitIcon sx={{ mr: 1 }} />
+                    Debit (Money OUT)
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
 
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
@@ -2803,37 +2979,83 @@ const Transactions: React.FC = () => {
 
                 <Grid item xs={12} sm={6}>
                   <Box>
-                    <TextField
-                      label="Date"
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      fullWidth
-                      required
-                      InputLabelProps={{ shrink: true }}
-                    />
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <ModernDatePicker
+                        label="Date"
+                        value={formData.date ? dayjs(formData.date) : null}
+                        onChange={(newValue) => {
+                          if (newValue) {
+                            setFormData({ ...formData, date: newValue.format('YYYY-MM-DD') });
+                          }
+                        }}
+                        fullWidth
+                        required
+                      />
+                    </LocalizationProvider>
                     <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
                       <Button
                         size="small"
-                        variant="text"
+                        variant="outlined"
                         onClick={setDateToToday}
-                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                        sx={{
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          borderColor: (theme) => theme.palette.primary.main,
+                          color: (theme) => theme.palette.primary.main,
+                          '&:hover': {
+                            background: (theme) => theme.palette.primary.main,
+                            color: 'white',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
                       >
                         Today
                       </Button>
                       <Button
                         size="small"
-                        variant="text"
+                        variant="outlined"
                         onClick={setDateToYesterday}
-                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                        sx={{
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          borderColor: (theme) => theme.palette.primary.main,
+                          color: (theme) => theme.palette.primary.main,
+                          '&:hover': {
+                            background: (theme) => theme.palette.primary.main,
+                            color: 'white',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
                       >
                         Yesterday
                       </Button>
                       <Button
                         size="small"
-                        variant="text"
+                        variant="outlined"
                         onClick={setDateToStartOfMonth}
-                        sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, py: 0.25 }}
+                        sx={{
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          borderColor: (theme) => theme.palette.primary.main,
+                          color: (theme) => theme.palette.primary.main,
+                          '&:hover': {
+                            background: (theme) => theme.palette.primary.main,
+                            color: 'white',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
                       >
                         Month Start
                       </Button>
@@ -2872,67 +3094,105 @@ const Transactions: React.FC = () => {
                 <Grid item xs={12}>
                   <Box
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      p: 2,
-                      bgcolor: 'action.hover',
-                      borderRadius: 1,
+                      p: 2.5,
+                      borderRadius: 3,
+                      background: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                          : 'linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                      border: '1px solid',
+                      borderColor: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'rgba(20, 184, 166, 0.2)'
+                          : 'rgba(20, 184, 166, 0.3)',
+                      backdropFilter: 'blur(10px)',
                     }}
                   >
-                    <Typography variant="body2" fontWeight="medium">
-                      Transaction Mode:
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={useSplitMode}
-                      exclusive
-                      onChange={(_, value) => {
-                        if (value !== null) {
-                          setUseSplitMode(value);
-                          if (!value) {
-                            // Quick add mode - sync first split with form data
-                            const amount = parseFloat(formData.amount) || 0;
-                            setFormData({
-                              ...formData,
-                              splits: [
-                                {
-                                  categoryId: formData.categoryId,
-                                  amount: amount,
-                                  tags: formData.tags,
-                                  notes: '',
-                                  order: 1,
-                                },
-                              ],
-                            });
-                          } else {
-                            // Split mode - ensure splits array has at least one entry
-                            if (formData.splits.length === 0) {
-                              setFormData({
-                                ...formData,
-                                splits: [
-                                  {
-                                    categoryId: '',
-                                    amount: 0,
-                                    tags: [],
-                                    notes: '',
-                                    order: 1,
-                                  },
-                                ],
-                              });
-                            }
-                          }
-                        }
-                      }}
-                      size="small"
-                    >
-                      <ToggleButton value={false}>Quick Add (Single Category)</ToggleButton>
-                      <ToggleButton value={true}>Split (Multiple Categories)</ToggleButton>
-                    </ToggleButtonGroup>
-                    {useSplitMode && (
-                      <Typography variant="caption" color="text.secondary">
-                        Split this transaction across multiple categories
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Typography variant="body2" fontWeight="600" color="primary">
+                        Transaction Mode:
                       </Typography>
-                    )}
+                      <Box
+                        sx={{
+                          p: 0.5,
+                          borderRadius: 2,
+                          background: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? 'rgba(255,255,255,0.8)'
+                              : 'rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        <ToggleButtonGroup
+                          value={useSplitMode}
+                          exclusive
+                          onChange={(_, value) => {
+                            if (value !== null) {
+                              setUseSplitMode(value);
+                              if (!value) {
+                                // Quick add mode - sync first split with form data
+                                const amount = parseFloat(formData.amount) || 0;
+                                setFormData({
+                                  ...formData,
+                                  splits: [
+                                    {
+                                      categoryId: formData.categoryId,
+                                      amount: amount,
+                                      tags: formData.tags,
+                                      notes: '',
+                                      order: 1,
+                                    },
+                                  ],
+                                });
+                              } else {
+                                // Split mode - ensure splits array has at least one entry
+                                if (formData.splits.length === 0) {
+                                  setFormData({
+                                    ...formData,
+                                    splits: [
+                                      {
+                                        categoryId: '',
+                                        amount: 0,
+                                        tags: [],
+                                        notes: '',
+                                        order: 1,
+                                      },
+                                    ],
+                                  });
+                                }
+                              }
+                            }
+                          }}
+                          fullWidth
+                          sx={{
+                            '& .MuiToggleButton-root': {
+                              border: 'none',
+                              borderRadius: 1.5,
+                              py: 1,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.875rem',
+                              transition: 'all 0.3s ease',
+                              '&.Mui-selected': {
+                                background: (theme) => theme.palette.gradient.primary,
+                                color: 'white',
+                                boxShadow: '0 2px 8px rgba(20, 184, 166, 0.3)',
+                                '&:hover': {
+                                  background: (theme) => theme.palette.gradient.primary,
+                                },
+                              },
+                            },
+                          }}
+                        >
+                          <ToggleButton value={false}>Quick Add (Single Category)</ToggleButton>
+                          <ToggleButton value={true}>Split (Multiple Categories)</ToggleButton>
+                        </ToggleButtonGroup>
+                      </Box>
+                      {useSplitMode && (
+                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          💡 Split this transaction across multiple categories
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
                 </Grid>
 
@@ -3021,19 +3281,31 @@ const Transactions: React.FC = () => {
                 {/* Split Mode - Multiple Splits */}
                 {useSplitMode && (
                   <Grid item xs={12}>
-                    <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                    <Box
+                      sx={{
+                        borderRadius: 3,
+                        p: 3,
+                        background: (theme) =>
+                          theme.palette.mode === 'light'
+                            ? 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)'
+                            : 'linear-gradient(135deg, rgba(30, 30, 30, 0.5) 0%, rgba(20, 20, 20, 0.5) 100%)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        backdropFilter: 'blur(10px)',
+                      }}
+                    >
                       <Box
                         sx={{
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          mb: 2,
+                          mb: 3,
                           flexWrap: 'wrap',
                           gap: 1,
                         }}
                       >
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          Split Details
+                        <Typography variant="subtitle1" fontWeight="700" color="primary">
+                          📊 Split Details
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           <Button
@@ -3041,10 +3313,33 @@ const Transactions: React.FC = () => {
                             variant="outlined"
                             onClick={distributeEqually}
                             disabled={!formData.amount || formData.splits.length === 0}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              '&:hover': {
+                                transform: 'translateY(-1px)',
+                              },
+                            }}
                           >
                             Distribute Equally
                           </Button>
-                          <Button size="small" startIcon={<AddIcon />} onClick={addSplit}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={addSplit}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              background: (theme) => theme.palette.gradient.primary,
+                              '&:hover': {
+                                transform: 'translateY(-1px)',
+                                boxShadow: 4,
+                              },
+                            }}
+                          >
                             Add Split
                           </Button>
                         </Box>
@@ -3053,24 +3348,53 @@ const Transactions: React.FC = () => {
                       {formData.splits.map((split, index) => (
                         <Box
                           key={index}
-                          sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}
+                          sx={{
+                            mb: 2,
+                            p: 2.5,
+                            borderRadius: 2.5,
+                            background: (theme) =>
+                              theme.palette.mode === 'light'
+                                ? 'rgba(255, 255, 255, 0.9)'
+                                : 'rgba(40, 40, 40, 0.6)',
+                            border: '1px solid',
+                            borderColor: (theme) =>
+                              theme.palette.mode === 'light'
+                                ? 'rgba(0, 0, 0, 0.06)'
+                                : 'rgba(255, 255, 255, 0.06)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                              transform: 'translateY(-2px)',
+                            },
+                          }}
                         >
                           <Box
                             sx={{
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
-                              mb: 1,
+                              mb: 1.5,
                             }}
                           >
-                            <Typography variant="caption" color="text.secondary">
-                              Split {index + 1}
-                            </Typography>
+                            <Chip
+                              label={`Split ${index + 1}`}
+                              size="small"
+                              sx={{
+                                background: (theme) => theme.palette.gradient.primary,
+                                color: 'white',
+                                fontWeight: 600,
+                              }}
+                            />
                             {formData.splits.length > 1 && (
                               <IconButton
                                 size="small"
                                 onClick={() => removeSplit(index)}
-                                color="error"
+                                sx={{
+                                  color: 'error.main',
+                                  '&:hover': {
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                  },
+                                }}
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
@@ -3266,23 +3590,59 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={formData.isRecurring}
-                        onChange={(e) => {
-                          const isRecurring = e.target.checked;
-                          const updatedTags = isRecurring
-                            ? [...formData.tags, 'recurring'].filter(
-                                (tag, index, self) => self.indexOf(tag) === index
-                              ) // Add and dedupe
-                            : formData.tags.filter((tag) => tag !== 'recurring'); // Remove tag
-                          setFormData({ ...formData, isRecurring, tags: updatedTags });
-                        }}
-                      />
-                    }
-                    label="Recurring Transaction"
-                  />
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 2,
+                      background: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%)'
+                          : 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                      border: '1px solid',
+                      borderColor: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'rgba(139, 92, 246, 0.2)'
+                          : 'rgba(139, 92, 246, 0.3)',
+                    }}
+                  >
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formData.isRecurring}
+                          onChange={(e) => {
+                            const isRecurring = e.target.checked;
+                            const updatedTags = isRecurring
+                              ? [...formData.tags, 'recurring'].filter(
+                                  (tag, index, self) => self.indexOf(tag) === index
+                                ) // Add and dedupe
+                              : formData.tags.filter((tag) => tag !== 'recurring'); // Remove tag
+                            setFormData({ ...formData, isRecurring, tags: updatedTags });
+                          }}
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': {
+                              color: '#8b5cf6',
+                              '&:hover': {
+                                backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                              },
+                            },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                            },
+                          }}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            🔄 Recurring Transaction
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Automatically repeat this transaction
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </Box>
                 </Grid>
 
                 {formData.isRecurring && (
@@ -3324,25 +3684,50 @@ const Transactions: React.FC = () => {
                     </Grid>
 
                     <Grid item xs={12}>
-                      <TextField
-                        label="End Date (Optional)"
-                        type="date"
-                        value={formData.recurrenceEndDate}
-                        onChange={(e) =>
-                          setFormData({ ...formData, recurrenceEndDate: e.target.value })
-                        }
-                        fullWidth
-                        InputLabelProps={{ shrink: true }}
-                        helperText="Leave empty for indefinite recurrence"
-                      />
+                      <LocalizationProvider dateAdapter={AdapterDayjs}>
+                        <ModernDatePicker
+                          label="End Date (Optional)"
+                          value={formData.recurrenceEndDate ? dayjs(formData.recurrenceEndDate) : null}
+                          onChange={(newValue) =>
+                            setFormData({ 
+                              ...formData, 
+                              recurrenceEndDate: newValue ? newValue.format('YYYY-MM-DD') : '' 
+                            })
+                          }
+                          fullWidth
+                          helperText="Leave empty for indefinite recurrence"
+                        />
+                      </LocalizationProvider>
                     </Grid>
                   </>
                 )}
               </Grid>
             </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
+          <DialogActions
+            sx={{
+              px: 3,
+              py: 2.5,
+              gap: 1.5,
+              borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'rgba(248, 250, 252, 0.8)'
+                  : 'rgba(15, 15, 15, 0.8)',
+            }}
+          >
+            <Button 
+              onClick={handleCloseDialog}
+              variant="outlined"
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleSubmit}
               variant="contained"
@@ -3356,6 +3741,20 @@ const Transactions: React.FC = () => {
                     formData.splits.some((s) => !s.categoryId || !s.amount)
                   : !formData.categoryId)
               }
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                textTransform: 'none',
+                fontWeight: 600,
+                background: approveMode
+                  ? undefined
+                  : (theme) => theme.palette.gradient.primary,
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                  boxShadow: 4,
+                },
+                transition: 'all 0.2s ease',
+              }}
             >
               {approveMode ? 'Complete & Approve' : (editingTransaction ? 'Update' : 'Create')}
             </Button>
