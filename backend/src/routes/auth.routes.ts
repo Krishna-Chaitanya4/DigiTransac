@@ -122,18 +122,21 @@ router.post(
       });
     } catch (error: any) {
       logger.error({ error }, 'Registration error');
-      
+
       // Handle duplicate key errors specifically
       if (error.code === 11000) {
-        const field = error.message.includes('email') ? 'Email' : 
-                     error.message.includes('phone') ? 'Phone number' : 'Username';
+        const field = error.message.includes('email')
+          ? 'Email'
+          : error.message.includes('phone')
+            ? 'Phone number'
+            : 'Username';
         res.status(409).json({
           success: false,
           message: `${field} is already registered. Please use a different one.`,
         });
         return;
       }
-      
+
       res.status(500).json({
         success: false,
         message: 'Unable to create account. Please try again later.',
