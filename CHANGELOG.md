@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] - 2025-12-28
+
+### Fixed
+- **CI/CD Workflow**: Prevented duplicate workflow runs on PR merge
+- Removed `closed` type from pull_request trigger events
+- When a PR is merged, only the push to main event triggers workflows now
+- Eliminates 5 duplicate workflow executions on every merge
+
+### Changed
+- Pull request workflows now only run for: `opened`, `synchronize`, `reopened`
+- Reduced unnecessary CI/CD runs and GitHub Actions usage
+
 ## [1.2.5] - 2025-12-28
 
 ### Fixed
