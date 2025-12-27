@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.7] - 2025-12-28
+
+### Fixed
+- **405/404 Login Error**: Added nginx proxy configuration to forward `/api` requests to backend
+- Frontend nginx was treating API calls as file requests instead of proxying to backend
+- Login and all API requests now properly routed through nginx to backend service
+- **User Error Messages**: Better error messages - no more technical HTTP codes shown to users
+  - 405: \"Service temporarily unavailable. Please try again in a moment\"
+  - 500+: \"Server error. Please try again later\"
+  - Default: \"Login failed. Please check your credentials and try again\"
+
+### Changed
+- Added `/api` location block in nginx.conf to proxy requests to backend
+- Removed duplicate CI/CD workflow files (ci-checks.yml, deploy-backend.yml, deploy-frontend.yml)
+- Now using only main-ci-cd.yml as single source of truth
+- Eliminates redundant workflow executions
+
 ## [1.2.6] - 2025-12-28
 
 ### Fixed
@@ -14,10 +31,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `closed` type from pull_request trigger events
 - When a PR is merged, only the push to main event triggers workflows now
 - Eliminates 5 duplicate workflow executions on every merge
+- **User Error Messages**: Improved 405 error message from "Login failed (Error 405)" to "Service temporarily unavailable. Please try again in a moment"
+- All error codes now show user-friendly messages instead of technical HTTP status codes
+- **Nginx API Proxy**: Added proxy configuration to forward `/api` requests from frontend to backend
+- Fixed CORS issues by properly routing API calls through the frontend domain
+
+### Added
+- **Performance Optimizations** (Industry Standard):
+  - Nginx: Gzip compression with optimal settings (comp_level 6, min_length 1024)
+  - Nginx: Connection pooling and buffer optimizations
+  - MongoDB: Connection pool (maxPoolSize: 50, minPoolSize: 10)
+  - MongoDB: Compression enabled (zlib)
+  - Nginx: Static asset caching (1 year for immutable assets)
+  - Nginx: HTML no-cache policy for index.html
+  
+- **Security Enhancements** (OWASP Recommendations):
+  - Added Referrer-Policy header: "strict-origin-when-cross-origin"
+  - Added Permissions-Policy header (blocks geolocation, microphone, camera)
+  - Client request timeouts to prevent slowloris attacks
+  - Buffer size limits to prevent buffer overflow
+  - Deny access to hidden files
+  - Proper timeout settings for proxy connections (60s)
 
 ### Changed
 - Pull request workflows now only run for: `opened`, `synchronize`, `reopened`
 - Reduced unnecessary CI/CD runs and GitHub Actions usage
+- Error messages for all HTTP status codes are now clear and actionable:
+  - 405: "Service temporarily unavailable. Please try again in a moment"
+  - 500+: "Server error. Please try again later"
+  - Default: "Login failed. Please check your credentials and try again"
+- Nginx proxy now sets correct Host header for backend CORS validation
+- Nginx proxy adds Origin header for proper CORS handling
 
 ## [1.2.5] - 2025-12-28
 

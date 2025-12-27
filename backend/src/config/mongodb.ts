@@ -30,12 +30,21 @@ class MongoDBService {
       const dbName =
         process.env.MONGODB_DATABASE_NAME || process.env.COSMOS_DATABASE_NAME || 'DigiTransacDB';
 
-      // Initialize MongoDB client with secure options
+      // Initialize MongoDB client with secure options and connection pooling
       this.client = new MongoClient(connectionString, {
         tls: true,
         tlsAllowInvalidCertificates: false,
         retryWrites: true,
         w: 'majority',
+        // Connection pool settings (industry standard)
+        maxPoolSize: 50,
+        minPoolSize: 10,
+        maxIdleTimeMS: 30000,
+        connectTimeoutMS: 10000,
+        serverSelectionTimeoutMS: 5000,
+        // Monitoring and reliability
+        monitorCommands: false,
+        compressors: ['zlib'],
       });
 
       await this.client.connect();
