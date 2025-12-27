@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2025-12-27
+
+### Fixed
+- CORS middleware blocking production health check endpoints
+- Health check endpoints (`/ping` and `/health`) now execute before CORS middleware
+- Resolves 500 errors during GitHub Actions deployment health checks
+
 ## [1.2.1] - 2025-12-27
 
 ### Fixed

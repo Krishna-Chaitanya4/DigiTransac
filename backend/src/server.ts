@@ -37,6 +37,47 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(helmet());
 
+// Health check endpoints BEFORE CORS (no CORS required)
+// Liveness probe - instant response
+app.get('/ping', (_req, res) => {
+  res.json({ status: 'alive' });
+});
+
+// Readiness probe - checks if DB is initialized
+app.get('/health', async (_req, res) => {
+  const healthCheckTimeout = setTimeout(() => {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'timeout',
+      error: 'Health check timeout',
+    });
+  }, 5000); // 5 second timeout
+
+  try {
+    // Simple check: just verify DB service is initialized
+    const isInitialized = cosmosDBService.usersContainer !== null;
+
+    clearTimeout(healthCheckTimeout);
+    res.status(isInitialized ? 200 : 503).json({
+      status: isInitialized ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: isInitialized ? 'initialized' : 'not initialized',
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+    });
+  } catch (error) {
+    clearTimeout(healthCheckTimeout);
+    logger.error({ error }, 'Health check failed');
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // CORS configuration - support multiple origins
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
@@ -99,44 +140,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
 app.use(globalLimiter);
 
-// Liveness probe - instant response
-app.get('/ping', (_req, res) => {
-  res.json({ status: 'alive' });
-});
-
-// Readiness probe - checks if DB is initialized
-app.get('/health', async (_req, res) => {
-  const healthCheckTimeout = setTimeout(() => {
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      database: 'timeout',
-      error: 'Health check timeout',
-    });
-  }, 5000); // 5 second timeout
-
-  try {
-    // Simple check: just verify DB service is initialized
-    const isInitialized = cosmosDBService.usersContainer !== null;
-
-    clearTimeout(healthCheckTimeout);
-    res.status(isInitialized ? 200 : 503).json({
-      status: isInitialized ? 'healthy' : 'unhealthy',
-      timestamp: new Date().toISOString(),
-      database: isInitialized ? 'initialized' : 'not initialized',
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-    });
-  } catch (error) {
-    clearTimeout(healthCheckTimeout);
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      database: 'error',
-      error: 'Health check failed',
-    });
-  }
-});
+// API routes (with CORS protection)
 
 // API Documentation
 setupSwagger(app);
