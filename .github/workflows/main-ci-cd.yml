@@ -34,10 +34,12 @@ jobs:
       run: |
         echo "🔍 Scanning for hardcoded secrets..."
         
-        # Check for potential secret patterns (exclude test files)
-        if grep -r -E "(COSMOS_KEY|JWT_SECRET|MASTER_ENCRYPTION_KEY|mongodb\+srv://.*:[^@]+@)" \
-           --include="*.ts" --include="*.js" --include="*.env.example" \
-           --exclude-dir=node_modules --exclude-dir=dist --exclude="*.test.ts" .; then
+        # Check for actual secret values (not variable names or example placeholders)
+        # Exclude: .env.example files, validators (contain variable names only)
+        if grep -r -E "(mongodb\+srv://[^:]+:[^@]{20,}@|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})" \
+           --include="*.ts" --include="*.js" \
+           --exclude-dir=node_modules --exclude-dir=dist \
+           --exclude="*.test.ts" --exclude="*envValidator.ts" .; then
           echo "❌ Found potential hardcoded secrets!"
           exit 1
         fi
