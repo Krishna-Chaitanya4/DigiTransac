@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.9] - 2025-12-28
+
+### Fixed
+- **Missing Origin Header**: Fixed nginx to always provide Origin header to backend
+- Backend rejects requests without Origin header in production
+- Added fallback: uses client's Origin if present, otherwise defaults to https://digitransac.com
+- Resolves "Not allowed by CORS" / "Server error" on login when Origin header is missing
+- Browser same-origin requests (direct navigation) don't include Origin header by default
+
 ## [1.2.8] - 2025-12-28
 
 ### Fixed
