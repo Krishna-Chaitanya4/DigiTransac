@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-12-27
+
+### Added
+- **Azure Key Vault Integration**: Enterprise-grade secret management
+  - Centralized KeyVaultService for all secret access
+  - Lazy initialization pattern for proper dotenv timing
+  - Support for both development (Azure CLI) and production (Managed Identity)
+  - Secret caching for performance optimization
+- **Comprehensive CI/CD Pipeline**: Industry-standard automated deployment
+  - Secret scanning and Key Vault validation
+  - Backend: linting, TypeScript compilation, tests with coverage
+  - Frontend: linting and production builds
+  - Dependency vulnerability scanning (npm audit)
+  - Version consistency checks
+  - Multi-stage Docker builds with verification
+  - Automated deployment to Azure on PR merge
+  - Health checks and production smoke tests
+  - Code coverage reporting to Codecov
+- **GitHub Secrets Management**: Automated setup script for CI/CD
+  - Service Principal creation and configuration
+  - Automatic retrieval of Azure resource URLs
+  - One-command GitHub Secrets configuration
+
+### Changed
+- **Database Migration**: Moved from Azure Cosmos DB to Azure DocumentDB M10 FREE tier
+  - Cost reduction: ₹7,150/month → ₹0/month (99% savings)
+  - 32GB storage with shared vCore architecture
+  - Updated connection string format for DocumentDB
+- **Security Architecture**: "Key Vault everywhere" pattern
+  - All secrets moved from environment variables to Azure Key Vault
+  - JWT-Secret: Fetched from Key Vault on first authentication
+  - Master-Encryption-Key: Fetched from Key Vault during service initialization
+  - MongoDB-ConnectionString: Fetched from Key Vault on startup
+  - Zero secrets in code, containers, or environment files
+- **Docker Compose**: Simplified for production testing only
+  - Removed development volume mounts
+  - Production-like builds for local testing
+  - Clearer documentation about daily development workflow
+- **Environment Configuration**: Streamlined to Key Vault requirements
+  - Removed: COSMOS_ENDPOINT, COSMOS_KEY, JWT_SECRET, MASTER_ENCRYPTION_KEY
+  - Required: AZURE_KEY_VAULT_URL only
+  - Updated .env.example files to reflect Key Vault architecture
+- **Documentation**: Simplified and focused on essentials
+  - README.md: Crisp, essential information only
+  - Removed temporary migration documentation
+  - Focus on long-term maintainable content
+
+### Fixed
+- **Version Management**: Package.json now syncs with VERSION files
+- **Prettier Formatting**: All TypeScript files properly formatted
+- **BOM Characters**: Removed from VERSION files for CI compatibility
+
+### Removed
+- **Temporary Documentation**: Cleanup of migration-specific docs
+  - LEARNING_SYSTEM.md (feature-specific)
+  - MIGRATION_MERCHANT_LEARNING.md (temporary)
+  - OFFLINE.md (feature-specific)
+  - CI-CD.md (one-time setup)
+- **Setup Scripts**: One-time configuration scripts removed
+  - setup-github-secrets.ps1 (GitHub Secrets now configured)
+- **Legacy Workflows**: Redundant CI/CD workflows consolidated
+  - security-scan.yml (CodeQL requires paid GitHub Advanced Security)
+  - Kept main-ci-cd.yml as comprehensive pipeline
+
+### Security
+- **Enhanced Secret Management**
+  - Azure Managed Identity for passwordless authentication
+  - DefaultAzureCredential pattern (dev: az login, prod: Managed Identity)
+  - RBAC-based Key Vault access control
+  - Full audit trail for secret access
+  - TLS 1.2+ encryption for all communications
+- **CI/CD Security**
+  - Automated secret scanning in pull requests
+  - Dependency vulnerability scanning
+  - No hardcoded secrets validation
+  - Multi-stage Docker builds minimize attack surface
+
+### Infrastructure
+- **Cost Optimization**
+  - Total monthly cost: ~₹50 (~$0.60)
+  - Azure DocumentDB M10: FREE tier (32GB)
+  - Azure Key Vault: Pay-per-operation (~₹50/month)
+  - Azure Container Apps: Consumption plan (scales to zero)
+  - Previous total: ₹7,150/month
+  - **Savings: ₹7,100/month (99% reduction)**
+
 ## [1.1.0] - 2025-12-21
 
 ### Added - Infrastructure
