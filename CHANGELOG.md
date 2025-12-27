@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2025-12-27
+
+### Fixed
+- **CI/CD Pipeline**: Deployment jobs now only trigger on main branch push
+- Removed incorrect `pull_request.merged` condition that caused duplicate deployments
+- CI validation jobs still run on all PRs as expected
+- Follows industry standard: CI on PRs, CD only on main
+
+### Changed
+- Deploy conditions simplified to `github.event_name == 'push' && github.ref == 'refs/heads/main'`
+
 ## [1.2.3] - 2025-12-27
 
 ### Changed
