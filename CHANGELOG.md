@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] - 2025-12-28
+
+### Fixed
+- **Authentication Errors**: HTTP 405 Method Not Allowed error during login
+- Removed problematic 308 redirect middleware for legacy API routes
+- Legacy routes (`/api/auth`, `/api/users`, etc.) now mounted directly alongside v1 routes
+- Both `/api/auth/login` and `/api/v1/auth/login` now work correctly
+
+### Improved
+- **Error Messages**: User-friendly error messages for login and registration
+- Backend now provides specific field information for duplicate errors (e.g., "Email is already registered")
+- Frontend displays clear messages based on HTTP status codes:
+  - 401: "Invalid username/email/phone or password"
+  - 409: "This username, email, or phone number is already registered"
+  - 429: "Too many attempts. Please try again later"
+  - Network errors: "Please check your connection"
+- No more technical errors like "HTTP 405" or "Error registering user" shown to users
+- Better duplicate key error handling with specific field identification
+
 ## [1.2.4] - 2025-12-27
 
 ### Fixed
