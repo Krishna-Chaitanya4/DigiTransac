@@ -169,8 +169,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const errorMessage = errorData.message || 
           (fetchResponse.status === 401 ? 'Invalid username/email/phone or password' :
            fetchResponse.status === 404 ? 'Login service is currently unavailable' :
+           fetchResponse.status === 405 ? 'Service temporarily unavailable. Please try again in a moment' :
            fetchResponse.status === 429 ? 'Too many login attempts. Please try again later' :
-           `Login failed (Error ${fetchResponse.status})`);
+           fetchResponse.status >= 500 ? 'Server error. Please try again later' :
+           'Login failed. Please check your credentials and try again');
         throw new Error(errorMessage);
       }
 
