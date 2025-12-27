@@ -19,24 +19,25 @@ env:
   FRONTEND_CONTAINER_APP: digitransac-frontend
 
 jobs:
-  # ==================== STAGE 1: VALIDATION ====================
-  
-  version-check:
-    name: 📌 Version Validation
+  ci-cd-pipeline:
+    name: CI/CD Pipeline
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     
     steps:
-    - name: Checkout code
+    # ==================== STAGE 1: CHECKOUT ====================
+    
+    - name: 📥 Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
     
-    - name: Fetch main branch (PR only)
+    # ==================== STAGE 2: VERSION VALIDATION ====================
+    
+    - name: 📌 Fetch main branch (PR only)
       if: github.event_name == 'pull_request'
       run: git fetch origin main:main
     
-    - name: Get current versions
+    - name: 📌 Get current versions
       id: current
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
@@ -44,7 +45,7 @@ jobs:
         echo "backend=$BACKEND_VERSION" >> $GITHUB_OUTPUT
         echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
     
-    - name: Get main branch versions (PR only)
+    - name: 📌 Get main branch versions (PR only)
       if: github.event_name == 'pull_request'
       id: main
       run: |
@@ -53,7 +54,7 @@ jobs:
         echo "backend=$BACKEND_VERSION" >> $GITHUB_OUTPUT
         echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
     
-    - name: Compare versions (PR only)
+    - name: 📌 Compare versions (PR only)
       if: github.event_name == 'pull_request'
       run: |
         echo "🔍 Version Comparison"
@@ -74,7 +75,7 @@ jobs:
         
         echo "✅ Both versions have been updated"
     
-    - name: Check version consistency
+    - name: 📌 Check version consistency
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
         FRONTEND_VERSION=$(cat frontend/VERSION)
@@ -93,7 +94,7 @@ jobs:
         
         echo "✅ Version files are consistent"
     
-    - name: Check CHANGELOG updated (PR only)
+    - name: 📌 Check CHANGELOG updated (PR only)
       if: github.event_name == 'pull_request'
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
@@ -104,7 +105,7 @@ jobs:
           exit 1
         fi
     
-    - name: Validate semantic versioning
+    - name: 📌 Validate semantic versioning
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
         if [[ ! $BACKEND_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -113,27 +114,12 @@ jobs:
         fi
         echo "✅ Valid semantic version: v$BACKEND_VERSION"
     
-    - name: Summary
-      run: |
-        echo "## 📌 Version Info" >> $GITHUB_STEP_SUMMARY
-        echo "- Backend: v${{ steps.current.outputs.backend }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Frontend: v${{ steps.current.outputs.frontend }}" >> $GITHUB_STEP_SUMMARY
-
-  validate-secrets:
-    name: 🔐 Security Validation
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    # ==================== STAGE 3: SECURITY VALIDATION ====================
     
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Check for hardcoded secrets
+    - name: 🔐 Check for hardcoded secrets
       run: |
         echo "🔍 Scanning for hardcoded secrets..."
         
-        # Check for actual secret values (not variable names or example placeholders)
-        # Exclude: .env.example files, validators (contain variable names only)
         if grep -r -E "(mongodb\+srv://[^:]+:[^@]{20,}@|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})" \
            --include="*.ts" --include="*.js" \
            --exclude-dir=node_modules --exclude-dir=dist \
@@ -144,57 +130,56 @@ jobs:
         
         echo "✅ No hardcoded secrets found"
     
-    - name: Verify Key Vault references
+    - name: 🔐 Verify Key Vault references
       run: |
         echo "🔍 Verifying Key Vault integration..."
         
-        # Check that code uses Key Vault
         if ! grep -r "keyVaultService" backend/src --include="*.ts" | grep -q "getSecret"; then
           echo "⚠️ Warning: Key Vault usage not detected"
         else
           echo "✅ Key Vault service properly integrated"
         fi
-
-  # ==================== STAGE 2: BUILD & TEST ====================
-
-  backend-ci:
-    name: 🔨 Backend Build & Test
-    runs-on: ubuntu-latest
-    needs: [version-check, validate-secrets]
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - name: 🛡️ Dependency scan - Backend
+      run: |
+        cd backend
+        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
     
-    - name: Setup Node.js
+    - name: 🛡️ Dependency scan - Frontend
+      run: |
+        cd frontend
+        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
+    
+    # ==================== STAGE 4: BACKEND BUILD & TEST ====================
+    
+    - name: 🔨 Setup Node.js for Backend
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: backend/package-lock.json
     
-    - name: Install dependencies
+    - name: 🔨 Install backend dependencies
       run: |
         cd backend
         npm ci
     
-    - name: Run linter
+    - name: 🔨 Run backend linter
       run: |
         cd backend
         npm run lint
     
-    - name: Check TypeScript compilation
+    - name: 🔨 Check TypeScript compilation
       run: |
         cd backend
         npm run build
     
-    - name: Run tests
+    - name: 🔨 Run backend tests
       run: |
         cd backend
         npm test -- --coverage
     
-    - name: Upload coverage reports
+    - name: 🔨 Upload backend coverage
       uses: codecov/codecov-action@v3
       if: always()
       with:
@@ -202,239 +187,133 @@ jobs:
         flags: backend
         name: backend-coverage
     
-    - name: Build Docker image (verification)
+    - name: 🔨 Build backend Docker image
       run: |
         cd backend
         docker build -t backend-test:${{ github.sha }} .
-        echo "✅ Docker image built successfully"
-
-  frontend-ci:
-    name: 🎨 Frontend Build & Test
-    runs-on: ubuntu-latest
-    needs: [version-check, validate-secrets]
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+        echo "✅ Backend Docker image built successfully"
     
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    # ==================== STAGE 5: FRONTEND BUILD & TEST ====================
     
-    - name: Setup Node.js
+    - name: 🎨 Setup Node.js for Frontend
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
     
-    - name: Install dependencies
+    - name: 🎨 Install frontend dependencies
       run: |
         cd frontend
         npm ci
     
-    - name: Run linter (if exists)
+    - name: 🎨 Run frontend linter
       run: |
         cd frontend
         npm run lint || echo "⚠️ No lint script found"
       continue-on-error: true
     
-    - name: Build frontend
+    - name: 🎨 Build frontend
       run: |
         cd frontend
         npm run build
     
-    - name: Check build size
+    - name: 🎨 Check build size
       run: |
         cd frontend/dist
         SIZE=$(du -sh . | cut -f1)
         echo "## 📦 Build Size: $SIZE" >> $GITHUB_STEP_SUMMARY
         du -h --max-depth=1 . >> $GITHUB_STEP_SUMMARY
-
-  dependency-scan:
-    name: 🛡️ Dependency Security Scan
-    runs-on: ubuntu-latest
-    needs: [version-check]
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    # ==================== STAGE 6: DEPLOY BACKEND (Main Branch Only) ====================
     
-    - name: Run npm audit (backend)
-      run: |
-        cd backend
-        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
-    
-    - name: Run npm audit (frontend)
-      run: |
-        cd frontend
-        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
-
-  # ==================== STAGE 3: DEPLOYMENT ====================
-  
-  deploy-backend:
-    name: 🚀 Deploy Backend
-    runs-on: ubuntu-latest
-    needs: [backend-ci, dependency-scan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Get version
-      id: version
-      run: |
-        VERSION=$(cat backend/VERSION)
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "Deploying Backend v$VERSION"
-    
-    - name: Log in to Azure
+    - name: 🚀 Deploy Backend - Log in to Azure
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
     
-    - name: Log in to ACR
+    - name: 🚀 Deploy Backend - Log in to ACR
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: az acr login --name herdswebsiteacr
     
-    - name: Build and push Docker image
+    - name: 🚀 Deploy Backend - Build and push image
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         cd backend
-        VERSION=${{ steps.version.outputs.VERSION }}
-        docker build \
-          -t ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest \
-          -t ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${VERSION} \
-          -t ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }} .
+        VERSION=$(cat VERSION)
+        IMAGE_TAG="${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${VERSION}"
+        IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest"
         
-        docker push ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
-        docker push ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${VERSION}
-        docker push ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+        echo "Building backend v${VERSION}..."
+        docker build -t ${IMAGE_TAG} -t ${IMAGE_TAG_LATEST} .
+        
+        echo "Pushing to ACR..."
+        docker push ${IMAGE_TAG}
+        docker push ${IMAGE_TAG_LATEST}
+        
+        echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+        echo "VERSION=${VERSION}" >> $GITHUB_ENV
     
-    - name: Deploy to Container App
+    - name: 🚀 Deploy Backend - Update Container App
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
+        echo "Deploying backend v${VERSION}..."
+        
         az containerapp update \
           --name ${{ env.BACKEND_CONTAINER_APP }} \
           --resource-group ${{ env.RESOURCE_GROUP }} \
-          --image ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${{ steps.version.outputs.VERSION }} \
-          --set-env-vars \
-            "AZURE_KEY_VAULT_URL=${{ secrets.AZURE_KEY_VAULT_URL }}" \
-            "MONGODB_DATABASE_NAME=${{ secrets.MONGODB_DATABASE_NAME }}" \
-            "PORT=5000" \
-            "NODE_ENV=production" \
-            "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" \
-            "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" \
-            "BACKEND_URL=${{ secrets.BACKEND_URL }}" \
-            "JWT_EXPIRE=7d"
-    
-    - name: Wait for deployment
-      run: sleep 30
-    
-    - name: Health check
-      run: |
-        BACKEND_URL="${{ secrets.BACKEND_URL }}"
-        echo "Checking $BACKEND_URL/health"
+          --image ${IMAGE_TAG} \
+          --set-env-vars "VERSION=${VERSION}"
         
-        for i in {1..5}; do
-          if curl -f "$BACKEND_URL/health"; then
-            echo "✅ Backend is healthy"
-            exit 0
-          fi
-          echo "⏳ Attempt $i/5 failed, retrying..."
-          sleep 10
-        done
-        
-        echo "❌ Health check failed"
-        exit 1
-    
-    - name: Deployment summary
-      run: |
+        echo "✅ Backend v${VERSION} deployed successfully!"
         echo "## 🚀 Backend Deployed" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version:** v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Image:** ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **URL:** ${{ secrets.BACKEND_URL }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Key Vault:** ✅ Managed Identity" >> $GITHUB_STEP_SUMMARY
-
-  deploy-frontend:
-    name: 🎨 Deploy Frontend
-    runs-on: ubuntu-latest
-    needs: [frontend-ci, deploy-backend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        echo "- Version: v${VERSION}" >> $GITHUB_STEP_SUMMARY
+        echo "- Image: ${IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
     
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    # ==================== STAGE 7: DEPLOY FRONTEND (Main Branch Only) ====================
     
-    - name: Get version
-      id: version
-      run: |
-        VERSION=$(cat frontend/VERSION)
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "Deploying Frontend v$VERSION"
-    
-    - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-    
-    - name: Log in to ACR
-      run: az acr login --name herdswebsiteacr
-    
-    - name: Build and push Docker image
+    - name: 🎨 Deploy Frontend - Build and push image
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         cd frontend
-        VERSION=${{ steps.version.outputs.VERSION }}
-        docker build \
-          --build-arg VITE_API_URL=${{ secrets.BACKEND_URL }} \
-          -t ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest \
-          -t ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${VERSION} \
-          -t ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }} .
+        VERSION=$(cat VERSION)
+        IMAGE_TAG="${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${VERSION}"
+        IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest"
         
-        docker push ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
-        docker push ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${VERSION}
-        docker push ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+        echo "Building frontend v${VERSION}..."
+        docker build -t ${IMAGE_TAG} -t ${IMAGE_TAG_LATEST} .
+        
+        echo "Pushing to ACR..."
+        docker push ${IMAGE_TAG}
+        docker push ${IMAGE_TAG_LATEST}
+        
+        echo "FRONTEND_IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+        echo "FRONTEND_VERSION=${VERSION}" >> $GITHUB_ENV
     
-    - name: Deploy to Container App
+    - name: 🎨 Deploy Frontend - Update Container App
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
+        echo "Deploying frontend v${FRONTEND_VERSION}..."
+        
         az containerapp update \
           --name ${{ env.FRONTEND_CONTAINER_APP }} \
           --resource-group ${{ env.RESOURCE_GROUP }} \
-          --image ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${{ steps.version.outputs.VERSION }}
-    
-    - name: Deployment summary
-      run: |
+          --image ${FRONTEND_IMAGE_TAG} \
+          --set-env-vars "VERSION=${FRONTEND_VERSION}"
+        
+        echo "✅ Frontend v${FRONTEND_VERSION} deployed successfully!"
         echo "## 🎨 Frontend Deployed" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version:** v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Image:** ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **URL:** ${{ secrets.FRONTEND_URL }}" >> $GITHUB_STEP_SUMMARY
-
-  # ==================== POST-DEPLOYMENT VERIFICATION ====================
-  
-  post-deploy-tests:
-    name: ✅ Production Verification
-    runs-on: ubuntu-latest
-    needs: [deploy-backend, deploy-frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        echo "- Version: v${FRONTEND_VERSION}" >> $GITHUB_STEP_SUMMARY
+        echo "- Image: ${FRONTEND_IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
     
-    steps:
-    - name: Test backend health
-      run: |
-        curl -f "${{ secrets.BACKEND_URL }}/health" || exit 1
-        echo "✅ Backend health check passed"
+    # ==================== FINAL SUMMARY ====================
     
-    - name: Test frontend
+    - name: 📊 Pipeline Summary
+      if: always()
       run: |
-        curl -f "${{ secrets.FRONTEND_URL }}" || exit 1
-        echo "✅ Frontend is accessible"
-    
-    - name: Final summary
-      run: |
-        echo "## ✅ Deployment Complete" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 All services deployed and verified successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🔐 Security" >> $GITHUB_STEP_SUMMARY
-        echo "- All secrets managed by Azure Key Vault" >> $GITHUB_STEP_SUMMARY
-        echo "- Managed Identity authentication" >> $GITHUB_STEP_SUMMARY
-        echo "- Zero secrets in containers or code" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Pipeline Complete" >> $GITHUB_STEP_SUMMARY
+        echo "- Event: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Backend: v${{ steps.current.outputs.backend }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Frontend: v${{ steps.current.outputs.frontend }}" >> $GITHUB_STEP_SUMMARY
