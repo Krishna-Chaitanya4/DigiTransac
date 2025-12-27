@@ -3,9 +3,12 @@ import { logger } from './logger';
 /**
  * Validates required environment variables on startup
  * Throws error if critical configuration is missing
+ * 
+ * Note: Secrets (MongoDB connection, JWT secret, encryption key) are now
+ * stored in Azure Key Vault and validated at runtime, not here.
  */
 export const validateConfig = (): void => {
-  const required = ['COSMOS_ENDPOINT', 'COSMOS_KEY', 'COSMOS_DATABASE_NAME', 'JWT_SECRET'];
+  const required = ['AZURE_KEY_VAULT_URL'];
 
   const missing: string[] = [];
 
@@ -17,22 +20,10 @@ export const validateConfig = (): void => {
 
   if (missing.length > 0) {
     logger.error({ missing }, '❌ Missing required environment variables');
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-  }
-
-  // Warn about development defaults
-  if (
-    process.env.JWT_SECRET === 'fallback-secret' ||
-    process.env.JWT_SECRET === 'your-jwt-secret-change-in-production'
-  ) {
-    logger.warn('⚠️  Using weak JWT_SECRET - not suitable for production!');
-  }
-
-  // Validate JWT_SECRET strength in production
-  if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET) {
-    if (process.env.JWT_SECRET.length < 32) {
-      logger.warn('⚠️  JWT_SECRET is too short for production (minimum 32 characters recommended)');
-    }
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}\n` +
+      'Run "az login" and set AZURE_KEY_VAULT_URL=https://digitransac-kv-3895.vault.azure.net/'
+    );
   }
 
   logger.info('✅ Configuration validated successfully');

@@ -1,38 +1,19 @@
-import { SecretClient } from '@azure/keyvault-secrets';
-import { DefaultAzureCredential } from '@azure/identity';
 import crypto, { CipherGCM, DecipherGCM } from 'crypto';
 import { logger } from '../utils/logger';
+import { keyVaultService } from '../config/keyVault';
 
 class EncryptionService {
-  private secretClient: SecretClient | null = null;
   private masterKey: string | null = null;
   private algorithm = 'aes-256-gcm';
-  private keyVaultUrl: string;
-
-  constructor() {
-    this.keyVaultUrl = process.env.KEY_VAULT_URL || 'https://digitransac-kv-3895.vault.azure.net/';
-  }
 
   /**
-   * Initialize connection to Azure Key Vault and retrieve master key
+   * Initialize encryption service by fetching master key from Key Vault
    */
   async initialize(): Promise<void> {
     try {
-      // In development, use environment variable for master key
-      if (process.env.NODE_ENV === 'development' && process.env.MASTER_ENCRYPTION_KEY) {
-        this.masterKey = process.env.MASTER_ENCRYPTION_KEY;
-        logger.info('✅ Using master key from environment variable (development mode)');
-        return;
-      }
-
-      // In production, use Azure Key Vault
-      const credential = new DefaultAzureCredential();
-      this.secretClient = new SecretClient(this.keyVaultUrl, credential);
-
-      const secret = await this.secretClient.getSecret('master-encryption-key');
-      this.masterKey = secret.value!;
-
-      logger.info('✅ Master encryption key retrieved from Azure Key Vault');
+      // Always fetch from Key Vault (both dev and prod)
+      this.masterKey = await keyVaultService.getSecret('Master-Encryption-Key');
+      logger.info('✅ Master encryption key retrieved from Key Vault');
     } catch (error) {
       logger.error(error, '❌ Error initializing encryption service');
       throw new Error('Failed to initialize encryption service');

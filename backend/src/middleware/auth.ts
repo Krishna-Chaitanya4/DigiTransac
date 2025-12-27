@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
+import { keyVaultService } from '../config/keyVault';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -12,6 +13,9 @@ interface JWTPayload {
   iat: number;
   exp: number;
 }
+
+// Cache JWT secret for performance
+let jwtSecretCache: string | null = null;
 
 export const authenticate = async (
   req: AuthRequest,
@@ -31,13 +35,12 @@ export const authenticate = async (
       throw new AppError('Authentication token required', 401);
     }
 
-    // Verify JWT token
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new AppError('JWT_SECRET not configured', 500);
+    // Get JWT secret from Key Vault (cached)
+    if (!jwtSecretCache) {
+      jwtSecretCache = await keyVaultService.getSecret('JWT-Secret');
     }
 
-    const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
+    const decoded = jwt.verify(token, jwtSecretCache) as JWTPayload;
 
     // Attach userId to request
     req.userId = decoded.userId;

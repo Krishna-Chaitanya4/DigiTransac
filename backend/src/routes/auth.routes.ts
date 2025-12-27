@@ -2,12 +2,23 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cosmosDBService } from '../config/cosmosdb';
+import { keyVaultService } from '../config/keyVault';
 import { User } from '../models/types';
 import { validate, schemas } from '../middleware/validation';
 import { authenticate } from '../middleware/auth';
 import { logger } from '../utils/logger';
 
 const router = Router();
+
+// Cache JWT secret for performance
+let jwtSecretCache: string | null = null;
+
+async function getJWTSecret(): Promise<string> {
+  if (!jwtSecretCache) {
+    jwtSecretCache = await keyVaultService.getSecret('JWT-Secret');
+  }
+  return jwtSecretCache;
+}
 
 interface RegisterBody {
   email?: string;
@@ -93,10 +104,11 @@ router.post(
       // Save to database
       await usersContainer.insertOne(newUser);
 
-      // Generate JWT token
+      // Generate JWT token with secret from Key Vault
+      const jwtSecret = await getJWTSecret();
       const token = jwt.sign(
         { userId: newUser.id, username: newUser.username },
-        process.env.JWT_SECRET as jwt.Secret,
+        jwtSecret,
         { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
       );
 
@@ -160,10 +172,11 @@ router.post(
         return;
       }
 
-      // Generate JWT token
+      // Generate JWT token with secret from Key Vault
+      const jwtSecret = await getJWTSecret();
       const token = jwt.sign(
         { userId: user.id, username: user.username },
-        process.env.JWT_SECRET as jwt.Secret,
+        jwtSecret,
         { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
       );
 
@@ -196,10 +209,11 @@ router.post('/refresh', authenticate, async (req: any, res: Response): Promise<v
     const userId = req.userId;
     const email = req.user?.email;
 
-    // Generate new JWT token
+    // Generate new JWT token with secret from Key Vault
+    const jwtSecret = await getJWTSecret();
     const token = jwt.sign(
       { userId, email },
-      process.env.JWT_SECRET as jwt.Secret,
+      jwtSecret,
       { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
     );
 
