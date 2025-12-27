@@ -1,4 +1,4 @@
-import { cosmosDBService } from '../config/cosmosdb';
+﻿import { mongoDBService } from '../config/mongodb';
 import { Transaction, RecurrencePattern } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
@@ -11,7 +11,7 @@ export async function processRecurringTransactions(): Promise<number> {
   try {
     logger.info('🔄 Processing recurring transactions...');
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Find all recurring transactions
     const recurringTransactions = (await transactionsContainer

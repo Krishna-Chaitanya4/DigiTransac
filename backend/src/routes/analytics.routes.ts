@@ -1,6 +1,6 @@
 ﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 import { calculateBudgetSpendingInRange } from '../utils/budgetHelpers';
 import { Budget, Category } from '../models/types';
@@ -23,8 +23,8 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
       ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
       : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     // Build filter for approved debit transactions only
     const txFilter: any = buildExpenseFilter(userId, start, end);
@@ -58,7 +58,7 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
     const avgExpense = expenseCount > 0 ? totalSpent / expenseCount : 0;
 
     // Get budget info
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = await budgetsContainer
       .find({
         userId,
@@ -145,8 +145,8 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
       : new Date(new Date().setHours(23, 59, 59, 999));
 
     // Get transactions and their splits to aggregate by category
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     // Only include approved transactions in calculations
     const transactions = await transactionsContainer
@@ -173,7 +173,7 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     });
 
     // Get category details
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
     const categories = await categoriesContainer.find({ userId }).toArray();
 
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
@@ -248,7 +248,7 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
     const expenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
     // Get all categories
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
     const categories = await categoriesContainer.find({ userId }).toArray();
 
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
@@ -405,7 +405,7 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       : new Date(new Date().setHours(23, 59, 59, 999));
 
     // Get active budgets
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer
       .find({
         userId,
@@ -419,7 +419,7 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
     const categories = (await categoriesContainer
       .find({ userId })
@@ -492,7 +492,7 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
           isFolder = category?.isFolder || false;
         } else if (budget.scopeType === 'tag' && (budget.includeTagIds || budget.excludeTagIds)) {
           // Fetch tag names
-          const tagsContainer = await cosmosDBService.getTagsContainer();
+          const tagsContainer = await mongoDBService.getTagsContainer();
           const allTagIds = [...(budget.includeTagIds || []), ...(budget.excludeTagIds || [])];
           const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
           const tagMap = new Map(tags.map((t: any) => [t.id, t.name]));
@@ -516,7 +516,7 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
           displayColor = '#ff6b6b';
         } else if (budget.scopeType === 'account' && budget.accountId) {
           // Fetch account name
-          const accountsContainer = await cosmosDBService.getAccountsContainer();
+          const accountsContainer = await mongoDBService.getAccountsContainer();
           const account = await accountsContainer.findOne({ id: budget.accountId, userId });
           displayName = account?.name || 'Unknown Account';
           displayColor = account?.color || '#4ecdc4';
@@ -578,7 +578,7 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
       .slice(0, parseInt(limit as string));
 
     // Get category details
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
     const categories = await categoriesContainer.find({ userId }).toArray();
     const categoryLookup = new Map(categories.map((cat: any) => [cat.id, cat]));
 
@@ -632,7 +632,7 @@ router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response):
     });
 
     // Get payment method details
-    const paymentMethodsContainer = await cosmosDBService.getPaymentMethodsContainer();
+    const paymentMethodsContainer = await mongoDBService.getPaymentMethodsContainer();
     const paymentMethods = await paymentMethodsContainer.find({ userId }).toArray();
 
     const totalAmount = Array.from(paymentMethodMap.values()).reduce(
@@ -735,8 +735,8 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
     const end = endDate ? new Date(endDate as string) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    const categoriesContainer = await cosmosDBService.getCategoriesContainer();
-    const budgetsContainer = await cosmosDBService.getBudgetsContainer();
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
     // Get current period expenses (approved only)
     const currentExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
@@ -951,7 +951,7 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
   try {
     const userId = req.userId!;
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Use aggregation to count by status efficiently
     const [pending, approved, rejected, pendingTransactions] = await Promise.all([

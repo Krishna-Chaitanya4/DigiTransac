@@ -1,7 +1,7 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { smsParserService, ParsedTransaction } from '../services/smsParser.service';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -51,7 +51,7 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
     }
 
     // Get existing transactions for duplicate detection
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
     // Get transactions from last 7 days
     const sevenDaysAgo = new Date();
@@ -123,7 +123,7 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
 
     // Save to database
     const savedTransactions: any[] = [];
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     for (const transaction of pendingTransactions) {
       const result = await transactionsContainer.insertOne(transaction);

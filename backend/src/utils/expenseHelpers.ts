@@ -1,4 +1,4 @@
-import { cosmosDBService } from '../config/cosmosdb';
+﻿import { mongoDBService } from '../config/mongodb';
 import { decryptTransaction } from './transactionEncryption';
 import { buildExpenseFilter } from './transactionFilters';
 
@@ -32,7 +32,7 @@ export async function getExpensesFromTransactions(
   endDate: Date,
   reviewStatus?: string
 ): Promise<ExpenseFromSplit[]> {
-  const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+  const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
   // Use centralized filter builder - defaults to approved if reviewStatus provided
   const filter: any = reviewStatus
@@ -47,7 +47,7 @@ export async function getExpensesFromTransactions(
   const decryptedTransactions = transactions.map((t: any) => decryptTransaction(t));
 
   // Get splits for these transactions
-  const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
   const transactionIds = decryptedTransactions.map((t: any) => t.id);
 
   const splits = await splitsContainer.find({ transactionId: { $in: transactionIds } }).toArray();
@@ -81,12 +81,12 @@ export async function getExpenseById(
   userId: string,
   expenseId: string
 ): Promise<ExpenseFromSplit | null> {
-  const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
   const split = await splitsContainer.findOne({ id: expenseId, userId });
 
   if (!split) return null;
 
-  const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+  const transactionsContainer = await mongoDBService.getTransactionsContainer();
   const transaction = await transactionsContainer.findOne({ id: split.transactionId, userId });
 
   if (!transaction) return null;
@@ -114,7 +114,7 @@ export async function getExpenseById(
  * Count expenses (debit transaction splits) matching criteria
  */
 export async function countExpenses(userId: string, filter: any = {}): Promise<number> {
-  const transactionsContainer = await cosmosDBService.getTransactionsContainer();
+  const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
   const txFilter: any = {
     userId,
@@ -128,7 +128,7 @@ export async function countExpenses(userId: string, filter: any = {}): Promise<n
   if (transactions.length === 0) return 0;
 
   // Count splits for these transactions
-  const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
   const transactionIds = transactions.map((t: any) => t.id);
 
   const count = await splitsContainer.countDocuments({

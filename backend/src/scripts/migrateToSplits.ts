@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Migration Script: Convert existing transactions to use split model
  *
  * This script:
@@ -7,7 +7,7 @@
  * 3. Preserves all existing data
  */
 
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { Transaction, TransactionSplit } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,10 +15,10 @@ async function migrateToSplits() {
   try {
     console.log('🚀 Starting migration to split transactions...\n');
 
-    await cosmosDBService.initialize();
+    await mongoDBService.initialize();
 
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     // Get all transactions
     const allTransactions = (await transactionsContainer
@@ -81,7 +81,7 @@ async function migrateToSplits() {
     console.log(`   ❌ Errors: ${errorCount}`);
     console.log(`   📊 Total processed: ${allTransactions.length}\n`);
 
-    await cosmosDBService.close();
+    await mongoDBService.close();
     console.log('✅ Migration completed successfully!');
     process.exit(0);
   } catch (error) {

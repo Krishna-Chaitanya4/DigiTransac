@@ -1,7 +1,7 @@
-import { detectTransactionTags } from '../utils/transactionTags';
+﻿import { detectTransactionTags } from '../utils/transactionTags';
 import { getLearnedMapping } from './merchantLearning.service';
 import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { logger } from '../utils/logger';
 
 interface ParsedTransaction {
@@ -238,7 +238,7 @@ export class EmailParserService {
 
           if (userId && (bank.name || cardLast4)) {
             try {
-              const accountsContainer = await cosmosDBService.getAccountsContainer();
+              const accountsContainer = await mongoDBService.getAccountsContainer();
               matchedAccountId =
                 (await matchAccount(userId, accountsContainer as any, bank.name, cardLast4)) ||
                 undefined;

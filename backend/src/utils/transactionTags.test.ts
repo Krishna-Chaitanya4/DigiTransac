@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Jest test suite for transaction tag detection
  */
 

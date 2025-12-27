@@ -1,7 +1,7 @@
-import express from 'express';
+﻿import express from 'express';
 import { Request, Response } from 'express';
 import { emailParserService } from '../services/emailParser.service';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { randomUUID } from 'crypto';
 import { Transaction, TransactionSplit } from '../models/types';
 
@@ -47,7 +47,7 @@ router.post('/inbound', async (req: Request, res: Response) => {
     }
 
     // Get user's email integration settings
-    const userContainer = await cosmosDBService.getUsersContainer();
+    const userContainer = await mongoDBService.getUsersContainer();
     const user = await userContainer.findOne({ id: userId });
 
     if (!user || !user.emailIntegration?.enabled) {
@@ -67,8 +67,8 @@ router.post('/inbound', async (req: Request, res: Response) => {
       parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
 
     // Create pending transaction
-    const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-    const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     const transactionId = randomUUID();
     const splitId = randomUUID();

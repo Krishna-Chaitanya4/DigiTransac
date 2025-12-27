@@ -1,7 +1,7 @@
-import express, { Request, Response } from 'express';
+﻿import express, { Request, Response } from 'express';
 import { google } from 'googleapis';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { encryptionService } from '../services/encryption.service';
 import { oauthLimiter } from '../middleware/rateLimiter';
 import crypto from 'crypto';
@@ -115,7 +115,7 @@ router.get('/callback', oauthLimiter, async (req: Request, res: Response): Promi
     const encryptedRefreshToken = encryptionService.encrypt(tokens.refresh_token!);
 
     // Save encrypted tokens to database
-    const userContainer = await cosmosDBService.getUsersContainer();
+    const userContainer = await mongoDBService.getUsersContainer();
     await userContainer.updateOne(
       { id: userId },
       {
@@ -243,7 +243,7 @@ router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response)
   try {
     const userId = req.userId;
 
-    const userContainer = await cosmosDBService.getUsersContainer();
+    const userContainer = await mongoDBService.getUsersContainer();
     await userContainer.updateOne(
       { id: userId },
       {
@@ -269,7 +269,7 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response): Pro
   try {
     const userId = req.userId;
 
-    const userContainer = await cosmosDBService.getUsersContainer();
+    const userContainer = await mongoDBService.getUsersContainer();
     const user = await userContainer.findOne({ id: userId });
 
     if (!user || !user.emailIntegration) {

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2025-12-27
+
+### Changed
+- **Refactoring**: Renamed `cosmosdb.ts` to `mongodb.ts` for accurate naming
+- Renamed `CosmosDBService` class to `MongoDBService`
+- Updated all service references from `cosmosDBService` to `mongoDBService`
+- Replaced all "Cosmos DB" references with "MongoDB" in logs and comments
+
+### Fixed
+- Email and phone indexes now use `sparse: true` option
+- Allows multiple users to register without email or phone (prevents duplicate key violations)
+- Fixes "Duplicate key violation on Index 'email_1'" error for phone-only registrations
+
+### Added
+- Unique index on username field for data integrity
+
 ## [1.2.2] - 2025-12-27
 
 ### Fixed

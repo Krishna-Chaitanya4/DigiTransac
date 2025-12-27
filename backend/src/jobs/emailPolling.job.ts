@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+﻿import cron from 'node-cron';
 import { gmailPollingService } from '../services/gmailPolling.service';
 import { logger } from '../utils/logger';
 

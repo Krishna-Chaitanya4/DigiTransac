@@ -1,5 +1,5 @@
-import { google } from 'googleapis';
-import { cosmosDBService } from '../config/cosmosdb';
+﻿import { google } from 'googleapis';
+import { mongoDBService } from '../config/mongodb';
 import { emailParserService } from './emailParser.service';
 import { encryptionService } from './encryption.service';
 import { Transaction, TransactionSplit, Category } from '../models/types';
@@ -34,7 +34,7 @@ class GmailPollingService {
       const encryptedAccessToken = encryptionService.encrypt(credentials.access_token!);
 
       // Update tokens in database
-      const userContainer = await cosmosDBService.getUsersContainer();
+      const userContainer = await mongoDBService.getUsersContainer();
       await userContainer.updateOne(
         { id: user.id },
         {
@@ -57,7 +57,7 @@ class GmailPollingService {
    */
   private async getOrCreateUncategorizedCategory(userId: string): Promise<string> {
     try {
-      const categoriesContainer = await cosmosDBService.getCategoriesContainer();
+      const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
       // Try to find existing "Uncategorized" category
       const existing = await categoriesContainer.findOne({
@@ -121,7 +121,7 @@ class GmailPollingService {
         const initialHistoryId = profile.data.historyId;
 
         // Store initial historyId
-        const userContainer = await cosmosDBService.getUsersContainer();
+        const userContainer = await mongoDBService.getUsersContainer();
         await userContainer.updateOne(
           { id: user.id },
           { $set: { 'emailIntegration.lastHistoryId': initialHistoryId } }
@@ -149,7 +149,7 @@ class GmailPollingService {
           const profile = await gmail.users.getProfile({ userId: 'me' });
           const freshHistoryId = profile.data.historyId;
 
-          const userContainer = await cosmosDBService.getUsersContainer();
+          const userContainer = await mongoDBService.getUsersContainer();
           await userContainer.updateOne(
             { id: user.id },
             { $set: { 'emailIntegration.lastHistoryId': freshHistoryId } }
@@ -186,7 +186,7 @@ class GmailPollingService {
       if (newMessageIds.length === 0) {
         // Update historyId even if no messages to process
         const newHistoryId = history.data.historyId;
-        const userContainer = await cosmosDBService.getUsersContainer();
+        const userContainer = await mongoDBService.getUsersContainer();
         await userContainer.updateOne(
           { id: user.id },
           { $set: { 'emailIntegration.lastHistoryId': newHistoryId } }
@@ -328,8 +328,8 @@ class GmailPollingService {
             parsedTransaction.matchedAccountId || parsedTransaction.learnedAccountId || '';
 
           // Create pending transaction
-          const transactionsContainer = await cosmosDBService.getTransactionsContainer();
-          const splitsContainer = await cosmosDBService.getTransactionSplitsContainer();
+          const transactionsContainer = await mongoDBService.getTransactionsContainer();
+          const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
           const transactionId = randomUUID();
           const splitId = randomUUID();
@@ -388,7 +388,7 @@ class GmailPollingService {
 
       // Update historyId to the latest from Gmail (critical for delta sync)
       const newHistoryId = history.data.historyId;
-      const userContainer = await cosmosDBService.getUsersContainer();
+      const userContainer = await mongoDBService.getUsersContainer();
 
       await userContainer.updateOne(
         { id: user.id },
@@ -422,7 +422,7 @@ class GmailPollingService {
     try {
       console.log('Starting email polling job...');
 
-      const userContainer = await cosmosDBService.getUsersContainer();
+      const userContainer = await mongoDBService.getUsersContainer();
 
       // Find all users with email integration enabled
       const users = await userContainer

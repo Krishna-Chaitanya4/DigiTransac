@@ -1,7 +1,7 @@
-import { Router, Request, Response } from 'express';
+﻿import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { cosmosDBService } from '../config/cosmosdb';
+import { mongoDBService } from '../config/mongodb';
 import { keyVaultService } from '../config/keyVault';
 import { User } from '../models/types';
 import { validate, schemas } from '../middleware/validation';
@@ -46,7 +46,7 @@ router.post(
     try {
       const { email, phone, username, password, fullName, dateOfBirth, currency } = req.body;
 
-      const usersContainer = await cosmosDBService.getUsersContainer();
+      const usersContainer = await mongoDBService.getUsersContainer();
 
       // Check if username already exists
       const existingUsername = await usersContainer.findOne({ username: username.toLowerCase() });
@@ -141,7 +141,7 @@ router.post(
     try {
       const { identifier, password } = req.body;
 
-      const usersContainer = await cosmosDBService.getUsersContainer();
+      const usersContainer = await mongoDBService.getUsersContainer();
 
       // Find user by email, phone, or username
       const user = (await usersContainer.findOne({
