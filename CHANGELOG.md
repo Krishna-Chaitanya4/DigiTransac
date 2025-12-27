@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [1.2.10] - 2025-12-28
+
+### Fixed
+- **Nginx If Statement Issue**: Replaced problematic `if` statement with nginx `map` directive
+- Nginx `if` inside location blocks can cause unexpected behavior
+- Using map directive is nginx best practice for conditional header values
+- Properly sets Origin header fallback using industry-standard approach
+## [1.3.0] - 2025-12-28
+
+### Changed
+- **CI/CD Pipeline**: Consolidated workflows into single multi-stage pipeline
+- Merged `version-check.yml` into `main-ci-cd.yml` for better organization
+- Added proper job dependencies using `needs` keyword
+- Pipeline stages:
+  1. **Validation**: Version checks, security scanning, secrets validation
+  2. **Build & Test**: Backend and frontend CI with parallel execution
+  3. **Deployment**: Sequential deployment (backend → frontend)
+  4. **Verification**: Post-deployment smoke tests
+- Industry standard approach: Single source of truth for CI/CD
+- Better visibility with emojis and clear stage separation
+- Eliminates redundant workflow runs
+
+### Fixed
+- Version validation now runs before build stage (fails fast)
+- All deployment jobs depend on successful CI completion
+- No deployment can occur if any validation or build step fails
 
 ## [1.2.9] - 2025-12-28
 

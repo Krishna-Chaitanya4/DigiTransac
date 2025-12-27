@@ -19,10 +19,108 @@ env:
   FRONTEND_CONTAINER_APP: digitransac-frontend
 
 jobs:
-  # ==================== CI JOBS (Run on PRs and Main) ====================
+  # ==================== STAGE 1: VALIDATION ====================
   
+  version-check:
+    name: 📌 Version Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Fetch main branch (PR only)
+      if: github.event_name == 'pull_request'
+      run: git fetch origin main:main
+    
+    - name: Get current versions
+      id: current
+      run: |
+        BACKEND_VERSION=$(cat backend/VERSION)
+        FRONTEND_VERSION=$(cat frontend/VERSION)
+        echo "backend=$BACKEND_VERSION" >> $GITHUB_OUTPUT
+        echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
+    
+    - name: Get main branch versions (PR only)
+      if: github.event_name == 'pull_request'
+      id: main
+      run: |
+        BACKEND_VERSION=$(git show main:backend/VERSION)
+        FRONTEND_VERSION=$(git show main:frontend/VERSION)
+        echo "backend=$BACKEND_VERSION" >> $GITHUB_OUTPUT
+        echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
+    
+    - name: Compare versions (PR only)
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "🔍 Version Comparison"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Backend:  ${{ steps.main.outputs.backend }} → ${{ steps.current.outputs.backend }}"
+        echo "Frontend: ${{ steps.main.outputs.frontend }} → ${{ steps.current.outputs.frontend }}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        if [ "${{ steps.current.outputs.backend }}" == "${{ steps.main.outputs.backend }}" ]; then
+          echo "❌ ERROR: Backend version not updated!"
+          exit 1
+        fi
+        
+        if [ "${{ steps.current.outputs.frontend }}" == "${{ steps.main.outputs.frontend }}" ]; then
+          echo "❌ ERROR: Frontend version not updated!"
+          exit 1
+        fi
+        
+        echo "✅ Both versions have been updated"
+    
+    - name: Check version consistency
+      run: |
+        BACKEND_VERSION=$(cat backend/VERSION)
+        FRONTEND_VERSION=$(cat frontend/VERSION)
+        BACKEND_PKG_VERSION=$(node -p "require('./backend/package.json').version")
+        FRONTEND_PKG_VERSION=$(node -p "require('./frontend/package.json').version")
+        
+        if [ "$BACKEND_VERSION" != "$BACKEND_PKG_VERSION" ]; then
+          echo "❌ Backend VERSION and package.json mismatch!"
+          exit 1
+        fi
+        
+        if [ "$FRONTEND_VERSION" != "$FRONTEND_PKG_VERSION" ]; then
+          echo "❌ Frontend VERSION and package.json mismatch!"
+          exit 1
+        fi
+        
+        echo "✅ Version files are consistent"
+    
+    - name: Check CHANGELOG updated (PR only)
+      if: github.event_name == 'pull_request'
+      run: |
+        BACKEND_VERSION=$(cat backend/VERSION)
+        if grep -q "\[$BACKEND_VERSION\]" CHANGELOG.md; then
+          echo "✅ CHANGELOG.md updated for v$BACKEND_VERSION"
+        else
+          echo "❌ ERROR: CHANGELOG.md missing entry for v$BACKEND_VERSION"
+          exit 1
+        fi
+    
+    - name: Validate semantic versioning
+      run: |
+        BACKEND_VERSION=$(cat backend/VERSION)
+        if [[ ! $BACKEND_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ ERROR: Invalid semver format: $BACKEND_VERSION"
+          exit 1
+        fi
+        echo "✅ Valid semantic version: v$BACKEND_VERSION"
+    
+    - name: Summary
+      run: |
+        echo "## 📌 Version Info" >> $GITHUB_STEP_SUMMARY
+        echo "- Backend: v${{ steps.current.outputs.backend }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Frontend: v${{ steps.current.outputs.frontend }}" >> $GITHUB_STEP_SUMMARY
+
   validate-secrets:
-    name: Validate Key Vault Configuration
+    name: 🔐 Security Validation
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     
@@ -57,9 +155,12 @@ jobs:
           echo "✅ Key Vault service properly integrated"
         fi
 
+  # ==================== STAGE 2: BUILD & TEST ====================
+
   backend-ci:
-    name: Backend Tests & Build
+    name: 🔨 Backend Build & Test
     runs-on: ubuntu-latest
+    needs: [version-check, validate-secrets]
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     
     steps:
@@ -108,8 +209,9 @@ jobs:
         echo "✅ Docker image built successfully"
 
   frontend-ci:
-    name: Frontend Tests & Build
+    name: 🎨 Frontend Build & Test
     runs-on: ubuntu-latest
+    needs: [version-check, validate-secrets]
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     
     steps:
@@ -147,8 +249,9 @@ jobs:
         du -h --max-depth=1 . >> $GITHUB_STEP_SUMMARY
 
   dependency-scan:
-    name: Dependency Security Scan
+    name: 🛡️ Dependency Security Scan
     runs-on: ubuntu-latest
+    needs: [version-check]
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     
     steps:
@@ -165,33 +268,12 @@ jobs:
         cd frontend
         npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
 
-  version-check:
-    name: Version Consistency
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Validate versions
-      run: |
-        BACKEND_VERSION=$(cat backend/VERSION)
-        FRONTEND_VERSION=$(cat frontend/VERSION)
-        
-        echo "Backend: v$BACKEND_VERSION"
-        echo "Frontend: v$FRONTEND_VERSION"
-        
-        echo "## 📌 Version Info" >> $GITHUB_STEP_SUMMARY
-        echo "- Backend: v$BACKEND_VERSION" >> $GITHUB_STEP_SUMMARY
-        echo "- Frontend: v$FRONTEND_VERSION" >> $GITHUB_STEP_SUMMARY
-
-  # ==================== CD JOBS (Deploy on Main Push/PR Merge) ====================
+  # ==================== STAGE 3: DEPLOYMENT ====================
   
   deploy-backend:
-    name: Deploy Backend to Azure
+    name: 🚀 Deploy Backend
     runs-on: ubuntu-latest
-    needs: [validate-secrets, backend-ci, dependency-scan, version-check]
+    needs: [backend-ci, dependency-scan]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
@@ -273,9 +355,9 @@ jobs:
         echo "- **Key Vault:** ✅ Managed Identity" >> $GITHUB_STEP_SUMMARY
 
   deploy-frontend:
-    name: Deploy Frontend to Azure
+    name: 🎨 Deploy Frontend
     runs-on: ubuntu-latest
-    needs: [frontend-ci, version-check, deploy-backend]
+    needs: [frontend-ci, deploy-backend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
@@ -330,7 +412,7 @@ jobs:
   # ==================== POST-DEPLOYMENT VERIFICATION ====================
   
   post-deploy-tests:
-    name: Production Smoke Tests
+    name: ✅ Production Verification
     runs-on: ubuntu-latest
     needs: [deploy-backend, deploy-frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
