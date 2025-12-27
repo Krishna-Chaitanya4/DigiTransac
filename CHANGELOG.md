@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.8] - 2025-12-28
+
+### Fixed
+- **502 CORS Error**: Fixed nginx proxy Origin header configuration
+- Changed from hardcoded `Origin: https://digitransac.com` to pass-through `Origin: $http_origin`
+- Backend was rejecting requests with "Not allowed by CORS" due to missing/incorrect Origin
+- Now properly forwards the actual Origin header from client requests
+- Resolves 502 Bad Gateway errors on login and all API calls
+
 ## [1.2.7] - 2025-12-28
 
 ### Fixed
