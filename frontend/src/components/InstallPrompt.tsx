@@ -70,9 +70,7 @@ export const InstallPrompt: React.FC = () => {
       await installPrompt.prompt();
       const { outcome } = await installPrompt.userChoice;
       
-      if (outcome === 'accepted') {
-        console.log('PWA installed');
-      }
+      // PWA installed if outcome === 'accepted'
       
       setShowPrompt(false);
       setInstallPrompt(null);

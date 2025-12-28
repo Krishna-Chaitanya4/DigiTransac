@@ -102,7 +102,7 @@ const OfflineIndicator: React.FC = () => {
         >
           <OfflineIcon fontSize="small" />
           <Typography variant="body2" fontWeight={500}>
-            You're offline
+            You&apos;re offline
           </Typography>
           {queueSize > 0 && (
             <Typography variant="body2" sx={{ ml: 1 }}>

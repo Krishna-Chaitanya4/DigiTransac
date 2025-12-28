@@ -431,19 +431,21 @@ const Accounts: React.FC = () => {
         case 'name':
           compareValue = a.name.localeCompare(b.name);
           break;
-        case 'balance':
+        case 'balance': {
           const balanceA = accountBalances.get(a.id)?.calculatedBalance || a.balance;
           const balanceB = accountBalances.get(b.id)?.calculatedBalance || b.balance;
           compareValue = balanceA - balanceB;
           break;
+        }
         case 'type':
           compareValue = a.type.localeCompare(b.type);
           break;
-        case 'lastActivity':
+        case 'lastActivity': {
           const dateA = accountBalances.get(a.id)?.lastTransactionDate || a.createdAt;
           const dateB = accountBalances.get(b.id)?.lastTransactionDate || b.createdAt;
           compareValue = new Date(dateA).getTime() - new Date(dateB).getTime();
           break;
+        }
         default:
           compareValue = 0;
       }

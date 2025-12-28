@@ -78,7 +78,7 @@ export const apiLimiter = rateLimit({
   // It will use userId from skip function if we need user-based limiting
   skip: (req: Request) => {
     // Never skip, but this allows us to track authenticated users differently
-    const userId = (req as any).userId;
+    const userId = (req as Request & { userId?: string }).userId;
     if (userId) {
       // For authenticated users, we could implement separate limits
       // For now, use the same IP-based limit
@@ -87,7 +87,7 @@ export const apiLimiter = rateLimit({
   },
 
   handler: (req: Request, res: Response) => {
-    const userId = (req as any).userId;
+    const userId = (req as Request & { userId?: string }).userId;
     logger.warn(
       {
         userId: userId || 'anonymous',

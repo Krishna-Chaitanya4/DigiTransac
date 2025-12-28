@@ -240,6 +240,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
+                    key={option.id}
                     label={option.name}
                     size="small"
                     {...getTagProps({ index })}
@@ -268,6 +269,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
+                    key={option.id}
                     label={option.name}
                     size="small"
                     sx={{
@@ -300,6 +302,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
+                    key={option.id}
                     label={option.name}
                     size="small"
                     color="success"
@@ -329,6 +332,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
+                    key={option.id}
                     label={option.name}
                     size="small"
                     color="error"

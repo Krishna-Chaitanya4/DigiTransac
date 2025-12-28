@@ -52,7 +52,7 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
   const [preview, setPreview] = useState<ParsedTransaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'input' | 'preview' | 'result'>('input');
-  const [importResult, setImportResult] = useState<any>(null);
+  const [importResult, setImportResult] = useState<{ created?: number; failed?: number } | null>(null);
 
   const handlePreview = async () => {
     if (!smsText.trim()) {
@@ -87,8 +87,9 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
         setPreview(response.data.transactions);
         setStep('preview');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to parse SMS messages');
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to parse SMS messages');
     } finally {
       setLoading(false);
     }
@@ -117,8 +118,9 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
 
       setImportResult(response.data);
       setStep('result');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to import transactions');
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to import transactions');
     } finally {
       setLoading(false);
     }

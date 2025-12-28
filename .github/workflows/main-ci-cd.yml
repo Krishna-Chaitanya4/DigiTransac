@@ -17,27 +17,27 @@ env:
   RESOURCE_GROUP: rg-digitransac
   BACKEND_CONTAINER_APP: digitransac-backend
   FRONTEND_CONTAINER_APP: digitransac-frontend
+  # Dependency strictness: BALANCED (allows 1 version behind) | STRICT (must be latest)
+  STRICTNESS: STRICT
 
 jobs:
-  ci-cd-pipeline:
-    name: CI/CD Pipeline
+  # ==================== STAGE 1: VALIDATION ====================
+  
+  validation:
+    name: 📌 Validation
     runs-on: ubuntu-latest
     
     steps:
-    # ==================== STAGE 1: CHECKOUT ====================
-    
-    - name: 📥 Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
     
-    # ==================== STAGE 2: VERSION VALIDATION ====================
-    
-    - name: 📌 Fetch main branch (PR only)
-      if: github.event_name == 'pull_request'
+    - name: Fetch main branch (PR only)
+      if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
       run: git fetch origin main:main
     
-    - name: 📌 Get current versions
+    - name: Get current versions
       id: current
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
@@ -45,8 +45,8 @@ jobs:
         echo "backend=$BACKEND_VERSION" >> $GITHUB_OUTPUT
         echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
     
-    - name: 📌 Get main branch versions (PR only)
-      if: github.event_name == 'pull_request'
+    - name: Get main branch versions (PR only)
+      if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
       id: main
       run: |
         BACKEND_VERSION=$(git show main:backend/VERSION)
@@ -54,7 +54,7 @@ jobs:
         echo "backend=$BACKEND_VERSION" >> $GITHUB_OUTPUT
         echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
     
-    - name: 📌 Compare versions (PR only)
+    - name: Compare versions (PR only)
       if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
       run: |
         echo "🔍 Version Comparison"
@@ -75,7 +75,7 @@ jobs:
         
         echo "✅ Both versions have been updated"
     
-    - name: 📌 Check version consistency
+    - name: Check version consistency
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
         FRONTEND_VERSION=$(cat frontend/VERSION)
@@ -94,7 +94,7 @@ jobs:
         
         echo "✅ Version files are consistent"
     
-    - name: 📌 Check CHANGELOG updated (PR only)
+    - name: Check CHANGELOG updated (PR only)
       if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
@@ -105,7 +105,7 @@ jobs:
           exit 1
         fi
     
-    - name: 📌 Validate semantic versioning
+    - name: Validate semantic versioning
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
         if [[ ! $BACKEND_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -113,10 +113,19 @@ jobs:
           exit 1
         fi
         echo "✅ Valid semantic version: v$BACKEND_VERSION"
+
+  # ==================== STAGE 2: SECURITY ====================
+  
+  security:
+    name: 🔐 Security
+    runs-on: ubuntu-latest
+    needs: validation
     
-    # ==================== STAGE 3: SECURITY VALIDATION ====================
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
     
-    - name: 🔐 Check for hardcoded secrets
+    - name: Check for hardcoded secrets
       run: |
         echo "🔍 Scanning for hardcoded secrets..."
         
@@ -130,7 +139,7 @@ jobs:
         
         echo "✅ No hardcoded secrets found"
     
-    - name: 🔐 Verify Key Vault references
+    - name: Verify Key Vault references
       run: |
         echo "🔍 Verifying Key Vault integration..."
         
@@ -140,46 +149,201 @@ jobs:
           echo "✅ Key Vault service properly integrated"
         fi
     
-    - name: 🛡️ Dependency scan - Backend
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    
+    - name: Dependency audit - Backend (strict)
       run: |
         cd backend
-        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
+        echo "🔍 Checking for high/critical vulnerabilities..."
+        npm audit --audit-level=high
     
-    - name: 🛡️ Dependency scan - Frontend
+    - name: Dependency audit - Frontend (strict)
       run: |
         cd frontend
-        npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"
+        echo "🔍 Checking for high/critical vulnerabilities..."
+        npm audit --audit-level=high
     
-    # ==================== STAGE 4: BACKEND BUILD & TEST ====================
+    - name: Check for deprecated packages
+      run: |
+        echo "📦 Checking for deprecated packages..."
+        cd backend
+        npx check-is-deprecated || echo "⚠️ Deprecated packages found in backend"
+        cd ../frontend
+        npx check-is-deprecated || echo "⚠️ Deprecated packages found in frontend"
     
-    - name: 🔨 Setup Node.js for Backend
+    - name: Check for outdated packages
+      run: |
+        echo "🔍 Checking for major outdated dependencies..."
+        cd backend
+        echo "Backend:"
+        npm outdated --long || echo "Some packages are outdated"
+        cd ../frontend
+        echo "Frontend:"
+        npm outdated --long || echo "Some packages are outdated"
+      continue-on-error: true
+    
+    - name: Check for severely outdated packages (2+ major versions)
+      # STRICTNESS controlled at workflow level (top env section)
+      # BALANCED: allows 1 version behind | STRICT: must be latest
+      run: |
+        cd backend
+        OUTDATED=$(npm outdated --json || echo '{}')
+        
+        if [ "$STRICTNESS" = "STRICT" ]; then
+          echo "🔒 STRICT MODE: Checking for ANY outdated packages..."
+          echo "$OUTDATED" | node -e "
+            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            const outdated = Object.entries(data);
+            if (outdated.length > 0) {
+              console.log('❌ Outdated packages found (strict mode):');
+              outdated.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
+              process.exit(1);
+            }
+            console.log('✅ All packages are on latest version');
+          "
+        else
+          echo "⚖️ BALANCED MODE: Checking for severely outdated (2+ major versions)..."
+          echo "$OUTDATED" | node -e "
+            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            const severe = Object.entries(data).filter(([_, v]) => {
+              const current = v.current?.split('.')[0] || '0';
+              const latest = v.latest?.split('.')[0] || '0';
+              return parseInt(latest) - parseInt(current) >= 2;
+            });
+            if (severe.length > 0) {
+              console.log('❌ Severely outdated packages (2+ major versions behind):');
+              severe.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
+              process.exit(1);
+            }
+            console.log('✅ No severely outdated packages');
+          "
+        fi
+        
+        cd ../frontend
+        OUTDATED=$(npm outdated --json || echo '{}')
+        
+        if [ "$STRICTNESS" = "STRICT" ]; then
+          echo "🔒 STRICT MODE: Checking for ANY outdated packages..."
+          echo "$OUTDATED" | node -e "
+            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            const outdated = Object.entries(data);
+            if (outdated.length > 0) {
+              console.log('❌ Outdated packages found (strict mode):');
+              outdated.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
+              process.exit(1);
+            }
+            console.log('✅ All packages are on latest version');
+          "
+        else
+          echo "⚖️ BALANCED MODE: Checking for severely outdated (2+ major versions)..."
+          echo "$OUTDATED" | node -e "
+            const data = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            const severe = Object.entries(data).filter(([_, v]) => {
+              const current = v.current?.split('.')[0] || '0';
+              const latest = v.latest?.split('.')[0] || '0';
+              return parseInt(latest) - parseInt(current) >= 2;
+            });
+            if (severe.length > 0) {
+              console.log('❌ Severely outdated packages (2+ major versions behind):');
+              severe.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
+              process.exit(1);
+            }
+            console.log('✅ No severely outdated packages');
+          "
+        fi
+    
+    - name: License compliance check
+      run: |
+        echo "🔍 Checking license compliance..."
+        cd backend
+        npm install --package-lock-only
+        npx license-checker --summary
+        cd ../frontend
+        npm install --package-lock-only
+        npx license-checker --summary
+        echo "✅ License check complete"
+
+  # ==================== STAGE 3: BUILD & TEST (PARALLEL) ====================
+  
+  backend-build-test:
+    name: 🔨 Backend Build & Test
+    runs-on: ubuntu-latest
+    needs: [validation, security]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: backend/package-lock.json
     
-    - name: 🔨 Install backend dependencies
+    - name: Install dependencies
       run: |
         cd backend
         npm ci
     
-    - name: 🔨 Run backend linter
+    - name: Check code formatting
       run: |
         cd backend
-        npm run lint
+        npm run format:check
     
-    - name: 🔨 Check TypeScript compilation
+    - name: Run linter (strict)
+      run: |
+        cd backend
+        npm run lint -- --max-warnings 0
+    
+    - name: Check TypeScript compilation
       run: |
         cd backend
         npm run build
     
-    - name: 🔨 Run backend tests
+    - name: Run tests with coverage
       run: |
         cd backend
-        npm test -- --coverage
+        npm test -- --coverage --coverageReporters=json-summary
     
-    - name: 🔨 Upload backend coverage
+    - name: Check coverage threshold (strict)
+      run: |
+        cd backend
+        COVERAGE_LINES=$(node -p "require('./coverage/coverage-summary.json').total.lines.pct")
+        COVERAGE_BRANCHES=$(node -p "require('./coverage/coverage-summary.json').total.branches.pct")
+        COVERAGE_FUNCTIONS=$(node -p "require('./coverage/coverage-summary.json').total.functions.pct")
+        COVERAGE_STATEMENTS=$(node -p "require('./coverage/coverage-summary.json').total.statements.pct")
+        
+        echo "📊 Code Coverage:"
+        echo "  Lines:      ${COVERAGE_LINES}%"
+        echo "  Branches:   ${COVERAGE_BRANCHES}%"
+        echo "  Functions:  ${COVERAGE_FUNCTIONS}%"
+        echo "  Statements: ${COVERAGE_STATEMENTS}%"
+        
+        FAILED=0
+        if (( $(echo "$COVERAGE_LINES < 70" | bc -l) )); then
+          echo "❌ Line coverage below 70% threshold"
+          FAILED=1
+        fi
+        if (( $(echo "$COVERAGE_BRANCHES < 60" | bc -l) )); then
+          echo "❌ Branch coverage below 60% threshold"
+          FAILED=1
+        fi
+        if (( $(echo "$COVERAGE_FUNCTIONS < 70" | bc -l) )); then
+          echo "❌ Function coverage below 70% threshold"
+          FAILED=1
+        fi
+        
+        if [ $FAILED -eq 1 ]; then
+          exit 1
+        fi
+        
+        echo "✅ All coverage thresholds met"
+    
+    - name: Upload coverage
       uses: codecov/codecov-action@v3
       if: always()
       with:
@@ -187,66 +351,180 @@ jobs:
         flags: backend
         name: backend-coverage
     
-    - name: 🔨 Build backend Docker image
+    - name: Build Docker image
       run: |
         cd backend
-        docker build -t backend-test:${{ github.sha }} .
-        echo "✅ Backend Docker image built successfully"
+        docker build -t ${{ env.BACKEND_IMAGE }}:${{ github.sha }} .
+        echo "✅ Backend Docker image built"
     
-    # ==================== STAGE 5: FRONTEND BUILD & TEST ====================
+    - name: Save Docker image
+      run: |
+        docker save ${{ env.BACKEND_IMAGE }}:${{ github.sha }} -o /tmp/backend-image.tar
     
-    - name: 🎨 Setup Node.js for Frontend
+    - name: Upload Docker image artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-image
+        path: /tmp/backend-image.tar
+        retention-days: 1
+
+  frontend-build-test:
+    name: 🎨 Frontend Build & Test
+    runs-on: ubuntu-latest
+    needs: [validation, security]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
     
-    - name: 🎨 Install frontend dependencies
+    - name: Install dependencies
       run: |
         cd frontend
         npm ci
     
-    - name: 🎨 Run frontend linter
+    - name: Check code formatting
       run: |
         cd frontend
-        npm run lint || echo "⚠️ No lint script found"
-      continue-on-error: true
+        npm run format:check
     
-    - name: 🎨 Build frontend
+    - name: Run linter (strict)
+      run: |
+        cd frontend
+        npm run lint -- --max-warnings 0
+    
+    - name: Build frontend
       run: |
         cd frontend
         npm run build
     
-    - name: 🎨 Check build size
+    - name: Check bundle size
       run: |
         cd frontend/dist
-        SIZE=$(du -sh . | cut -f1)
-        echo "## 📦 Build Size: $SIZE" >> $GITHUB_STEP_SUMMARY
+        TOTAL_SIZE=$(du -sb . | cut -f1)
+        SIZE_MB=$(echo "scale=2; $TOTAL_SIZE / 1024 / 1024" | bc)
+        
+        echo "## 📦 Build Size: ${SIZE_MB}MB" >> $GITHUB_STEP_SUMMARY
         du -h --max-depth=1 . >> $GITHUB_STEP_SUMMARY
+        
+        # Alert if bundle is too large (>10MB)
+        if (( $(echo "$SIZE_MB > 10" | bc -l) )); then
+          echo "⚠️ Warning: Bundle size exceeds 10MB"
+        fi
     
-    # ==================== STAGE 6: DEPLOY BACKEND (Main Branch Only) ====================
+    - name: Build Docker image
+      run: |
+        cd frontend
+        docker build -t ${{ env.FRONTEND_IMAGE }}:${{ github.sha }} .
+        echo "✅ Frontend Docker image built"
     
-    - name: 🚀 Deploy Backend - Log in to Azure
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Save Docker image
+      run: |
+        docker save ${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -o /tmp/frontend-image.tar
+    
+    - name: Upload Docker image artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-image
+        path: /tmp/frontend-image.tar
+        retention-days: 1
+
+  # ==================== STAGE 4: CONTAINER SECURITY ====================
+  
+  container-security:
+    name: 🛡️ Container Security Scan
+    runs-on: ubuntu-latest
+    needs: [backend-build-test, frontend-build-test]
+    
+    steps:
+    - name: Download backend image
+      uses: actions/download-artifact@v4
+      with:
+        name: backend-image
+        path: /tmp
+    
+    - name: Download frontend image
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-image
+        path: /tmp
+    
+    - name: Load Docker images
+      run: |
+        docker load -i /tmp/backend-image.tar
+        docker load -i /tmp/frontend-image.tar
+    
+    - name: Run Trivy scan - Backend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'backend-trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+    
+    - name: Run Trivy scan - Frontend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'frontend-trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+    
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: '.'
+        category: 'container-security'
+
+  # ==================== STAGE 5: DEPLOY BACKEND ====================
+  
+  deploy-backend:
+    name: 🚀 Deploy Backend
+    runs-on: ubuntu-latest
+    needs: [backend-build-test, container-security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version
+      id: version
+      run: |
+        VERSION=$(cat backend/VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Deploying Backend v$VERSION"
+    
+    - name: Log in to Azure
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
     
-    - name: 🚀 Deploy Backend - Log in to ACR
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Log in to ACR
       run: az acr login --name herdswebsiteacr
     
-    - name: 🚀 Deploy Backend - Build and push image
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Download backend image
+      uses: actions/download-artifact@v4
+      with:
+        name: backend-image
+        path: /tmp
+    
+    - name: Load and push Docker image
       run: |
-        cd backend
-        VERSION=$(cat VERSION)
+        docker load -i /tmp/backend-image.tar
+        VERSION=${{ steps.version.outputs.VERSION }}
         IMAGE_TAG="${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${VERSION}"
         IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest"
         
-        echo "Building backend v${VERSION}..."
-        docker build -t ${IMAGE_TAG} -t ${IMAGE_TAG_LATEST} .
+        docker tag ${{ env.BACKEND_IMAGE }}:${{ github.sha }} ${IMAGE_TAG}
+        docker tag ${{ env.BACKEND_IMAGE }}:${{ github.sha }} ${IMAGE_TAG_LATEST}
         
         echo "Pushing to ACR..."
         docker push ${IMAGE_TAG}
@@ -255,8 +533,7 @@ jobs:
         echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
         echo "VERSION=${VERSION}" >> $GITHUB_ENV
     
-    - name: 🚀 Deploy Backend - Update Container App
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Update Container App
       run: |
         echo "Deploying backend v${VERSION}..."
         
@@ -270,19 +547,49 @@ jobs:
         echo "## 🚀 Backend Deployed" >> $GITHUB_STEP_SUMMARY
         echo "- Version: v${VERSION}" >> $GITHUB_STEP_SUMMARY
         echo "- Image: ${IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
+
+  # ==================== STAGE 6: DEPLOY FRONTEND ====================
+  
+  deploy-frontend:
+    name: 🎨 Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [frontend-build-test, container-security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
-    # ==================== STAGE 7: DEPLOY FRONTEND (Main Branch Only) ====================
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
     
-    - name: 🎨 Deploy Frontend - Build and push image
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Get version
+      id: version
       run: |
-        cd frontend
-        VERSION=$(cat VERSION)
+        VERSION=$(cat frontend/VERSION)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Deploying Frontend v$VERSION"
+    
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Log in to ACR
+      run: az acr login --name herdswebsiteacr
+    
+    - name: Download frontend image
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-image
+        path: /tmp
+    
+    - name: Load and push Docker image
+      run: |
+        docker load -i /tmp/frontend-image.tar
+        VERSION=${{ steps.version.outputs.VERSION }}
         IMAGE_TAG="${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${VERSION}"
         IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest"
         
-        echo "Building frontend v${VERSION}..."
-        docker build -t ${IMAGE_TAG} -t ${IMAGE_TAG_LATEST} .
+        docker tag ${{ env.FRONTEND_IMAGE }}:${{ github.sha }} ${IMAGE_TAG}
+        docker tag ${{ env.FRONTEND_IMAGE }}:${{ github.sha }} ${IMAGE_TAG_LATEST}
         
         echo "Pushing to ACR..."
         docker push ${IMAGE_TAG}
@@ -291,8 +598,7 @@ jobs:
         echo "FRONTEND_IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
         echo "FRONTEND_VERSION=${VERSION}" >> $GITHUB_ENV
     
-    - name: 🎨 Deploy Frontend - Update Container App
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Update Container App
       run: |
         echo "Deploying frontend v${FRONTEND_VERSION}..."
         
@@ -306,14 +612,3 @@ jobs:
         echo "## 🎨 Frontend Deployed" >> $GITHUB_STEP_SUMMARY
         echo "- Version: v${FRONTEND_VERSION}" >> $GITHUB_STEP_SUMMARY
         echo "- Image: ${FRONTEND_IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
-    
-    # ==================== FINAL SUMMARY ====================
-    
-    - name: 📊 Pipeline Summary
-      if: always()
-      run: |
-        echo "## 📊 Pipeline Complete" >> $GITHUB_STEP_SUMMARY
-        echo "- Event: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Backend: v${{ steps.current.outputs.backend }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Frontend: v${{ steps.current.outputs.frontend }}" >> $GITHUB_STEP_SUMMARY
