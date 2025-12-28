@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.3.1] - 2025-12-28
+
+### Fixed
+- **502 Bad Gateway**: Use internal service communication instead of external FQDN
+- Changed nginx proxy from `https://digitransac-backend.nicemeadow...` to `http://digitransac-backend`
+- Industry standard: Service-to-service communication within same Container Apps Environment
+- Fixes login and all API requests getting 502 errors
+
+### Changed
+- Dependabot: Skip version checks for bot PRs
+- Dependabot: Group dependencies (reduces PR spam)
+- Dependabot: GitHub Actions updates monthly instead of weekly
+
 ## [1.2.10] - 2025-12-28
 
 ### Fixed

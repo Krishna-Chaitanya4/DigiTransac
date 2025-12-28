@@ -55,7 +55,7 @@ jobs:
         echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
     
     - name: 📌 Compare versions (PR only)
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
       run: |
         echo "🔍 Version Comparison"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -95,7 +95,7 @@ jobs:
         echo "✅ Version files are consistent"
     
     - name: 📌 Check CHANGELOG updated (PR only)
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
       run: |
         BACKEND_VERSION=$(cat backend/VERSION)
         if grep -q "\[$BACKEND_VERSION\]" CHANGELOG.md; then
