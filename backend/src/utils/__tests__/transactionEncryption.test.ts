@@ -5,7 +5,13 @@ import { logger } from '../logger';
 
 // Mock dependencies
 jest.mock('../../services/encryption.service');
-jest.mock('../logger');
+jest.mock('../logger', () => ({
+  logger: {
+    warn: jest.fn(),
+    info: jest.fn(),
+    error: jest.fn(),
+  },
+}));
 
 describe('TransactionEncryption', () => {
   const mockTransaction: Partial<Transaction> = {
@@ -73,12 +79,12 @@ describe('TransactionEncryption', () => {
 
     it('should handle empty description', () => {
       const txWithEmptyDesc = { ...mockTransaction, description: '' };
-      (encryptionService.encrypt as jest.Mock).mockReturnValue('encrypted-empty');
 
       const result = encryptTransaction(txWithEmptyDesc);
 
-      expect(encryptionService.encrypt).toHaveBeenCalledWith('');
-      expect(result.description).toBe('encrypted-empty');
+      // Empty string should not be encrypted (no meaningful data)
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+      expect(result.description).toBe('');
     });
 
     it('should handle zero amount', () => {
