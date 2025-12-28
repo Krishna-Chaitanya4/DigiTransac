@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -544,7 +544,7 @@ const Analytics: React.FC = () => {
             }}
           >
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
+            <Grid size={{ md: 4, xs: 12 }}>
               <TextField
                 select
                 fullWidth
@@ -562,7 +562,7 @@ const Analytics: React.FC = () => {
             </Grid>
             {dateRangeType === 'custom' && (
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ md: 4, xs: 12 }}>
                   <ModernDatePicker
                     label="Start Date"
                     value={startDate}
@@ -570,7 +570,7 @@ const Analytics: React.FC = () => {
                     fullWidth
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ md: 4, xs: 12 }}>
                   <ModernDatePicker
                     label="End Date"
                     value={endDate}
@@ -593,7 +593,7 @@ const Analytics: React.FC = () => {
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={400}>
             <Card sx={{
               borderRadius: 3,
@@ -632,7 +632,7 @@ const Analytics: React.FC = () => {
             </Card>
           </Zoom>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={500}>
             <Card sx={{
               borderRadius: 3,
@@ -671,7 +671,7 @@ const Analytics: React.FC = () => {
             </Card>
           </Zoom>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={600}>
             <Card sx={{
               borderRadius: 3,
@@ -716,7 +716,7 @@ const Analytics: React.FC = () => {
             </Card>
           </Zoom>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={700}>
             <Card sx={{
               borderRadius: 3,
@@ -797,7 +797,7 @@ const Analytics: React.FC = () => {
                 <XAxis dataKey="month" stroke="#666" />
                 <YAxis stroke="#666" />
                 <RechartsTooltip
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''}
                   contentStyle={{
                     borderRadius: 8,
                     border: '1px solid rgba(0,0,0,0.1)',
@@ -843,7 +843,7 @@ const Analytics: React.FC = () => {
       {/* 2 & 3: Category Breakdown and Daily Spending */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {/* Category Breakdown Pie */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1200}>
             <Paper sx={{
               p: 3,
@@ -885,7 +885,7 @@ const Analytics: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={(entry) => `${entry.percentage.toFixed(0)}%`}
+                        label={(entry) => `${(entry.percent || 0).toFixed(0)}%`}
                         outerRadius={100}
                         fill="#8884d8"
                         dataKey="value"
@@ -894,7 +894,7 @@ const Analytics: React.FC = () => {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
+                      <RechartsTooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''} />
                     </PieChart>
                   </ResponsiveContainer>
                 </ResponsiveChart>
@@ -924,7 +924,7 @@ const Analytics: React.FC = () => {
         </Grid>
 
         {/* Daily Spending Bar Chart */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1300}>
             <Paper sx={{
               p: 3,
@@ -964,7 +964,7 @@ const Analytics: React.FC = () => {
                     <XAxis dataKey="day" stroke="#666" />
                     <YAxis stroke="#666" />
                     <RechartsTooltip
-                      formatter={(value: number) => formatCurrency(value)}
+                      formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''}
                       contentStyle={{
                         borderRadius: 8,
                         border: '1px solid rgba(0,0,0,0.1)',
@@ -1024,7 +1024,7 @@ const Analytics: React.FC = () => {
                 <XAxis dataKey="name" stroke="#666" />
                 <YAxis stroke="#666" />
                 <RechartsTooltip
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''}
                   contentStyle={{
                     borderRadius: 8,
                     border: '1px solid rgba(0,0,0,0.1)',
@@ -1043,7 +1043,7 @@ const Analytics: React.FC = () => {
       {/* 5 & 6: Tables */}
       <Grid container spacing={3}>
         {/* Top Merchants */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1500}>
             <Paper sx={{
               p: 3,
@@ -1107,7 +1107,7 @@ const Analytics: React.FC = () => {
         </Grid>
 
         {/* Month-over-Month */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1600}>
             <Paper sx={{
               p: 3,

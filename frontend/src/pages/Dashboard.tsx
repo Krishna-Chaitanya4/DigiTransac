@@ -664,7 +664,7 @@ const Dashboard: React.FC = () => {
         {/* Stats Cards Skeleton */}
         <Grid container spacing={3} mb={3}>
           {[1, 2, 3, 4, 5].map((i) => (
-            <Grid item xs={12} sm={6} md={4} lg={2.4} key={i}>
+            <Grid size={{ sm: 6, xs: 12, md: 4 }}key={i}>
               <Skeleton 
                 variant="rectangular" 
                 height={180} 
@@ -677,7 +677,7 @@ const Dashboard: React.FC = () => {
 
         {/* Content Skeleton */}
         <Grid container spacing={3}>
-          <Grid item xs={12} md={7}>
+          <Grid size={{ md: 7, xs: 12 }}>
             <Skeleton 
               variant="rectangular" 
               height={450} 
@@ -685,7 +685,7 @@ const Dashboard: React.FC = () => {
               animation="wave"
             />
           </Grid>
-          <Grid item xs={12} md={5}>
+          <Grid size={{ md: 5, xs: 12 }}>
             <Skeleton 
               variant="rectangular" 
               height={450} 
@@ -872,7 +872,7 @@ const Dashboard: React.FC = () => {
       {/* Stats Cards */}
       <Grid container spacing={3} mb={3}>
         {statCards.map((stat, index) => (
-          <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
+          <Grid size={{ sm: 6, xs: 12, md: 4 }}key={index}>
             <Zoom in timeout={400 + index * 100}>
               <Card
                 sx={{
@@ -1025,7 +1025,7 @@ const Dashboard: React.FC = () => {
 
       {/* Budget Status & Recent Activity */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid item xs={12} md={5}>
+        <Grid size={{ md: 5, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1110,7 +1110,7 @@ const Dashboard: React.FC = () => {
                     }
 
                     return (
-                      <Grid item xs={12} key={account.id}>
+                      <Grid size={{ xs: 12 }}key={account.id}>
                         <Box
                           sx={{
                             p: 2,
@@ -1224,7 +1224,7 @@ const Dashboard: React.FC = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={7}>
+        <Grid size={{ md: 7, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1348,7 +1348,7 @@ const Dashboard: React.FC = () => {
       {/* Financial Health Score & Quick Actions */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* Financial Health Score */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 4,
@@ -1496,7 +1496,7 @@ const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Quick Actions */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1583,7 +1583,7 @@ const Dashboard: React.FC = () => {
       {/* Budget Progress & Upcoming Recurring */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* Budget Progress Bars */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1669,7 +1669,7 @@ const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Upcoming Recurring Transactions */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 3,

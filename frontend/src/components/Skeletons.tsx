@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Box, Card, CardContent, Skeleton, Grid } from '@mui/material';
 
 const DashboardCardSkeletonComponent: React.FC = () => {
@@ -90,7 +90,7 @@ const GridSkeletonComponent: React.FC<GridSkeletonProps> = ({ count = 4, compone
   return (
     <Grid container spacing={3}>
       {Array.from({ length: count }).map((_, index) => (
-        <Grid item xs={12} sm={6} md={3} key={index}>
+        <Grid size={{ sm: 6, xs: 12, md: 3 }}key={index}>
           <Component />
         </Grid>
       ))}

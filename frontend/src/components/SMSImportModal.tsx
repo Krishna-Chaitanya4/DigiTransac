@@ -52,7 +52,9 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
   const [preview, setPreview] = useState<ParsedTransaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'input' | 'preview' | 'result'>('input');
-  const [importResult, setImportResult] = useState<{ created?: number; failed?: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ 
+    summary: { created: number; duplicates: number; failed: number } 
+  } | null>(null);
 
   const handlePreview = async () => {
     if (!smsText.trim()) {

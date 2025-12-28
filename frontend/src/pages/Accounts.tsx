@@ -595,7 +595,7 @@ const Accounts: React.FC = () => {
       : 'No activity';
 
     return (
-      <Grid item xs={12} md={6} lg={4} key={account.id}>
+      <Grid size={{ lg: 4, xs: 12, md: 6 }}key={account.id}>
         <Card
           sx={{
             height: '100%',
@@ -700,7 +700,7 @@ const Accounts: React.FC = () => {
                     THIS MONTH
                   </Typography>
                   <Grid container spacing={1} mt={0.5}>
-                    <Grid item xs={4}>
+                    <Grid size={{ xs: 4 }}>
                       <Typography variant="caption" color="text.secondary">
                         In
                       </Typography>
@@ -708,7 +708,7 @@ const Accounts: React.FC = () => {
                         +{formatCurrency(balance.thisMonthCredits, account.currency)}
                       </Typography>
                     </Grid>
-                    <Grid item xs={4}>
+                    <Grid size={{ xs: 4 }}>
                       <Typography variant="caption" color="text.secondary">
                         Out
                       </Typography>
@@ -716,7 +716,7 @@ const Accounts: React.FC = () => {
                         -{formatCurrency(balance.thisMonthDebits, account.currency)}
                       </Typography>
                     </Grid>
-                    <Grid item xs={4}>
+                    <Grid size={{ xs: 4 }}>
                       <Typography variant="caption" color="text.secondary">
                         Net
                       </Typography>
@@ -1232,7 +1232,7 @@ const Accounts: React.FC = () => {
 
       {/* Summary Cards */}
       <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ md: 4, xs: 12 }}>
           <Zoom in timeout={900}>
             <Card sx={{
               borderRadius: 3,
@@ -1274,7 +1274,7 @@ const Accounts: React.FC = () => {
             </Card>
           </Zoom>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ md: 4, xs: 12 }}>
           <Zoom in timeout={1000}>
             <Card sx={{
               borderRadius: 3,
@@ -1316,7 +1316,7 @@ const Accounts: React.FC = () => {
             </Card>
           </Zoom>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ md: 4, xs: 12 }}>
           <Zoom in timeout={1100}>
             <Card sx={{
               borderRadius: 3,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Container,
@@ -235,7 +235,7 @@ const Login: React.FC = () => {
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, px: { xs: 2, sm: 3 } }}>
         <Grid container spacing={{ xs: 0, md: 4 }} alignItems="center">
           {/* Left Side - Features */}
-          <Grid item xs={12} md={6} sx={{ display: { xs: 'none', md: 'block' } }}>
+          <Grid size={{ md: 6, xs: 12 }}sx={{ display: { xs: 'none', md: 'block' } }}>
               <Fade in timeout={800}>
                 <Box>
                   {/* App Branding */}
@@ -424,7 +424,7 @@ const Login: React.FC = () => {
           </Grid>
 
           {/* Right Side - Login Form */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ md: 6, xs: 12 }}>
             <Fade in timeout={600}>
               <Paper
                 elevation={0}

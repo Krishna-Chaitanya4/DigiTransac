@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -221,7 +221,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
       <Collapse in={expanded}>
         <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -240,7 +240,6 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
-                    key={option.id}
                     label={option.name}
                     size="small"
                     {...getTagProps({ index })}
@@ -250,7 +249,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -269,7 +268,6 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
-                    key={option.id}
                     label={option.name}
                     size="small"
                     sx={{
@@ -283,7 +281,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -302,7 +300,6 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
-                    key={option.id}
                     label={option.name}
                     size="small"
                     color="success"
@@ -313,7 +310,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -332,7 +329,6 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip
-                    key={option.id}
                     label={option.name}
                     size="small"
                     color="error"
@@ -344,7 +340,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           </Grid>
 
           {showTransactionType && (
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ sm: 6, xs: 12, md: 3 }}>
               <ToggleButtonGroup
                 size="small"
                 value={filters.transactionType}
@@ -367,7 +363,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           )}
 
           {/* Amount Range Filters */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Box>
               <ToggleButtonGroup
                 size="small"
@@ -420,7 +416,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
           {filters.amountRange.quickFilter === 'custom' && (
             <>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                 <TextField
                   label="Min Amount"
                   type="number"
@@ -442,7 +438,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                 <TextField
                   label="Max Amount"
                   type="number"

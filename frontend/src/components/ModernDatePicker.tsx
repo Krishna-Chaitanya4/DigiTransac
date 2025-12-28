@@ -1,5 +1,5 @@
 import React from 'react';
-import { DatePicker, DatePickerProps } from '@mui/x-date-pickers/DatePicker';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { styled } from '@mui/material/styles';
 import { Dayjs } from 'dayjs';
 
@@ -25,13 +25,17 @@ const StyledDatePicker = styled(DatePicker)(({ theme }) => ({
   },
 })) as typeof DatePicker;
 
-interface ModernDatePickerProps extends Omit<DatePickerProps<Dayjs>, 'renderInput'> {
+interface ModernDatePickerProps {
   label?: string;
   error?: boolean;
   helperText?: string;
   fullWidth?: boolean;
   required?: boolean;
   format?: string;
+  value?: Dayjs | null;
+  onChange?: (value: Dayjs | null) => void;
+  maxDate?: Dayjs;
+  minDate?: Dayjs;
 }
 
 export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({

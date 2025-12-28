@@ -29,7 +29,7 @@ const InstallPWA: React.FC = () => {
     if (!deferredPrompt) return;
 
     deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    await deferredPrompt.userChoice;
     
     // User accepted: outcome === 'accepted'
     // User dismissed: outcome === 'dismissed'

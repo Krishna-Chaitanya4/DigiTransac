@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Container,
@@ -380,7 +380,7 @@ const Register: React.FC = () => {
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
         <Grid container spacing={0} sx={{ minHeight: { md: '90vh' } }}>
           {/* Left Side - Features */}
-          <Grid item xs={12} md={5} sx={{ display: { xs: 'none', md: 'block' } }}>
+          <Grid size={{ md: 5, xs: 12 }}sx={{ display: { xs: 'none', md: 'block' } }}>
               <Fade in timeout={800}>
                 <Box
                   sx={{
@@ -465,7 +465,7 @@ const Register: React.FC = () => {
           </Grid>
 
           {/* Right Side - Registration Form */}
-          <Grid item xs={12} md={7}>
+          <Grid size={{ md: 7, xs: 12 }}>
             <Fade in timeout={600}>
               <Box
                 sx={{
@@ -534,7 +534,7 @@ const Register: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <Grid container spacing={3}>
               {/* Contact Method Tabs */}
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <Tabs
                   value={contactMethod}
                   onChange={(_, newValue) => setContactMethod(newValue)}
@@ -565,7 +565,7 @@ const Register: React.FC = () => {
 
               {/* Email or Phone Field */}
               {contactMethod === 'email' ? (
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <TextField
                     fullWidth
                     label="Email Address"
@@ -595,7 +595,7 @@ const Register: React.FC = () => {
                   />
                 </Grid>
               ) : (
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <TextField
                     fullWidth
                     label="Phone Number"
@@ -642,7 +642,7 @@ const Register: React.FC = () => {
               )}
 
               {/* Username */}
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Username"
@@ -670,7 +670,7 @@ const Register: React.FC = () => {
               </Grid>
 
               {/* Full Name */}
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Full Name"
@@ -696,7 +696,7 @@ const Register: React.FC = () => {
               </Grid>
 
               {/* Date of Birth (Optional) */}
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <ModernDatePicker
                     label="Date of Birth"
@@ -708,7 +708,7 @@ const Register: React.FC = () => {
                 </LocalizationProvider>
               </Grid>
               {/* Currency */}
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   select
@@ -730,7 +730,7 @@ const Register: React.FC = () => {
                   ))}
                 </TextField>
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Password"
@@ -823,7 +823,7 @@ const Register: React.FC = () => {
                   </Box>
                 )}
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Confirm Password"
@@ -842,7 +842,7 @@ const Register: React.FC = () => {
                   }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <FormControlLabel
                   control={
                     <Checkbox

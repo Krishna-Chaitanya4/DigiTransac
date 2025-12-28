@@ -900,7 +900,7 @@ const Budgets: React.FC = () => {
         </Box>
         <Grid container spacing={3}>
           {[...Array(4)].map((_, index) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={index} sx={{ display: { xs: index >= 2 ? 'none' : 'block', sm: 'block' } }}>
+            <Grid size={{ lg: 3, sm: 6, xs: 12, md: 4 }}key={index} sx={{ display: { xs: index >= 2 ? 'none' : 'block', sm: 'block' } }}>
               <BudgetCardSkeleton />
             </Grid>
           ))}
@@ -1051,7 +1051,7 @@ const Budgets: React.FC = () => {
             <CardContent sx={{ position: 'relative', zIndex: 1 }}>
             <Grid container spacing={3}>
               {/* Total Budgeted */}
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ sm: 3, xs: 6 }}>
                 <Box>
                   <Typography variant="caption" sx={{ opacity: 0.9 }}>
                     Total Budgeted
@@ -1066,7 +1066,7 @@ const Budgets: React.FC = () => {
               </Grid>
 
               {/* Total Spent */}
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ sm: 3, xs: 6 }}>
                 <Box>
                   <Typography variant="caption" sx={{ opacity: 0.9 }}>
                     Total Spent
@@ -1081,7 +1081,7 @@ const Budgets: React.FC = () => {
               </Grid>
 
               {/* Remaining */}
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ sm: 3, xs: 6 }}>
                 <Box>
                   <Typography variant="caption" sx={{ opacity: 0.9 }}>
                     Remaining
@@ -1096,7 +1096,7 @@ const Budgets: React.FC = () => {
               </Grid>
 
               {/* Budget Health */}
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ sm: 3, xs: 6 }}>
                 <Box>
                   <Typography variant="caption" sx={{ opacity: 0.9 }}>
                     Budget Health
@@ -1152,7 +1152,7 @@ const Budgets: React.FC = () => {
           }}>
           <Grid container spacing={2} alignItems="center">
             {/* Search */}
-            <Grid item xs={12} md={4}>
+            <Grid size={{ md: 4, xs: 12 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -1177,7 +1177,7 @@ const Budgets: React.FC = () => {
             </Grid>
 
             {/* Status Filter */}
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ sm: 6, xs: 12, md: 4 }}>
               <TextField
                 select
                 fullWidth
@@ -1201,7 +1201,7 @@ const Budgets: React.FC = () => {
             </Grid>
 
             {/* Sort By */}
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ sm: 6, xs: 12, md: 4 }}>
               <TextField
                 select
                 fullWidth
@@ -1302,7 +1302,7 @@ const Budgets: React.FC = () => {
 
             {/* Feature Highlights */}
             <Grid container spacing={3} mt={4} maxWidth="800px" mx="auto">
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ sm: 4, xs: 12 }}>
                 <Box>
                   <Typography variant="h6" gutterBottom>📊 Track Spending</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -1310,7 +1310,7 @@ const Budgets: React.FC = () => {
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ sm: 4, xs: 12 }}>
                 <Box>
                   <Typography variant="h6" gutterBottom>🎯 Set Goals</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -1318,7 +1318,7 @@ const Budgets: React.FC = () => {
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ sm: 4, xs: 12 }}>
                 <Box>
                   <Typography variant="h6" gutterBottom>⚡ Stay Alerted</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -1384,7 +1384,7 @@ const Budgets: React.FC = () => {
             const velocityInfo = calculateSpendingVelocity(budget);
             
             return (
-            <Grid item xs={12} md={6} lg={4} key={budget.id}>
+            <Grid size={{ lg: 4, xs: 12, md: 6 }}key={budget.id}>
               <Card
                 sx={{
                   background: (theme) =>
@@ -1726,7 +1726,7 @@ const Budgets: React.FC = () => {
 
             {/* Budget Amount and Period */}
             <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ md: 6, xs: 12 }}>
                 <TextField
                   label="💰 Budget Amount"
                   type="number"
@@ -1746,7 +1746,7 @@ const Budgets: React.FC = () => {
                   required
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ md: 6, xs: 12 }}>
                 <TextField
                   select
                   label="📅 Period"
@@ -1778,7 +1778,7 @@ const Budgets: React.FC = () => {
 
             {/* Date Range */}
             <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ md: 6, xs: 12 }}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <ModernDatePicker
                     label="📆 Start Date"
@@ -1803,7 +1803,7 @@ const Budgets: React.FC = () => {
                   />
                 </LocalizationProvider>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ md: 6, xs: 12 }}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <ModernDatePicker
                     label="📆 End Date"
@@ -1829,7 +1829,7 @@ const Budgets: React.FC = () => {
                 </LocalizationProvider>
               </Grid>
               {dateError && (
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Alert severity="error" sx={{ mt: -1 }}>
                     {dateError}
                   </Alert>
@@ -2401,7 +2401,7 @@ const Budgets: React.FC = () => {
           </Typography>
           <Grid container spacing={2}>
             {budgetTemplates.map((template) => (
-              <Grid item xs={12} sm={6} key={template.id}>
+              <Grid size={{ sm: 6, xs: 12 }}key={template.id}>
                 <Card
                   sx={{
                     cursor: 'pointer',

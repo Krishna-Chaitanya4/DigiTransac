@@ -1445,7 +1445,7 @@ const Transactions: React.FC = () => {
 
         {/* Summary Cards */}
         <Grid container spacing={3} mb={3}>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ md: 4, xs: 12 }}>
             <Card sx={{ 
               background: (theme) => theme.palette.gradient.success,
               color: 'white',
@@ -1483,7 +1483,7 @@ const Transactions: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ md: 4, xs: 12 }}>
             <Card sx={{ 
               background: (theme) => theme.palette.gradient.error,
               color: 'white',
@@ -1521,7 +1521,7 @@ const Transactions: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ md: 4, xs: 12 }}>
             <Card
               sx={{
                 background: (theme) =>
@@ -1840,7 +1840,7 @@ const Transactions: React.FC = () => {
             <Collapse in={showFilters}>
               <Divider sx={{ my: 2 }} />
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                   <TextField
                     select
                     label="Account"
@@ -1858,7 +1858,7 @@ const Transactions: React.FC = () => {
                   </TextField>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                   <Autocomplete
                     multiple
                     options={categories}
@@ -1917,7 +1917,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                   <ModernDatePicker
                     label="Start Date"
                     value={startDate}
@@ -1929,7 +1929,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                   <ModernDatePicker
                     label="End Date"
                     value={endDate}
@@ -1941,7 +1941,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <Chip
                       label="All Time"
@@ -2018,7 +2018,7 @@ const Transactions: React.FC = () => {
                   </Box>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ md: 6, xs: 12 }}>
                   <Autocomplete
                     multiple
                     options={tags.map((t) => t.name)}
@@ -2045,7 +2045,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ md: 6, xs: 12 }}>
                   <Autocomplete
                     multiple
                     options={tags.map((t) => t.name)}
@@ -2073,7 +2073,7 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 {/* Amount Range Filter - Compact Design */}
-                <Grid item xs={12} sm={6} md={2}>
+                <Grid size={{ sm: 6, xs: 12, md: 2 }}>
                   <TextField
                     select
                     label="Amount Range"
@@ -2119,7 +2119,7 @@ const Transactions: React.FC = () => {
                   </TextField>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={2}>
+                <Grid size={{ sm: 6, xs: 12, md: 2 }}>
                   <TextField
                     label="Min Amount"
                     type="number"
@@ -2139,7 +2139,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={2}>
+                <Grid size={{ sm: 6, xs: 12, md: 2 }}>
                   <TextField
                     label="Max Amount"
                     type="number"
@@ -2740,7 +2740,7 @@ const Transactions: React.FC = () => {
                                     </Typography>
                                     <Grid container spacing={2}>
                                       {(transaction.splits || []).map((split, idx) => (
-                                        <Grid item xs={12} sm={6} md={4} key={idx}>
+                                        <Grid size={{ sm: 6, xs: 12, md: 4 }}key={idx}>
                                           <Card variant="outlined" sx={{ p: 2 }}>
                                             <Box
                                               display="flex"
@@ -2941,7 +2941,7 @@ const Transactions: React.FC = () => {
               </Box>
 
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ sm: 6, xs: 12 }}>
                   <TextField
                     label="Amount"
                     type="number"
@@ -2977,7 +2977,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ sm: 6, xs: 12 }}>
                   <Box>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <ModernDatePicker
@@ -3063,7 +3063,7 @@ const Transactions: React.FC = () => {
                   </Box>
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ sm: 6, xs: 12 }}>
                   <TextField
                     select
                     label="Account"
@@ -3080,7 +3080,7 @@ const Transactions: React.FC = () => {
                   </TextField>
                 </Grid>
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <TextField
                     label="Description"
                     value={formData.description}
@@ -3091,7 +3091,7 @@ const Transactions: React.FC = () => {
                 </Grid>
 
                 {/* Split Mode Toggle */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Box
                     sx={{
                       p: 2.5,
@@ -3199,7 +3199,7 @@ const Transactions: React.FC = () => {
                 {/* Simple Mode - Single Category & Tags */}
                 {!useSplitMode && (
                   <>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ sm: 6, xs: 12 }}>
                       <Autocomplete
                         options={[
                           ...categories.filter((c) => recentCategories.includes(c.id)),
@@ -3245,7 +3245,7 @@ const Transactions: React.FC = () => {
                       />
                     </Grid>
 
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ sm: 6, xs: 12 }}>
                       <Autocomplete
                         multiple
                         freeSolo
@@ -3280,7 +3280,7 @@ const Transactions: React.FC = () => {
 
                 {/* Split Mode - Multiple Splits */}
                 {useSplitMode && (
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <Box
                       sx={{
                         borderRadius: 3,
@@ -3402,7 +3402,7 @@ const Transactions: React.FC = () => {
                           </Box>
 
                           <Grid container spacing={2}>
-                            <Grid item xs={12} sm={4}>
+                            <Grid size={{ sm: 4, xs: 12 }}>
                               <TextField
                                 select
                                 label="Category"
@@ -3421,7 +3421,7 @@ const Transactions: React.FC = () => {
                               </TextField>
                             </Grid>
 
-                            <Grid item xs={12} sm={3}>
+                            <Grid size={{ sm: 3, xs: 12 }}>
                               <Box sx={{ position: 'relative' }}>
                                 <TextField
                                   label="Amount"
@@ -3482,7 +3482,7 @@ const Transactions: React.FC = () => {
                               </Box>
                             </Grid>
 
-                            <Grid item xs={12} sm={5}>
+                            <Grid size={{ sm: 5, xs: 12 }}>
                               <Autocomplete
                                 multiple
                                 freeSolo
@@ -3496,7 +3496,7 @@ const Transactions: React.FC = () => {
                               />
                             </Grid>
 
-                            <Grid item xs={12}>
+                            <Grid size={{ xs: 12 }}>
                               <TextField
                                 label="Notes (optional)"
                                 value={split.notes}
@@ -3559,7 +3559,7 @@ const Transactions: React.FC = () => {
                   </Grid>
                 )}
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Autocomplete
                     freeSolo
                     options={merchants}
@@ -3589,7 +3589,7 @@ const Transactions: React.FC = () => {
                   />
                 </Grid>
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Box
                     sx={{
                       p: 2.5,
@@ -3647,7 +3647,7 @@ const Transactions: React.FC = () => {
 
                 {formData.isRecurring && (
                   <>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ sm: 6, xs: 12 }}>
                       <TextField
                         select
                         label="Recurrence Frequency"
@@ -3665,7 +3665,7 @@ const Transactions: React.FC = () => {
                       </TextField>
                     </Grid>
 
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ sm: 6, xs: 12 }}>
                       <TextField
                         label="Day of Month (for monthly/yearly)"
                         type="number"
@@ -3683,7 +3683,7 @@ const Transactions: React.FC = () => {
                       />
                     </Grid>
 
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <ModernDatePicker
                           label="End Date (Optional)"

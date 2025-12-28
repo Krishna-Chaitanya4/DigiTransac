@@ -68,7 +68,7 @@ export const InstallPrompt: React.FC = () => {
 
     try {
       await installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
+      await installPrompt.userChoice;
       
       // PWA installed if outcome === 'accepted'
       
