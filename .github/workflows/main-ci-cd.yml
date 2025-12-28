@@ -229,7 +229,7 @@ jobs:
     
     - name: 🚀 Deploy Backend - Log in to Azure
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: azure/login@v1
+      uses: azure/login@v2
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
     
