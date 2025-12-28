@@ -9,6 +9,11 @@ on:
       - main
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+
 env:
   NODE_VERSION: '20'
   REGISTRY: herdswebsiteacr.azurecr.io
@@ -416,6 +421,13 @@ jobs:
         output: 'backend-trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
     
+    - name: Upload Backend Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'backend-trivy-results.sarif'
+        category: 'container-security-backend'
+    
     - name: Run Trivy scan - Frontend
       uses: aquasecurity/trivy-action@master
       with:
@@ -424,12 +436,12 @@ jobs:
         output: 'frontend-trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
     
-    - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
+    - name: Upload Frontend Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
-        sarif_file: '.'
-        category: 'container-security'
+        sarif_file: 'frontend-trivy-results.sarif'
+        category: 'container-security-frontend'
 
   # ==================== STAGE 5: DEPLOY BACKEND ====================
   
