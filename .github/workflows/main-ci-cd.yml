@@ -440,6 +440,7 @@ jobs:
     
     - name: Upload Backend Trivy results to GitHub Security
       uses: github/codeql-action/upload-sarif@v4
+      continue-on-error: true
       if: steps.backend-scan.outputs.exists == 'true'
       with:
         sarif_file: 'backend-trivy-results.sarif'
@@ -468,10 +469,28 @@ jobs:
     
     - name: Upload Frontend Trivy results to GitHub Security
       uses: github/codeql-action/upload-sarif@v4
+      continue-on-error: true
       if: steps.frontend-scan.outputs.exists == 'true'
       with:
         sarif_file: 'frontend-trivy-results.sarif'
         category: 'container-security-frontend'
+    
+    - name: Security scan summary
+      if: always()
+      run: |
+        echo "## 🛡️ Container Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.backend-scan.outputs.exists }}" == "true" ]; then
+          echo "- ✅ Backend: Scanned successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ⚠️ Backend: No vulnerabilities or scan skipped" >> $GITHUB_STEP_SUMMARY
+        fi
+        if [ "${{ steps.frontend-scan.outputs.exists }}" == "true" ]; then
+          echo "- ✅ Frontend: Scanned successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ⚠️ Frontend: No vulnerabilities or scan skipped" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "ℹ️ To view detailed security results, enable GitHub Code Scanning in repository settings." >> $GITHUB_STEP_SUMMARY
 
   # ==================== STAGE 5: DEPLOY BACKEND ====================
   
