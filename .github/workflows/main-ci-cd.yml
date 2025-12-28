@@ -185,10 +185,12 @@ jobs:
         npm outdated --long || echo "Some packages are outdated"
       continue-on-error: true
     
-    - name: Check for severely outdated packages (2+ major versions)
+    - name: Check for severely outdated packages
       # STRICTNESS controlled at workflow level (top env section)
       # BALANCED: allows 1 version behind | STRICT: must be latest
       run: |
+        node .github/scripts/check-outdated-packages.js backend backend
+        node .github/scripts/check-outdated-packages.js frontend frontend
         cd backend
         echo "Checking backend packages..."
         
