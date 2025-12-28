@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2025-12-28
+
+### Fixed
+- **CRITICAL**: Use HTTPS for backend proxy (backend has `allowInsecure: false`)
+- Backend configuration verified: external ingress with HTTPS enforcement
+- Added `proxy_ssl_server_name on` for proper SNI handling
+- Correct FQDN: `digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io`
+- Correct Host header set to backend FQDN
+- Origin header uses map directive with fallback to digitransac.com
+- Fixes all login errors (404, 502, CORS)
+
+### Verified Industry Standards
+- ✅ HTTPS for external backend communication (matches backend allowInsecure=false)
+- ✅ Nginx map directive for conditional Origin header
+- ✅ OWASP security headers (X-Frame-Options, CSP, etc.)
+- ✅ Gzip compression level 6 (optimal)
+- ✅ Static asset caching (1 year for immutable files)
+- ✅ Proper timeouts (prevents slowloris attacks)
+- ✅ Buffer limits (prevents overflow attacks)
+- ✅ SNI enabled for SSL proxy
+
 ## [1.3.1] - 2025-12-28
 
 ### Fixed
