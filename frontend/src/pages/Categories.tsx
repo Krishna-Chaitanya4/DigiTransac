@@ -2085,8 +2085,8 @@ const Categories: React.FC = () => {
                   Replace with another tag:
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                  Select a tag to replace all occurrences of &quot;{deleteTagDialog.tag?.name}&quot; in your
-                  transactions and budgets.
+                  Select a tag to replace all occurrences of &quot;{deleteTagDialog.tag?.name}&quot;
+                  in your transactions and budgets.
                 </Typography>
                 <TextField
                   select
