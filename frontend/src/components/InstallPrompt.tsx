@@ -36,8 +36,7 @@ export const InstallPrompt: React.FC = () => {
     // Check if previously dismissed (within 7 days)
     const dismissedAt = localStorage.getItem('pwa-install-dismissed');
     if (dismissedAt) {
-      const daysSinceDismissed =
-        (Date.now() - parseInt(dismissedAt)) / (1000 * 60 * 60 * 24);
+      const daysSinceDismissed = (Date.now() - parseInt(dismissedAt)) / (1000 * 60 * 60 * 24);
       if (daysSinceDismissed < 7) {
         setDismissed(true);
         return;
@@ -47,7 +46,7 @@ export const InstallPrompt: React.FC = () => {
     const handler = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e as BeforeInstallPromptEvent);
-      
+
       // Show prompt after 10 seconds of usage
       setTimeout(() => {
         if (!dismissed && !isPWA()) {
@@ -69,9 +68,9 @@ export const InstallPrompt: React.FC = () => {
     try {
       await installPrompt.prompt();
       await installPrompt.userChoice;
-      
+
       // PWA installed if outcome === 'accepted'
-      
+
       setShowPrompt(false);
       setInstallPrompt(null);
     } catch (error) {

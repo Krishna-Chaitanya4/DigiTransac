@@ -18,10 +18,7 @@ import {
   IconButton,
   Divider,
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  Sms as SmsIcon,
-} from '@mui/icons-material';
+import { Close as CloseIcon, Sms as SmsIcon } from '@mui/icons-material';
 import axios from 'axios';
 import { getApiUrl } from '../services/config.service';
 
@@ -42,18 +39,14 @@ interface SMSImportModalProps {
   onImportComplete: () => void;
 }
 
-const SMSImportModal: React.FC<SMSImportModalProps> = ({
-  open,
-  onClose,
-  onImportComplete,
-}) => {
+const SMSImportModal: React.FC<SMSImportModalProps> = ({ open, onClose, onImportComplete }) => {
   const [smsText, setSmsText] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<ParsedTransaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'input' | 'preview' | 'result'>('input');
-  const [importResult, setImportResult] = useState<{ 
-    summary: { created: number; duplicates: number; failed: number } 
+  const [importResult, setImportResult] = useState<{
+    summary: { created: number; duplicates: number; failed: number };
   } | null>(null);
 
   const handlePreview = async () => {
@@ -171,8 +164,8 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
         {step === 'input' && (
           <>
             <Alert severity="info" sx={{ mb: 2 }}>
-              Copy and paste bank SMS messages below. Each SMS should be on a new line.
-              Supports HDFC, ICICI, SBI, Axis, Kotak, and more.
+              Copy and paste bank SMS messages below. Each SMS should be on a new line. Supports
+              HDFC, ICICI, SBI, Axis, Kotak, and more.
             </Alert>
 
             <TextField
@@ -194,8 +187,8 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
 
             <Box mt={2}>
               <Typography variant="caption" color="text.secondary">
-                Tip: You can paste up to 50 SMS messages at once. Duplicates will be
-                automatically filtered.
+                Tip: You can paste up to 50 SMS messages at once. Duplicates will be automatically
+                filtered.
               </Typography>
             </Box>
           </>
@@ -204,8 +197,8 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
         {step === 'preview' && (
           <>
             <Alert severity="success" sx={{ mb: 2 }}>
-              Found {preview.length} transaction{preview.length !== 1 ? 's' : ''}. Review
-              before importing.
+              Found {preview.length} transaction{preview.length !== 1 ? 's' : ''}. Review before
+              importing.
             </Alert>
 
             <List>
@@ -239,8 +232,7 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
                               Amount:{' '}
                               <span
                                 style={{
-                                  color:
-                                    transaction.type === 'debit' ? '#d32f2f' : '#2e7d32',
+                                  color: transaction.type === 'debit' ? '#d32f2f' : '#2e7d32',
                                   fontWeight: 600,
                                 }}
                               >
@@ -254,8 +246,7 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
                           </Box>
                           {transaction.bankName && (
                             <Typography variant="body2" color="text.secondary">
-                              Bank: {transaction.bankName} • A/c:{' '}
-                              {transaction.accountNumber}
+                              Bank: {transaction.bankName} • A/c: {transaction.accountNumber}
                             </Typography>
                           )}
                           <Typography
@@ -338,23 +329,23 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
               {importResult.summary.duplicates > 0 && (
                 <Alert severity="warning">
                   {importResult.summary.duplicates} duplicate transaction
-                  {importResult.summary.duplicates !== 1 ? 's' : ''} were skipped
-                  (already exist in last 7 days).
+                  {importResult.summary.duplicates !== 1 ? 's' : ''} were skipped (already exist in
+                  last 7 days).
                 </Alert>
               )}
 
               {importResult.summary.failed > 0 && (
                 <Alert severity="info">
                   {importResult.summary.failed} SMS message
-                  {importResult.summary.failed !== 1 ? 's' : ''} could not be parsed.
-                  They may not match any supported bank format.
+                  {importResult.summary.failed !== 1 ? 's' : ''} could not be parsed. They may not
+                  match any supported bank format.
                 </Alert>
               )}
 
               <Alert severity="info">
-                All transactions have been added to{' '}
-                <strong>Pending Transactions</strong> for review. You can edit and
-                approve them before they appear in your main transaction list.
+                All transactions have been added to <strong>Pending Transactions</strong> for
+                review. You can edit and approve them before they appear in your main transaction
+                list.
               </Alert>
             </Stack>
           </>
@@ -385,7 +376,9 @@ const SMSImportModal: React.FC<SMSImportModalProps> = ({
               disabled={loading || preview.length === 0}
               startIcon={loading ? <CircularProgress size={20} /> : undefined}
             >
-              {loading ? 'Importing...' : `Import ${preview.length} Transaction${preview.length !== 1 ? 's' : ''}`}
+              {loading
+                ? 'Importing...'
+                : `Import ${preview.length} Transaction${preview.length !== 1 ? 's' : ''}`}
             </Button>
           </>
         )}

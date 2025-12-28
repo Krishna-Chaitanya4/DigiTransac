@@ -54,26 +54,26 @@ const App: React.FC = () => {
                 element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />}
               />
 
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <Layout />
-                </PrivateRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="transactions" element={<Transactions />} />
-              <Route path="categories" element={<Categories />} />
-              <Route path="accounts" element={<Accounts />} />
-              <Route path="budgets" element={<Budgets />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="profile" element={<Profile />} />
-            </Route>
+              <Route
+                path="/"
+                element={
+                  <PrivateRoute>
+                    <Layout />
+                  </PrivateRoute>
+                }
+              >
+                <Route index element={<Navigate to="/dashboard" />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="transactions" element={<Transactions />} />
+                <Route path="categories" element={<Categories />} />
+                <Route path="accounts" element={<Accounts />} />
+                <Route path="budgets" element={<Budgets />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="profile" element={<Profile />} />
+              </Route>
 
-            <Route path="*" element={<Navigate to="/dashboard" />} />
-          </Routes>
+              <Route path="*" element={<Navigate to="/dashboard" />} />
+            </Routes>
           </Suspense>
         </Box>
       </ToastProvider>

@@ -83,11 +83,15 @@ export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
                 backgroundColor: 'rgba(20, 184, 166, 0.08)',
               },
               '&.Mui-selected': {
-                background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                background: (theme) =>
+                  theme.palette.gradient?.primary ||
+                  'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                 color: 'white',
                 fontWeight: 700,
                 '&:hover': {
-                  background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                  background: (theme) =>
+                    theme.palette.gradient?.primary ||
+                    'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                   opacity: 0.9,
                 },
               },
@@ -104,7 +108,9 @@ export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
             '& .MuiPickersYear-yearButton': {
               borderRadius: 2,
               '&.Mui-selected': {
-                background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                background: (theme) =>
+                  theme.palette.gradient?.primary ||
+                  'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                 color: 'white',
                 fontWeight: 700,
               },
@@ -112,7 +118,9 @@ export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
             '& .MuiPickersMonth-monthButton': {
               borderRadius: 2,
               '&.Mui-selected': {
-                background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                background: (theme) =>
+                  theme.palette.gradient?.primary ||
+                  'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                 color: 'white',
                 fontWeight: 700,
               },

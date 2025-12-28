@@ -27,9 +27,9 @@ import {
   Tab,
   Tabs,
 } from '@mui/material';
-import { 
-  Visibility, 
-  VisibilityOff, 
+import {
+  Visibility,
+  VisibilityOff,
   AccountBalance,
   CheckCircle,
   Cancel,
@@ -51,15 +51,49 @@ import { detectCountry } from '../utils/countryDetection';
 // Helper function to get country calling code
 const getCountryCallingCode = (countryCode: string): string => {
   const codes: Record<string, string> = {
-    'IN': '91', 'US': '1', 'GB': '44', 'CA': '1', 'AU': '61',
-    'JP': '81', 'CN': '86', 'SG': '65', 'MY': '60', 'PH': '63',
-    'TH': '66', 'ID': '62', 'VN': '84', 'KR': '82', 'HK': '852',
-    'TW': '886', 'BR': '55', 'MX': '52', 'ZA': '27', 'SA': '966',
-    'AE': '971', 'TR': '90', 'RU': '7', 'PL': '48', 'NG': '234',
-    'KE': '254', 'AR': '54', 'CL': '56', 'CO': '57', 'NZ': '64',
-    'IL': '972', 'CH': '41', 'DE': '49', 'FR': '33', 'ES': '34',
-    'IT': '39', 'NL': '31', 'PT': '351', 'BE': '32', 'AT': '43',
-    'IE': '353', 'FI': '358', 'GR': '30',
+    IN: '91',
+    US: '1',
+    GB: '44',
+    CA: '1',
+    AU: '61',
+    JP: '81',
+    CN: '86',
+    SG: '65',
+    MY: '60',
+    PH: '63',
+    TH: '66',
+    ID: '62',
+    VN: '84',
+    KR: '82',
+    HK: '852',
+    TW: '886',
+    BR: '55',
+    MX: '52',
+    ZA: '27',
+    SA: '966',
+    AE: '971',
+    TR: '90',
+    RU: '7',
+    PL: '48',
+    NG: '234',
+    KE: '254',
+    AR: '54',
+    CL: '56',
+    CO: '57',
+    NZ: '64',
+    IL: '972',
+    CH: '41',
+    DE: '49',
+    FR: '33',
+    ES: '34',
+    IT: '39',
+    NL: '31',
+    PT: '351',
+    BE: '32',
+    AT: '43',
+    IE: '353',
+    FI: '358',
+    GR: '30',
   };
   return codes[countryCode] || '1';
 };
@@ -67,7 +101,7 @@ const getCountryCallingCode = (countryCode: string): string => {
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
-  
+
   const [contactMethod, setContactMethod] = useState<'email' | 'phone'>('email');
   const [formData, setFormData] = useState({
     email: '',
@@ -244,7 +278,9 @@ const Register: React.FC = () => {
 
     // Check password strength
     if (passwordStrength.score < 3) {
-      setError('Please choose a stronger password. Include uppercase, lowercase, numbers, and special characters.');
+      setError(
+        'Please choose a stronger password. Include uppercase, lowercase, numbers, and special characters.'
+      );
       return;
     }
 
@@ -329,7 +365,8 @@ const Register: React.FC = () => {
           position: 'absolute',
           width: '400px',
           height: '400px',
-          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.main}26 0%, transparent 70%)`,
+          background: (theme) =>
+            `radial-gradient(circle, ${theme.palette.primary.main}26 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '-200px',
           right: '-200px',
@@ -348,7 +385,8 @@ const Register: React.FC = () => {
           position: 'absolute',
           width: '300px',
           height: '300px',
-          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.light}26 0%, transparent 70%)`,
+          background: (theme) =>
+            `radial-gradient(circle, ${theme.palette.primary.light}26 0%, transparent 70%)`,
           borderRadius: '50%',
           bottom: '-150px',
           left: '-150px',
@@ -365,7 +403,8 @@ const Register: React.FC = () => {
           position: 'absolute',
           width: '350px',
           height: '350px',
-          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.dark}1F 0%, transparent 70%)`,
+          background: (theme) =>
+            `radial-gradient(circle, ${theme.palette.primary.dark}1F 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '50%',
           right: '10%',
@@ -380,88 +419,107 @@ const Register: React.FC = () => {
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
         <Grid container spacing={0} sx={{ minHeight: { md: '90vh' } }}>
           {/* Left Side - Features */}
-          <Grid size={{ md: 5, xs: 12 }}sx={{ display: { xs: 'none', md: 'block' } }}>
-              <Fade in timeout={800}>
-                <Box
+          <Grid size={{ md: 5, xs: 12 }} sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Fade in timeout={800}>
+              <Box
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  pr: 4,
+                }}
+              >
+                <Typography
+                  variant="h2"
+                  fontWeight={800}
                   sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    pr: 4,
+                    color: 'white',
+                    mb: 2,
+                    textShadow: '0 2px 20px rgba(0,0,0,0.2)',
                   }}
                 >
-                  <Typography
-                    variant="h2"
-                    fontWeight={800}
-                    sx={{
-                      color: 'white',
-                      mb: 2,
-                      textShadow: '0 2px 20px rgba(0,0,0,0.2)',
-                    }}
-                  >
-                    Join DigiTransac
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    sx={{
-                      color: 'rgba(255, 255, 255, 0.9)',
-                      mb: 5,
-                      fontWeight: 300,
-                    }}
-                  >
-                    Your journey to smarter finance starts here
-                  </Typography>
+                  Join DigiTransac
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    mb: 5,
+                    fontWeight: 300,
+                  }}
+                >
+                  Your journey to smarter finance starts here
+                </Typography>
 
-                  <Stack spacing={3}>
-                    {[
-                      { icon: <Security />, title: 'Bank-Grade Security', desc: 'Your data is encrypted with industry-leading security' },
-                      { icon: <Insights />, title: 'Smart Insights', desc: 'AI-powered analytics for better financial decisions' },
-                      { icon: <Speed />, title: 'Lightning Fast', desc: 'Real-time transaction tracking and updates' },
-                      { icon: <CloudSync />, title: 'Cloud Sync', desc: 'Access your finances from anywhere, anytime' },
-                    ].map((feature, index) => (
-                      <Zoom in timeout={1000 + index * 200} key={feature.title}>
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            p: 3,
-                            background: 'rgba(255, 255, 255, 0.15)',
-                            backdropFilter: 'blur(20px)',
-                            border: '1px solid rgba(255, 255, 255, 0.3)',
-                            borderRadius: 3,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              background: 'rgba(255, 255, 255, 0.25)',
-                              transform: 'translateX(10px)',
-                            },
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                            <Box
-                              sx={{
-                                p: 1.5,
-                                borderRadius: 2,
-                                background: 'rgba(255, 255, 255, 0.2)',
-                                color: 'white',
-                              }}
-                            >
-                              {feature.icon}
-                            </Box>
-                            <Box>
-                              <Typography variant="h6" sx={{ color: 'white', fontWeight: 700, mb: 0.5 }}>
-                                {feature.title}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                {feature.desc}
-                              </Typography>
-                            </Box>
+                <Stack spacing={3}>
+                  {[
+                    {
+                      icon: <Security />,
+                      title: 'Bank-Grade Security',
+                      desc: 'Your data is encrypted with industry-leading security',
+                    },
+                    {
+                      icon: <Insights />,
+                      title: 'Smart Insights',
+                      desc: 'AI-powered analytics for better financial decisions',
+                    },
+                    {
+                      icon: <Speed />,
+                      title: 'Lightning Fast',
+                      desc: 'Real-time transaction tracking and updates',
+                    },
+                    {
+                      icon: <CloudSync />,
+                      title: 'Cloud Sync',
+                      desc: 'Access your finances from anywhere, anytime',
+                    },
+                  ].map((feature, index) => (
+                    <Zoom in timeout={1000 + index * 200} key={feature.title}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 3,
+                          background: 'rgba(255, 255, 255, 0.15)',
+                          backdropFilter: 'blur(20px)',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          borderRadius: 3,
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            background: 'rgba(255, 255, 255, 0.25)',
+                            transform: 'translateX(10px)',
+                          },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                          <Box
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 2,
+                              background: 'rgba(255, 255, 255, 0.2)',
+                              color: 'white',
+                            }}
+                          >
+                            {feature.icon}
                           </Box>
-                        </Paper>
-                      </Zoom>
-                    ))}
-                  </Stack>
-                </Box>
-              </Fade>
+                          <Box>
+                            <Typography
+                              variant="h6"
+                              sx={{ color: 'white', fontWeight: 700, mb: 0.5 }}
+                            >
+                              {feature.title}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                              {feature.desc}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Zoom>
+                  ))}
+                </Stack>
+              </Box>
+            </Fade>
           </Grid>
 
           {/* Right Side - Registration Form */}
@@ -495,433 +553,457 @@ const Register: React.FC = () => {
                         : '1px solid rgba(255, 255, 255, 0.1)',
                   }}
                 >
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Box
-              sx={{
-                display: 'inline-flex',
-                p: 2,
-                borderRadius: '50%',
-                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                mb: 2,
-              }}
-            >
-              <AccountBalance sx={{ fontSize: 40, color: 'white' }} />
-            </Box>
-            <Typography
-              variant="h4"
-              fontWeight={800}
-              gutterBottom
-              sx={{
-                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Create Account
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Join thousands managing their finances smarter
-            </Typography>
-          </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
-              {/* Contact Method Tabs */}
-              <Grid size={{ xs: 12 }}>
-                <Tabs
-                  value={contactMethod}
-                  onChange={(_, newValue) => setContactMethod(newValue)}
-                  variant="fullWidth"
-                  sx={{
-                    mb: 1,
-                    '& .MuiTab-root': {
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                    },
-                  }}
-                >
-                  <Tab
-                    value="email"
-                    label="Email"
-                    icon={<EmailIcon />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    value="phone"
-                    label="Phone"
-                    icon={<PhoneIcon />}
-                    iconPosition="start"
-                  />
-                </Tabs>
-              </Grid>
-
-              {/* Email or Phone Field */}
-              {contactMethod === 'email' ? (
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    fullWidth
-                    label="Email Address"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    autoComplete="email"
-                    autoFocus
-                    error={!!emailError}
-                    helperText={emailError}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 2,
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                        },
-                        '&.Mui-focused': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                        },
-                      },
-                    }}
-                  />
-                </Grid>
-              ) : (
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    fullWidth
-                    label="Phone Number"
-                    name="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, phone: value });
-                      if (value && !validatePhone(value)) {
-                        setPhoneError('Please enter a valid phone number with country code');
-                      } else {
-                        setPhoneError('');
-                      }
-                    }}
-                    required
-                    autoFocus
-                    placeholder="9876543210"
-                    error={!!phoneError}
-                    helperText={phoneError}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PhoneIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 2,
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                        },
-                        '&.Mui-focused': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                        },
-                      },
-                    }}
-                  />
-                </Grid>
-              )}
-
-              {/* Username */}
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  required
-                  error={!!usernameError}
-                  helperText={usernameError || 'Lowercase, 3-30 characters, letters, numbers, . or _'}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      },
-                      '&.Mui-focused': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                      },
-                    },
-                  }}
-                />
-              </Grid>
-
-              {/* Full Name */}
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Full Name"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  required
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      },
-                      '&.Mui-focused': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                      },
-                    },
-                  }}
-                />
-              </Grid>
-
-              {/* Date of Birth (Optional) */}
-              <Grid size={{ xs: 12 }}>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <ModernDatePicker
-                    label="Date of Birth"
-                    value={dateOfBirth}
-                    onChange={(newValue) => setDateOfBirth(newValue)}
-                    maxDate={dayjs()}
-                    fullWidth
-                  />
-                </LocalizationProvider>
-              </Grid>
-              {/* Currency */}
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  select
-                  label="Currency"
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleChange}
-                  required
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                >
-                  {availableCurrencies.map((currency) => (
-                    <MenuItem key={currency.code} value={currency.code}>
-                      {currency.symbol} - {currency.name} ({currency.code})
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  autoComplete="new-password"
-                  error={!!passwordError}
-                  helperText={passwordError}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                />
-                {/* Password Strength Indicator */}
-                {formData.password && (
-                  <Box sx={{ mt: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Password Strength
-                      </Typography>
-                      {passwordStrength.label && (
-                        <Chip
-                          label={passwordStrength.label}
-                          size="small"
-                          sx={{
-                            backgroundColor: passwordStrength.color,
-                            color: 'white',
-                            fontWeight: 600,
-                            fontSize: '0.7rem',
-                          }}
-                        />
-                      )}
-                    </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(passwordStrength.score / 5) * 100}
+                  <Box sx={{ textAlign: 'center', mb: 4 }}>
+                    <Box
                       sx={{
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: 'rgba(0,0,0,0.1)',
-                        '& .MuiLinearProgress-bar': {
-                          backgroundColor: passwordStrength.color,
-                          borderRadius: 3,
-                        },
+                        display: 'inline-flex',
+                        p: 2,
+                        borderRadius: '50%',
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                        mb: 2,
                       }}
-                    />
-                    <List dense sx={{ mt: 1 }}>
-                      {Object.entries(passwordStrength.checks).map(([key, passed]) => (
-                        <ListItem key={key} sx={{ py: 0, px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 28 }}>
-                            {passed ? (
-                              <CheckCircle sx={{ fontSize: 16, color: '#4caf50' }} />
-                            ) : (
-                              <Cancel sx={{ fontSize: 16, color: '#f44336' }} />
-                            )}
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={
-                              key === 'length'
-                                ? 'At least 8 characters'
-                                : key === 'uppercase'
-                                ? 'Uppercase letter'
-                                : key === 'lowercase'
-                                ? 'Lowercase letter'
-                                : key === 'number'
-                                ? 'Number'
-                                : 'Special character'
-                            }
-                            primaryTypographyProps={{
-                              variant: 'caption',
-                              color: passed ? 'success.main' : 'text.secondary',
+                    >
+                      <AccountBalance sx={{ fontSize: 40, color: 'white' }} />
+                    </Box>
+                    <Typography
+                      variant="h4"
+                      fontWeight={800}
+                      gutterBottom
+                      sx={{
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                      }}
+                    >
+                      Create Account
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Join thousands managing their finances smarter
+                    </Typography>
+                  </Box>
+
+                  {error && (
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                      {error}
+                    </Alert>
+                  )}
+
+                  <form onSubmit={handleSubmit}>
+                    <Grid container spacing={3}>
+                      {/* Contact Method Tabs */}
+                      <Grid size={{ xs: 12 }}>
+                        <Tabs
+                          value={contactMethod}
+                          onChange={(_, newValue) => setContactMethod(newValue)}
+                          variant="fullWidth"
+                          sx={{
+                            mb: 1,
+                            '& .MuiTab-root': {
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                            },
+                          }}
+                        >
+                          <Tab
+                            value="email"
+                            label="Email"
+                            icon={<EmailIcon />}
+                            iconPosition="start"
+                          />
+                          <Tab
+                            value="phone"
+                            label="Phone"
+                            icon={<PhoneIcon />}
+                            iconPosition="start"
+                          />
+                        </Tabs>
+                      </Grid>
+
+                      {/* Email or Phone Field */}
+                      {contactMethod === 'email' ? (
+                        <Grid size={{ xs: 12 }}>
+                          <TextField
+                            fullWidth
+                            label="Email Address"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                            autoComplete="email"
+                            autoFocus
+                            error={!!emailError}
+                            helperText={emailError}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                },
+                                '&.Mui-focused': {
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                                },
+                              },
                             }}
                           />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
-                )}
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Confirm Password"
-                  name="confirmPassword"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                  autoComplete="new-password"
-                  error={!!confirmPasswordError}
-                  helperText={confirmPasswordError}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                    },
-                  }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={agreedToTerms}
-                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                        </Grid>
+                      ) : (
+                        <Grid size={{ xs: 12 }}>
+                          <TextField
+                            fullWidth
+                            label="Phone Number"
+                            name="phone"
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFormData({ ...formData, phone: value });
+                              if (value && !validatePhone(value)) {
+                                setPhoneError(
+                                  'Please enter a valid phone number with country code'
+                                );
+                              } else {
+                                setPhoneError('');
+                              }
+                            }}
+                            required
+                            autoFocus
+                            placeholder="9876543210"
+                            error={!!phoneError}
+                            helperText={phoneError}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <PhoneIcon />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                },
+                                '&.Mui-focused': {
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                                },
+                              },
+                            }}
+                          />
+                        </Grid>
+                      )}
+
+                      {/* Username */}
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          label="Username"
+                          name="username"
+                          value={formData.username}
+                          onChange={handleChange}
+                          required
+                          error={!!usernameError}
+                          helperText={
+                            usernameError || 'Lowercase, 3-30 characters, letters, numbers, . or _'
+                          }
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              },
+                              '&.Mui-focused': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                              },
+                            },
+                          }}
+                        />
+                      </Grid>
+
+                      {/* Full Name */}
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          label="Full Name"
+                          name="fullName"
+                          value={formData.fullName}
+                          onChange={handleChange}
+                          required
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              },
+                              '&.Mui-focused': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                              },
+                            },
+                          }}
+                        />
+                      </Grid>
+
+                      {/* Date of Birth (Optional) */}
+                      <Grid size={{ xs: 12 }}>
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                          <ModernDatePicker
+                            label="Date of Birth"
+                            value={dateOfBirth}
+                            onChange={(newValue) => setDateOfBirth(newValue)}
+                            maxDate={dayjs()}
+                            fullWidth
+                          />
+                        </LocalizationProvider>
+                      </Grid>
+                      {/* Currency */}
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          select
+                          label="Currency"
+                          name="currency"
+                          value={formData.currency}
+                          onChange={handleChange}
+                          required
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                            },
+                          }}
+                        >
+                          {availableCurrencies.map((currency) => (
+                            <MenuItem key={currency.code} value={currency.code}>
+                              {currency.symbol} - {currency.name} ({currency.code})
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          label="Password"
+                          name="password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={formData.password}
+                          onChange={handleChange}
+                          required
+                          autoComplete="new-password"
+                          error={!!passwordError}
+                          helperText={passwordError}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  onClick={() => setShowPassword(!showPassword)}
+                                  edge="end"
+                                >
+                                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                            },
+                          }}
+                        />
+                        {/* Password Strength Indicator */}
+                        {formData.password && (
+                          <Box sx={{ mt: 2 }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                mb: 1,
+                              }}
+                            >
+                              <Typography variant="caption" color="text.secondary">
+                                Password Strength
+                              </Typography>
+                              {passwordStrength.label && (
+                                <Chip
+                                  label={passwordStrength.label}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: passwordStrength.color,
+                                    color: 'white',
+                                    fontWeight: 600,
+                                    fontSize: '0.7rem',
+                                  }}
+                                />
+                              )}
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={(passwordStrength.score / 5) * 100}
+                              sx={{
+                                height: 6,
+                                borderRadius: 3,
+                                backgroundColor: 'rgba(0,0,0,0.1)',
+                                '& .MuiLinearProgress-bar': {
+                                  backgroundColor: passwordStrength.color,
+                                  borderRadius: 3,
+                                },
+                              }}
+                            />
+                            <List dense sx={{ mt: 1 }}>
+                              {Object.entries(passwordStrength.checks).map(([key, passed]) => (
+                                <ListItem key={key} sx={{ py: 0, px: 0 }}>
+                                  <ListItemIcon sx={{ minWidth: 28 }}>
+                                    {passed ? (
+                                      <CheckCircle sx={{ fontSize: 16, color: '#4caf50' }} />
+                                    ) : (
+                                      <Cancel sx={{ fontSize: 16, color: '#f44336' }} />
+                                    )}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={
+                                      key === 'length'
+                                        ? 'At least 8 characters'
+                                        : key === 'uppercase'
+                                          ? 'Uppercase letter'
+                                          : key === 'lowercase'
+                                            ? 'Lowercase letter'
+                                            : key === 'number'
+                                              ? 'Number'
+                                              : 'Special character'
+                                    }
+                                    primaryTypographyProps={{
+                                      variant: 'caption',
+                                      color: passed ? 'success.main' : 'text.secondary',
+                                    }}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </Box>
+                        )}
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          label="Confirm Password"
+                          name="confirmPassword"
+                          type={showPassword ? 'text' : 'password'}
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          required
+                          autoComplete="new-password"
+                          error={!!confirmPasswordError}
+                          helperText={confirmPasswordError}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                            },
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={agreedToTerms}
+                              onChange={(e) => setAgreedToTerms(e.target.checked)}
+                              sx={{
+                                color: 'primary.main',
+                                '&.Mui-checked': {
+                                  color: 'primary.main',
+                                },
+                              }}
+                            />
+                          }
+                          label={
+                            <Typography variant="body2" color="text.secondary">
+                              I agree to the{' '}
+                              <Link href="#" sx={{ color: 'primary.main', textDecoration: 'none' }}>
+                                Terms of Service
+                              </Link>{' '}
+                              and{' '}
+                              <Link href="#" sx={{ color: 'primary.main', textDecoration: 'none' }}>
+                                Privacy Policy
+                              </Link>
+                            </Typography>
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Button
+                      type="submit"
+                      fullWidth
+                      variant="contained"
+                      size="large"
+                      disabled={
+                        isLoading ||
+                        !!emailError ||
+                        !!passwordError ||
+                        !!confirmPasswordError ||
+                        !agreedToTerms
+                      }
                       sx={{
-                        color: 'primary.main',
-                        '&.Mui-checked': {
-                          color: 'primary.main',
+                        mt: 4,
+                        mb: 2,
+                        py: 1.8,
+                        fontSize: '1.1rem',
+                        fontWeight: 700,
+                        borderRadius: 2,
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                        boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: (theme) => `0 8px 30px ${theme.palette.primary.main}99`,
+                          background: (theme) =>
+                            `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
+                        },
+                        '&:disabled': {
+                          background: (theme) => theme.palette.primary.main,
+                          opacity: 0.5,
                         },
                       }}
-                    />
-                  }
-                  label={
-                    <Typography variant="body2" color="text.secondary">
-                      I agree to the{' '}
-                      <Link href="#" sx={{ color: 'primary.main', textDecoration: 'none' }}>
-                        Terms of Service
-                      </Link>{' '}
-                      and{' '}
-                      <Link href="#" sx={{ color: 'primary.main', textDecoration: 'none' }}>
-                        Privacy Policy
-                      </Link>
-                    </Typography>
-                  }
-                />
-              </Grid>
-            </Grid>
+                    >
+                      {isLoading ? 'Creating Account...' : 'Create Account'}
+                    </Button>
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={isLoading || !!emailError || !!passwordError || !!confirmPasswordError || !agreedToTerms}
-              sx={{
-                mt: 4,
-                mb: 2,
-                py: 1.8,
-                fontSize: '1.1rem',
-                fontWeight: 700,
-                borderRadius: 2,
-                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: (theme) => `0 8px 30px ${theme.palette.primary.main}99`,
-                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
-                },
-                '&:disabled': {
-                  background: (theme) => theme.palette.primary.main,
-                  opacity: 0.5,
-                },
-              }}
-            >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
-            </Button>
-
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                Already have an account?{' '}
-                <Link
-                  component={RouterLink}
-                  to="/login"
-                  sx={{ 
-                    fontWeight: 600, 
-                    textDecoration: 'none',
-                    color: 'primary.main',
-                    '&:hover': {
-                      color: 'primary.light',
-                    },
-                  }}
-                >
-                  Sign In
-                </Link>
-              </Typography>
-            </Box>
-          </form>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Already have an account?{' '}
+                        <Link
+                          component={RouterLink}
+                          to="/login"
+                          sx={{
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                            color: 'primary.main',
+                            '&:hover': {
+                              color: 'primary.light',
+                            },
+                          }}
+                        >
+                          Sign In
+                        </Link>
+                      </Typography>
+                    </Box>
+                  </form>
                 </Paper>
               </Box>
             </Fade>

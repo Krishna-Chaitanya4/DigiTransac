@@ -143,35 +143,36 @@ interface Tag {
 }
 
 // Smart tag mapping: category names (lowercase) to suggested tags
-const CATEGORY_TAG_SUGGESTIONS: Record<string, { suggestedTags: string[]; removeTags: string[] }> = {
-  // Investment categories
-  'stocks': { suggestedTags: ['investment'], removeTags: ['expense'] },
-  'mutual funds': { suggestedTags: ['investment'], removeTags: ['expense'] },
-  'crypto': { suggestedTags: ['investment'], removeTags: ['expense'] },
-  'cryptocurrency': { suggestedTags: ['investment'], removeTags: ['expense'] },
-  'investment': { suggestedTags: ['investment'], removeTags: ['expense'] },
-  'bonds': { suggestedTags: ['investment'], removeTags: ['expense'] },
-  'real estate': { suggestedTags: ['investment'], removeTags: ['expense'] },
-  
-  // Transfer categories
-  'transfer': { suggestedTags: ['transfer'], removeTags: ['expense', 'income'] },
-  'account transfer': { suggestedTags: ['transfer'], removeTags: ['expense', 'income'] },
-  
-  // Savings categories
-  'savings': { suggestedTags: ['savings'], removeTags: ['expense'] },
-  'emergency fund': { suggestedTags: ['savings'], removeTags: ['expense'] },
-  
-  // Loan/Debt categories
-  'loan payment': { suggestedTags: ['loan'], removeTags: ['expense'] },
-  'loan': { suggestedTags: ['loan'], removeTags: ['expense'] },
-  'debt payment': { suggestedTags: ['loan'], removeTags: ['expense'] },
-  'emi': { suggestedTags: ['loan'], removeTags: ['expense'] },
-  
-  // Refund categories
-  'refund': { suggestedTags: ['refund'], removeTags: ['income'] },
-  'cashback': { suggestedTags: ['refund'], removeTags: ['income'] },
-  'return': { suggestedTags: ['refund'], removeTags: ['income'] },
-};
+const CATEGORY_TAG_SUGGESTIONS: Record<string, { suggestedTags: string[]; removeTags: string[] }> =
+  {
+    // Investment categories
+    stocks: { suggestedTags: ['investment'], removeTags: ['expense'] },
+    'mutual funds': { suggestedTags: ['investment'], removeTags: ['expense'] },
+    crypto: { suggestedTags: ['investment'], removeTags: ['expense'] },
+    cryptocurrency: { suggestedTags: ['investment'], removeTags: ['expense'] },
+    investment: { suggestedTags: ['investment'], removeTags: ['expense'] },
+    bonds: { suggestedTags: ['investment'], removeTags: ['expense'] },
+    'real estate': { suggestedTags: ['investment'], removeTags: ['expense'] },
+
+    // Transfer categories
+    transfer: { suggestedTags: ['transfer'], removeTags: ['expense', 'income'] },
+    'account transfer': { suggestedTags: ['transfer'], removeTags: ['expense', 'income'] },
+
+    // Savings categories
+    savings: { suggestedTags: ['savings'], removeTags: ['expense'] },
+    'emergency fund': { suggestedTags: ['savings'], removeTags: ['expense'] },
+
+    // Loan/Debt categories
+    'loan payment': { suggestedTags: ['loan'], removeTags: ['expense'] },
+    loan: { suggestedTags: ['loan'], removeTags: ['expense'] },
+    'debt payment': { suggestedTags: ['loan'], removeTags: ['expense'] },
+    emi: { suggestedTags: ['loan'], removeTags: ['expense'] },
+
+    // Refund categories
+    refund: { suggestedTags: ['refund'], removeTags: ['income'] },
+    cashback: { suggestedTags: ['refund'], removeTags: ['income'] },
+    return: { suggestedTags: ['refund'], removeTags: ['income'] },
+  };
 
 // Tags to exclude from expense calculations in dashboards
 const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
@@ -194,7 +195,10 @@ const Transactions: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; transactionId: string | null }>({
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean;
+    transactionId: string | null;
+  }>({
     open: false,
     transactionId: null,
   });
@@ -229,10 +233,13 @@ const Transactions: React.FC = () => {
   const [pendingCount, setPendingCount] = useState(0); // All-time pending count
   const [merchants, setMerchants] = useState<string[]>([]); // Unique merchant names
   const [recentCategories, setRecentCategories] = useState<string[]>([]); // Recent category IDs
-  
+
   // Undo reject state
-  const [undoRejectInfo, setUndoRejectInfo] = useState<{ transactionId: string; timeoutId: number } | null>(null);
-  
+  const [undoRejectInfo, setUndoRejectInfo] = useState<{
+    transactionId: string;
+    timeoutId: number;
+  } | null>(null);
+
   // Approve mode state
   const [approveMode, setApproveMode] = useState(false); // Track if we're in "Complete & Approve" mode
 
@@ -295,7 +302,7 @@ const Transactions: React.FC = () => {
       if (state.addTransaction) {
         const transactionType = state.type || 'debit';
         const defaultTag = transactionType === 'debit' ? 'expense' : 'income';
-        
+
         setFormData((prev) => ({
           ...prev,
           accountId: state.accountId || prev.accountId,
@@ -330,19 +337,50 @@ const Transactions: React.FC = () => {
     if (token) {
       setPage(0);
     }
-  }, [selectedType, selectedAccount, selectedCategories, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery]);
+  }, [
+    selectedType,
+    selectedAccount,
+    selectedCategories,
+    includeTags,
+    excludeTags,
+    startDate,
+    endDate,
+    reviewStatus,
+    sortBy,
+    sortOrder,
+    searchQuery,
+  ]);
 
   // Fetch transactions when page, rowsPerPage, or any filter changes
   useEffect(() => {
     if (!token) return;
-    
+
     // Debounce only for search query to avoid excessive API calls while typing
-    const debounceTimer = setTimeout(() => {
-      fetchTransactions();
-    }, searchQuery ? 500 : 0); // Debounce search, immediate for other filters
+    const debounceTimer = setTimeout(
+      () => {
+        fetchTransactions();
+      },
+      searchQuery ? 500 : 0
+    ); // Debounce search, immediate for other filters
 
     return () => clearTimeout(debounceTimer);
-  }, [page, rowsPerPage, selectedType, selectedAccount, selectedCategories, includeTags, excludeTags, startDate, endDate, reviewStatus, sortBy, sortOrder, searchQuery, minAmount, maxAmount]);
+  }, [
+    page,
+    rowsPerPage,
+    selectedType,
+    selectedAccount,
+    selectedCategories,
+    includeTags,
+    excludeTags,
+    startDate,
+    endDate,
+    reviewStatus,
+    sortBy,
+    sortOrder,
+    searchQuery,
+    minAmount,
+    maxAmount,
+  ]);
 
   const fetchTransactions = async () => {
     try {
@@ -361,11 +399,11 @@ const Transactions: React.FC = () => {
       if (selectedCategories.length > 0) {
         // Expand folders to category IDs before sending to backend
         const expandedCategoryIds = new Set<string>();
-        
+
         const getAllDescendants = (folderId: string): string[] => {
           const descendants: string[] = [];
           const children = categories.filter((c) => c.parentId === folderId);
-          
+
           children.forEach((child) => {
             if (child.isFolder) {
               descendants.push(...getAllDescendants(child.id));
@@ -373,10 +411,10 @@ const Transactions: React.FC = () => {
               descendants.push(child.id);
             }
           });
-          
+
           return descendants;
         };
-        
+
         selectedCategories.forEach((catId) => {
           const cat = categories.find((c) => c.id === catId);
           if (cat?.isFolder) {
@@ -385,7 +423,7 @@ const Transactions: React.FC = () => {
             expandedCategoryIds.add(catId);
           }
         });
-        
+
         params.categoryIds = Array.from(expandedCategoryIds).join(',');
       }
       if (includeTags.length > 0) params.includeTags = includeTags.join(',');
@@ -465,21 +503,23 @@ const Transactions: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
         params: { limit: '1000', sortBy: 'date', sortOrder: 'desc' },
       });
-      
+
       const txns = txnResponse.data.transactions || [];
-      
+
       // Extract unique merchants
-      const uniqueMerchants = [...new Set(
-        txns
-          .map((t: Transaction) => t.merchantName)
-          .filter((m: string | undefined) => m && m.trim())
-      )] as string[];
+      const uniqueMerchants = [
+        ...new Set(
+          txns
+            .map((t: Transaction) => t.merchantName)
+            .filter((m: string | undefined) => m && m.trim())
+        ),
+      ] as string[];
       setMerchants(uniqueMerchants);
-      
+
       // Extract recent categories (most used in last 30 days)
       const recentTxns = txns.slice(0, 100); // Last 100 transactions
       const categoryCounts: Record<string, number> = {};
-      
+
       recentTxns.forEach((t: Transaction) => {
         if (t.splits && t.splits.length > 0) {
           t.splits.forEach((s: TransactionSplit) => {
@@ -489,13 +529,13 @@ const Transactions: React.FC = () => {
           categoryCounts[t.categoryId] = (categoryCounts[t.categoryId] || 0) + 1;
         }
       });
-      
+
       // Sort by frequency and take top 5
       const topCategories = Object.entries(categoryCounts)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
         .map(([catId]) => catId);
-      
+
       setRecentCategories(topCategories);
     } catch (err: any) {
       console.error('Failed to fetch merchants/recent categories:', err);
@@ -503,22 +543,24 @@ const Transactions: React.FC = () => {
   };
 
   // Validation: Check if transaction is complete and ready for approval
-  const isTransactionComplete = (transaction: Transaction): { complete: boolean; missing: string[] } => {
+  const isTransactionComplete = (
+    transaction: Transaction
+  ): { complete: boolean; missing: string[] } => {
     const missing: string[] = [];
-    
+
     // Check account
     if (!transaction.accountId) {
       missing.push('Account');
     }
-    
+
     // Check amount
     if (!transaction.amount || transaction.amount <= 0) {
       missing.push('Amount');
     }
-    
+
     // Check splits for categories
     if (transaction.splits && transaction.splits.length > 0) {
-      const incompleteSplits = transaction.splits.filter(s => !s.categoryId);
+      const incompleteSplits = transaction.splits.filter((s) => !s.categoryId);
       if (incompleteSplits.length > 0) {
         missing.push(`Category for ${incompleteSplits.length} split(s)`);
       }
@@ -528,16 +570,21 @@ const Transactions: React.FC = () => {
         missing.push('Category');
       }
     }
-    
+
     return {
       complete: missing.length === 0,
       missing,
     };
   };
 
-  const changeTransactionStatus = async (id: string, status: 'pending' | 'approved' | 'rejected', reason?: string) => {
+  const changeTransactionStatus = async (
+    id: string,
+    status: 'pending' | 'approved' | 'rejected',
+    reason?: string
+  ) => {
     try {
-      await axios.patch(`/api/transactions/${id}/status`, 
+      await axios.patch(
+        `/api/transactions/${id}/status`,
         { status, reason },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -552,15 +599,15 @@ const Transactions: React.FC = () => {
   const handleApprove = async (id: string) => {
     try {
       // Find the transaction
-      const transaction = transactions.find(t => t.id === id);
+      const transaction = transactions.find((t) => t.id === id);
       if (!transaction) {
         toast.error('Transaction not found');
         return;
       }
-      
+
       // Validate if transaction is complete
       const validation = isTransactionComplete(transaction);
-      
+
       if (!validation.complete) {
         // Open edit dialog with approve mode
         setApproveMode(true);
@@ -568,15 +615,18 @@ const Transactions: React.FC = () => {
         toast.warning(`Please complete: ${validation.missing.join(', ')}`);
         return;
       }
-      
+
       // Transaction is complete, proceed with approval
-      await axios.patch(`/api/transactions/${id}/approve`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.patch(
+        `/api/transactions/${id}/approve`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       toast.success('Transaction approved');
       await fetchTransactions();
       await fetchPendingCount();
-      
     } catch (error: any) {
       console.error('Error approving transaction:', error);
       toast.error(error.response?.data?.message || 'Failed to approve transaction');
@@ -590,22 +640,25 @@ const Transactions: React.FC = () => {
         clearTimeout(undoRejectInfo.timeoutId);
       }
 
-      await axios.patch(`/api/transactions/${id}/reject`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
+      await axios.patch(
+        `/api/transactions/${id}/reject`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
       await fetchTransactions();
       await fetchPendingCount();
-      
+
       // Show undo toast with 5 second timeout
       const timeoutId = window.setTimeout(() => {
         setUndoRejectInfo(null);
       }, 5000);
-      
+
       setUndoRejectInfo({ transactionId: id, timeoutId });
-      
+
       // Note: Snackbar with undo button is rendered at the bottom of the component
-      
     } catch (error: any) {
       console.error('Error rejecting transaction:', error);
       toast.error(error.response?.data?.message || 'Failed to reject transaction');
@@ -619,40 +672,44 @@ const Transactions: React.FC = () => {
     }
 
     // Validate selected transactions
-    const selectedTxns = transactions.filter(t => selectedTransactions.has(t.id));
-    const incompleteTransactions = selectedTxns.filter(t => !isTransactionComplete(t).complete);
-    
+    const selectedTxns = transactions.filter((t) => selectedTransactions.has(t.id));
+    const incompleteTransactions = selectedTxns.filter((t) => !isTransactionComplete(t).complete);
+
     if (incompleteTransactions.length > 0) {
       const proceed = window.confirm(
         `${incompleteTransactions.length} of ${selectedTransactions.size} transactions are incomplete and cannot be approved.\n\n` +
-        `Complete transactions: ${selectedTxns.length - incompleteTransactions.length}\n` +
-        `Incomplete transactions: ${incompleteTransactions.length}\n\n` +
-        `Do you want to approve only the complete transactions?`
+          `Complete transactions: ${selectedTxns.length - incompleteTransactions.length}\n` +
+          `Incomplete transactions: ${incompleteTransactions.length}\n\n` +
+          `Do you want to approve only the complete transactions?`
       );
-      
+
       if (!proceed) {
         return;
       }
-      
+
       // Filter to only complete transactions
       const completeTransactionIds = selectedTxns
-        .filter(t => isTransactionComplete(t).complete)
-        .map(t => t.id);
-      
+        .filter((t) => isTransactionComplete(t).complete)
+        .map((t) => t.id);
+
       if (completeTransactionIds.length === 0) {
         toast.error('All selected transactions are incomplete. Please complete them first.');
         return;
       }
-      
+
       try {
-        await axios.post('/api/transactions/bulk-approve', {
-          transactionIds: completeTransactionIds,
-        }, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axios.post(
+          '/api/transactions/bulk-approve',
+          {
+            transactionIds: completeTransactionIds,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         toast.success(
           `${completeTransactionIds.length} transactions approved. ` +
-          `${incompleteTransactions.length} skipped (incomplete).`
+            `${incompleteTransactions.length} skipped (incomplete).`
         );
         setSelectedTransactions(new Set());
         await fetchTransactions();
@@ -661,22 +718,25 @@ const Transactions: React.FC = () => {
         console.error('Error bulk approving:', error);
         toast.error(error.response?.data?.message || 'Failed to approve transactions');
       }
-      
+
       return;
     }
 
     // All transactions are complete, proceed normally
     try {
-      await axios.post('/api/transactions/bulk-approve', {
-        transactionIds: Array.from(selectedTransactions),
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.post(
+        '/api/transactions/bulk-approve',
+        {
+          transactionIds: Array.from(selectedTransactions),
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       toast.success(`${selectedTransactions.size} transactions approved`);
       setSelectedTransactions(new Set());
       await fetchTransactions();
       await fetchPendingCount();
-      
     } catch (error: any) {
       console.error('Error bulk approving:', error);
       toast.error(error.response?.data?.message || 'Failed to approve transactions');
@@ -703,7 +763,7 @@ const Transactions: React.FC = () => {
 
   const handleImportSuccess = useCallback(async () => {
     await fetchTransactions();
-    
+
     toast.success('Transactions imported successfully');
   }, [fetchTransactions, toast]);
 
@@ -729,8 +789,8 @@ const Transactions: React.FC = () => {
       setUseSplitMode(shouldUseSplitMode);
 
       // For Quick Add mode (single split), use the category from the first split
-      const categoryId = splits.length > 0 ? splits[0].categoryId : (transaction.categoryId || '');
-      const tags = splits.length > 0 ? splits[0].tags : (transaction.tags || []);
+      const categoryId = splits.length > 0 ? splits[0].categoryId : transaction.categoryId || '';
+      const tags = splits.length > 0 ? splits[0].tags : transaction.tags || [];
 
       setFormData({
         type: transaction.type,
@@ -795,10 +855,7 @@ const Transactions: React.FC = () => {
     // Update all split tags as well (replace old default tag with new one)
     const updatedSplits = formData.splits.map((split) => ({
       ...split,
-      tags: [
-        ...split.tags.filter((tag) => tag !== oldTag && tag !== newTag),
-        newTag,
-      ],
+      tags: [...split.tags.filter((tag) => tag !== oldTag && tag !== newTag), newTag],
     }));
 
     setFormData({
@@ -861,12 +918,16 @@ const Transactions: React.FC = () => {
         await axios.put(`/api/transactions/${editingTransaction.id}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        
+
         // If in approve mode, also approve the transaction after saving
         if (approveMode) {
-          await axios.patch(`/api/transactions/${editingTransaction.id}/approve`, {}, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          await axios.patch(
+            `/api/transactions/${editingTransaction.id}/approve`,
+            {},
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
           toast.success('Transaction completed and approved');
         } else {
           toast.success('Transaction updated successfully');
@@ -913,7 +974,7 @@ const Transactions: React.FC = () => {
   const addSplit = () => {
     // New splits should inherit the default tag based on transaction type
     const defaultTag = formData.type === 'debit' ? 'expense' : 'income';
-    
+
     const newSplit: TransactionSplit = {
       categoryId: '',
       amount: 0,
@@ -959,27 +1020,27 @@ const Transactions: React.FC = () => {
     const total = parseFloat(formData.amount) || 0;
     const splitCount = formData.splits.length;
     if (splitCount === 0) return;
-    
+
     const amountPerSplit = total / splitCount;
     const newSplits = formData.splits.map((split) => ({
       ...split,
       amount: Math.round(amountPerSplit * 100) / 100, // Round to 2 decimals
     }));
-    
+
     // Adjust last split to account for rounding
     const distributedTotal = newSplits.reduce((sum, s) => sum + s.amount, 0);
     const diff = total - distributedTotal;
     if (diff !== 0 && newSplits.length > 0) {
       newSplits[newSplits.length - 1].amount += diff;
     }
-    
+
     setFormData({ ...formData, splits: newSplits });
   };
 
   const fillRemaining = (index: number) => {
     const remaining = getRemainingAmount();
     if (remaining <= 0) return;
-    
+
     const newSplits = [...formData.splits];
     newSplits[index] = { ...newSplits[index], amount: (newSplits[index].amount || 0) + remaining };
     setFormData({ ...formData, splits: newSplits });
@@ -1004,10 +1065,10 @@ const Transactions: React.FC = () => {
     const merchantTransactions = transactions.filter(
       (t) => t.merchantName?.toLowerCase() === merchantName.toLowerCase()
     );
-    
+
     if (merchantTransactions.length > 0) {
       const categoryCounts: Record<string, number> = {};
-      
+
       merchantTransactions.forEach((t) => {
         if (t.splits && t.splits.length > 0) {
           t.splits.forEach((s) => {
@@ -1017,20 +1078,23 @@ const Transactions: React.FC = () => {
           categoryCounts[t.categoryId] = (categoryCounts[t.categoryId] || 0) + 1;
         }
       });
-      
+
       // Get most common category
-      const suggestedCategoryId = Object.entries(categoryCounts)
-        .sort(([, a], [, b]) => b - a)[0]?.[0];
-      
+      const suggestedCategoryId = Object.entries(categoryCounts).sort(
+        ([, a], [, b]) => b - a
+      )[0]?.[0];
+
       if (suggestedCategoryId && !formData.categoryId) {
         setFormData({
           ...formData,
           merchantName,
           categoryId: suggestedCategoryId,
-          splits: [{
-            ...formData.splits[0],
-            categoryId: suggestedCategoryId,
-          }],
+          splits: [
+            {
+              ...formData.splits[0],
+              categoryId: suggestedCategoryId,
+            },
+          ],
         });
         toast.success(`Category suggested based on "${merchantName}" history`);
       } else {
@@ -1062,11 +1126,13 @@ const Transactions: React.FC = () => {
           ...formData,
           categoryId,
           tags: updatedTags,
-          splits: [{
-            ...formData.splits[0],
-            categoryId,
-            tags: updatedTags,
-          }],
+          splits: [
+            {
+              ...formData.splits[0],
+              categoryId,
+              tags: updatedTags,
+            },
+          ],
         });
 
         if (suggestion.suggestedTags.length > 0) {
@@ -1098,10 +1164,12 @@ const Transactions: React.FC = () => {
         setFormData({
           ...formData,
           categoryId,
-          splits: [{
-            ...formData.splits[0],
-            categoryId,
-          }],
+          splits: [
+            {
+              ...formData.splits[0],
+              categoryId,
+            },
+          ],
         });
       } else {
         updateSplit(splitIndex, 'categoryId', categoryId);
@@ -1119,7 +1187,7 @@ const Transactions: React.FC = () => {
         e.preventDefault();
         handleSubmit();
       }
-      
+
       // Ctrl+S or Cmd+S to toggle split mode
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
@@ -1173,14 +1241,15 @@ const Transactions: React.FC = () => {
       'Status',
       'Total Amount',
     ];
-    
+
     // Each split becomes a separate row (industry standard)
     const rows: string[][] = [];
     transactions.forEach((t) => {
-      const splits = t.splits && t.splits.length > 0 ? t.splits : [
-        { categoryId: t.categoryId || '', amount: t.amount, tags: t.tags || [] }
-      ];
-      
+      const splits =
+        t.splits && t.splits.length > 0
+          ? t.splits
+          : [{ categoryId: t.categoryId || '', amount: t.amount, tags: t.tags || [] }];
+
       splits.forEach((split) => {
         rows.push([
           dayjs(t.date).format('YYYY-MM-DD'),
@@ -1217,16 +1286,19 @@ const Transactions: React.FC = () => {
     setSelectAll(!selectAll);
   }, [selectAll, transactions]);
 
-  const handleSelectTransaction = useCallback((id: string) => {
-    const newSelected = new Set(selectedTransactions);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedTransactions(newSelected);
-    setSelectAll(newSelected.size === transactions.length);
-  }, [selectedTransactions, transactions.length]);
+  const handleSelectTransaction = useCallback(
+    (id: string) => {
+      const newSelected = new Set(selectedTransactions);
+      if (newSelected.has(id)) {
+        newSelected.delete(id);
+      } else {
+        newSelected.add(id);
+      }
+      setSelectedTransactions(newSelected);
+      setSelectAll(newSelected.size === transactions.length);
+    },
+    [selectedTransactions, transactions.length]
+  );
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -1259,15 +1331,21 @@ const Transactions: React.FC = () => {
     return categories.find((c) => c.id === categoryId)?.color || '#667eea';
   };
 
-  const formatCurrency = useCallback((amount: number, accountId: string) => {
-    const account = accounts.find((a) => a.id === accountId);
-    const currency = account?.currency || user?.currency || 'USD';
-    return formatCurrencyUtil(amount, currency);
-  }, [accounts, user?.currency]);
+  const formatCurrency = useCallback(
+    (amount: number, accountId: string) => {
+      const account = accounts.find((a) => a.id === accountId);
+      const currency = account?.currency || user?.currency || 'USD';
+      return formatCurrencyUtil(amount, currency);
+    },
+    [accounts, user?.currency]
+  );
 
-  const formatUserCurrency = useCallback((amount: number) => {
-    return formatCurrencyUtil(amount, user?.currency || 'USD');
-  }, [user?.currency]);
+  const formatUserCurrency = useCallback(
+    (amount: number) => {
+      return formatCurrencyUtil(amount, user?.currency || 'USD');
+    },
+    [user?.currency]
+  );
 
   if (loading) {
     return (
@@ -1283,7 +1361,7 @@ const Transactions: React.FC = () => {
   // Summary cards should ONLY show approved transactions for accurate financial position
   // This follows industry standard: list is flexible, but totals are always accurate
   // Also exclude investment/transfer/savings tags from totals
-  
+
   const shouldExcludeFromExpenses = (t: Transaction): boolean => {
     if (t.splits && t.splits.length > 0) {
       return t.splits.some((split) =>
@@ -1303,10 +1381,14 @@ const Transactions: React.FC = () => {
   };
 
   const totalCredits = transactions
-    .filter((t) => t.type === 'credit' && t.reviewStatus === 'approved' && !shouldExcludeFromIncome(t))
+    .filter(
+      (t) => t.type === 'credit' && t.reviewStatus === 'approved' && !shouldExcludeFromIncome(t)
+    )
     .reduce((sum, t) => sum + t.amount, 0);
   const totalDebits = transactions
-    .filter((t) => t.type === 'debit' && t.reviewStatus === 'approved' && !shouldExcludeFromExpenses(t))
+    .filter(
+      (t) => t.type === 'debit' && t.reviewStatus === 'approved' && !shouldExcludeFromExpenses(t)
+    )
     .reduce((sum, t) => sum + t.amount, 0);
   const netAmount = totalCredits - totalDebits;
 
@@ -1314,7 +1396,7 @@ const Transactions: React.FC = () => {
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ width: '100%', overflow: 'hidden' }}>
         {/* Enhanced Header */}
-        <Box 
+        <Box
           sx={{
             mb: 4,
             p: 3,
@@ -1333,7 +1415,8 @@ const Transactions: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.15) 0%, transparent 50%)',
+              background:
+                'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.15) 0%, transparent 50%)',
               animation: 'pulse 4s ease-in-out infinite',
             },
             '@keyframes pulse': {
@@ -1343,10 +1426,16 @@ const Transactions: React.FC = () => {
           }}
         >
           <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="flex-start"
+              flexWrap="wrap"
+              gap={2}
+            >
               <Box>
-                <Typography 
-                  variant="h4" 
+                <Typography
+                  variant="h4"
                   gutterBottom
                   sx={{
                     fontWeight: 800,
@@ -1357,10 +1446,18 @@ const Transactions: React.FC = () => {
                 >
                   Transactions
                 </Typography>
-                <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
+                <Typography
+                  variant="body1"
+                  sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}
+                >
                   {transactions.length} this month
                   {transactions.length > 0 && transactions[0] && (
-                    <> • Last: {transactions[0].description || 'Untitled'} {formatUserCurrency(transactions[0].amount)} • {new Date(transactions[0].date).toLocaleDateString()}</>
+                    <>
+                      {' '}
+                      • Last: {transactions[0].description || 'Untitled'}{' '}
+                      {formatUserCurrency(transactions[0].amount)} •{' '}
+                      {new Date(transactions[0].date).toLocaleDateString()}
+                    </>
                   )}
                 </Typography>
               </Box>
@@ -1370,7 +1467,7 @@ const Transactions: React.FC = () => {
                   startIcon={<ImportIcon sx={{ display: { xs: 'none', sm: 'inline' } }} />}
                   onClick={handleImportMenuOpen}
                   size="small"
-                  sx={{ 
+                  sx={{
                     minWidth: { xs: 80, sm: 'auto' },
                     color: 'white',
                     borderColor: 'rgba(255,255,255,0.3)',
@@ -1402,7 +1499,7 @@ const Transactions: React.FC = () => {
                   onClick={handleExportCSV}
                   disabled={transactions.length === 0}
                   size="small"
-                  sx={{ 
+                  sx={{
                     minWidth: { xs: 80, sm: 'auto' },
                     color: 'white',
                     borderColor: 'rgba(255,255,255,0.3)',
@@ -1418,12 +1515,12 @@ const Transactions: React.FC = () => {
                 >
                   Export
                 </Button>
-                <Button 
-                  variant="contained" 
-                  startIcon={<AddIcon />} 
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
                   onClick={() => handleOpenDialog()}
                   size="small"
-                  sx={{ 
+                  sx={{
                     minWidth: { xs: 80, sm: 'auto' },
                     bgcolor: 'white',
                     color: 'primary.main',
@@ -1446,33 +1543,51 @@ const Transactions: React.FC = () => {
         {/* Summary Cards */}
         <Grid container spacing={3} mb={3}>
           <Grid size={{ md: 4, xs: 12 }}>
-            <Card sx={{ 
-              background: (theme) => theme.palette.gradient.success,
-              color: 'white',
-              borderRadius: 3,
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              cursor: 'pointer',
-              '&:hover': {
-                transform: 'translateY(-6px)',
-                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '100px',
-                height: '100px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                background: (theme) => theme.palette.gradient.success,
+                color: 'white',
+                borderRadius: 3,
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: 'translateY(-6px)',
+                  boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '100px',
+                  height: '100px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Total Credits
                   </Typography>
                   <CreditIcon sx={{ opacity: 0.7 }} />
@@ -1484,33 +1599,51 @@ const Transactions: React.FC = () => {
             </Card>
           </Grid>
           <Grid size={{ md: 4, xs: 12 }}>
-            <Card sx={{ 
-              background: (theme) => theme.palette.gradient.error,
-              color: 'white',
-              borderRadius: 3,
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              cursor: 'pointer',
-              '&:hover': {
-                transform: 'translateY(-6px)',
-                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '100px',
-                height: '100px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                background: (theme) => theme.palette.gradient.error,
+                color: 'white',
+                borderRadius: 3,
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: 'translateY(-6px)',
+                  boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '100px',
+                  height: '100px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Total Debits
                   </Typography>
                   <DebitIcon sx={{ opacity: 0.7 }} />
@@ -1532,16 +1665,18 @@ const Transactions: React.FC = () => {
                 borderRadius: 3,
                 overflow: 'hidden',
                 position: 'relative',
-                boxShadow: netAmount >= 0 
-                  ? '0 4px 20px rgba(59, 130, 246, 0.25)'
-                  : '0 4px 20px rgba(249, 115, 22, 0.25)',
+                boxShadow:
+                  netAmount >= 0
+                    ? '0 4px 20px rgba(59, 130, 246, 0.25)'
+                    : '0 4px 20px rgba(249, 115, 22, 0.25)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 cursor: 'pointer',
                 '&:hover': {
                   transform: 'translateY(-6px)',
-                  boxShadow: netAmount >= 0 
-                    ? '0 12px 32px rgba(59, 130, 246, 0.35)'
-                    : '0 12px 32px rgba(249, 115, 22, 0.35)',
+                  boxShadow:
+                    netAmount >= 0
+                      ? '0 12px 32px rgba(59, 130, 246, 0.35)'
+                      : '0 12px 32px rgba(249, 115, 22, 0.35)',
                 },
                 '&::after': {
                   content: '""',
@@ -1556,8 +1691,24 @@ const Transactions: React.FC = () => {
               }}
             >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Net Amount
                   </Typography>
                   <AccountBalanceWallet sx={{ opacity: 0.7 }} />
@@ -1589,18 +1740,14 @@ const Transactions: React.FC = () => {
                   ),
                   endAdornment: searchQuery && (
                     <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setSearchQuery('')}
-                        edge="end"
-                      >
+                      <IconButton size="small" onClick={() => setSearchQuery('')} edge="end">
                         <CloseIcon fontSize="small" />
                       </IconButton>
                     </InputAdornment>
                   ),
                 }}
-                sx={{ 
-                  minWidth: 250, 
+                sx={{
+                  minWidth: 250,
                   flexGrow: { xs: 1, sm: 0 },
                   '& .MuiInputBase-input': {
                     fontSize: '0.875rem',
@@ -1615,7 +1762,7 @@ const Transactions: React.FC = () => {
                 color={selectedType === 'all' ? 'primary' : 'default'}
                 variant={selectedType === 'all' ? 'filled' : 'outlined'}
                 size="medium"
-                sx={{ 
+                sx={{
                   fontWeight: selectedType === 'all' ? 600 : 400,
                   fontSize: '0.875rem',
                   height: 32,
@@ -1628,7 +1775,7 @@ const Transactions: React.FC = () => {
                 color={selectedType === 'credit' ? 'success' : 'default'}
                 variant={selectedType === 'credit' ? 'filled' : 'outlined'}
                 size="medium"
-                sx={{ 
+                sx={{
                   fontWeight: selectedType === 'credit' ? 600 : 400,
                   fontSize: '0.875rem',
                   height: 32,
@@ -1641,7 +1788,7 @@ const Transactions: React.FC = () => {
                 color={selectedType === 'debit' ? 'error' : 'default'}
                 variant={selectedType === 'debit' ? 'filled' : 'outlined'}
                 size="medium"
-                sx={{ 
+                sx={{
                   fontWeight: selectedType === 'debit' ? 600 : 400,
                   fontSize: '0.875rem',
                   height: 32,
@@ -1658,7 +1805,7 @@ const Transactions: React.FC = () => {
                 color={reviewStatus === 'all' ? 'primary' : 'default'}
                 variant={reviewStatus === 'all' ? 'filled' : 'outlined'}
                 size="medium"
-                sx={{ 
+                sx={{
                   fontWeight: reviewStatus === 'all' ? 600 : 400,
                   fontSize: '0.875rem',
                   height: 32,
@@ -1676,13 +1823,13 @@ const Transactions: React.FC = () => {
                 color={reviewStatus === 'pending' ? 'warning' : 'default'}
                 variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
                 size="medium"
-                sx={{ 
+                sx={{
                   fontWeight: reviewStatus === 'pending' ? 600 : 400,
                   fontSize: '0.875rem',
                   height: 32,
                   '& .MuiChip-label': {
                     fontWeight: pendingCount > 0 ? 600 : 400,
-                  }
+                  },
                 }}
               />
               <Chip
@@ -1692,7 +1839,7 @@ const Transactions: React.FC = () => {
                 color={reviewStatus === 'approved' ? 'success' : 'default'}
                 variant={reviewStatus === 'approved' ? 'filled' : 'outlined'}
                 size="medium"
-                sx={{ 
+                sx={{
                   fontWeight: reviewStatus === 'approved' ? 600 : 400,
                   fontSize: '0.875rem',
                   height: 32,
@@ -1705,7 +1852,7 @@ const Transactions: React.FC = () => {
                 color={reviewStatus === 'rejected' ? 'error' : 'default'}
                 variant={reviewStatus === 'rejected' ? 'filled' : 'outlined'}
                 size="medium"
-                sx={{ 
+                sx={{
                   fontWeight: reviewStatus === 'rejected' ? 600 : 400,
                   fontSize: '0.875rem',
                   height: 32,
@@ -1746,11 +1893,11 @@ const Transactions: React.FC = () => {
                   sx={{ fontWeight: 500, fontSize: '0.8125rem', height: 28 }}
                 />
               )}
-              
+
               {/* Active filter indicators */}
               {selectedAccount && (
                 <Chip
-                  label={`Account: ${accounts.find(a => a.id === selectedAccount)?.name || ''}`}
+                  label={`Account: ${accounts.find((a) => a.id === selectedAccount)?.name || ''}`}
                   onDelete={() => setSelectedAccount('')}
                   size="small"
                   color="info"
@@ -1761,7 +1908,7 @@ const Transactions: React.FC = () => {
               {selectedCategories.length > 0 && (
                 <Chip
                   label={`${selectedCategories.length} ${selectedCategories.length === 1 ? 'Category' : 'Categories'}`}
-                  onDelete={() => setSelectedCategories([])} 
+                  onDelete={() => setSelectedCategories([])}
                   size="small"
                   color="info"
                   variant="outlined"
@@ -1870,16 +2017,17 @@ const Transactions: React.FC = () => {
                       setSelectedCategories(newValue.map((cat) => cat.id));
                     }}
                     renderInput={(params) => (
-                      <TextField 
-                        {...params} 
-                        label="Categories" 
+                      <TextField
+                        {...params}
+                        label="Categories"
                         size="small"
                         placeholder="Select categories or folders..."
                       />
                     )}
                     renderOption={(props, option) => (
                       <li {...props}>
-                        {option.isFolder ? '📁 ' : ''}{option.name}
+                        {option.isFolder ? '📁 ' : ''}
+                        {option.name}
                       </li>
                     )}
                     renderTags={(value, getTagProps) => {
@@ -1887,7 +2035,7 @@ const Transactions: React.FC = () => {
                       const getDescendantCount = (folderId: string): number => {
                         let count = 0;
                         const children = categories.filter((c) => c.parentId === folderId);
-                        
+
                         children.forEach((child) => {
                           if (child.isFolder) {
                             count += getDescendantCount(child.id);
@@ -1895,21 +2043,21 @@ const Transactions: React.FC = () => {
                             count++;
                           }
                         });
-                        
+
                         return count;
                       };
 
                       return value.map((option, index) => {
-                        const label = option.isFolder 
+                        const label = option.isFolder
                           ? `📁 ${option.name} (${getDescendantCount(option.id)})`
                           : option.name;
-                        
+
                         return (
-                          <Chip 
+                          <Chip
                             label={label}
                             size="small"
                             style={{ backgroundColor: option.color || '#667eea', color: '#fff' }}
-                            {...getTagProps({ index })} 
+                            {...getTagProps({ index })}
                           />
                         );
                       });
@@ -2025,20 +2173,20 @@ const Transactions: React.FC = () => {
                     value={includeTags}
                     onChange={(_, value) => setIncludeTags(value)}
                     renderInput={(params) => (
-                      <TextField 
-                        {...params} 
-                        label="Include Tags (show WITH these)" 
+                      <TextField
+                        {...params}
+                        label="Include Tags (show WITH these)"
                         size="small"
                         placeholder="Select tags to include..."
                       />
                     )}
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
-                        <Chip 
-                          label={option} 
-                          size="small" 
+                        <Chip
+                          label={option}
+                          size="small"
                           color="success"
-                          {...getTagProps({ index })} 
+                          {...getTagProps({ index })}
                         />
                       ))
                     }
@@ -2052,20 +2200,20 @@ const Transactions: React.FC = () => {
                     value={excludeTags}
                     onChange={(_, value) => setExcludeTags(value)}
                     renderInput={(params) => (
-                      <TextField 
-                        {...params} 
-                        label="Exclude Tags (hide WITH these)" 
+                      <TextField
+                        {...params}
+                        label="Exclude Tags (hide WITH these)"
                         size="small"
                         placeholder="Select tags to exclude..."
                       />
                     )}
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
-                        <Chip 
-                          label={option} 
-                          size="small" 
+                        <Chip
+                          label={option}
+                          size="small"
                           color="error"
-                          {...getTagProps({ index })} 
+                          {...getTagProps({ index })}
                         />
                       ))
                     }
@@ -2111,9 +2259,15 @@ const Transactions: React.FC = () => {
                     size="small"
                   >
                     <MenuItem value="any">Any Amount</MenuItem>
-                    <MenuItem value="small">{currencySymbol}0-{currencySymbol}50</MenuItem>
-                    <MenuItem value="medium">{currencySymbol}50-{currencySymbol}200</MenuItem>
-                    <MenuItem value="large">{currencySymbol}200-{currencySymbol}1K</MenuItem>
+                    <MenuItem value="small">
+                      {currencySymbol}0-{currencySymbol}50
+                    </MenuItem>
+                    <MenuItem value="medium">
+                      {currencySymbol}50-{currencySymbol}200
+                    </MenuItem>
+                    <MenuItem value="large">
+                      {currencySymbol}200-{currencySymbol}1K
+                    </MenuItem>
                     <MenuItem value="veryLarge">&gt;{currencySymbol}1K</MenuItem>
                     <MenuItem value="custom">Custom Range</MenuItem>
                   </TextField>
@@ -2179,113 +2333,123 @@ const Transactions: React.FC = () => {
               ) : (
                 <>
                   {transactions.map((transaction) => {
-                      const CardComponent = isTouchDevice ? SwipeableTransactionCard : TransactionCard;
-                      const isPending = transaction.reviewStatus === 'pending';
-                      const isRejected = transaction.reviewStatus === 'rejected';
-                      const validation = isPending ? isTransactionComplete(transaction) : { complete: true, missing: [] };
-                      
-                      return (
-                        <Box key={transaction.id} sx={{ position: 'relative' }}>
-                          {isPending && !validation.complete && (
-                            <Chip
-                              label={`Incomplete: ${validation.missing.join(', ')}`}
+                    const CardComponent = isTouchDevice
+                      ? SwipeableTransactionCard
+                      : TransactionCard;
+                    const isPending = transaction.reviewStatus === 'pending';
+                    const isRejected = transaction.reviewStatus === 'rejected';
+                    const validation = isPending
+                      ? isTransactionComplete(transaction)
+                      : { complete: true, missing: [] };
+
+                    return (
+                      <Box key={transaction.id} sx={{ position: 'relative' }}>
+                        {isPending && !validation.complete && (
+                          <Chip
+                            label={`Incomplete: ${validation.missing.join(', ')}`}
+                            color="warning"
+                            size="small"
+                            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
+                          />
+                        )}
+                        <CardComponent
+                          transaction={transaction}
+                          onEdit={() => handleOpenDialog(transaction)}
+                          onDelete={() => handleDeleteClick(transaction.id)}
+                          formatCurrency={(amount) => formatCurrency(amount, transaction.accountId)}
+                          getCategoryName={getCategoryName}
+                          getCategoryColor={getCategoryColor}
+                          getAccountName={getAccountName}
+                          isExpanded={expandedRows.has(transaction.id)}
+                          onToggleExpand={() => toggleRowExpansion(transaction.id)}
+                        />
+                        {isPending && (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              gap: 1,
+                              mt: 1,
+                              px: 2,
+                              pb: 2,
+                            }}
+                          >
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              startIcon={<ApproveIcon />}
+                              onClick={() => handleApprove(transaction.id)}
+                              fullWidth
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              size="small"
+                              startIcon={<RejectIcon />}
+                              onClick={() => handleReject(transaction.id)}
+                              fullWidth
+                            >
+                              Reject
+                            </Button>
+                          </Box>
+                        )}
+                        {isRejected && (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              gap: 1,
+                              mt: 1,
+                              px: 2,
+                              pb: 2,
+                            }}
+                          >
+                            <Button
+                              variant="contained"
                               color="warning"
                               size="small"
-                              sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
-                            />
-                          )}
-                          <CardComponent
-                            transaction={transaction}
-                            onEdit={() => handleOpenDialog(transaction)}
-                            onDelete={() => handleDeleteClick(transaction.id)}
-                            formatCurrency={(amount) => formatCurrency(amount, transaction.accountId)}
-                            getCategoryName={getCategoryName}
-                            getCategoryColor={getCategoryColor}
-                            getAccountName={getAccountName}
-                            isExpanded={expandedRows.has(transaction.id)}
-                            onToggleExpand={() => toggleRowExpansion(transaction.id)}
-                          />
-                          {isPending && (
-                            <Box 
-                              sx={{ 
-                                display: 'flex', 
-                                gap: 1, 
-                                mt: 1, 
-                                px: 2, 
-                                pb: 2 
+                              startIcon={<ApproveIcon />}
+                              onClick={async () => {
+                                const success = await changeTransactionStatus(
+                                  transaction.id,
+                                  'pending'
+                                );
+                                if (success) {
+                                  toast.success('Transaction restored to pending');
+                                  await fetchTransactions();
+                                  await fetchPendingCount();
+                                }
                               }}
+                              fullWidth
                             >
-                              <Button
-                                variant="contained"
-                                color="success"
-                                size="small"
-                                startIcon={<ApproveIcon />}
-                                onClick={() => handleApprove(transaction.id)}
-                                fullWidth
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                color="error"
-                                size="small"
-                                startIcon={<RejectIcon />}
-                                onClick={() => handleReject(transaction.id)}
-                                fullWidth
-                              >
-                                Reject
-                              </Button>
-                            </Box>
-                          )}
-                          {isRejected && (
-                            <Box 
-                              sx={{ 
-                                display: 'flex', 
-                                gap: 1, 
-                                mt: 1, 
-                                px: 2, 
-                                pb: 2 
+                              Restore to Pending
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="success"
+                              size="small"
+                              startIcon={<ApproveIcon />}
+                              onClick={async () => {
+                                const success = await changeTransactionStatus(
+                                  transaction.id,
+                                  'approved'
+                                );
+                                if (success) {
+                                  toast.success('Transaction approved');
+                                  await fetchTransactions();
+                                  await fetchPendingCount();
+                                }
                               }}
+                              fullWidth
                             >
-                              <Button
-                                variant="contained"
-                                color="warning"
-                                size="small"
-                                startIcon={<ApproveIcon />}
-                                onClick={async () => {
-                                  const success = await changeTransactionStatus(transaction.id, 'pending');
-                                  if (success) {
-                                    toast.success('Transaction restored to pending');
-                                    await fetchTransactions();
-                                    await fetchPendingCount();
-                                  }
-                                }}
-                                fullWidth
-                              >
-                                Restore to Pending
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                color="success"
-                                size="small"
-                                startIcon={<ApproveIcon />}
-                                onClick={async () => {
-                                  const success = await changeTransactionStatus(transaction.id, 'approved');
-                                  if (success) {
-                                    toast.success('Transaction approved');
-                                    await fetchTransactions();
-                                    await fetchPendingCount();
-                                  }
-                                }}
-                                fullWidth
-                              >
-                                Approve Anyway
-                              </Button>
-                            </Box>
-                          )}
-                        </Box>
-                      );
-                    })}
+                              Approve Anyway
+                            </Button>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
                   <TablePagination
                     component="div"
                     count={totalCount}
@@ -2305,160 +2469,175 @@ const Transactions: React.FC = () => {
         ) : (
           // Desktop Table View
           <Card>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      checked={selectAll}
-                      onChange={handleSelectAll}
-                      disabled={transactions.length === 0}
-                    />
-                  </TableCell>
-                  <TableCell></TableCell>
-                  <TableCell 
-                    sx={{ 
-                      cursor: 'pointer', 
-                      userSelect: 'none',
-                      '&:hover .sort-icon': { opacity: 1 }
-                    }}
-                    onClick={() => {
-                      if (sortBy === 'date') {
-                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                      } else {
-                        setSortBy('date');
-                        setSortOrder('desc');
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      Date
-                      {sortBy === 'date' ? (
-                        sortOrder === 'desc' ? 
-                          <ArrowDownwardIcon fontSize="small" /> : 
-                          <ArrowUpwardIcon fontSize="small" />
-                      ) : (
-                        <UnfoldMoreIcon 
-                          fontSize="small" 
-                          className="sort-icon"
-                          sx={{ opacity: 0, color: 'text.secondary' }} 
-                        />
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell 
-                    sx={{ 
-                      cursor: 'pointer', 
-                      userSelect: 'none',
-                      '&:hover .sort-icon': { opacity: 1 }
-                    }}
-                    onClick={() => {
-                      if (sortBy === 'type') {
-                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                      } else {
-                        setSortBy('type');
-                        setSortOrder('asc');
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      Type
-                      {sortBy === 'type' ? (
-                        sortOrder === 'desc' ? 
-                          <ArrowDownwardIcon fontSize="small" /> : 
-                          <ArrowUpwardIcon fontSize="small" />
-                      ) : (
-                        <UnfoldMoreIcon 
-                          fontSize="small" 
-                          className="sort-icon"
-                          sx={{ opacity: 0, color: 'text.secondary' }} 
-                        />
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell 
-                    sx={{ 
-                      cursor: 'pointer', 
-                      userSelect: 'none',
-                      '&:hover .sort-icon': { opacity: 1 }
-                    }}
-                    onClick={() => {
-                      if (sortBy === 'description') {
-                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                      } else {
-                        setSortBy('description');
-                        setSortOrder('asc');
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      Description
-                      {sortBy === 'description' ? (
-                        sortOrder === 'desc' ? 
-                          <ArrowDownwardIcon fontSize="small" /> : 
-                          <ArrowUpwardIcon fontSize="small" />
-                      ) : (
-                        <UnfoldMoreIcon 
-                          fontSize="small" 
-                          className="sort-icon"
-                          sx={{ opacity: 0, color: 'text.secondary' }} 
-                        />
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Tags</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell 
-                    align="right"
-                    sx={{ 
-                      cursor: 'pointer', 
-                      userSelect: 'none',
-                      '&:hover .sort-icon': { opacity: 1 }
-                    }}
-                    onClick={() => {
-                      if (sortBy === 'amount') {
-                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                      } else {
-                        setSortBy('amount');
-                        setSortOrder('desc');
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                      Amount
-                      {sortBy === 'amount' ? (
-                        sortOrder === 'desc' ? 
-                          <ArrowDownwardIcon fontSize="small" /> : 
-                          <ArrowUpwardIcon fontSize="small" />
-                      ) : (
-                        <UnfoldMoreIcon 
-                          fontSize="small" 
-                          className="sort-icon"
-                          sx={{ opacity: 0, color: 'text.secondary' }} 
-                        />
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {transactions.length === 0 ? (
+            <TableContainer>
+              <Table>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ border: 'none', p: 0 }}>
-                      <EmptyState
-                        icon={<ReceiptIcon />}
-                        title="No transactions found"
-                        description="Start tracking your finances by adding your first transaction"
-                        actionLabel="Add Transaction"
-                        onAction={() => handleOpenDialog()}
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                        disabled={transactions.length === 0}
                       />
                     </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell
+                      sx={{
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover .sort-icon': { opacity: 1 },
+                      }}
+                      onClick={() => {
+                        if (sortBy === 'date') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('date');
+                          setSortOrder('desc');
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        Date
+                        {sortBy === 'date' ? (
+                          sortOrder === 'desc' ? (
+                            <ArrowDownwardIcon fontSize="small" />
+                          ) : (
+                            <ArrowUpwardIcon fontSize="small" />
+                          )
+                        ) : (
+                          <UnfoldMoreIcon
+                            fontSize="small"
+                            className="sort-icon"
+                            sx={{ opacity: 0, color: 'text.secondary' }}
+                          />
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover .sort-icon': { opacity: 1 },
+                      }}
+                      onClick={() => {
+                        if (sortBy === 'type') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('type');
+                          setSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        Type
+                        {sortBy === 'type' ? (
+                          sortOrder === 'desc' ? (
+                            <ArrowDownwardIcon fontSize="small" />
+                          ) : (
+                            <ArrowUpwardIcon fontSize="small" />
+                          )
+                        ) : (
+                          <UnfoldMoreIcon
+                            fontSize="small"
+                            className="sort-icon"
+                            sx={{ opacity: 0, color: 'text.secondary' }}
+                          />
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover .sort-icon': { opacity: 1 },
+                      }}
+                      onClick={() => {
+                        if (sortBy === 'description') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('description');
+                          setSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        Description
+                        {sortBy === 'description' ? (
+                          sortOrder === 'desc' ? (
+                            <ArrowDownwardIcon fontSize="small" />
+                          ) : (
+                            <ArrowUpwardIcon fontSize="small" />
+                          )
+                        ) : (
+                          <UnfoldMoreIcon
+                            fontSize="small"
+                            className="sort-icon"
+                            sx={{ opacity: 0, color: 'text.secondary' }}
+                          />
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell>Category</TableCell>
+                    <TableCell>Tags</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover .sort-icon': { opacity: 1 },
+                      }}
+                      onClick={() => {
+                        if (sortBy === 'amount') {
+                          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy('amount');
+                          setSortOrder('desc');
+                        }
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
+                          gap: 0.5,
+                        }}
+                      >
+                        Amount
+                        {sortBy === 'amount' ? (
+                          sortOrder === 'desc' ? (
+                            <ArrowDownwardIcon fontSize="small" />
+                          ) : (
+                            <ArrowUpwardIcon fontSize="small" />
+                          )
+                        ) : (
+                          <UnfoldMoreIcon
+                            fontSize="small"
+                            className="sort-icon"
+                            sx={{ opacity: 0, color: 'text.secondary' }}
+                          />
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">Actions</TableCell>
                   </TableRow>
-                ) : (
-                  transactions.map((transaction) => {
+                </TableHead>
+                <TableBody>
+                  {transactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} sx={{ border: 'none', p: 0 }}>
+                        <EmptyState
+                          icon={<ReceiptIcon />}
+                          title="No transactions found"
+                          description="Start tracking your finances by adding your first transaction"
+                          actionLabel="Add Transaction"
+                          onAction={() => handleOpenDialog()}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    transactions.map((transaction) => {
                       const isExpanded = expandedRows.has(transaction.id);
                       const hasSplits = transaction.splits && transaction.splits.length > 1;
 
@@ -2566,16 +2745,19 @@ const Transactions: React.FC = () => {
                             </TableCell>
                             <TableCell sx={{ minWidth: 180, maxWidth: 280 }}>
                               <Box display="flex" gap={0.5} flexWrap="wrap" alignItems="center">
-                                {transaction.reviewStatus === 'pending' && !isTransactionComplete(transaction).complete && (
-                                  <Tooltip title={`Incomplete: ${isTransactionComplete(transaction).missing.join(', ')}`}>
-                                    <Chip
-                                      label="⚠"
-                                      color="warning"
-                                      size="small"
-                                      sx={{ fontSize: '0.7rem', minWidth: 24, height: 20 }}
-                                    />
-                                  </Tooltip>
-                                )}
+                                {transaction.reviewStatus === 'pending' &&
+                                  !isTransactionComplete(transaction).complete && (
+                                    <Tooltip
+                                      title={`Incomplete: ${isTransactionComplete(transaction).missing.join(', ')}`}
+                                    >
+                                      <Chip
+                                        label="⚠"
+                                        color="warning"
+                                        size="small"
+                                        sx={{ fontSize: '0.7rem', minWidth: 24, height: 20 }}
+                                      />
+                                    </Tooltip>
+                                  )}
                                 {transaction.splits && transaction.splits.length > 0
                                   ? Array.from(
                                       new Set(transaction.splits.flatMap((s) => s.tags || []))
@@ -2616,17 +2798,19 @@ const Transactions: React.FC = () => {
                             <TableCell sx={{ width: 110 }}>
                               <Chip
                                 label={
-                                  transaction.reviewStatus 
-                                    ? transaction.reviewStatus.charAt(0).toUpperCase() + transaction.reviewStatus.slice(1)
+                                  transaction.reviewStatus
+                                    ? transaction.reviewStatus.charAt(0).toUpperCase() +
+                                      transaction.reviewStatus.slice(1)
                                     : 'Pending'
                                 }
                                 size="small"
                                 color={
-                                  transaction.reviewStatus === 'pending' || !transaction.reviewStatus
+                                  transaction.reviewStatus === 'pending' ||
+                                  !transaction.reviewStatus
                                     ? 'warning'
                                     : transaction.reviewStatus === 'approved'
-                                    ? 'success'
-                                    : 'error'
+                                      ? 'success'
+                                      : 'error'
                                 }
                                 variant="outlined"
                               />
@@ -2674,7 +2858,10 @@ const Transactions: React.FC = () => {
                                         size="small"
                                         color="warning"
                                         onClick={async () => {
-                                          const success = await changeTransactionStatus(transaction.id, 'pending');
+                                          const success = await changeTransactionStatus(
+                                            transaction.id,
+                                            'pending'
+                                          );
                                           if (success) {
                                             toast.success('Transaction restored to pending');
                                             await fetchTransactions();
@@ -2690,7 +2877,10 @@ const Transactions: React.FC = () => {
                                         size="small"
                                         color="success"
                                         onClick={async () => {
-                                          const success = await changeTransactionStatus(transaction.id, 'approved');
+                                          const success = await changeTransactionStatus(
+                                            transaction.id,
+                                            'approved'
+                                          );
                                           if (success) {
                                             toast.success('Transaction approved');
                                             await fetchTransactions();
@@ -2740,7 +2930,7 @@ const Transactions: React.FC = () => {
                                     </Typography>
                                     <Grid container spacing={2}>
                                       {(transaction.splits || []).map((split, idx) => (
-                                        <Grid size={{ sm: 6, xs: 12, md: 4 }}key={idx}>
+                                        <Grid size={{ sm: 6, xs: 12, md: 4 }} key={idx}>
                                           <Card variant="outlined" sx={{ p: 2 }}>
                                             <Box
                                               display="flex"
@@ -2813,24 +3003,24 @@ const Transactions: React.FC = () => {
                         </React.Fragment>
                       );
                     })
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-          <TablePagination
-            rowsPerPageOptions={[10, 25, 50, 100]}
-            component="div"
-            count={totalCount}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-          />
-        </Card>
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              component="div"
+              count={totalCount}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </Card>
         )}
 
         {/* Add/Edit Dialog */}
@@ -2854,23 +3044,30 @@ const Transactions: React.FC = () => {
               },
             }}
           >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                position: 'relative',
+                zIndex: 1,
+              }}
+            >
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
                   <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
                     {formData.type === 'credit' ? '💰' : '💸'}
                   </Avatar>
                   <Typography variant="h5" fontWeight={700}>
-                    {approveMode ? 'Complete Transaction to Approve' : (editingTransaction ? 'Edit Transaction' : 'Add Transaction')}
+                    {approveMode
+                      ? 'Complete Transaction to Approve'
+                      : editingTransaction
+                        ? 'Edit Transaction'
+                        : 'Add Transaction'}
                   </Typography>
                 </Box>
                 {approveMode && (
-                  <Chip 
-                    label="Approval Required" 
-                    color="warning" 
-                    size="small" 
-                    sx={{ ml: 7 }}
-                  />
+                  <Chip label="Approval Required" color="warning" size="small" sx={{ ml: 7 }} />
                 )}
               </Box>
               <Typography variant="caption" sx={{ opacity: 0.9, fontStyle: 'italic' }}>
@@ -3188,7 +3385,11 @@ const Transactions: React.FC = () => {
                         </ToggleButtonGroup>
                       </Box>
                       {useSplitMode && (
-                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontStyle: 'italic' }}
+                        >
                           💡 Split this transaction across multiple categories
                         </Typography>
                       )}
@@ -3214,10 +3415,12 @@ const Transactions: React.FC = () => {
                             setFormData({
                               ...formData,
                               categoryId: '',
-                              splits: [{
-                                ...formData.splits[0],
-                                categoryId: '',
-                              }],
+                              splits: [
+                                {
+                                  ...formData.splits[0],
+                                  categoryId: '',
+                                },
+                              ],
                             });
                           }
                         }}
@@ -3225,7 +3428,12 @@ const Transactions: React.FC = () => {
                           recentCategories.includes(option.id) ? 'Recent' : 'All Categories'
                         }
                         renderInput={(params) => (
-                          <TextField {...params} label="Category" required placeholder="Select category..." />
+                          <TextField
+                            {...params}
+                            label="Category"
+                            required
+                            placeholder="Select category..."
+                          />
                         )}
                         renderOption={(props, option) => (
                           <li {...props}>
@@ -3413,11 +3621,13 @@ const Transactions: React.FC = () => {
                                 size="small"
                                 error={Boolean(!split.categoryId && split.amount > 0)}
                               >
-                                {categories.filter((c) => !c.isFolder).map((category) => (
-                                  <MenuItem key={category.id} value={category.id}>
-                                    {category.name}
-                                  </MenuItem>
-                                ))}
+                                {categories
+                                  .filter((c) => !c.isFolder)
+                                  .map((category) => (
+                                    <MenuItem key={category.id} value={category.id}>
+                                      {category.name}
+                                    </MenuItem>
+                                  ))}
                               </TextField>
                             </Grid>
 
@@ -3687,11 +3897,13 @@ const Transactions: React.FC = () => {
                       <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <ModernDatePicker
                           label="End Date (Optional)"
-                          value={formData.recurrenceEndDate ? dayjs(formData.recurrenceEndDate) : null}
+                          value={
+                            formData.recurrenceEndDate ? dayjs(formData.recurrenceEndDate) : null
+                          }
                           onChange={(newValue) =>
-                            setFormData({ 
-                              ...formData, 
-                              recurrenceEndDate: newValue ? newValue.format('YYYY-MM-DD') : '' 
+                            setFormData({
+                              ...formData,
+                              recurrenceEndDate: newValue ? newValue.format('YYYY-MM-DD') : '',
                             })
                           }
                           fullWidth
@@ -3716,7 +3928,7 @@ const Transactions: React.FC = () => {
                   : 'rgba(15, 15, 15, 0.8)',
             }}
           >
-            <Button 
+            <Button
               onClick={handleCloseDialog}
               variant="outlined"
               sx={{
@@ -3746,9 +3958,7 @@ const Transactions: React.FC = () => {
                 px: 4,
                 textTransform: 'none',
                 fontWeight: 600,
-                background: approveMode
-                  ? undefined
-                  : (theme) => theme.palette.gradient.primary,
+                background: approveMode ? undefined : (theme) => theme.palette.gradient.primary,
                 '&:hover': {
                   transform: 'translateY(-1px)',
                   boxShadow: 4,
@@ -3756,7 +3966,7 @@ const Transactions: React.FC = () => {
                 transition: 'all 0.2s ease',
               }}
             >
-              {approveMode ? 'Complete & Approve' : (editingTransaction ? 'Update' : 'Create')}
+              {approveMode ? 'Complete & Approve' : editingTransaction ? 'Update' : 'Create'}
             </Button>
           </DialogActions>
         </ResponsiveDialog>
@@ -3793,16 +4003,19 @@ const Transactions: React.FC = () => {
           <DialogTitle>Email Import</DialogTitle>
           <DialogContent>
             <Alert severity="info" sx={{ mb: 2 }}>
-              Email import works through Gmail integration. Transactions from bank notification emails 
-              are automatically imported when you connect your Gmail account.
+              Email import works through Gmail integration. Transactions from bank notification
+              emails are automatically imported when you connect your Gmail account.
             </Alert>
             <Typography variant="body2" gutterBottom>
               To enable email import:
             </Typography>
             <Typography variant="body2" component="div" sx={{ pl: 2, mt: 1 }}>
-              1. Go to Profile Settings<br />
-              2. Connect your Gmail account<br />
-              3. Grant required permissions<br />
+              1. Go to Profile Settings
+              <br />
+              2. Connect your Gmail account
+              <br />
+              3. Grant required permissions
+              <br />
               4. Transactions will be automatically imported from bank emails
             </Typography>
           </DialogContent>
@@ -3819,7 +4032,7 @@ const Transactions: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
-        
+
         {/* Undo Reject Snackbar */}
         <Snackbar
           open={!!undoRejectInfo}
@@ -3833,7 +4046,10 @@ const Transactions: React.FC = () => {
               onClick={async () => {
                 if (undoRejectInfo) {
                   clearTimeout(undoRejectInfo.timeoutId);
-                  const success = await changeTransactionStatus(undoRejectInfo.transactionId, 'pending');
+                  const success = await changeTransactionStatus(
+                    undoRejectInfo.transactionId,
+                    'pending'
+                  );
                   if (success) {
                     await fetchTransactions();
                     await fetchPendingCount();

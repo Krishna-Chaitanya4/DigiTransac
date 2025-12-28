@@ -81,7 +81,7 @@ interface Tag {
 const Categories: React.FC = () => {
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
-  
+
   // Category state
   const [categories, setCategories] = useState<Category[]>([]);
   const [treeData, setTreeData] = useState<CategoryNode[]>([]);
@@ -91,7 +91,7 @@ const Categories: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [parentForNew, setParentForNew] = useState<Category | null>(null);
-  
+
   // Tag state
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
@@ -101,7 +101,7 @@ const Categories: React.FC = () => {
     name: '',
     color: '#667eea',
   });
-  
+
   // Tag deletion state
   const [deleteTagDialog, setDeleteTagDialog] = useState<{
     open: boolean;
@@ -120,18 +120,18 @@ const Categories: React.FC = () => {
     loading: false,
   });
   const [replaceTagId, setReplaceTagId] = useState<string>('');
-  
+
   // Search and filter state (Categories)
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'folder' | 'category'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'usage' | 'recent'>('name');
-  
+
   // Search and sort state (Tags)
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [debouncedTagSearchQuery, setDebouncedTagSearchQuery] = useState('');
   const [tagSortBy, setTagSortBy] = useState<'name' | 'usage' | 'recent'>('name');
-  
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -181,7 +181,7 @@ const Categories: React.FC = () => {
       const response = await axios.get(`/api/categories/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       // Normalize data: ensure all categories have required fields
       const normalizedCategories = (response.data.categories || []).map((cat: any) => ({
         ...cat,
@@ -190,7 +190,7 @@ const Categories: React.FC = () => {
         lastUsed: cat.lastUsed || null,
         totalAmount: cat.totalAmount || 0,
       }));
-      
+
       setCategories(normalizedCategories);
       setError('');
     } catch (err: any) {
@@ -358,11 +358,11 @@ const Categories: React.FC = () => {
     if (!query) return text;
     const index = text.toLowerCase().indexOf(query.toLowerCase());
     if (index === -1) return text;
-    
+
     const before = text.substring(0, index);
     const match = text.substring(index, index + query.length);
     const after = text.substring(index + query.length);
-    
+
     return (
       <>
         {before}
@@ -453,7 +453,7 @@ const Categories: React.FC = () => {
   };
 
   // ============= TAG MANAGEMENT FUNCTIONS =============
-  
+
   const fetchTags = async () => {
     try {
       setTagsLoading(true);
@@ -534,7 +534,7 @@ const Categories: React.FC = () => {
       const response = await axios.get(`/api/tags/${tag.id}/usage`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       setDeleteTagDialog({
         open: true,
         tag,
@@ -559,7 +559,7 @@ const Categories: React.FC = () => {
       await axios.delete(`/api/tags/${deleteTagDialog.tag.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       setDeleteTagDialog({
         open: false,
         tag: null,
@@ -581,7 +581,7 @@ const Categories: React.FC = () => {
         { replacementTagId: replaceTagId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       setDeleteTagDialog({
         open: false,
         tag: null,
@@ -590,7 +590,7 @@ const Categories: React.FC = () => {
       });
       setReplaceTagId('');
       fetchTags();
-      
+
       // Show success message
       setError(''); // Clear any previous errors
       setTimeout(() => {
@@ -608,9 +608,7 @@ const Categories: React.FC = () => {
     // Search filter
     if (debouncedTagSearchQuery) {
       const searchLower = debouncedTagSearchQuery.toLowerCase();
-      filtered = filtered.filter((tag) =>
-        tag.name.toLowerCase().includes(searchLower)
-      );
+      filtered = filtered.filter((tag) => tag.name.toLowerCase().includes(searchLower));
     }
 
     // Sort
@@ -632,7 +630,6 @@ const Categories: React.FC = () => {
 
   // ============= END TAG MANAGEMENT FUNCTIONS =============
 
-
   const renderTree = (nodes: CategoryNode[]) => {
     return nodes.map((node) => (
       <Box key={node.id} onContextMenu={(e) => handleContextMenu(e, node)}>
@@ -643,7 +640,10 @@ const Categories: React.FC = () => {
             py: 1.5,
             display: 'flex',
             alignItems: 'center',
-            borderLeft: !debouncedSearchQuery && node.level > 0 ? '2px solid rgba(102, 126, 234, 0.15)' : 'none',
+            borderLeft:
+              !debouncedSearchQuery && node.level > 0
+                ? '2px solid rgba(102, 126, 234, 0.15)'
+                : 'none',
             ml: !debouncedSearchQuery && node.level > 0 ? 2 : 0,
             cursor: 'pointer',
             borderBottom: debouncedSearchQuery ? '1px solid rgba(0, 0, 0, 0.06)' : 'none',
@@ -872,7 +872,8 @@ const Categories: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              background:
+                'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
               animation: 'pulse 4s ease-in-out infinite',
             },
             '@keyframes pulse': {
@@ -882,7 +883,13 @@ const Categories: React.FC = () => {
           }}
         >
           <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="flex-start"
+              flexWrap="wrap"
+              gap={2}
+            >
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                   <Avatar
@@ -907,8 +914,17 @@ const Categories: React.FC = () => {
                     Categories & Tags
                   </Typography>
                 </Box>
-                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
-                  {categories.length + tags.length} {(categories.length + tags.length) === 1 ? 'item' : 'items'} • {categories.filter(c => c.isFolder).length} {categories.filter(c => c.isFolder).length === 1 ? 'folder' : 'folders'} • {categories.filter(c => !c.isFolder).length} {categories.filter(c => !c.isFolder).length === 1 ? 'category' : 'categories'} • {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
+                <Typography
+                  variant="h6"
+                  sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}
+                >
+                  {categories.length + tags.length}{' '}
+                  {categories.length + tags.length === 1 ? 'item' : 'items'} •{' '}
+                  {categories.filter((c) => c.isFolder).length}{' '}
+                  {categories.filter((c) => c.isFolder).length === 1 ? 'folder' : 'folders'} •{' '}
+                  {categories.filter((c) => !c.isFolder).length}{' '}
+                  {categories.filter((c) => !c.isFolder).length === 1 ? 'category' : 'categories'} •{' '}
+                  {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
@@ -919,7 +935,12 @@ const Categories: React.FC = () => {
                         variant="contained"
                         startIcon={<FolderOpenIcon />}
                         onClick={() => {
-                          setFormData({ name: '', color: '#14b8a6', isFolder: true, parentId: null });
+                          setFormData({
+                            name: '',
+                            color: '#14b8a6',
+                            isFolder: true,
+                            parentId: null,
+                          });
                           setParentForNew(null);
                           setOpenDialog(true);
                         }}
@@ -935,7 +956,8 @@ const Categories: React.FC = () => {
                             bgcolor: '#ffffff',
                             color: 'primary.main',
                             transform: 'translateY(-3px) scale(1.02)',
-                            boxShadow: '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
+                            boxShadow:
+                              '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
                           },
                           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
@@ -960,7 +982,8 @@ const Categories: React.FC = () => {
                             bgcolor: '#ffffff',
                             color: 'primary.main',
                             transform: 'translateY(-3px) scale(1.02)',
-                            boxShadow: '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
+                            boxShadow:
+                              '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
                           },
                           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
@@ -987,7 +1010,8 @@ const Categories: React.FC = () => {
                           bgcolor: '#ffffff',
                           color: 'primary.main',
                           transform: 'translateY(-3px) scale(1.02)',
-                          boxShadow: '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
+                          boxShadow:
+                            '0 8px 28px rgba(20, 184, 166, 0.3), 0 0 40px rgba(20, 184, 166, 0.2)',
                         },
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
@@ -1030,40 +1054,40 @@ const Categories: React.FC = () => {
             },
           }}
         >
-          <Tab 
+          <Tab
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <LabelIcon sx={{ fontSize: 20 }} />
                 Categories
-                <Chip 
-                  label={categories.length} 
-                  size="small" 
-                  sx={{ 
-                    height: 20, 
+                <Chip
+                  label={categories.length}
+                  size="small"
+                  sx={{
+                    height: 20,
                     minWidth: 28,
                     bgcolor: activeTab === 0 ? 'primary.main' : 'grey.300',
                     color: 'white',
                     fontSize: '0.75rem',
-                  }} 
+                  }}
                 />
               </Box>
             }
           />
-          <Tab 
+          <Tab
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <TagIcon sx={{ fontSize: 20 }} />
                 Tags
-                <Chip 
-                  label={tags.length} 
-                  size="small" 
-                  sx={{ 
+                <Chip
+                  label={tags.length}
+                  size="small"
+                  sx={{
                     height: 20,
                     minWidth: 28,
                     bgcolor: activeTab === 1 ? 'primary.main' : 'grey.300',
                     color: 'white',
                     fontSize: '0.75rem',
-                  }} 
+                  }}
                 />
               </Box>
             }
@@ -1075,421 +1099,462 @@ const Categories: React.FC = () => {
       {activeTab === 0 && (
         <>
           {/* Search and Controls */}
-      <Fade in timeout={800}>
-        <Box
-          sx={{
-            mb: 2,
-            p: 2,
-            borderRadius: 3,
-            background: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-            backdropFilter: 'blur(20px)',
-            border: (theme) =>
-              theme.palette.mode === 'light'
-                ? `1px solid ${theme.palette.primary.main}1A`
-                : `1px solid ${theme.palette.primary.main}33`,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-          }}
-        >
-        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-          {/* Search */}
-          <TextField
-            size="small"
-            placeholder="Search categories..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ flexGrow: 1, minWidth: 200 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-              endAdornment: searchQuery && (
-                <InputAdornment position="end">
-                  <IconButton
-                    size="small"
-                    onClick={() => setSearchQuery('')}
-                    edge="end"
-                  >
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-          {debouncedSearchQuery && (
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {treeData.length} {treeData.length === 1 ? 'result' : 'results'}
-            </Typography>
-          )}
-
-          {/* Filter by Type */}
-          <TextField
-            select
-            size="small"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as any)}
-            sx={{ minWidth: 130 }}
-            label="Type"
-          >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="folder">Folders Only</MenuItem>
-            <MenuItem value="category">Categories Only</MenuItem>
-          </TextField>
-
-          {/* Sort By */}
-          <TextField
-            select
-            size="small"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            sx={{ minWidth: 150 }}
-            label="Sort By"
-          >
-            <MenuItem value="name">Name</MenuItem>
-            <MenuItem value="usage">Most Used</MenuItem>
-            <MenuItem value="recent">Recently Used</MenuItem>
-          </TextField>
-
-          {/* Expand/Collapse All */}
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <Tooltip title="Expand All">
-              <IconButton size="small" onClick={handleExpandAll} color="primary">
-                <ExpandAllIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Collapse All">
-              <IconButton size="small" onClick={handleCollapseAll} color="primary">
-                <CollapseAllIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
-        </Box>
-      </Fade>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
-
-      <Box
-        sx={{
-          background: (theme) =>
-            theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 30, 30, 0.9)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: 2,
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-          p: 2,
-          minHeight: '400px',
-        }}
-      >
-        {treeData.length === 0 ? (
-          <Box
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            justifyContent="center"
-            minHeight="300px"
-          >
-            <FolderOpenIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              {debouncedSearchQuery ? `No results for "${debouncedSearchQuery}"` : 'No categories yet'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" mb={3} textAlign="center">
-              {debouncedSearchQuery ? (
-                'Try a different search term or clear the filter.'
-              ) : (
-                <>
-                  Create folders and categories to organize your expenses.
-                  <br />
-                  Folders can contain subcategories for better hierarchy.
-                </>
-              )}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                startIcon={<FolderOpenIcon />}
-                onClick={() => {
-                  setFormData({ name: '', color: '#667eea', isFolder: true, parentId: null });
-                  setParentForNew(null);
-                  setOpenDialog(true);
-                }}
-              >
-                Create Folder
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenDialog(undefined, false)}
-              >
-                Create Category
-              </Button>
-            </Box>
-          </Box>
-        ) : (
-          <Box sx={{ py: 1 }}>{renderTree(treeData)}</Box>
-        )}
-      </Box>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle
-          sx={{
-            background: (theme) => theme.palette.gradient.primary,
-            color: 'white',
-            py: 3,
-            position: 'relative',
-            overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: '-50%',
-              right: '-10%',
-              width: '120px',
-              height: '120px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-            },
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
-            <Avatar
+          <Fade in timeout={800}>
+            <Box
               sx={{
-                bgcolor: 'rgba(255,255,255,0.2)',
-                width: 48,
-                height: 48,
+                mb: 2,
+                p: 2,
+                borderRadius: 3,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                    : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? `1px solid ${theme.palette.primary.main}1A`
+                    : `1px solid ${theme.palette.primary.main}33`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
               }}
             >
-              <LabelIcon />
-            </Avatar>
-            <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
-              {editingCategory
-                ? `Edit ${editingCategory.isFolder ? 'Folder' : 'Category'}`
-                : parentForNew
-                  ? `Add to "${parentForNew.name}"`
-                  : formData.isFolder
-                    ? 'Create New Folder'
-                    : 'Create New Category'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {parentForNew && (
-              <Alert severity="info" sx={{ mb: 1 }}>
-                Creating subcategory under <strong>{parentForNew.name}</strong>
-              </Alert>
-            )}
+              <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+                {/* Search */}
+                <TextField
+                  size="small"
+                  placeholder="Search categories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  sx={{ flexGrow: 1, minWidth: 200 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearchQuery('')} edge="end">
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                {debouncedSearchQuery && (
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    {treeData.length} {treeData.length === 1 ? 'result' : 'results'}
+                  </Typography>
+                )}
 
-            <TextField
-              label="Name"
-              fullWidth
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              autoFocus
-            />
+                {/* Filter by Type */}
+                <TextField
+                  select
+                  size="small"
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value as any)}
+                  sx={{ minWidth: 130 }}
+                  label="Type"
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="folder">Folders Only</MenuItem>
+                  <MenuItem value="category">Categories Only</MenuItem>
+                </TextField>
 
-            <TextField
-              select
-              label="Parent Folder"
-              fullWidth
-              value={formData.parentId || ''}
-              onChange={(e) => setFormData({ ...formData, parentId: e.target.value || null })}
-              helperText={
-                editingCategory
-                  ? 'Change parent to reorganize category hierarchy'
-                  : 'Select a parent folder or leave empty for root level'
-              }
-            >
-              <MenuItem value="">
-                <em>Root Level (No Parent)</em>
-              </MenuItem>
-              {categories
-                .filter((cat) => {
-                  // Only show folders
-                  if (!cat.isFolder) return false;
-                  // When editing, exclude self and descendants to prevent circular refs
-                  if (editingCategory) {
-                    if (cat.id === editingCategory.id) return false;
-                    if (cat.path?.includes(editingCategory.id)) return false;
-                  }
-                  return true;
-                })
-                .map((folder) => (
-                  <MenuItem key={folder.id} value={folder.id}>
-                    {'  '.repeat(folder.path?.length || 0)} 📁 {folder.name}
-                  </MenuItem>
-                ))}
-            </TextField>
+                {/* Sort By */}
+                <TextField
+                  select
+                  size="small"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  sx={{ minWidth: 150 }}
+                  label="Sort By"
+                >
+                  <MenuItem value="name">Name</MenuItem>
+                  <MenuItem value="usage">Most Used</MenuItem>
+                  <MenuItem value="recent">Recently Used</MenuItem>
+                </TextField>
 
-            <Box>
-              <Typography variant="body2" fontWeight={600} color="primary" gutterBottom>
-                Category Color
-              </Typography>
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  background: (theme) =>
-                    theme.palette.mode === 'light'
-                      ? 'rgba(248, 250, 252, 0.8)'
-                      : 'rgba(30, 30, 30, 0.5)',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                {/* Preset Colors */}
-                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
-                  Quick Select
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                  {[
-                    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
-                    '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
-                    '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b',
-                  ].map((presetColor) => (
-                    <Box
-                      key={presetColor}
-                      onClick={() => setFormData({ ...formData, color: presetColor })}
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 1.5,
-                        bgcolor: presetColor,
-                        cursor: 'pointer',
-                        border: '3px solid',
-                        borderColor: formData.color === presetColor ? 'primary.main' : 'transparent',
-                        transition: 'all 0.2s ease',
-                        boxShadow: formData.color === presetColor ? '0 0 0 2px rgba(20, 184, 166, 0.2)' : 'none',
-                        '&:hover': {
-                          transform: 'scale(1.1)',
-                          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                        },
-                      }}
-                    />
-                  ))}
-                </Box>
-
-                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
-                  Custom Color
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      width: 48,
-                      height: 48,
-                      borderRadius: '50%',
-                      overflow: 'hidden',
-                      border: '3px solid',
-                      borderColor: 'background.paper',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'scale(1.05)',
-                        boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
-                      },
-                    }}
-                  >
-                    <input
-                      type="color"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
-                    />
-                  </Box>
-                  <TextField
-                    size="small"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    placeholder="#667eea"
-                    sx={{
-                      flex: 1,
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 2,
-                        fontFamily: 'monospace',
-                        fontWeight: 600,
-                      },
-                    }}
-                    InputProps={{
-                      startAdornment: (
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: '50%',
-                            bgcolor: formData.color,
-                            mr: 1,
-                            border: '2px solid',
-                            borderColor: 'divider',
-                          }}
-                        />
-                      ),
-                    }}
-                  />
+                {/* Expand/Collapse All */}
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Tooltip title="Expand All">
+                    <IconButton size="small" onClick={handleExpandAll} color="primary">
+                      <ExpandAllIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Collapse All">
+                    <IconButton size="small" onClick={handleCollapseAll} color="primary">
+                      <CollapseAllIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </Box>
             </Box>
+          </Fade>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+              {error}
+            </Alert>
+          )}
+
+          <Box
+            sx={{
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'rgba(255, 255, 255, 0.9)'
+                  : 'rgba(30, 30, 30, 0.9)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: 2,
+              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+              p: 2,
+              minHeight: '400px',
+            }}
+          >
+            {treeData.length === 0 ? (
+              <Box
+                display="flex"
+                flexDirection="column"
+                alignItems="center"
+                justifyContent="center"
+                minHeight="300px"
+              >
+                <FolderOpenIcon
+                  sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.5 }}
+                />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  {debouncedSearchQuery
+                    ? `No results for "${debouncedSearchQuery}"`
+                    : 'No categories yet'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={3} textAlign="center">
+                  {debouncedSearchQuery ? (
+                    'Try a different search term or clear the filter.'
+                  ) : (
+                    <>
+                      Create folders and categories to organize your expenses.
+                      <br />
+                      Folders can contain subcategories for better hierarchy.
+                    </>
+                  )}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<FolderOpenIcon />}
+                    onClick={() => {
+                      setFormData({ name: '', color: '#667eea', isFolder: true, parentId: null });
+                      setParentForNew(null);
+                      setOpenDialog(true);
+                    }}
+                  >
+                    Create Folder
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => handleOpenDialog(undefined, false)}
+                  >
+                    Create Category
+                  </Button>
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ py: 1 }}>{renderTree(treeData)}</Box>
+            )}
           </Box>
-        </DialogContent>
-        <DialogActions
-          sx={{
-            px: 3,
-            py: 2.5,
-            gap: 1.5,
-            borderTop: 1,
-            borderColor: 'divider',
-            backgroundColor: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'rgba(248, 250, 252, 0.8)'
-                : 'rgba(15, 15, 15, 0.8)',
-          }}
-        >
-          <Button
-            onClick={handleCloseDialog}
-            variant="outlined"
-            sx={{
-              borderRadius: 2,
-              px: 3,
-              textTransform: 'none',
-              fontWeight: 600,
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={!formData.name}
-            sx={{
-              borderRadius: 2,
-              px: 4,
-              textTransform: 'none',
-              fontWeight: 600,
-              background: (theme) => theme.palette.gradient.primary,
-              '&:hover': {
-                transform: 'translateY(-1px)',
-                boxShadow: 4,
-                transition: 'all 0.2s ease',
-              },
-            }}
-          >
-            {editingCategory ? 'Update' : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+
+          {/* Create/Edit Dialog */}
+          <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+            <DialogTitle
+              sx={{
+                background: (theme) => theme.palette.gradient.primary,
+                color: 'white',
+                py: 3,
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: '-50%',
+                  right: '-10%',
+                  width: '120px',
+                  height: '120px',
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  position: 'relative',
+                  zIndex: 1,
+                }}
+              >
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    width: 48,
+                    height: 48,
+                  }}
+                >
+                  <LabelIcon />
+                </Avatar>
+                <Typography variant="h5" component="div" sx={{ fontWeight: 700 }}>
+                  {editingCategory
+                    ? `Edit ${editingCategory.isFolder ? 'Folder' : 'Category'}`
+                    : parentForNew
+                      ? `Add to "${parentForNew.name}"`
+                      : formData.isFolder
+                        ? 'Create New Folder'
+                        : 'Create New Category'}
+                </Typography>
+              </Box>
+            </DialogTitle>
+            <DialogContent sx={{ pt: 3 }}>
+              <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {parentForNew && (
+                  <Alert severity="info" sx={{ mb: 1 }}>
+                    Creating subcategory under <strong>{parentForNew.name}</strong>
+                  </Alert>
+                )}
+
+                <TextField
+                  label="Name"
+                  fullWidth
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  autoFocus
+                />
+
+                <TextField
+                  select
+                  label="Parent Folder"
+                  fullWidth
+                  value={formData.parentId || ''}
+                  onChange={(e) => setFormData({ ...formData, parentId: e.target.value || null })}
+                  helperText={
+                    editingCategory
+                      ? 'Change parent to reorganize category hierarchy'
+                      : 'Select a parent folder or leave empty for root level'
+                  }
+                >
+                  <MenuItem value="">
+                    <em>Root Level (No Parent)</em>
+                  </MenuItem>
+                  {categories
+                    .filter((cat) => {
+                      // Only show folders
+                      if (!cat.isFolder) return false;
+                      // When editing, exclude self and descendants to prevent circular refs
+                      if (editingCategory) {
+                        if (cat.id === editingCategory.id) return false;
+                        if (cat.path?.includes(editingCategory.id)) return false;
+                      }
+                      return true;
+                    })
+                    .map((folder) => (
+                      <MenuItem key={folder.id} value={folder.id}>
+                        {'  '.repeat(folder.path?.length || 0)} 📁 {folder.name}
+                      </MenuItem>
+                    ))}
+                </TextField>
+
+                <Box>
+                  <Typography variant="body2" fontWeight={600} color="primary" gutterBottom>
+                    Category Color
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 2,
+                      background: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'rgba(248, 250, 252, 0.8)'
+                          : 'rgba(30, 30, 30, 0.5)',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    {/* Preset Colors */}
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      gutterBottom
+                      display="block"
+                      mb={1}
+                    >
+                      Quick Select
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                      {[
+                        '#ef4444',
+                        '#f97316',
+                        '#f59e0b',
+                        '#eab308',
+                        '#84cc16',
+                        '#22c55e',
+                        '#10b981',
+                        '#14b8a6',
+                        '#06b6d4',
+                        '#0ea5e9',
+                        '#3b82f6',
+                        '#6366f1',
+                        '#8b5cf6',
+                        '#a855f7',
+                        '#d946ef',
+                        '#ec4899',
+                        '#f43f5e',
+                        '#64748b',
+                      ].map((presetColor) => (
+                        <Box
+                          key={presetColor}
+                          onClick={() => setFormData({ ...formData, color: presetColor })}
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 1.5,
+                            bgcolor: presetColor,
+                            cursor: 'pointer',
+                            border: '3px solid',
+                            borderColor:
+                              formData.color === presetColor ? 'primary.main' : 'transparent',
+                            transition: 'all 0.2s ease',
+                            boxShadow:
+                              formData.color === presetColor
+                                ? '0 0 0 2px rgba(20, 184, 166, 0.2)'
+                                : 'none',
+                            '&:hover': {
+                              transform: 'scale(1.1)',
+                              boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                            },
+                          }}
+                        />
+                      ))}
+                    </Box>
+
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      gutterBottom
+                      display="block"
+                      mb={1}
+                    >
+                      Custom Color
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          width: 48,
+                          height: 48,
+                          borderRadius: '50%',
+                          overflow: 'hidden',
+                          border: '3px solid',
+                          borderColor: 'background.paper',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.05)',
+                            boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
+                          },
+                        }}
+                      >
+                        <input
+                          type="color"
+                          value={formData.color}
+                          onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        />
+                      </Box>
+                      <TextField
+                        size="small"
+                        value={formData.color}
+                        onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                        placeholder="#667eea"
+                        sx={{
+                          flex: 1,
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                            fontFamily: 'monospace',
+                            fontWeight: 600,
+                          },
+                        }}
+                        InputProps={{
+                          startAdornment: (
+                            <Box
+                              sx={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: '50%',
+                                bgcolor: formData.color,
+                                mr: 1,
+                                border: '2px solid',
+                                borderColor: 'divider',
+                              }}
+                            />
+                          ),
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            </DialogContent>
+            <DialogActions
+              sx={{
+                px: 3,
+                py: 2.5,
+                gap: 1.5,
+                borderTop: 1,
+                borderColor: 'divider',
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'rgba(248, 250, 252, 0.8)'
+                    : 'rgba(15, 15, 15, 0.8)',
+              }}
+            >
+              <Button
+                onClick={handleCloseDialog}
+                variant="outlined"
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                variant="contained"
+                disabled={!formData.name}
+                sx={{
+                  borderRadius: 2,
+                  px: 4,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  background: (theme) => theme.palette.gradient.primary,
+                  '&:hover': {
+                    transform: 'translateY(-1px)',
+                    boxShadow: 4,
+                    transition: 'all 0.2s ease',
+                  },
+                }}
+              >
+                {editingCategory ? 'Update' : 'Create'}
+              </Button>
+            </DialogActions>
+          </Dialog>
         </>
       )}
 
@@ -1503,7 +1568,9 @@ const Categories: React.FC = () => {
               p: 3,
               borderRadius: 3,
               bgcolor: (theme) =>
-                theme.palette.mode === 'light' ? 'rgba(102, 126, 234, 0.03)' : 'rgba(102, 126, 234, 0.08)',
+                theme.palette.mode === 'light'
+                  ? 'rgba(102, 126, 234, 0.03)'
+                  : 'rgba(102, 126, 234, 0.08)',
               border: '1px solid',
               borderColor: 'divider',
             }}
@@ -1626,7 +1693,13 @@ const Categories: React.FC = () => {
               </Button>
             </Box>
           ) : (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: 2,
+              }}
+            >
               {getFilteredAndSortedTags().map((tag) => (
                 <Fade in key={tag.id}>
                   <Card
@@ -1751,7 +1824,26 @@ const Categories: React.FC = () => {
                 Tag Color
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
-                {['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b'].map((presetColor) => (
+                {[
+                  '#ef4444',
+                  '#f97316',
+                  '#f59e0b',
+                  '#eab308',
+                  '#84cc16',
+                  '#22c55e',
+                  '#10b981',
+                  '#14b8a6',
+                  '#06b6d4',
+                  '#0ea5e9',
+                  '#3b82f6',
+                  '#6366f1',
+                  '#8b5cf6',
+                  '#a855f7',
+                  '#d946ef',
+                  '#ec4899',
+                  '#f43f5e',
+                  '#64748b',
+                ].map((presetColor) => (
                   <Box
                     key={presetColor}
                     onClick={() => setTagFormData({ ...tagFormData, color: presetColor })}
@@ -1762,7 +1854,8 @@ const Categories: React.FC = () => {
                       bgcolor: presetColor,
                       cursor: 'pointer',
                       border: '3px solid',
-                      borderColor: tagFormData.color === presetColor ? 'primary.main' : 'transparent',
+                      borderColor:
+                        tagFormData.color === presetColor ? 'primary.main' : 'transparent',
                       transition: 'all 0.2s ease',
                       '&:hover': {
                         transform: 'scale(1.1)',
@@ -1773,7 +1866,13 @@ const Categories: React.FC = () => {
                 ))}
               </Box>
 
-              <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                display="block"
+                mb={1}
+              >
                 Custom Color
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -1880,9 +1979,10 @@ const Categories: React.FC = () => {
       >
         <DialogTitle
           sx={{
-            background: (theme) => deleteTagDialog.usage?.canDelete 
-              ? theme.palette.gradient.primary 
-              : 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+            background: (theme) =>
+              deleteTagDialog.usage?.canDelete
+                ? theme.palette.gradient.primary
+                : 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
             color: 'white',
             pb: 2,
           }}
@@ -1928,7 +2028,7 @@ const Categories: React.FC = () => {
               <Alert severity="warning" sx={{ mb: 2 }}>
                 This tag cannot be deleted because it's currently in use.
               </Alert>
-              
+
               <Typography variant="body1" gutterBottom fontWeight={600}>
                 Tag{' '}
                 <Chip
@@ -1942,21 +2042,28 @@ const Categories: React.FC = () => {
                 />{' '}
                 is used in:
               </Typography>
-              
+
               <Box sx={{ pl: 2, mt: 2, mb: 3 }}>
                 {deleteTagDialog.usage && deleteTagDialog.usage.transactions > 0 && (
                   <Typography variant="body2" color="text.secondary" gutterBottom>
-                    • {deleteTagDialog.usage.transactions} transaction{deleteTagDialog.usage.transactions !== 1 ? 's' : ''}
+                    • {deleteTagDialog.usage.transactions} transaction
+                    {deleteTagDialog.usage.transactions !== 1 ? 's' : ''}
                   </Typography>
                 )}
                 {deleteTagDialog.usage && deleteTagDialog.usage.budgets > 0 && (
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      • {deleteTagDialog.usage.budgets} budget{deleteTagDialog.usage.budgets !== 1 ? 's' : ''}:
+                      • {deleteTagDialog.usage.budgets} budget
+                      {deleteTagDialog.usage.budgets !== 1 ? 's' : ''}:
                     </Typography>
                     <Box sx={{ pl: 2 }}>
                       {deleteTagDialog.usage.budgetNames.map((name) => (
-                        <Typography key={name} variant="caption" color="text.secondary" display="block">
+                        <Typography
+                          key={name}
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                        >
                           - {name}
                         </Typography>
                       ))}
@@ -1978,7 +2085,8 @@ const Categories: React.FC = () => {
                   Replace with another tag:
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                  Select a tag to replace all occurrences of "{deleteTagDialog.tag?.name}" in your transactions and budgets.
+                  Select a tag to replace all occurrences of "{deleteTagDialog.tag?.name}" in your
+                  transactions and budgets.
                 </Typography>
                 <TextField
                   select
@@ -2025,7 +2133,9 @@ const Categories: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2.5 }}>
           <Button
-            onClick={() => setDeleteTagDialog({ open: false, tag: null, usage: null, loading: false })}
+            onClick={() =>
+              setDeleteTagDialog({ open: false, tag: null, usage: null, loading: false })
+            }
             variant="outlined"
             sx={{
               borderRadius: 2,
@@ -2075,9 +2185,7 @@ const Categories: React.FC = () => {
         onClose={handleCloseContextMenu}
         anchorReference="anchorPosition"
         anchorPosition={
-          contextMenu !== null
-            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
-            : undefined
+          contextMenu !== null ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined
         }
       >
         {contextMenu?.category && contextMenu.category.isFolder && (

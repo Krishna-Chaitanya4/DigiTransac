@@ -24,9 +24,7 @@ import {
   useTheme,
 } from '@mui/material';
 import { ModernDatePicker } from '../components/ModernDatePicker';
-import {
-  LocalizationProvider,
-} from '@mui/x-date-pickers';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import {
@@ -88,7 +86,10 @@ const getChartColors = (theme: any) => ({
     theme.palette.success.light,
     theme.palette.warning.main,
     theme.palette.warning.light,
-    '#8b5cf6', '#a78bfa', '#ec4899', '#f472b6',
+    '#8b5cf6',
+    '#a78bfa',
+    '#ec4899',
+    '#f472b6',
   ],
 });
 
@@ -199,8 +200,10 @@ const Analytics: React.FC = () => {
 
       const txnData = txnRes.data.transactions || [];
       const catData = Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || [];
-      const budgetData = Array.isArray(budgetRes.data) ? budgetRes.data : budgetRes.data?.budgets || [];
-      
+      const budgetData = Array.isArray(budgetRes.data)
+        ? budgetRes.data
+        : budgetRes.data?.budgets || [];
+
       setTransactions(txnData);
       setCategories(catData);
       setBudgets(budgetData);
@@ -401,9 +404,12 @@ const Analytics: React.FC = () => {
     return { income, expenses, net, avgDailySpending };
   }, [enrichedTransactions, startDate, endDate]);
 
-  const formatCurrency = useCallback((amount: number) => {
-    return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
-  }, [user?.currency]);
+  const formatCurrency = useCallback(
+    (amount: number) => {
+      return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
+    },
+    [user?.currency]
+  );
 
   const exportData = useCallback(() => {
     const csvData = [
@@ -459,7 +465,8 @@ const Analytics: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              background:
+                'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
               animation: 'pulse 4s ease-in-out infinite',
             },
             '@keyframes pulse': {
@@ -469,7 +476,13 @@ const Analytics: React.FC = () => {
           }}
         >
           <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="flex-start"
+              flexWrap="wrap"
+              gap={2}
+            >
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                   <Avatar
@@ -494,7 +507,10 @@ const Analytics: React.FC = () => {
                     Financial Insights
                   </Typography>
                 </Box>
-                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}
+                >
                   {getCurrentMonthYear()} • Net Savings: {formatCurrency(summaryStats.net)}
                 </Typography>
               </Box>
@@ -543,44 +559,44 @@ const Analytics: React.FC = () => {
               boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
             }}
           >
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ md: 4, xs: 12 }}>
-              <TextField
-                select
-                fullWidth
-                label="Date Range"
-                value={dateRangeType}
-                onChange={(e) => setDateRangeType(e.target.value)}
-                size="small"
-              >
-                {DATE_RANGES.map((range) => (
-                  <MenuItem key={range.value} value={range.value}>
-                    {range.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+            <Grid container spacing={2} alignItems="center">
+              <Grid size={{ md: 4, xs: 12 }}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Date Range"
+                  value={dateRangeType}
+                  onChange={(e) => setDateRangeType(e.target.value)}
+                  size="small"
+                >
+                  {DATE_RANGES.map((range) => (
+                    <MenuItem key={range.value} value={range.value}>
+                      {range.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              {dateRangeType === 'custom' && (
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <Grid size={{ md: 4, xs: 12 }}>
+                    <ModernDatePicker
+                      label="Start Date"
+                      value={startDate}
+                      onChange={(newValue) => setStartDate(newValue)}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid size={{ md: 4, xs: 12 }}>
+                    <ModernDatePicker
+                      label="End Date"
+                      value={endDate}
+                      onChange={(newValue) => setEndDate(newValue)}
+                      fullWidth
+                    />
+                  </Grid>
+                </LocalizationProvider>
+              )}
             </Grid>
-            {dateRangeType === 'custom' && (
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <Grid size={{ md: 4, xs: 12 }}>
-                  <ModernDatePicker
-                    label="Start Date"
-                    value={startDate}
-                    onChange={(newValue) => setStartDate(newValue)}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid size={{ md: 4, xs: 12 }}>
-                  <ModernDatePicker
-                    label="End Date"
-                    value={endDate}
-                    onChange={(newValue) => setEndDate(newValue)}
-                    fullWidth
-                  />
-                </Grid>
-              </LocalizationProvider>
-            )}
-          </Grid>
           </Paper>
         </Fade>
       </Box>
@@ -595,32 +611,50 @@ const Analytics: React.FC = () => {
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={400}>
-            <Card sx={{
-              borderRadius: 3,
-              background: (theme) => theme.palette.gradient.success,
-              color: 'white',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                background: (theme) => theme.palette.gradient.success,
+                color: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Total Income
                   </Typography>
                   <TrendingUp sx={{ opacity: 0.7 }} />
@@ -634,32 +668,50 @@ const Analytics: React.FC = () => {
         </Grid>
         <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={500}>
-            <Card sx={{
-              borderRadius: 3,
-              background: (theme) => theme.palette.gradient.error,
-              color: 'white',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                background: (theme) => theme.palette.gradient.error,
+                color: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Total Expenses
                   </Typography>
                   <TrendingDown sx={{ opacity: 0.7 }} />
@@ -673,38 +725,59 @@ const Analytics: React.FC = () => {
         </Grid>
         <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={600}>
-            <Card sx={{
-              borderRadius: 3,
-              background: (theme) => summaryStats.net >= 0
-                ? theme.palette.gradient.info
-                : theme.palette.gradient.error,
-              color: 'white',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: summaryStats.net >= 0
-                ? '0 4px 20px rgba(6, 182, 212, 0.25)'
-                : '0 4px 20px rgba(249, 115, 22, 0.25)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: summaryStats.net >= 0
-                  ? '0 12px 32px rgba(6, 182, 212, 0.35)'
-                  : '0 12px 32px rgba(249, 115, 22, 0.35)',
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                background: (theme) =>
+                  summaryStats.net >= 0
+                    ? theme.palette.gradient.info
+                    : theme.palette.gradient.error,
+                color: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow:
+                  summaryStats.net >= 0
+                    ? '0 4px 20px rgba(6, 182, 212, 0.25)'
+                    : '0 4px 20px rgba(249, 115, 22, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow:
+                    summaryStats.net >= 0
+                      ? '0 12px 32px rgba(6, 182, 212, 0.35)'
+                      : '0 12px 32px rgba(249, 115, 22, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Net Savings
                   </Typography>
                   <AccountBalance sx={{ opacity: 0.7 }} />
@@ -718,32 +791,50 @@ const Analytics: React.FC = () => {
         </Grid>
         <Grid size={{ sm: 6, xs: 12, md: 3 }}>
           <Zoom in timeout={700}>
-            <Card sx={{
-              borderRadius: 3,
-              background: (theme) => theme.palette.gradient.primary,
-              color: 'white',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                background: (theme) => theme.palette.gradient.primary,
+                color: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Avg Daily Spending
                   </Typography>
                   <CalendarMonth sx={{ opacity: 0.7 }} />
@@ -759,21 +850,23 @@ const Analytics: React.FC = () => {
 
       {/* 1. Income vs Expense Trend */}
       <Fade in timeout={1000}>
-        <Paper sx={{
-          p: 3,
-          borderRadius: 3,
-          mb: 3,
-          background: (theme) =>
-            theme.palette.mode === 'light'
-              ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-              : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-          backdropFilter: 'blur(20px)',
-          border: (theme) =>
-            theme.palette.mode === 'light'
-              ? `1px solid ${theme.palette.primary.main}0D`
-              : `1px solid ${theme.palette.primary.main}1A`,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-        }}>
+        <Paper
+          sx={{
+            p: 3,
+            borderRadius: 3,
+            mb: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: (theme) =>
+              theme.palette.mode === 'light'
+                ? `1px solid ${theme.palette.primary.main}0D`
+                : `1px solid ${theme.palette.primary.main}1A`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+          }}
+        >
           <Box display="flex" alignItems="center" gap={1} mb={3}>
             <Avatar
               sx={{
@@ -789,54 +882,56 @@ const Analytics: React.FC = () => {
               Income vs Expenses Over Time
             </Typography>
           </Box>
-        {incomeExpenseData.length > 0 ? (
-          <ResponsiveChart>
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={incomeExpenseData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                <XAxis dataKey="month" stroke="#666" />
-                <YAxis stroke="#666" />
-                <RechartsTooltip
-                  formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''}
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: '1px solid rgba(0,0,0,0.1)',
-                  }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="income"
-                  stroke={COLORS.success}
-                  strokeWidth={3}
-                  name="Income"
-                  dot={{ fill: COLORS.success, r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="expenses"
-                  stroke={COLORS.error}
-                  strokeWidth={3}
-                  name="Expenses"
-                  dot={{ fill: COLORS.error, r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="net"
-                  stroke={COLORS.primary}
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="Net"
-                  dot={{ fill: COLORS.primary, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </ResponsiveChart>
-        ) : (
-          <Box textAlign="center" py={6}>
-            <Typography color="text.secondary">No data available</Typography>
-          </Box>
-        )}
+          {incomeExpenseData.length > 0 ? (
+            <ResponsiveChart>
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={incomeExpenseData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                  <XAxis dataKey="month" stroke="#666" />
+                  <YAxis stroke="#666" />
+                  <RechartsTooltip
+                    formatter={(value: number | undefined) =>
+                      value !== undefined ? formatCurrency(value) : ''
+                    }
+                    contentStyle={{
+                      borderRadius: 8,
+                      border: '1px solid rgba(0,0,0,0.1)',
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="income"
+                    stroke={COLORS.success}
+                    strokeWidth={3}
+                    name="Income"
+                    dot={{ fill: COLORS.success, r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="expenses"
+                    stroke={COLORS.error}
+                    strokeWidth={3}
+                    name="Expenses"
+                    dot={{ fill: COLORS.error, r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="net"
+                    stroke={COLORS.primary}
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Net"
+                    dot={{ fill: COLORS.primary, r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ResponsiveChart>
+          ) : (
+            <Box textAlign="center" py={6}>
+              <Typography color="text.secondary">No data available</Typography>
+            </Box>
+          )}
         </Paper>
       </Fade>
 
@@ -845,21 +940,23 @@ const Analytics: React.FC = () => {
         {/* Category Breakdown Pie */}
         <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1200}>
-            <Paper sx={{
-              p: 3,
-              borderRadius: 3,
-              height: '100%',
-              background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? `1px solid ${theme.palette.primary.main}0D`
-                  : `1px solid ${theme.palette.primary.main}1A`,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-            }}>
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                height: '100%',
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                    : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? `1px solid ${theme.palette.primary.main}0D`
+                    : `1px solid ${theme.palette.primary.main}1A`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+              }}
+            >
               <Box display="flex" alignItems="center" gap={1} mb={3}>
                 <Avatar
                   sx={{
@@ -875,50 +972,54 @@ const Analytics: React.FC = () => {
                   Spending by Category
                 </Typography>
               </Box>
-            {categoryBreakdown.length > 0 ? (
-              <>
-                <ResponsiveChart>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={categoryBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={(entry) => `${(entry.percent || 0).toFixed(0)}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {categoryBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ResponsiveChart>
-                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {categoryBreakdown.slice(0, 5).map((cat) => (
-                    <Box key={cat.name} display="flex" alignItems="center" gap={1}>
-                      <Box
-                        sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: cat.color }}
-                      />
-                      <Typography variant="body2" sx={{ flex: 1 }}>
-                        {cat.name}
-                      </Typography>
-                      <Typography variant="body2" fontWeight={600}>
-                        {formatCurrency(cat.value)}
-                      </Typography>
-                    </Box>
-                  ))}
+              {categoryBreakdown.length > 0 ? (
+                <>
+                  <ResponsiveChart>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={categoryBreakdown}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={(entry) => `${(entry.percent || 0).toFixed(0)}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {categoryBreakdown.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          formatter={(value: number | undefined) =>
+                            value !== undefined ? formatCurrency(value) : ''
+                          }
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ResponsiveChart>
+                  <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {categoryBreakdown.slice(0, 5).map((cat) => (
+                      <Box key={cat.name} display="flex" alignItems="center" gap={1}>
+                        <Box
+                          sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: cat.color }}
+                        />
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          {cat.name}
+                        </Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {formatCurrency(cat.value)}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              ) : (
+                <Box textAlign="center" py={6}>
+                  <Typography color="text.secondary">No category data</Typography>
                 </Box>
-              </>
-            ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No category data</Typography>
-              </Box>
-            )}
+              )}
             </Paper>
           </Fade>
         </Grid>
@@ -926,21 +1027,23 @@ const Analytics: React.FC = () => {
         {/* Daily Spending Bar Chart */}
         <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1300}>
-            <Paper sx={{
-              p: 3,
-              borderRadius: 3,
-              height: '100%',
-              background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? `1px solid ${theme.palette.primary.main}0D`
-                  : `1px solid ${theme.palette.primary.main}1A`,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-            }}>
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                height: '100%',
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                    : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? `1px solid ${theme.palette.primary.main}0D`
+                    : `1px solid ${theme.palette.primary.main}1A`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+              }}
+            >
               <Box display="flex" alignItems="center" gap={1} mb={3}>
                 <Avatar
                   sx={{
@@ -956,29 +1059,31 @@ const Analytics: React.FC = () => {
                   Daily Spending Trend
                 </Typography>
               </Box>
-            {dailySpendingData.length > 0 ? (
-              <ResponsiveChart>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={dailySpendingData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                    <XAxis dataKey="day" stroke="#666" />
-                    <YAxis stroke="#666" />
-                    <RechartsTooltip
-                      formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''}
-                      contentStyle={{
-                        borderRadius: 8,
-                        border: '1px solid rgba(0,0,0,0.1)',
-                      }}
-                    />
-                    <Bar dataKey="amount" fill={COLORS.primary} radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ResponsiveChart>
-            ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No spending data</Typography>
-              </Box>
-            )}
+              {dailySpendingData.length > 0 ? (
+                <ResponsiveChart>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={dailySpendingData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                      <XAxis dataKey="day" stroke="#666" />
+                      <YAxis stroke="#666" />
+                      <RechartsTooltip
+                        formatter={(value: number | undefined) =>
+                          value !== undefined ? formatCurrency(value) : ''
+                        }
+                        contentStyle={{
+                          borderRadius: 8,
+                          border: '1px solid rgba(0,0,0,0.1)',
+                        }}
+                      />
+                      <Bar dataKey="amount" fill={COLORS.primary} radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ResponsiveChart>
+              ) : (
+                <Box textAlign="center" py={6}>
+                  <Typography color="text.secondary">No spending data</Typography>
+                </Box>
+              )}
             </Paper>
           </Fade>
         </Grid>
@@ -987,21 +1092,23 @@ const Analytics: React.FC = () => {
       {/* 4. Budget vs Actual */}
       {budgetComparisonData.length > 0 && (
         <Fade in timeout={1400}>
-          <Paper sx={{
-            p: 3,
-            borderRadius: 3,
-            mb: 3,
-            background: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-            backdropFilter: 'blur(20px)',
-            border: (theme) =>
-              theme.palette.mode === 'light'
-                ? `1px solid ${theme.palette.primary.main}0D`
-                : `1px solid ${theme.palette.primary.main}1A`,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-          }}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              mb: 3,
+              background: (theme) =>
+                theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: (theme) =>
+                theme.palette.mode === 'light'
+                  ? `1px solid ${theme.palette.primary.main}0D`
+                  : `1px solid ${theme.palette.primary.main}1A`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            }}
+          >
             <Box display="flex" alignItems="center" gap={1} mb={3}>
               <Avatar
                 sx={{
@@ -1017,25 +1124,27 @@ const Analytics: React.FC = () => {
                 Budget vs Actual Spending
               </Typography>
             </Box>
-          <ResponsiveChart>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={budgetComparisonData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                <XAxis dataKey="name" stroke="#666" />
-                <YAxis stroke="#666" />
-                <RechartsTooltip
-                  formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''}
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: '1px solid rgba(0,0,0,0.1)',
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="budget" fill={COLORS.info} name="Budget" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="spent" fill={COLORS.error} name="Spent" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ResponsiveChart>
+            <ResponsiveChart>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={budgetComparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                  <XAxis dataKey="name" stroke="#666" />
+                  <YAxis stroke="#666" />
+                  <RechartsTooltip
+                    formatter={(value: number | undefined) =>
+                      value !== undefined ? formatCurrency(value) : ''
+                    }
+                    contentStyle={{
+                      borderRadius: 8,
+                      border: '1px solid rgba(0,0,0,0.1)',
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="budget" fill={COLORS.info} name="Budget" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="spent" fill={COLORS.error} name="Spent" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ResponsiveChart>
           </Paper>
         </Fade>
       )}
@@ -1045,20 +1154,22 @@ const Analytics: React.FC = () => {
         {/* Top Merchants */}
         <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1500}>
-            <Paper sx={{
-              p: 3,
-              borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? `1px solid ${theme.palette.primary.main}0D`
-                  : `1px solid ${theme.palette.primary.main}1A`,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-            }}>
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                    : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? `1px solid ${theme.palette.primary.main}0D`
+                    : `1px solid ${theme.palette.primary.main}1A`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+              }}
+            >
               <Box display="flex" alignItems="center" gap={1} mb={3}>
                 <Avatar
                   sx={{
@@ -1074,34 +1185,34 @@ const Analytics: React.FC = () => {
                   Top Merchants
                 </Typography>
               </Box>
-            {topMerchants.length > 0 ? (
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Merchant</TableCell>
-                      <TableCell align="right">Transactions</TableCell>
-                      <TableCell align="right">Total</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {topMerchants.map((merchant, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell>{merchant.name}</TableCell>
-                        <TableCell align="right">{merchant.count}</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(merchant.amount)}
-                        </TableCell>
+              {topMerchants.length > 0 ? (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Merchant</TableCell>
+                        <TableCell align="right">Transactions</TableCell>
+                        <TableCell align="right">Total</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <Typography color="text.secondary">No merchant data</Typography>
-              </Box>
-            )}
+                    </TableHead>
+                    <TableBody>
+                      {topMerchants.map((merchant, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>{merchant.name}</TableCell>
+                          <TableCell align="right">{merchant.count}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>
+                            {formatCurrency(merchant.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box textAlign="center" py={4}>
+                  <Typography color="text.secondary">No merchant data</Typography>
+                </Box>
+              )}
             </Paper>
           </Fade>
         </Grid>
@@ -1109,20 +1220,22 @@ const Analytics: React.FC = () => {
         {/* Month-over-Month */}
         <Grid size={{ md: 6, xs: 12 }}>
           <Fade in timeout={1600}>
-            <Paper sx={{
-              p: 3,
-              borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-                  : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? `1px solid ${theme.palette.primary.main}0D`
-                  : `1px solid ${theme.palette.primary.main}1A`,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-            }}>
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                background: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                    : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: (theme) =>
+                  theme.palette.mode === 'light'
+                    ? `1px solid ${theme.palette.primary.main}0D`
+                    : `1px solid ${theme.palette.primary.main}1A`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+              }}
+            >
               <Box display="flex" alignItems="center" gap={1} mb={3}>
                 <Avatar
                   sx={{
@@ -1138,54 +1251,59 @@ const Analytics: React.FC = () => {
                   Month-over-Month Comparison
                 </Typography>
               </Box>
-            {monthOverMonthData.length > 0 ? (
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Month</TableCell>
-                      <TableCell align="right">Income</TableCell>
-                      <TableCell align="right">Expenses</TableCell>
-                      <TableCell align="right">Change</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {monthOverMonthData.slice(0, 6).map((row, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell>{row.month}</TableCell>
-                        <TableCell align="right">{formatCurrency(row.income)}</TableCell>
-                        <TableCell align="right">{formatCurrency(row.expenses)}</TableCell>
-                        <TableCell align="right">
-                          <Box display="flex" alignItems="center" justifyContent="flex-end" gap={0.5}>
-                            {row.expensesChange > 0 ? (
-                              <TrendingUp fontSize="small" color="error" />
-                            ) : row.expensesChange < 0 ? (
-                              <TrendingDown fontSize="small" color="success" />
-                            ) : null}
-                            <Typography
-                              variant="body2"
-                              color={
-                                row.expensesChange > 0
-                                  ? 'error'
-                                  : row.expensesChange < 0
-                                  ? 'success.main'
-                                  : 'text.secondary'
-                              }
-                            >
-                              {row.expensesChange.toFixed(1)}%
-                            </Typography>
-                          </Box>
-                        </TableCell>
+              {monthOverMonthData.length > 0 ? (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Month</TableCell>
+                        <TableCell align="right">Income</TableCell>
+                        <TableCell align="right">Expenses</TableCell>
+                        <TableCell align="right">Change</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <Typography color="text.secondary">No monthly data</Typography>
-              </Box>
-            )}
+                    </TableHead>
+                    <TableBody>
+                      {monthOverMonthData.slice(0, 6).map((row, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>{row.month}</TableCell>
+                          <TableCell align="right">{formatCurrency(row.income)}</TableCell>
+                          <TableCell align="right">{formatCurrency(row.expenses)}</TableCell>
+                          <TableCell align="right">
+                            <Box
+                              display="flex"
+                              alignItems="center"
+                              justifyContent="flex-end"
+                              gap={0.5}
+                            >
+                              {row.expensesChange > 0 ? (
+                                <TrendingUp fontSize="small" color="error" />
+                              ) : row.expensesChange < 0 ? (
+                                <TrendingDown fontSize="small" color="success" />
+                              ) : null}
+                              <Typography
+                                variant="body2"
+                                color={
+                                  row.expensesChange > 0
+                                    ? 'error'
+                                    : row.expensesChange < 0
+                                      ? 'success.main'
+                                      : 'text.secondary'
+                                }
+                              >
+                                {row.expensesChange.toFixed(1)}%
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box textAlign="center" py={4}>
+                  <Typography color="text.secondary">No monthly data</Typography>
+                </Box>
+              )}
             </Paper>
           </Fade>
         </Grid>

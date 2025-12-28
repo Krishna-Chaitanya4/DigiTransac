@@ -123,7 +123,13 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
             {transaction.splits?.[0]?.tags && transaction.splits[0].tags.length > 0 && (
               <Box display="flex" gap={0.5} flexWrap="wrap" mt={1}>
                 {transaction.splits[0].tags.slice(0, 3).map((tagId: string, idx: number) => (
-                  <Chip key={idx} label={tagId} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                  <Chip
+                    key={idx}
+                    label={tagId}
+                    size="small"
+                    variant="outlined"
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
                 ))}
               </Box>
             )}

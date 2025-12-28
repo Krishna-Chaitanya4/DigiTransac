@@ -39,16 +39,19 @@ export const useSwipe = (
     setIsSwiping(true);
   }, []);
 
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (!isSwiping) return;
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (!isSwiping) return;
 
-    const currentX = e.touches[0].clientX;
-    const delta = currentX - startX.current;
+      const currentX = e.touches[0].clientX;
+      const delta = currentX - startX.current;
 
-    // Limit swipe distance
-    const limitedDelta = Math.max(-150, Math.min(150, delta));
-    setDeltaX(limitedDelta);
-  }, [isSwiping]);
+      // Limit swipe distance
+      const limitedDelta = Math.max(-150, Math.min(150, delta));
+      setDeltaX(limitedDelta);
+    },
+    [isSwiping]
+  );
 
   const handleTouchEnd = useCallback(() => {
     if (!isSwiping) return;

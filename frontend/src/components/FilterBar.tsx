@@ -141,7 +141,14 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
   return (
     <Paper sx={{ p: 2, mb: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: expanded ? 2 : 0 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: expanded ? 2 : 0,
+        }}
+      >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', flex: 1 }}>
           <TextField
             select
@@ -198,9 +205,9 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton 
-            size="small" 
-            onClick={handleReset} 
+          <IconButton
+            size="small"
+            onClick={handleReset}
             title="Reset Filters"
             sx={{
               color: 'primary.main',
@@ -239,11 +246,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               )}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
-                  <Chip
-                    label={option.name}
-                    size="small"
-                    {...getTagProps({ index })}
-                  />
+                  <Chip label={option.name} size="small" {...getTagProps({ index })} />
                 ))
               }
             />
@@ -371,7 +374,8 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                 exclusive
                 onChange={(_, newValue) => {
                   if (newValue !== null) {
-                    let min = '', max = '';
+                    let min = '',
+                      max = '';
                     switch (newValue) {
                       case 'small':
                         min = '0';

@@ -25,8 +25,8 @@ const ResponsiveChart: React.FC<ResponsiveChartProps> = ({
     height,
     style: {
       fontSize: isMobile ? '11px' : '13px',
-      ...(typeof children.props === 'object' && children.props !== null && 'style' in children.props 
-        ? (children.props as any).style 
+      ...(typeof children.props === 'object' && children.props !== null && 'style' in children.props
+        ? (children.props as any).style
         : {}),
     },
   } as any);

@@ -16,13 +16,16 @@ import './index.css';
 setupAxiosInterceptors();
 
 // Initialize offline support
-offlineDB.init().then(() => {
-  console.log('Offline database initialized');
-  // Start auto-sync
-  syncManager.startAutoSync();
-}).catch(error => {
-  console.error('Failed to initialize offline database:', error);
-});
+offlineDB
+  .init()
+  .then(() => {
+    console.log('Offline database initialized');
+    // Start auto-sync
+    syncManager.startAutoSync();
+  })
+  .catch((error) => {
+    console.error('Failed to initialize offline database:', error);
+  });
 
 // Register service worker for PWA (always enabled for testing)
 registerServiceWorker();

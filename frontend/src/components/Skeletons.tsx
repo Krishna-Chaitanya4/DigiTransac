@@ -12,7 +12,12 @@ const DashboardCardSkeletonComponent: React.FC = () => {
     >
       <CardContent>
         <Skeleton variant="text" width="60%" sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} />
-        <Skeleton variant="text" width="80%" height={40} sx={{ bgcolor: 'rgba(255,255,255,0.2)', mt: 1 }} />
+        <Skeleton
+          variant="text"
+          width="80%"
+          height={40}
+          sx={{ bgcolor: 'rgba(255,255,255,0.2)', mt: 1 }}
+        />
         <Skeleton variant="text" width="40%" sx={{ bgcolor: 'rgba(255,255,255,0.2)', mt: 1 }} />
       </CardContent>
     </Card>
@@ -23,7 +28,9 @@ export const DashboardCardSkeleton = React.memo(DashboardCardSkeletonComponent);
 
 const TransactionRowSkeletonComponent: React.FC = () => {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', py: 2, px: 2, borderBottom: '1px solid #eee' }}>
+    <Box
+      sx={{ display: 'flex', alignItems: 'center', py: 2, px: 2, borderBottom: '1px solid #eee' }}
+    >
       <Skeleton variant="circular" width={40} height={40} sx={{ mr: 2 }} />
       <Box sx={{ flex: 1 }}>
         <Skeleton variant="text" width="30%" />
@@ -86,11 +93,14 @@ interface GridSkeletonProps {
   component: React.ComponentType;
 }
 
-const GridSkeletonComponent: React.FC<GridSkeletonProps> = ({ count = 4, component: Component }) => {
+const GridSkeletonComponent: React.FC<GridSkeletonProps> = ({
+  count = 4,
+  component: Component,
+}) => {
   return (
     <Grid container spacing={3}>
       {Array.from({ length: count }).map((_, index) => (
-        <Grid size={{ sm: 6, xs: 12, md: 3 }}key={index}>
+        <Grid size={{ sm: 6, xs: 12, md: 3 }} key={index}>
           <Component />
         </Grid>
       ))}

@@ -115,7 +115,10 @@ export class OfflineDB {
 
         // Sync queue store
         if (!db.objectStoreNames.contains('syncQueue')) {
-          const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
+          const syncStore = db.createObjectStore('syncQueue', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
           syncStore.createIndex('timestamp', 'timestamp', { unique: false });
           syncStore.createIndex('entity', 'entity', { unique: false });
         }
@@ -176,9 +179,9 @@ export class OfflineDB {
     const store = this.getStore(storeName, 'readwrite');
     return new Promise((resolve, reject) => {
       const transaction = store.transaction;
-      
-      items.forEach(item => store.put(item));
-      
+
+      items.forEach((item) => store.put(item));
+
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });

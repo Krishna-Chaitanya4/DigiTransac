@@ -44,14 +44,11 @@ export class OfflineAPI {
   // Transactions
   async getTransactions(userId: string): Promise<Transaction[]> {
     try {
-      const data = await this.request<{ transactions: Transaction[] }>(
-        'GET',
-        '/transactions'
-      );
-      
+      const data = await this.request<{ transactions: Transaction[] }>('GET', '/transactions');
+
       // Cache in IndexedDB
       await offlineDB.putMany('transactions', data.transactions);
-      
+
       return data.transactions;
     } catch (error) {
       if ((error as Error).message === 'OFFLINE') {
@@ -154,11 +151,8 @@ export class OfflineAPI {
   // Categories
   async getCategories(userId: string): Promise<Category[]> {
     try {
-      const data = await this.request<{ categories: Category[] }>(
-        'GET',
-        '/categories'
-      );
-      
+      const data = await this.request<{ categories: Category[] }>('GET', '/categories');
+
       await offlineDB.putMany('categories', data.categories);
       return data.categories;
     } catch (error) {
@@ -186,11 +180,7 @@ export class OfflineAPI {
     }
 
     try {
-      const created = await this.request<{ category: Category }>(
-        'POST',
-        '/categories',
-        category
-      );
+      const created = await this.request<{ category: Category }>('POST', '/categories', category);
 
       await offlineDB.delete('categories', tempId);
       await offlineDB.put('categories', created.category);
@@ -245,11 +235,8 @@ export class OfflineAPI {
   // Accounts
   async getAccounts(userId: string): Promise<Account[]> {
     try {
-      const data = await this.request<{ accounts: Account[] }>(
-        'GET',
-        '/accounts'
-      );
-      
+      const data = await this.request<{ accounts: Account[] }>('GET', '/accounts');
+
       await offlineDB.putMany('accounts', data.accounts);
       return data.accounts;
     } catch (error) {
@@ -277,11 +264,7 @@ export class OfflineAPI {
     }
 
     try {
-      const created = await this.request<{ account: Account }>(
-        'POST',
-        '/accounts',
-        account
-      );
+      const created = await this.request<{ account: Account }>('POST', '/accounts', account);
 
       await offlineDB.delete('accounts', tempId);
       await offlineDB.put('accounts', created.account);
@@ -305,11 +288,7 @@ export class OfflineAPI {
     }
 
     try {
-      const result = await this.request<{ account: Account }>(
-        'PUT',
-        `/accounts/${id}`,
-        updates
-      );
+      const result = await this.request<{ account: Account }>('PUT', `/accounts/${id}`, updates);
       await offlineDB.put('accounts', result.account);
       return result.account;
     } catch (error) {
@@ -336,11 +315,8 @@ export class OfflineAPI {
   // Budgets
   async getBudgets(userId: string): Promise<Budget[]> {
     try {
-      const data = await this.request<{ budgets: Budget[] }>(
-        'GET',
-        '/budgets'
-      );
-      
+      const data = await this.request<{ budgets: Budget[] }>('GET', '/budgets');
+
       await offlineDB.putMany('budgets', data.budgets);
       return data.budgets;
     } catch (error) {

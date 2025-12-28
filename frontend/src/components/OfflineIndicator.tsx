@@ -24,7 +24,7 @@ const OfflineIndicator: React.FC = () => {
       setIsOnline(true);
       setShowBanner(true);
       setDismissed(false);
-      
+
       // Start syncing
       setSyncing(true);
       syncManager.sync().finally(() => {

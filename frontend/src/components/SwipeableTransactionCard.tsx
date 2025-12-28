@@ -21,7 +21,7 @@ const SwipeableTransactionCard: React.FC<SwipeableTransactionCardProps> = (props
 
   const [swipeHandlers, { deltaX, isSwiping }] = useSwipe(
     () => onDelete(), // Swipe left to delete
-    () => onEdit()    // Swipe right to edit
+    () => onEdit() // Swipe right to edit
   );
 
   return (
