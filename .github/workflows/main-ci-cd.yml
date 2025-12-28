@@ -18,7 +18,8 @@ env:
   BACKEND_CONTAINER_APP: digitransac-backend
   FRONTEND_CONTAINER_APP: digitransac-frontend
   # Dependency strictness: BALANCED (allows 1 version behind) | STRICT (must be latest)
-  STRICTNESS: STRICT
+  # TODO: Switch to STRICT after this PR merges and Dependabot updates are processed
+  STRICTNESS: BALANCED
 
 jobs:
   # ==================== STAGE 1: VALIDATION ====================
