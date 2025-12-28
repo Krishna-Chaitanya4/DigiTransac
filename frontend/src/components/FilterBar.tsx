@@ -246,11 +246,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
               )}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
-                  <Chip
-                    label={option.name}
-                    size="small"
-                    {...getTagProps({ index })}
-                  />
+                  <Chip label={option.name} size="small" {...getTagProps({ index })} />
                 ))
               }
             />
