@@ -39,7 +39,7 @@ export function decryptTransaction(transaction: Transaction): Transaction {
       decrypted.amount = encryptionService.decryptNumber((decrypted as any).encryptedAmount);
       // Remove the encrypted field from response
       delete (decrypted as any).encryptedAmount;
-    } catch (error) {
+    } catch {
       // If decryption fails, use original amount (backward compatibility)
       logger.warn('Failed to decrypt amount, using original value');
     }
