@@ -153,7 +153,7 @@ jobs:
     # ==================== STAGE 4: BACKEND BUILD & TEST ====================
     
     - name: 🔨 Setup Node.js for Backend
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
@@ -196,7 +196,7 @@ jobs:
     # ==================== STAGE 5: FRONTEND BUILD & TEST ====================
     
     - name: 🎨 Setup Node.js for Frontend
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
