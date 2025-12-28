@@ -79,7 +79,7 @@ axios.interceptors.response.use(
 
       // Check if we have a refresh token or need to re-login
       const token = localStorage.getItem('auth-token');
-      
+
       if (!token) {
         // No token, redirect to login
         isRefreshing = false;
@@ -91,31 +91,31 @@ axios.interceptors.response.use(
       // For now, just clear auth and redirect to login
       isRefreshing = false;
       processQueue(new Error('Authentication failed'));
-      
+
       localStorage.removeItem('auth-token');
       localStorage.removeItem('auth-user');
       window.location.href = '/login';
-      
+
       return Promise.reject(error);
     }
 
     // Handle 503 Service Unavailable - retry with exponential backoff
     if (error.response?.status === 503 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
+
       // Wait 2 seconds before retrying
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      
+
       return axios(originalRequest);
     }
 
     // Handle network errors - retry once
     if (!error.response && !originalRequest._retry) {
       originalRequest._retry = true;
-      
+
       // Wait 1 second before retrying
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      
+
       return axios(originalRequest);
     }
 

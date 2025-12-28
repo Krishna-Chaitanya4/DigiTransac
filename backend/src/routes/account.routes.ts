@@ -233,12 +233,12 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
       .toArray();
 
     const credits = transactions
-      .filter((t: any) => t.type === 'credit')
-      .reduce((sum: number, t: any) => sum + t.amount, 0);
+      .filter((t) => t.type === 'credit')
+      .reduce((sum: number, t) => sum + t.amount, 0);
 
     const debits = transactions
-      .filter((t: any) => t.type === 'debit')
-      .reduce((sum: number, t: any) => sum + t.amount, 0);
+      .filter((t) => t.type === 'debit')
+      .reduce((sum: number, t) => sum + t.amount, 0);
 
     const calculatedBalance = (account.initialBalance || 0) + credits - debits;
 

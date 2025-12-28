@@ -25,26 +25,41 @@ function SlideTransition(props: SlideProps) {
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, severity: AlertColor = 'info', duration = 4000) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, severity, duration }]);
-  }, []);
+  const showToast = useCallback(
+    (message: string, severity: AlertColor = 'info', duration = 4000) => {
+      const id = Date.now();
+      setToasts((prev) => [...prev, { id, message, severity, duration }]);
+    },
+    []
+  );
 
-  const success = useCallback((message: string, duration?: number) => {
-    showToast(message, 'success', duration);
-  }, [showToast]);
+  const success = useCallback(
+    (message: string, duration?: number) => {
+      showToast(message, 'success', duration);
+    },
+    [showToast]
+  );
 
-  const error = useCallback((message: string, duration?: number) => {
-    showToast(message, 'error', duration);
-  }, [showToast]);
+  const error = useCallback(
+    (message: string, duration?: number) => {
+      showToast(message, 'error', duration);
+    },
+    [showToast]
+  );
 
-  const warning = useCallback((message: string, duration?: number) => {
-    showToast(message, 'warning', duration);
-  }, [showToast]);
+  const warning = useCallback(
+    (message: string, duration?: number) => {
+      showToast(message, 'warning', duration);
+    },
+    [showToast]
+  );
 
-  const info = useCallback((message: string, duration?: number) => {
-    showToast(message, 'info', duration);
-  }, [showToast]);
+  const info = useCallback(
+    (message: string, duration?: number) => {
+      showToast(message, 'info', duration);
+    },
+    [showToast]
+  );
 
   const handleClose = (id: number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));

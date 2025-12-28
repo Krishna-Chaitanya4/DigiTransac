@@ -443,7 +443,7 @@ export class SMSParserService {
                   parsed.bankName,
                   parsed.accountNumber
                 )) || undefined;
-            } catch (error) {
+            } catch {
               // Account matching failed, continue without it
             }
           }

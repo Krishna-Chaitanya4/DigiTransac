@@ -52,7 +52,10 @@ const shouldExcludeFromExpenses = (transaction: any): boolean => {
     );
   }
   // Fallback to transaction-level tags
-  return transaction.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+  return (
+    transaction.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase())) ||
+    false
+  );
 };
 
 const shouldExcludeFromIncome = (transaction: any): boolean => {
@@ -63,7 +66,10 @@ const shouldExcludeFromIncome = (transaction: any): boolean => {
     );
   }
   // Fallback to transaction-level tags
-  return transaction.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase())) || false;
+  return (
+    transaction.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase())) ||
+    false
+  );
 };
 
 interface DashboardStats {
@@ -140,7 +146,7 @@ const Dashboard: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  
+
   // Dashboard always shows "This Month" - no user filtering
   const filters = {
     dateRange: {
@@ -199,13 +205,16 @@ const Dashboard: React.FC = () => {
     }
   }, [token]);
 
-  const handleDismissAlert = useCallback((alert: string) => {
-    const newDismissed = new Set(dismissedAlerts);
-    newDismissed.add(alert);
-    setDismissedAlerts(newDismissed);
-    // Save to localStorage
-    localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
-  }, [dismissedAlerts]);
+  const handleDismissAlert = useCallback(
+    (alert: string) => {
+      const newDismissed = new Set(dismissedAlerts);
+      newDismissed.add(alert);
+      setDismissedAlerts(newDismissed);
+      // Save to localStorage
+      localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
+    },
+    [dismissedAlerts]
+  );
 
   const fetchDashboardData = async () => {
     try {
@@ -213,7 +222,7 @@ const Dashboard: React.FC = () => {
       // Ensure start date includes beginning of day and end date includes end of day
       const startDate = filters.dateRange.start.startOf('day').toISOString();
       const endDate = filters.dateRange.end.endOf('day').toISOString();
-      
+
       // Build query params for transactions API
       // Only fetch approved transactions for accurate financial calculations
       const txnParams = new URLSearchParams({
@@ -223,10 +232,10 @@ const Dashboard: React.FC = () => {
         sortBy: 'date',
         sortOrder: 'desc',
       });
-      
+
       // Add account filters if specified
       if (filters.accounts.length > 0) {
-        filters.accounts.forEach(accountId => txnParams.append('accountIds', accountId));
+        filters.accounts.forEach((accountId) => txnParams.append('accountIds', accountId));
       }
 
       const [transactionsRes, budgetsRes, accountsRes] = await Promise.all([
@@ -249,35 +258,39 @@ const Dashboard: React.FC = () => {
         if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
           return false;
         }
-        
+
         // Filter by categories (check splits)
         if (filters.categories.length > 0) {
           const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
-          const hasMatchingCategory = txnCategories.some((catId: string) => 
+          const hasMatchingCategory = txnCategories.some((catId: string) =>
             filters.categories.includes(catId)
           );
           if (!hasMatchingCategory) return false;
         }
-        
+
         // Filter by tags (include/exclude logic)
         if (filters.includeTags.length > 0) {
           const txnTags = t.tags || [];
           const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
           if (!hasIncludedTag) return false;
         }
-        
+
         if (filters.excludeTags.length > 0) {
           const txnTags = t.tags || [];
           const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
           if (hasExcludedTag) return false;
         }
-        
+
         return true;
       });
 
       // Filter debits and credits with smart tag exclusion
-      const debits = transactions.filter((t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t));
-      const credits = transactions.filter((t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t));
+      const debits = transactions.filter(
+        (t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t)
+      );
+      const credits = transactions.filter(
+        (t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t)
+      );
       const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const netSavings = totalIncome - totalSpent;
@@ -288,16 +301,16 @@ const Dashboard: React.FC = () => {
       const periodDuration = currentEnd.getTime() - currentStart.getTime();
       const prevEnd = new Date(currentStart.getTime() - 1);
       const prevStart = new Date(prevEnd.getTime() - periodDuration);
-      
+
       const prevParams = new URLSearchParams({
         startDate: prevStart.toISOString(),
         endDate: prevEnd.toISOString(),
         reviewStatus: 'approved',
       });
       if (filters.accounts.length > 0) {
-        filters.accounts.forEach(accountId => prevParams.append('accountIds', accountId));
+        filters.accounts.forEach((accountId) => prevParams.append('accountIds', accountId));
       }
-      
+
       const prevRes = await axios.get(`/api/transactions?${prevParams}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -310,7 +323,7 @@ const Dashboard: React.FC = () => {
         }
         if (filters.categories.length > 0) {
           const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
-          const hasMatchingCategory = txnCategories.some((catId: string) => 
+          const hasMatchingCategory = txnCategories.some((catId: string) =>
             filters.categories.includes(catId)
           );
           if (!hasMatchingCategory) return false;
@@ -349,7 +362,7 @@ const Dashboard: React.FC = () => {
       } else if (totalIncome > 0) {
         incomeChange = 100;
       }
-      
+
       // Calculate days in current period for average daily spending
       const daysInPeriod = Math.ceil(periodDuration / (1000 * 60 * 60 * 24)) || 1;
 
@@ -408,7 +421,7 @@ const Dashboard: React.FC = () => {
         // Use effective budget (includes rollover)
         const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
         totalBudget += effectiveBudget;
-        
+
         // Use spent amount calculated by backend (handles all budget types correctly)
         const spent = budget.spent || 0;
         const percentage = Math.round((spent / effectiveBudget) * 100);
@@ -416,7 +429,7 @@ const Dashboard: React.FC = () => {
         // Get display name based on budget type
         let displayName = 'Unknown';
         let displayColor = '#667eea';
-        
+
         if (budget.scopeType === 'category' && budget.categoryId) {
           const category = categoryMap.get(budget.categoryId);
           displayName = category?.name || 'Unknown Category';
@@ -435,7 +448,7 @@ const Dashboard: React.FC = () => {
               return tag?.name || id;
             })
             .join(', ');
-          
+
           if (includeTagNames && excludeTagNames) {
             displayName = `${includeTagNames} (excl: ${excludeTagNames})`;
           } else if (includeTagNames) {
@@ -460,11 +473,11 @@ const Dashboard: React.FC = () => {
           isOver: spent > effectiveBudget,
         });
       }
-      
+
       // Update budget left in stats
       // Only calculate budget left if there are budgets configured
       const budgetLeft = budgets.length > 0 ? totalBudget - totalSpent : 0;
-      setStats(prev => prev ? { ...prev, budgetLeft } : null);
+      setStats((prev) => (prev ? { ...prev, budgetLeft } : null));
 
       setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
 
@@ -472,50 +485,21 @@ const Dashboard: React.FC = () => {
       const now = new Date();
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
+
       // Set to start and end of day for inclusive date range
       sixMonthsAgo.setHours(0, 0, 0, 0);
       now.setHours(23, 59, 59, 999);
-      
+
       const trendParams = new URLSearchParams({
         startDate: sixMonthsAgo.toISOString(),
         endDate: now.toISOString(),
       });
       if (filters.accounts.length > 0) {
-        filters.accounts.forEach(accountId => trendParams.append('accountIds', accountId));
+        filters.accounts.forEach((accountId) => trendParams.append('accountIds', accountId));
       }
 
-      const trendsRes = await axios.get(
-        `/api/transactions?${trendParams}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      let allTransactions = trendsRes.data.transactions || [];
-
-      // Apply same client-side filtering
-      allTransactions = allTransactions.filter((t: any) => {
-        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
-          return false;
-        }
-        if (filters.categories.length > 0) {
-          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
-          const hasMatchingCategory = txnCategories.some((catId: string) => 
-            filters.categories.includes(catId)
-          );
-          if (!hasMatchingCategory) return false;
-        }
-        if (filters.includeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
-          if (!hasIncludedTag) return false;
-        }
-        if (filters.excludeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
-          if (hasExcludedTag) return false;
-        }
-        return true;
+      await axios.get(`/api/transactions?${trendParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       // Get upcoming recurring transactions
@@ -531,7 +515,7 @@ const Dashboard: React.FC = () => {
           const lastCreated = t.recurrencePattern.lastCreated
             ? new Date(t.recurrencePattern.lastCreated)
             : new Date(t.date);
-          let nextDate = new Date(lastCreated);
+          const nextDate = new Date(lastCreated);
 
           switch (t.recurrencePattern.frequency) {
             case 'daily':
@@ -598,8 +582,9 @@ const Dashboard: React.FC = () => {
           });
         }
       });
-      const topCategory = Array.from(categorySpending.values())
-        .sort((a, b) => b.amount - a.amount)[0];
+      const topCategory = Array.from(categorySpending.values()).sort(
+        (a, b) => b.amount - a.amount
+      )[0];
 
       // Generate Smart Insights
       const insights = {
@@ -612,8 +597,8 @@ const Dashboard: React.FC = () => {
           netSavings > 0 && incomeChange > spentChange
             ? ('improving' as const)
             : netSavings < 0 || spentChange > incomeChange
-            ? ('declining' as const)
-            : ('stable' as const),
+              ? ('declining' as const)
+              : ('stable' as const),
         budgetHealthScore: Math.max(
           0,
           Math.min(100, 100 - (overBudget.length / Math.max(1, budgetStatuses.length)) * 100)
@@ -633,9 +618,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const formatCurrency = useCallback((amount: number) => {
-    return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
-  }, [user?.currency]);
+  const formatCurrency = useCallback(
+    (amount: number) => {
+      return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
+    },
+    [user?.currency]
+  );
 
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
@@ -664,10 +652,10 @@ const Dashboard: React.FC = () => {
         {/* Stats Cards Skeleton */}
         <Grid container spacing={3} mb={3}>
           {[1, 2, 3, 4, 5].map((i) => (
-            <Grid item xs={12} sm={6} md={4} lg={2.4} key={i}>
-              <Skeleton 
-                variant="rectangular" 
-                height={180} 
+            <Grid size={{ sm: 6, xs: 12, md: 4 }} key={i}>
+              <Skeleton
+                variant="rectangular"
+                height={180}
                 sx={{ borderRadius: 3 }}
                 animation="wave"
               />
@@ -677,18 +665,18 @@ const Dashboard: React.FC = () => {
 
         {/* Content Skeleton */}
         <Grid container spacing={3}>
-          <Grid item xs={12} md={7}>
-            <Skeleton 
-              variant="rectangular" 
-              height={450} 
+          <Grid size={{ md: 7, xs: 12 }}>
+            <Skeleton
+              variant="rectangular"
+              height={450}
               sx={{ borderRadius: 3 }}
               animation="wave"
             />
           </Grid>
-          <Grid item xs={12} md={5}>
-            <Skeleton 
-              variant="rectangular" 
-              height={450} 
+          <Grid size={{ md: 5, xs: 12 }}>
+            <Skeleton
+              variant="rectangular"
+              height={450}
               sx={{ borderRadius: 3 }}
               animation="wave"
             />
@@ -767,7 +755,8 @@ const Dashboard: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              background:
+                'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
               animation: 'pulse 4s ease-in-out infinite',
             },
             '@keyframes pulse': {
@@ -777,7 +766,15 @@ const Dashboard: React.FC = () => {
           }}
         >
           <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: 2,
+              }}
+            >
               <Box sx={{ flex: 1, minWidth: 250 }}>
                 <Typography
                   variant="h3"
@@ -789,7 +786,8 @@ const Dashboard: React.FC = () => {
                     textShadow: '0 2px 10px rgba(0,0,0,0.1)',
                   }}
                 >
-                  {getTimeBasedGreeting()}, {user?.fullName || user?.username || 'User'}! {getTimeEmoji()}
+                  {getTimeBasedGreeting()}, {user?.fullName || user?.username || 'User'}!{' '}
+                  {getTimeEmoji()}
                 </Typography>
                 <Typography
                   variant="h6"
@@ -800,11 +798,11 @@ const Dashboard: React.FC = () => {
                     textShadow: '0 1px 3px rgba(0,0,0,0.1)',
                   }}
                 >
-                  {budgetStatus.length > 0 && budgetStatus.some(b => b.percentage >= 90)
-                    ? `⚠️ ${budgetStatus.filter(b => b.percentage >= 90).length} budget${budgetStatus.filter(b => b.percentage >= 90).length > 1 ? 's' : ''} approaching limit`
+                  {budgetStatus.length > 0 && budgetStatus.some((b) => b.percentage >= 90)
+                    ? `⚠️ ${budgetStatus.filter((b) => b.percentage >= 90).length} budget${budgetStatus.filter((b) => b.percentage >= 90).length > 1 ? 's' : ''} approaching limit`
                     : (stats?.netSavings || 0) >= 0
-                    ? `🎉 You're ${formatCurrency(Math.abs(stats?.netSavings || 0))} in savings this month`
-                    : `Spending ${formatCurrency(Math.abs(stats?.netSavings || 0))} more than income this month`}
+                      ? `🎉 You're ${formatCurrency(Math.abs(stats?.netSavings || 0))} in savings this month`
+                      : `Spending ${formatCurrency(Math.abs(stats?.netSavings || 0))} more than income this month`}
                 </Typography>
               </Box>
               <Zoom in timeout={800}>
@@ -872,7 +870,7 @@ const Dashboard: React.FC = () => {
       {/* Stats Cards */}
       <Grid container spacing={3} mb={3}>
         {statCards.map((stat, index) => (
-          <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
+          <Grid size={{ sm: 6, xs: 12, md: 4 }} key={index}>
             <Zoom in timeout={400 + index * 100}>
               <Card
                 sx={{
@@ -996,8 +994,8 @@ const Dashboard: React.FC = () => {
                             ? 'rgba(16, 185, 129, 0.1)'
                             : 'rgba(239, 68, 68, 0.1)'
                           : stat.trend === 'up'
-                          ? 'rgba(16, 185, 129, 0.2)'
-                          : 'rgba(239, 68, 68, 0.2)',
+                            ? 'rgba(16, 185, 129, 0.2)'
+                            : 'rgba(239, 68, 68, 0.2)',
                     }}
                   >
                     {stat.trend === 'up' ? (
@@ -1025,7 +1023,7 @@ const Dashboard: React.FC = () => {
 
       {/* Budget Status & Recent Activity */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid item xs={12} md={5}>
+        <Grid size={{ md: 5, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1110,7 +1108,7 @@ const Dashboard: React.FC = () => {
                     }
 
                     return (
-                      <Grid item xs={12} key={account.id}>
+                      <Grid size={{ xs: 12 }} key={account.id}>
                         <Box
                           sx={{
                             p: 2,
@@ -1224,7 +1222,7 @@ const Dashboard: React.FC = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={7}>
+        <Grid size={{ md: 7, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1348,7 +1346,7 @@ const Dashboard: React.FC = () => {
       {/* Financial Health Score & Quick Actions */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* Financial Health Score */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 4,
@@ -1396,7 +1394,7 @@ const Dashboard: React.FC = () => {
                 background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
               }}
             />
-            
+
             <Box sx={{ position: 'relative', zIndex: 1 }}>
               <Box display="flex" alignItems="center" gap={1.5} mb={3}>
                 <Avatar
@@ -1409,15 +1407,19 @@ const Dashboard: React.FC = () => {
                 >
                   <TrendingUp sx={{ fontSize: 28 }} />
                 </Avatar>
-                <Typography variant="h5" fontWeight={700} sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                <Typography
+                  variant="h5"
+                  fontWeight={700}
+                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                >
                   Financial Health Score
                 </Typography>
               </Box>
               <Box display="flex" alignItems="baseline" gap={2} mb={4}>
-                <Typography 
-                  variant="h1" 
+                <Typography
+                  variant="h1"
                   fontWeight={800}
-                  sx={{ 
+                  sx={{
                     fontSize: { xs: '3.5rem', sm: '4rem' },
                     textShadow: '0 4px 12px rgba(0,0,0,0.2)',
                   }}
@@ -1430,12 +1432,22 @@ const Dashboard: React.FC = () => {
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <Box>
-                  <Typography variant="body2" sx={{ opacity: 0.85, mb: 1, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.85,
+                      mb: 1,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Top Spending
                   </Typography>
-                  <Box 
-                    display="flex" 
-                    alignItems="center" 
+                  <Box
+                    display="flex"
+                    alignItems="center"
                     gap={1.5}
                     sx={{
                       p: 1.5,
@@ -1463,12 +1475,22 @@ const Dashboard: React.FC = () => {
                 </Box>
                 {smartInsights?.savingsTrend && (
                   <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.85, mb: 1, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        opacity: 0.85,
+                        mb: 1,
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        fontSize: '0.7rem',
+                      }}
+                    >
                       Savings Trend
                     </Typography>
-                    <Box 
-                      display="flex" 
-                      alignItems="center" 
+                    <Box
+                      display="flex"
+                      alignItems="center"
                       gap={1.5}
                       sx={{
                         p: 1.5,
@@ -1484,7 +1506,11 @@ const Dashboard: React.FC = () => {
                       ) : (
                         <Remove fontSize="small" sx={{ fontWeight: 'bold' }} />
                       )}
-                      <Typography variant="body1" fontWeight={700} sx={{ textTransform: 'capitalize' }}>
+                      <Typography
+                        variant="body1"
+                        fontWeight={700}
+                        sx={{ textTransform: 'capitalize' }}
+                      >
                         {smartInsights.savingsTrend}
                       </Typography>
                     </Box>
@@ -1496,7 +1522,7 @@ const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Quick Actions */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1583,7 +1609,7 @@ const Dashboard: React.FC = () => {
       {/* Budget Progress & Upcoming Recurring */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* Budget Progress Bars */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1669,7 +1695,7 @@ const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Upcoming Recurring Transactions */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ md: 6, xs: 12 }}>
           <Paper
             sx={{
               p: 3,
@@ -1778,9 +1804,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <Box>
-      <PullToRefresh onRefresh={fetchDashboardData}>
-        {content}
-      </PullToRefresh>
+      <PullToRefresh onRefresh={fetchDashboardData}>{content}</PullToRefresh>
     </Box>
   );
 };

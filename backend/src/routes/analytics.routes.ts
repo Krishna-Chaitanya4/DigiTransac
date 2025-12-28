@@ -27,7 +27,7 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
     const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
     // Build filter for approved debit transactions only
-    const txFilter: any = buildExpenseFilter(userId, start, end);
+    const txFilter: Record<string, unknown> = buildExpenseFilter(userId, start, end);
 
     if (accounts) {
       const accountIds = (accounts as string).split(',');
@@ -39,13 +39,13 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
     // Filter by categories/tags in splits if specified
     let splits = await splitsContainer
       .find({
-        transactionId: { $in: expenses.map((e: any) => e.id) },
+        transactionId: { $in: expenses.map((e) => e.id) },
       })
       .toArray();
 
     if (categories) {
       const categoryIds = (categories as string).split(',');
-      splits = splits.filter((s: any) => categoryIds.includes(s.categoryId));
+      splits = splits.filter((s) => categoryIds.includes(s.categoryId));
     }
 
     if (tags) {

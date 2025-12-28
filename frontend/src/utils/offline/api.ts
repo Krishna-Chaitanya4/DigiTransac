@@ -32,33 +32,30 @@ export class OfflineAPI {
     try {
       const response: AxiosResponse<T> = await axios(requestConfig);
       return response.data;
-    } catch (error) {
+    } catch (err) {
       // If offline, throw a specific error
       if (!navigator.onLine) {
         throw new Error('OFFLINE');
       }
-      throw error;
+      throw err;
     }
   }
 
   // Transactions
   async getTransactions(userId: string): Promise<Transaction[]> {
     try {
-      const data = await this.request<{ transactions: Transaction[] }>(
-        'GET',
-        '/transactions'
-      );
-      
+      const data = await this.request<{ transactions: Transaction[] }>('GET', '/transactions');
+
       // Cache in IndexedDB
       await offlineDB.putMany('transactions', data.transactions);
-      
+
       return data.transactions;
-    } catch (error) {
-      if ((error as Error).message === 'OFFLINE') {
+    } catch (err) {
+      if ((err as Error).message === 'OFFLINE') {
         // Return from IndexedDB
         return await offlineDB.getByIndex<Transaction>('transactions', 'userId', userId);
       }
-      throw error;
+      throw err;
     }
   }
 
@@ -93,7 +90,7 @@ export class OfflineAPI {
       await offlineDB.put('transactions', created.transaction);
 
       return created.transaction;
-    } catch (error) {
+    } catch {
       // If failed but we have it locally, queue for sync
       await syncManager.queueCreate('transaction', transaction);
       return optimisticTransaction;
@@ -129,7 +126,7 @@ export class OfflineAPI {
 
       await offlineDB.put('transactions', result.transaction);
       return result.transaction;
-    } catch (error) {
+    } catch {
       await syncManager.queueUpdate('transaction', updated);
       return updated;
     }
@@ -146,7 +143,7 @@ export class OfflineAPI {
 
     try {
       await this.request('DELETE', `/transactions/${id}`);
-    } catch (error) {
+    } catch {
       await syncManager.queueDelete('transaction', id);
     }
   }
@@ -154,18 +151,15 @@ export class OfflineAPI {
   // Categories
   async getCategories(userId: string): Promise<Category[]> {
     try {
-      const data = await this.request<{ categories: Category[] }>(
-        'GET',
-        '/categories'
-      );
-      
+      const data = await this.request<{ categories: Category[] }>('GET', '/categories');
+
       await offlineDB.putMany('categories', data.categories);
       return data.categories;
-    } catch (error) {
-      if ((error as Error).message === 'OFFLINE') {
+    } catch (err) {
+      if ((err as Error).message === 'OFFLINE') {
         return await offlineDB.getByIndex<Category>('categories', 'userId', userId);
       }
-      throw error;
+      throw err;
     }
   }
 
@@ -186,16 +180,12 @@ export class OfflineAPI {
     }
 
     try {
-      const created = await this.request<{ category: Category }>(
-        'POST',
-        '/categories',
-        category
-      );
+      const created = await this.request<{ category: Category }>('POST', '/categories', category);
 
       await offlineDB.delete('categories', tempId);
       await offlineDB.put('categories', created.category);
       return created.category;
-    } catch (error) {
+    } catch {
       await syncManager.queueCreate('category', category);
       return optimistic;
     }
@@ -221,7 +211,7 @@ export class OfflineAPI {
       );
       await offlineDB.put('categories', result.category);
       return result.category;
-    } catch (error) {
+    } catch {
       await syncManager.queueUpdate('category', updated);
       return updated;
     }
@@ -237,7 +227,7 @@ export class OfflineAPI {
 
     try {
       await this.request('DELETE', `/categories/${id}`);
-    } catch (error) {
+    } catch {
       await syncManager.queueDelete('category', id);
     }
   }
@@ -245,18 +235,15 @@ export class OfflineAPI {
   // Accounts
   async getAccounts(userId: string): Promise<Account[]> {
     try {
-      const data = await this.request<{ accounts: Account[] }>(
-        'GET',
-        '/accounts'
-      );
-      
+      const data = await this.request<{ accounts: Account[] }>('GET', '/accounts');
+
       await offlineDB.putMany('accounts', data.accounts);
       return data.accounts;
-    } catch (error) {
-      if ((error as Error).message === 'OFFLINE') {
+    } catch (err) {
+      if ((err as Error).message === 'OFFLINE') {
         return await offlineDB.getByIndex<Account>('accounts', 'userId', userId);
       }
-      throw error;
+      throw err;
     }
   }
 
@@ -277,16 +264,12 @@ export class OfflineAPI {
     }
 
     try {
-      const created = await this.request<{ account: Account }>(
-        'POST',
-        '/accounts',
-        account
-      );
+      const created = await this.request<{ account: Account }>('POST', '/accounts', account);
 
       await offlineDB.delete('accounts', tempId);
       await offlineDB.put('accounts', created.account);
       return created.account;
-    } catch (error) {
+    } catch {
       await syncManager.queueCreate('account', account);
       return optimistic;
     }
@@ -305,14 +288,10 @@ export class OfflineAPI {
     }
 
     try {
-      const result = await this.request<{ account: Account }>(
-        'PUT',
-        `/accounts/${id}`,
-        updates
-      );
+      const result = await this.request<{ account: Account }>('PUT', `/accounts/${id}`, updates);
       await offlineDB.put('accounts', result.account);
       return result.account;
-    } catch (error) {
+    } catch {
       await syncManager.queueUpdate('account', updated);
       return updated;
     }
@@ -328,7 +307,7 @@ export class OfflineAPI {
 
     try {
       await this.request('DELETE', `/accounts/${id}`);
-    } catch (error) {
+    } catch {
       await syncManager.queueDelete('account', id);
     }
   }
@@ -336,18 +315,15 @@ export class OfflineAPI {
   // Budgets
   async getBudgets(userId: string): Promise<Budget[]> {
     try {
-      const data = await this.request<{ budgets: Budget[] }>(
-        'GET',
-        '/budgets'
-      );
-      
+      const data = await this.request<{ budgets: Budget[] }>('GET', '/budgets');
+
       await offlineDB.putMany('budgets', data.budgets);
       return data.budgets;
-    } catch (error) {
-      if ((error as Error).message === 'OFFLINE') {
+    } catch (err) {
+      if ((err as Error).message === 'OFFLINE') {
         return await offlineDB.getByIndex<Budget>('budgets', 'userId', userId);
       }
-      throw error;
+      throw err;
     }
   }
 }

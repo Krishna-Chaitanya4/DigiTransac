@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Don't set axios baseURL in development - use relative URLs for Vite proxy
       // In production, the config service will provide the correct API URL
       const isDevelopment = isDevelopmentEnvironment();
-      
+
       if (!isDevelopment) {
         const apiUrl = configService.getApiUrl();
         axios.defaults.baseURL = apiUrl;
@@ -113,7 +113,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setToken(savedToken);
           setUser(JSON.parse(savedUser));
           axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-        } catch (error) {
+        } catch {
           localStorage.removeItem('auth-token');
           localStorage.removeItem('auth-user');
           setToken(null);
@@ -152,7 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Use relative URL to let Vite proxy handle it
       const loginUrl = '/api/auth/login';
-      
+
       // Try fetch with relative path (uses Vite proxy)
       const fetchResponse = await fetch(loginUrl, {
         method: 'POST',
@@ -166,13 +166,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!fetchResponse.ok) {
         const errorData = await fetchResponse.json().catch(() => ({}));
-        const errorMessage = errorData.message || 
-          (fetchResponse.status === 401 ? 'Invalid username/email/phone or password' :
-           fetchResponse.status === 404 ? 'Login service is currently unavailable' :
-           fetchResponse.status === 405 ? 'Service temporarily unavailable. Please try again in a moment' :
-           fetchResponse.status === 429 ? 'Too many login attempts. Please try again later' :
-           fetchResponse.status >= 500 ? 'Server error. Please try again later' :
-           'Login failed. Please check your credentials and try again');
+        const errorMessage =
+          errorData.message ||
+          (fetchResponse.status === 401
+            ? 'Invalid username/email/phone or password'
+            : fetchResponse.status === 404
+              ? 'Login service is currently unavailable'
+              : fetchResponse.status === 405
+                ? 'Service temporarily unavailable. Please try again in a moment'
+                : fetchResponse.status === 429
+                  ? 'Too many login attempts. Please try again later'
+                  : fetchResponse.status >= 500
+                    ? 'Server error. Please try again later'
+                    : 'Login failed. Please check your credentials and try again');
         throw new Error(errorMessage);
       }
 
@@ -215,10 +221,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error.response) {
         const status = error.response.status;
         const serverMessage = error.response.data?.message;
-        
+
         if (status === 409) {
           // Conflict - duplicate data
-          throw new Error(serverMessage || 'This username, email, or phone number is already registered');
+          throw new Error(
+            serverMessage || 'This username, email, or phone number is already registered'
+          );
         } else if (status === 400) {
           // Validation error
           throw new Error(serverMessage || 'Please check your information and try again');
@@ -229,7 +237,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Server error
           throw new Error('Server error. Please try again later');
         }
-        
+
         throw new Error(serverMessage || `Registration failed (Error ${status})`);
       } else if (error.request) {
         // Network error

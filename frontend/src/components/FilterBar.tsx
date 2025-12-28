@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -141,7 +141,14 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
   return (
     <Paper sx={{ p: 2, mb: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: expanded ? 2 : 0 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: expanded ? 2 : 0,
+        }}
+      >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', flex: 1 }}>
           <TextField
             select
@@ -198,9 +205,9 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton 
-            size="small" 
-            onClick={handleReset} 
+          <IconButton
+            size="small"
+            onClick={handleReset}
             title="Reset Filters"
             sx={{
               color: 'primary.main',
@@ -221,7 +228,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
       <Collapse in={expanded}>
         <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -243,13 +250,14 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                     label={option.name}
                     size="small"
                     {...getTagProps({ index })}
+                    key={option.id || index}
                   />
                 ))
               }
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -275,13 +283,14 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                       color: option.color ? '#fff' : undefined,
                     }}
                     {...getTagProps({ index })}
+                    key={option.id || index}
                   />
                 ))
               }
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -304,13 +313,14 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                     size="small"
                     color="success"
                     {...getTagProps({ index })}
+                    key={option.id || index}
                   />
                 ))
               }
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ sm: 6, xs: 12, md: 3 }}>
             <Autocomplete
               multiple
               size="small"
@@ -333,6 +343,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                     size="small"
                     color="error"
                     {...getTagProps({ index })}
+                    key={option.id || index}
                   />
                 ))
               }
@@ -340,7 +351,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           </Grid>
 
           {showTransactionType && (
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ sm: 6, xs: 12, md: 3 }}>
               <ToggleButtonGroup
                 size="small"
                 value={filters.transactionType}
@@ -363,7 +374,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           )}
 
           {/* Amount Range Filters */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Box>
               <ToggleButtonGroup
                 size="small"
@@ -371,7 +382,8 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                 exclusive
                 onChange={(_, newValue) => {
                   if (newValue !== null) {
-                    let min = '', max = '';
+                    let min = '',
+                      max = '';
                     switch (newValue) {
                       case 'small':
                         min = '0';
@@ -416,7 +428,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
           {filters.amountRange.quickFilter === 'custom' && (
             <>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                 <TextField
                   label="Min Amount"
                   type="number"
@@ -438,7 +450,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ sm: 6, xs: 12, md: 3 }}>
                 <TextField
                   label="Max Amount"
                   type="number"

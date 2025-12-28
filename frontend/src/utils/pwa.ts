@@ -31,7 +31,7 @@ export const registerServiceWorker = async () => {
       });
 
       return registration;
-    } catch (error) {
+    } catch {
       return undefined;
     }
   } else {

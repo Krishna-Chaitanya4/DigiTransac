@@ -124,25 +124,29 @@ const Layout: React.FC = () => {
   };
 
   // Filter menu items based on search
-  const filteredMenuItems = menuItems.filter(item =>
+  const filteredMenuItems = menuItems.filter((item) =>
     item.text.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+    <Box
+      sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}
+    >
       {/* Header with Logo and Toggle */}
-      <Box sx={{ 
-        p: sidebarCollapsed ? 1.5 : 2.5, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-        minHeight: 64,
-      }}>
-        <Box 
+      <Box
+        sx={{
+          p: sidebarCollapsed ? 1.5 : 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+          minHeight: 64,
+        }}
+      >
+        <Box
           onClick={() => navigate('/dashboard')}
-          sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
             gap: 1.5,
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -229,7 +233,7 @@ const Layout: React.FC = () => {
                 bgcolor: 'action.hover',
                 '& fieldset': { border: 'none' },
                 '&:hover': { bgcolor: 'action.selected' },
-                '&.Mui-focused': { 
+                '&.Mui-focused': {
                   bgcolor: 'action.selected',
                   boxShadow: '0 0 0 2px rgba(20, 184, 166, 0.2)',
                 },
@@ -251,8 +255,8 @@ const Layout: React.FC = () => {
       <List sx={{ flexGrow: 1, px: sidebarCollapsed ? 1 : 2, py: 2 }}>
         {filteredMenuItems.map((item) => (
           <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-            <Tooltip 
-              title={sidebarCollapsed ? item.text : ''} 
+            <Tooltip
+              title={sidebarCollapsed ? item.text : ''}
               placement="right"
               arrow
               TransitionComponent={Fade}
@@ -317,13 +321,15 @@ const Layout: React.FC = () => {
       </List>
 
       {/* Profile Section at Bottom */}
-      <Box sx={{ 
-        borderTop: '1px solid', 
-        borderColor: 'divider', 
-        p: sidebarCollapsed ? 1 : 2,
-        display: 'flex',
-        justifyContent: 'center',
-      }}>
+      <Box
+        sx={{
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          p: sidebarCollapsed ? 1 : 2,
+          display: 'flex',
+          justifyContent: 'center',
+        }}
+      >
         <Box
           sx={{
             display: 'flex',
@@ -442,7 +448,12 @@ const Layout: React.FC = () => {
           },
         }}
       >
-        <MenuItem onClick={() => { toggleTheme(); handleMenuClose(); }}>
+        <MenuItem
+          onClick={() => {
+            toggleTheme();
+            handleMenuClose();
+          }}
+        >
           <ListItemIcon>
             {mode === 'dark' ? (
               <LightModeIcon fontSize="small" sx={{ color: '#14b8a6' }} />
@@ -461,7 +472,14 @@ const Layout: React.FC = () => {
         </MenuItem>
       </Menu>
 
-      <Box component="nav" sx={{ width: { md: currentWidth }, flexShrink: { md: 0 }, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+      <Box
+        component="nav"
+        sx={{
+          width: { md: currentWidth },
+          flexShrink: { md: 0 },
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
         <Drawer
           variant="temporary"
           open={mobileOpen}

@@ -3,7 +3,7 @@
  */
 export const getTimeBasedGreeting = (): string => {
   const hour = new Date().getHours();
-  
+
   if (hour >= 5 && hour < 12) {
     return 'Good morning';
   } else if (hour >= 12 && hour < 17) {
@@ -20,7 +20,7 @@ export const getTimeBasedGreeting = (): string => {
  */
 export const getTimeEmoji = (): string => {
   const hour = new Date().getHours();
-  
+
   if (hour >= 5 && hour < 12) {
     return '☀️';
   } else if (hour >= 12 && hour < 17) {
@@ -38,8 +38,18 @@ export const getTimeEmoji = (): string => {
 export const getCurrentMonthYear = (): string => {
   const now = new Date();
   const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
 };

@@ -12,7 +12,7 @@ export const detectCountry = (): string => {
     // METHOD 1: Timezone-based detection
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      
+
       const timezoneToCountry: Record<string, string> = {
         // Asia
         'Asia/Kolkata': 'IN',
@@ -63,17 +63,17 @@ export const detectCountry = (): string => {
         'Africa/Lagos': 'NG',
         'Africa/Nairobi': 'KE',
       };
-      
+
       if (timezoneToCountry[timezone]) {
         return timezoneToCountry[timezone];
       }
-    } catch (tzError) {
+    } catch {
       // Continue to fallback
     }
-    
+
     // METHOD 2: Locale-based detection
     const languages = navigator.languages || [navigator.language];
-    
+
     for (const lang of languages) {
       // Extract country code from locale (e.g., "en-IN" → "IN")
       if (lang.includes('-')) {
@@ -83,10 +83,10 @@ export const detectCountry = (): string => {
         }
       }
     }
-    
+
     // Fallback to US
     return 'US';
-  } catch (error) {
+  } catch {
     return 'US';
   }
 };

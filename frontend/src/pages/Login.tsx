@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Container,
@@ -18,9 +18,9 @@ import {
   Stack,
   Chip,
 } from '@mui/material';
-import { 
-  Visibility, 
-  VisibilityOff, 
+import {
+  Visibility,
+  VisibilityOff,
   AccountBalance,
   Email,
   Lock,
@@ -70,18 +70,18 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     // Validate before submitting
     if (!identifier || identifier.length < 3) {
       setIdentifierError('Please enter your email, phone, or username');
       return;
     }
-    
+
     if (password.length < 8) {
       setPasswordError('Password must be at least 8 characters');
       return;
     }
-    
+
     setIsLoading(true);
 
     try {
@@ -126,7 +126,8 @@ const Login: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: (theme) => `linear-gradient(45deg, ${theme.palette.primary.main}66 0%, ${theme.palette.primary.light}66 50%, ${theme.palette.primary.dark}66 100%)`,
+          background: (theme) =>
+            `linear-gradient(45deg, ${theme.palette.primary.main}66 0%, ${theme.palette.primary.light}66 50%, ${theme.palette.primary.dark}66 100%)`,
           animation: 'waveMove 15s ease-in-out infinite',
         },
         '&::after': {
@@ -136,25 +137,26 @@ const Login: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(-45deg, rgba(13, 148, 136, 0.3) 0%, transparent 50%, rgba(34, 211, 238, 0.3) 100%)',
+          background:
+            'linear-gradient(-45deg, rgba(13, 148, 136, 0.3) 0%, transparent 50%, rgba(34, 211, 238, 0.3) 100%)',
           animation: 'waveMove2 20s ease-in-out infinite reverse',
         },
         '@keyframes waveMove': {
-          '0%, 100%': { 
+          '0%, 100%': {
             transform: 'translateX(-25%) translateY(-25%) rotate(0deg)',
             opacity: 0.6,
           },
-          '50%': { 
+          '50%': {
             transform: 'translateX(25%) translateY(25%) rotate(180deg)',
             opacity: 0.9,
           },
         },
         '@keyframes waveMove2': {
-          '0%, 100%': { 
+          '0%, 100%': {
             transform: 'translateX(25%) translateY(25%) rotate(0deg)',
             opacity: 0.5,
           },
-          '50%': { 
+          '50%': {
             transform: 'translateX(-25%) translateY(-25%) rotate(-180deg)',
             opacity: 0.8,
           },
@@ -167,18 +169,19 @@ const Login: React.FC = () => {
           position: 'absolute',
           width: '600px',
           height: '600px',
-          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.main}40 0%, transparent 70%)`,
+          background: (theme) =>
+            `radial-gradient(circle, ${theme.palette.primary.main}40 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '-200px',
           left: '-200px',
           filter: 'blur(100px)',
           animation: 'pulse1 12s ease-in-out infinite',
           '@keyframes pulse1': {
-            '0%, 100%': { 
+            '0%, 100%': {
               transform: 'scale(1)',
               opacity: 0.6,
             },
-            '50%': { 
+            '50%': {
               transform: 'scale(1.3)',
               opacity: 0.9,
             },
@@ -190,18 +193,19 @@ const Login: React.FC = () => {
           position: 'absolute',
           width: '500px',
           height: '500px',
-          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.light}33 0%, transparent 70%)`,
+          background: (theme) =>
+            `radial-gradient(circle, ${theme.palette.primary.light}33 0%, transparent 70%)`,
           borderRadius: '50%',
           bottom: '-150px',
           right: '-150px',
           filter: 'blur(90px)',
           animation: 'pulse2 16s ease-in-out infinite',
           '@keyframes pulse2': {
-            '0%, 100%': { 
+            '0%, 100%': {
               transform: 'scale(1.2)',
               opacity: 0.5,
             },
-            '50%': { 
+            '50%': {
               transform: 'scale(1)',
               opacity: 0.8,
             },
@@ -213,20 +217,21 @@ const Login: React.FC = () => {
           position: 'absolute',
           width: '400px',
           height: '400px',
-          background: (theme) => `radial-gradient(circle, ${theme.palette.primary.dark}2E 0%, transparent 70%)`,
+          background: (theme) =>
+            `radial-gradient(circle, ${theme.palette.primary.dark}2E 0%, transparent 70%)`,
           borderRadius: '50%',
           top: '40%',
           right: '10%',
           filter: 'blur(80px)',
           animation: 'drift1 20s ease-in-out infinite',
           '@keyframes drift1': {
-            '0%, 100%': { 
+            '0%, 100%': {
               transform: 'translate(0, 0)',
             },
-            '33%': { 
+            '33%': {
               transform: 'translate(-80px, 60px)',
             },
-            '66%': { 
+            '66%': {
               transform: 'translate(40px, -40px)',
             },
           },
@@ -235,103 +240,103 @@ const Login: React.FC = () => {
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, px: { xs: 2, sm: 3 } }}>
         <Grid container spacing={{ xs: 0, md: 4 }} alignItems="center">
           {/* Left Side - Features */}
-          <Grid item xs={12} md={6} sx={{ display: { xs: 'none', md: 'block' } }}>
-              <Fade in timeout={800}>
-                <Box>
-                  {/* App Branding */}
-                  <Box sx={{ mb: 6 }}>
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        p: 2.5,
-                        borderRadius: 4,
-                        background: 'rgba(255, 255, 255, 0.15)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        mb: 3,
-                        boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}4D`,
-                        animation: 'float 3s ease-in-out infinite',
-                        '@keyframes float': {
-                          '0%, 100%': { transform: 'translateY(0px)' },
-                          '50%': { transform: 'translateY(-10px)' },
-                        },
-                      }}
-                    >
-                      <AccountBalance sx={{ fontSize: 48, color: 'white' }} />
-                    </Box>
-                    <Typography
-                      variant="h2"
-                      fontWeight={900}
-                      gutterBottom
-                      sx={{
-                        color: 'white',
-                        letterSpacing: '-0.02em',
-                        textShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                        mb: 2,
-                      }}
-                    >
-                      DigiTransac
-                    </Typography>
-                    <Typography
-                      variant="h5"
-                      sx={{
-                        color: 'rgba(255,255,255,0.9)',
-                        fontWeight: 500,
-                        lineHeight: 1.6,
-                        mb: 1,
-                      }}
-                    >
-                      Your Complete Digital Transaction Manager
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        color: 'rgba(255,255,255,0.8)',
-                        fontSize: '1.1rem',
-                        lineHeight: 1.7,
-                      }}
-                    >
-                      Track income, expenses, and transfers all in one place. 
-                      Get insights that help you make better financial decisions.
-                    </Typography>
+          <Grid size={{ md: 6, xs: 12 }} sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Fade in timeout={800}>
+              <Box>
+                {/* App Branding */}
+                <Box sx={{ mb: 6 }}>
+                  <Box
+                    sx={{
+                      display: 'inline-flex',
+                      p: 2.5,
+                      borderRadius: 4,
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      mb: 3,
+                      boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}4D`,
+                      animation: 'float 3s ease-in-out infinite',
+                      '@keyframes float': {
+                        '0%, 100%': { transform: 'translateY(0px)' },
+                        '50%': { transform: 'translateY(-10px)' },
+                      },
+                    }}
+                  >
+                    <AccountBalance sx={{ fontSize: 48, color: 'white' }} />
                   </Box>
+                  <Typography
+                    variant="h2"
+                    fontWeight={900}
+                    gutterBottom
+                    sx={{
+                      color: 'white',
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                      mb: 2,
+                    }}
+                  >
+                    DigiTransac
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      color: 'rgba(255,255,255,0.9)',
+                      fontWeight: 500,
+                      lineHeight: 1.6,
+                      mb: 1,
+                    }}
+                  >
+                    Your Complete Digital Transaction Manager
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      color: 'rgba(255,255,255,0.8)',
+                      fontSize: '1.1rem',
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    Track income, expenses, and transfers all in one place. Get insights that help
+                    you make better financial decisions.
+                  </Typography>
+                </Box>
 
-                  {/* Features List */}
-                  <Stack spacing={3}>
-                    {[
-                      {
-                        icon: <TrendingUp />,
-                        title: 'Complete Transaction Tracking',
-                        desc: 'Manage income, expenses, and transfers seamlessly',
-                      },
-                      {
-                        icon: <AccountBalanceWallet />,
-                        title: 'Multi-Account Management',
-                        desc: 'Track all your bank accounts and credit cards in one place',
-                      },
-                      {
-                        icon: <Insights />,
-                        title: 'Smart Analytics & Insights',
-                        desc: 'Beautiful charts and intelligent spending patterns',
-                      },
-                      {
-                        icon: <CloudDone />,
-                        title: 'Offline-First, Cloud-Synced',
-                        desc: 'Works without internet, syncs when you\'re back online',
-                      },
-                      {
-                        icon: <Security />,
-                        title: 'Bank-Level Security',
-                        desc: '256-bit encryption keeps your financial data safe',
-                      },
-                    ].map((feature, index) => (
-                      <Zoom in timeout={1000 + index * 200} key={index}>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: 2,
-                            p: 2.5,
+                {/* Features List */}
+                <Stack spacing={3}>
+                  {[
+                    {
+                      icon: <TrendingUp />,
+                      title: 'Complete Transaction Tracking',
+                      desc: 'Manage income, expenses, and transfers seamlessly',
+                    },
+                    {
+                      icon: <AccountBalanceWallet />,
+                      title: 'Multi-Account Management',
+                      desc: 'Track all your bank accounts and credit cards in one place',
+                    },
+                    {
+                      icon: <Insights />,
+                      title: 'Smart Analytics & Insights',
+                      desc: 'Beautiful charts and intelligent spending patterns',
+                    },
+                    {
+                      icon: <CloudDone />,
+                      title: 'Offline-First, Cloud-Synced',
+                      desc: "Works without internet, syncs when you're back online",
+                    },
+                    {
+                      icon: <Security />,
+                      title: 'Bank-Level Security',
+                      desc: '256-bit encryption keeps your financial data safe',
+                    },
+                  ].map((feature, index) => (
+                    <Zoom in timeout={1000 + index * 200} key={index}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 2,
+                          p: 2.5,
                           borderRadius: 3,
                           background: 'rgba(255, 255, 255, 0.1)',
                           backdropFilter: 'blur(10px)',
@@ -342,89 +347,89 @@ const Login: React.FC = () => {
                             transform: 'translateX(8px)',
                             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
                             borderColor: 'rgba(255, 255, 255, 0.3)',
-                            },
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 2,
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            display: 'flex',
+                            color: 'white',
+                            boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}33`,
                           }}
                         >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 2,
-                              background: 'rgba(255, 255, 255, 0.2)',
-                              display: 'flex',
-                              color: 'white',
-                              boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}33`,
-                            }}
-                          >
-                            {feature.icon}
-                          </Box>
-                          <Box>
-                            <Typography
-                              variant="subtitle1"
-                              fontWeight={700}
-                              sx={{ color: 'white', mb: 0.5 }}
-                            >
-                              {feature.title}
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{ color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}
-                            >
-                              {feature.desc}
-                            </Typography>
-                          </Box>
+                          {feature.icon}
                         </Box>
-                      </Zoom>
-                    ))}
-                  </Stack>
+                        <Box>
+                          <Typography
+                            variant="subtitle1"
+                            fontWeight={700}
+                            sx={{ color: 'white', mb: 0.5 }}
+                          >
+                            {feature.title}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}
+                          >
+                            {feature.desc}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Zoom>
+                  ))}
+                </Stack>
 
-                  {/* Trust Badges */}
-                  <Box sx={{ mt: 4, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                    <Chip
-                      label="🔒 Encrypted"
-                      sx={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        fontWeight: 600,
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.25)',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.25)',
-                        },
-                      }}
-                    />
-                    <Chip
-                      label="📱 PWA Ready"
-                      sx={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        fontWeight: 600,
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.25)',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.25)',
-                        },
-                      }}
-                    />
-                    <Chip
-                      label="🌙 Dark Mode"
-                      sx={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        fontWeight: 600,
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.25)',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.25)',
-                        },
-                      }}
-                    />
-                  </Box>
+                {/* Trust Badges */}
+                <Box sx={{ mt: 4, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Chip
+                    label="🔒 Encrypted"
+                    sx={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      fontWeight: 600,
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      '&:hover': {
+                        background: 'rgba(255, 255, 255, 0.25)',
+                      },
+                    }}
+                  />
+                  <Chip
+                    label="📱 PWA Ready"
+                    sx={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      fontWeight: 600,
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      '&:hover': {
+                        background: 'rgba(255, 255, 255, 0.25)',
+                      },
+                    }}
+                  />
+                  <Chip
+                    label="🌙 Dark Mode"
+                    sx={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      fontWeight: 600,
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      '&:hover': {
+                        background: 'rgba(255, 255, 255, 0.25)',
+                      },
+                    }}
+                  />
                 </Box>
-              </Fade>
+              </Box>
+            </Fade>
           </Grid>
 
           {/* Right Side - Login Form */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ md: 6, xs: 12 }}>
             <Fade in timeout={600}>
               <Paper
                 elevation={0}
@@ -447,301 +452,313 @@ const Login: React.FC = () => {
                     boxShadow: '0 12px 48px 0 rgba(31, 38, 135, 0.5)',
                   },
                 }}
-                >
-            <Zoom in timeout={800}>
-              <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>
-                <Box
-                  sx={{
-                    display: { xs: 'inline-flex', md: 'none' },
-                    p: { xs: 1.5, sm: 2 },
-                    borderRadius: '50%',
-                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                    mb: 2,
-                    boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
-                    animation: 'float 3s ease-in-out infinite',
-                    '@keyframes float': {
-                      '0%, 100%': { transform: 'translateY(0px)' },
-                      '50%': { transform: 'translateY(-10px)' },
-                    },
-                  }}
-                >
-                  <AccountBalance sx={{ fontSize: { xs: 40, sm: 48 }, color: 'white' }} />
-                </Box>
-                <Typography
-                  variant="h3"
-                  fontWeight={800}
-                  gutterBottom
-                  sx={{
-                    fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' },
-                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    letterSpacing: '-0.02em',
-                    mb: 1,
-                  }}
-                >
-                  Welcome Back
-                </Typography>
-                <Typography 
-                  variant="body1" 
-                  color="text.secondary" 
-                  sx={{ 
-                    fontSize: { xs: '0.95rem', sm: '1.1rem' },
-                    fontWeight: 500,
-                  }}
-                >
-                  Sign in to continue managing your finances
-                </Typography>
-              </Box>
-            </Zoom>
-
-          {error && (
-            <Fade in timeout={300}>
-              <Alert 
-                severity="error" 
-                sx={{ 
-                  mb: 3,
-                  borderRadius: 2,
-                  '& .MuiAlert-icon': {
-                    fontSize: 24,
-                  },
-                }}
               >
-                {error}
-              </Alert>
-            </Fade>
-          )}
+                <Zoom in timeout={800}>
+                  <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>
+                    <Box
+                      sx={{
+                        display: { xs: 'inline-flex', md: 'none' },
+                        p: { xs: 1.5, sm: 2 },
+                        borderRadius: '50%',
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                        mb: 2,
+                        boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
+                        animation: 'float 3s ease-in-out infinite',
+                        '@keyframes float': {
+                          '0%, 100%': { transform: 'translateY(0px)' },
+                          '50%': { transform: 'translateY(-10px)' },
+                        },
+                      }}
+                    >
+                      <AccountBalance sx={{ fontSize: { xs: 40, sm: 48 }, color: 'white' }} />
+                    </Box>
+                    <Typography
+                      variant="h3"
+                      fontWeight={800}
+                      gutterBottom
+                      sx={{
+                        fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' },
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        letterSpacing: '-0.02em',
+                        mb: 1,
+                      }}
+                    >
+                      Welcome Back
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      color="text.secondary"
+                      sx={{
+                        fontSize: { xs: '0.95rem', sm: '1.1rem' },
+                        fontWeight: 500,
+                      }}
+                    >
+                      Sign in to continue managing your finances
+                    </Typography>
+                  </Box>
+                </Zoom>
 
-          <form onSubmit={handleSubmit}>
-            <Box sx={{ mb: 2 }}>
-              <TextField
-                fullWidth
-                label="Email, Phone, or Username"
-                value={identifier}
-                onChange={handleIdentifierChange}
-                onFocus={() => setIdentifierFocused(true)}
-                onBlur={() => setIdentifierFocused(false)}
-                required
-                autoComplete="username"
-                autoFocus
-                error={!!identifierError}
-                helperText={identifierError || 'Enter your email, phone number, or username'}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email 
-                        sx={{ 
-                          color: identifierFocused ? 'primary.main' : 'action.disabled',
-                          transition: 'color 0.3s ease',
-                        }} 
-                      />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    backgroundColor: identifierFocused ? 'action.hover' : 'transparent',
-                    '& fieldset': {
-                      borderWidth: 2,
-                      transition: 'border-color 0.3s ease',
-                    },
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      '& fieldset': {
-                        borderColor: 'primary.main',
+                {error && (
+                  <Fade in timeout={300}>
+                    <Alert
+                      severity="error"
+                      sx={{
+                        mb: 3,
+                        borderRadius: 2,
+                        '& .MuiAlert-icon': {
+                          fontSize: 24,
+                        },
+                      }}
+                    >
+                      {error}
+                    </Alert>
+                  </Fade>
+                )}
+
+                <form onSubmit={handleSubmit}>
+                  <Box sx={{ mb: 2 }}>
+                    <TextField
+                      fullWidth
+                      label="Email, Phone, or Username"
+                      value={identifier}
+                      onChange={handleIdentifierChange}
+                      onFocus={() => setIdentifierFocused(true)}
+                      onBlur={() => setIdentifierFocused(false)}
+                      required
+                      autoComplete="username"
+                      autoFocus
+                      error={!!identifierError}
+                      helperText={identifierError || 'Enter your email, phone number, or username'}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Email
+                              sx={{
+                                color: identifierFocused ? 'primary.main' : 'action.disabled',
+                                transition: 'color 0.3s ease',
+                              }}
+                            />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          backgroundColor: identifierFocused ? 'action.hover' : 'transparent',
+                          '& fieldset': {
+                            borderWidth: 2,
+                            transition: 'border-color 0.3s ease',
+                          },
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            '& fieldset': {
+                              borderColor: 'primary.main',
+                            },
+                          },
+                          '&.Mui-focused': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
+                          },
+                        },
+                        '& .MuiInputLabel-root': {
+                          fontWeight: 500,
+                        },
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ mb: 1 }}>
+                    <TextField
+                      fullWidth
+                      label="Password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={handlePasswordChange}
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
+                      required
+                      autoComplete="current-password"
+                      error={!!passwordError}
+                      helperText={passwordError}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Lock
+                              sx={{
+                                color: passwordFocused ? 'primary.main' : 'action.disabled',
+                                transition: 'color 0.3s ease',
+                              }}
+                            />
+                          </InputAdornment>
+                        ),
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowPassword(!showPassword)}
+                              edge="end"
+                              sx={{
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  transform: 'scale(1.1)',
+                                  backgroundColor: 'action.hover',
+                                },
+                              }}
+                            >
+                              {showPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          backgroundColor: passwordFocused ? 'action.hover' : 'transparent',
+                          '& fieldset': {
+                            borderWidth: 2,
+                            transition: 'border-color 0.3s ease',
+                          },
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            '& fieldset': {
+                              borderColor: 'primary.main',
+                            },
+                          },
+                          '&.Mui-focused': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
+                          },
+                        },
+                        '& .MuiInputLabel-root': {
+                          fontWeight: 500,
+                        },
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ textAlign: 'right', mb: 3 }}>
+                    <Link
+                      component={RouterLink}
+                      to="/forgot-password"
+                      sx={{
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        color: 'primary.main',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                          transform: 'translateX(2px)',
+                        },
+                      }}
+                    >
+                      Forgot password?
+                    </Link>
+                  </Box>
+
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    disabled={
+                      isLoading || !identifier || !password || !!identifierError || !!passwordError
+                    }
+                    endIcon={!isLoading && <ArrowForward />}
+                    sx={{
+                      mt: 1,
+                      mb: 3,
+                      py: { xs: 1.5, sm: 1.8 },
+                      fontSize: { xs: '1rem', sm: '1.1rem' },
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      background: (theme) =>
+                        `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                      boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: '-100%',
+                        width: '100%',
+                        height: '100%',
+                        background:
+                          'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                        transition: 'left 0.5s ease',
                       },
-                    },
-                    '&.Mui-focused': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
-                    },
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontWeight: 500,
-                  },
-                }}
-              />
-            </Box>
+                      '&:hover': {
+                        transform: 'translateY(-3px)',
+                        boxShadow: (theme) => `0 8px 30px ${theme.palette.primary.main}99`,
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
+                        '&::before': {
+                          left: '100%',
+                        },
+                      },
+                      '&:active': {
+                        transform: 'translateY(-1px)',
+                      },
+                      '&:disabled': {
+                        background: (theme) => theme.palette.primary.main,
+                        opacity: 0.5,
+                        transform: 'none',
+                      },
+                    }}
+                  >
+                    {isLoading ? 'Signing In...' : 'Sign In'}
+                  </Button>
 
-            <Box sx={{ mb: 1 }}>
-              <TextField
-                fullWidth
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={handlePasswordChange}
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
-                required
-                autoComplete="current-password"
-                error={!!passwordError}
-                helperText={passwordError}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock 
-                        sx={{ 
-                          color: passwordFocused ? 'primary.main' : 'action.disabled',
-                          transition: 'color 0.3s ease',
-                        }} 
-                      />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
+                  <Divider sx={{ my: 3 }}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ px: 2, fontWeight: 500 }}
+                    >
+                      or
+                    </Typography>
+                  </Divider>
+
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                      Don&apos;t have an account?{' '}
+                      <Link
+                        component={RouterLink}
+                        to="/register"
                         sx={{
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          background: (theme) =>
+                            `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                          backgroundClip: 'text',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
                           transition: 'all 0.2s ease',
                           '&:hover': {
-                            transform: 'scale(1.1)',
-                            backgroundColor: 'action.hover',
+                            textDecoration: 'underline',
                           },
                         }}
                       >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    backgroundColor: passwordFocused ? 'action.hover' : 'transparent',
-                    '& fieldset': {
-                      borderWidth: 2,
-                      transition: 'border-color 0.3s ease',
-                    },
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      '& fieldset': {
-                        borderColor: 'primary.main',
-                      },
-                    },
-                    '&.Mui-focused': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: (theme) => `0 4px 12px ${theme.palette.primary.main}40`,
-                    },
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontWeight: 500,
-                  },
-                }}
-              />
-            </Box>
-
-            <Box sx={{ textAlign: 'right', mb: 3 }}>
-              <Link
-                component={RouterLink}
-                to="/forgot-password"
-                sx={{
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  color: 'primary.main',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    textDecoration: 'underline',
-                    transform: 'translateX(2px)',
-                  },
-                }}
-              >
-                Forgot password?
-              </Link>
-            </Box>
-
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={isLoading || !identifier || !password || !!identifierError || !!passwordError}
-              endIcon={!isLoading && <ArrowForward />}
-              sx={{
-                mt: 1,
-                mb: 3,
-                py: { xs: 1.5, sm: 1.8 },
-                fontSize: { xs: '1rem', sm: '1.1rem' },
-                fontWeight: 700,
-                borderRadius: 2,
-              background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-              boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}66`,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                position: 'relative',
-                overflow: 'hidden',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: '-100%',
-                  width: '100%',
-                  height: '100%',
-                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-                  transition: 'left 0.5s ease',
-                },
-                '&:hover': {
-                  transform: 'translateY(-3px)',
-                  boxShadow: (theme) => `0 8px 30px ${theme.palette.primary.main}99`,
-                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
-                  '&::before': {
-                    left: '100%',
-                  },
-                },
-                '&:active': {
-                  transform: 'translateY(-1px)',
-                },
-                '&:disabled': {
-                  background: (theme) => theme.palette.primary.main,
-                  opacity: 0.5,
-                  transform: 'none',
-                },
-              }}
-            >
-              {isLoading ? 'Signing In...' : 'Sign In'}
-            </Button>
-
-            <Divider sx={{ my: 3 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ px: 2, fontWeight: 500 }}>
-                or
-              </Typography>
-            </Divider>
-
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                Don't have an account?{' '}
-                <Link
-                  component={RouterLink}
-                  to="/register"
-                  sx={{
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      textDecoration: 'underline',
-                    },
-                  }}
-                >
-                  Sign Up
-                </Link>
-              </Typography>
-            </Box>
-          </form>
-        </Paper>
-      </Fade>
-    </Grid>
-  </Grid>
-</Container>
-</Box>
-);
+                        Sign Up
+                      </Link>
+                    </Typography>
+                  </Box>
+                </form>
+              </Paper>
+            </Fade>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
+  );
 };
 
 export default Login;

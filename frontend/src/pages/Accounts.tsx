@@ -117,7 +117,7 @@ const Accounts: React.FC = () => {
   const [adjustingAccount, setAdjustingAccount] = useState<Account | null>(null);
   const [actualBalance, setActualBalance] = useState('');
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
-  
+
   // Transfer dialog states
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [transferFromAccount, setTransferFromAccount] = useState<Account | null>(null);
@@ -126,7 +126,7 @@ const Accounts: React.FC = () => {
   const [transferAmount, setTransferAmount] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
   const [transferDate, setTransferDate] = useState(new Date().toISOString().split('T')[0]);
-  
+
   // Search, Filter, Sort states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
@@ -137,7 +137,6 @@ const Accounts: React.FC = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [groupByType, setGroupByType] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-
 
   // Form states
   const [formData, setFormData] = useState({
@@ -178,8 +177,16 @@ const Accounts: React.FC = () => {
         // Fetch last transaction and this month stats
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); // Start of month 00:00:00
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999); // End of today 23:59:59.999
-        
+        const endOfToday = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23,
+          59,
+          59,
+          999
+        ); // End of today 23:59:59.999
+
         // Fetch last transaction (any status for true last activity)
         const txnRes = await axios.get(`/api/transactions`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -431,19 +438,21 @@ const Accounts: React.FC = () => {
         case 'name':
           compareValue = a.name.localeCompare(b.name);
           break;
-        case 'balance':
+        case 'balance': {
           const balanceA = accountBalances.get(a.id)?.calculatedBalance || a.balance;
           const balanceB = accountBalances.get(b.id)?.calculatedBalance || b.balance;
           compareValue = balanceA - balanceB;
           break;
+        }
         case 'type':
           compareValue = a.type.localeCompare(b.type);
           break;
-        case 'lastActivity':
+        case 'lastActivity': {
           const dateA = accountBalances.get(a.id)?.lastTransactionDate || a.createdAt;
           const dateB = accountBalances.get(b.id)?.lastTransactionDate || b.createdAt;
           compareValue = new Date(dateA).getTime() - new Date(dateB).getTime();
           break;
+        }
         default:
           compareValue = 0;
       }
@@ -511,7 +520,9 @@ const Accounts: React.FC = () => {
       ];
     });
 
-    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -522,7 +533,6 @@ const Accounts: React.FC = () => {
   };
 
   // Quick actions
-
 
   const handleViewTransactions = () => {
     navigate('/transactions');
@@ -544,7 +554,7 @@ const Accounts: React.FC = () => {
 
   const handleTransferSubmit = async () => {
     const fromAccountId = transferFromAccount?.id;
-    
+
     if (!fromAccountId || !transferToAccountId || !transferAmount) {
       setError('Please fill in all required fields');
       return;
@@ -593,7 +603,7 @@ const Accounts: React.FC = () => {
       : 'No activity';
 
     return (
-      <Grid item xs={12} md={6} lg={4} key={account.id}>
+      <Grid size={{ lg: 4, xs: 12, md: 6 }} key={account.id}>
         <Card
           sx={{
             height: '100%',
@@ -624,11 +634,11 @@ const Accounts: React.FC = () => {
                 </Box>
               </Box>
               <Box display="flex" gap={0.5}>
-                <Tooltip title={account.isDefault ? "Default Account" : "Set as Default"}>
+                <Tooltip title={account.isDefault ? 'Default Account' : 'Set as Default'}>
                   <IconButton
                     size="small"
                     onClick={() => handleSetDefault(account.id)}
-                    color={account.isDefault ? "warning" : "default"}
+                    color={account.isDefault ? 'warning' : 'default'}
                   >
                     {account.isDefault ? <StarIcon /> : <StarIcon sx={{ opacity: 0.3 }} />}
                   </IconButton>
@@ -643,8 +653,8 @@ const Accounts: React.FC = () => {
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Edit Account">
-                  <IconButton 
-                    size="small" 
+                  <IconButton
+                    size="small"
                     onClick={() => handleOpenDialog(account)}
                     color="primary"
                   >
@@ -678,10 +688,7 @@ const Accounts: React.FC = () => {
                 color={isNegative ? 'error.main' : 'success.main'}
                 gutterBottom
               >
-                {formatCurrency(
-                  balance?.calculatedBalance || account.balance,
-                  account.currency
-                )}
+                {formatCurrency(balance?.calculatedBalance || account.balance, account.currency)}
               </Typography>
 
               {/* This Month Activity */}
@@ -698,7 +705,7 @@ const Accounts: React.FC = () => {
                     THIS MONTH
                   </Typography>
                   <Grid container spacing={1} mt={0.5}>
-                    <Grid item xs={4}>
+                    <Grid size={{ xs: 4 }}>
                       <Typography variant="caption" color="text.secondary">
                         In
                       </Typography>
@@ -706,7 +713,7 @@ const Accounts: React.FC = () => {
                         +{formatCurrency(balance.thisMonthCredits, account.currency)}
                       </Typography>
                     </Grid>
-                    <Grid item xs={4}>
+                    <Grid size={{ xs: 4 }}>
                       <Typography variant="caption" color="text.secondary">
                         Out
                       </Typography>
@@ -714,7 +721,7 @@ const Accounts: React.FC = () => {
                         -{formatCurrency(balance.thisMonthDebits, account.currency)}
                       </Typography>
                     </Grid>
-                    <Grid item xs={4}>
+                    <Grid size={{ xs: 4 }}>
                       <Typography variant="caption" color="text.secondary">
                         Net
                       </Typography>
@@ -949,7 +956,8 @@ const Accounts: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              background:
+                'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
               animation: 'pulse 4s ease-in-out infinite',
             },
             '@keyframes pulse': {
@@ -959,7 +967,13 @@ const Accounts: React.FC = () => {
           }}
         >
           <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="flex-start"
+              flexWrap="wrap"
+              gap={2}
+            >
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                   <Avatar
@@ -984,14 +998,18 @@ const Accounts: React.FC = () => {
                     My Accounts
                   </Typography>
                 </Box>
-                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}>
-                  {activeAccountCount} account{activeAccountCount !== 1 ? 's' : ''} • Total: {formatCurrency(netWorth, user?.currency || 'USD')}
+                <Typography
+                  variant="h6"
+                  sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500, ml: 9 }}
+                >
+                  {activeAccountCount} account{activeAccountCount !== 1 ? 's' : ''} • Total:{' '}
+                  {formatCurrency(netWorth, user?.currency || 'USD')}
                 </Typography>
               </Box>
               <Box display="flex" gap={2}>
                 <Zoom in timeout={700}>
                   <Tooltip title="Export Accounts">
-                    <IconButton 
+                    <IconButton
                       onClick={handleExportAccounts}
                       sx={{
                         bgcolor: 'white',
@@ -1012,7 +1030,7 @@ const Accounts: React.FC = () => {
                 </Zoom>
                 <Zoom in timeout={800}>
                   <Tooltip title="Refresh Balances">
-                    <IconButton 
+                    <IconButton
                       onClick={fetchAccounts}
                       sx={{
                         bgcolor: 'white',
@@ -1033,9 +1051,9 @@ const Accounts: React.FC = () => {
                   </Tooltip>
                 </Zoom>
                 <Zoom in timeout={900}>
-                  <Button 
-                    variant="outlined" 
-                    startIcon={<TransferIcon />} 
+                  <Button
+                    variant="outlined"
+                    startIcon={<TransferIcon />}
                     onClick={() => handleTransferMoney(null)}
                     sx={{
                       bgcolor: 'white',
@@ -1054,9 +1072,9 @@ const Accounts: React.FC = () => {
                   </Button>
                 </Zoom>
                 <Zoom in timeout={1000}>
-                  <Button 
-                    variant="contained" 
-                    startIcon={<AddIcon />} 
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
                     onClick={() => handleOpenDialog()}
                     sx={{
                       bgcolor: 'white',
@@ -1092,177 +1110,206 @@ const Accounts: React.FC = () => {
 
       {/* Search and Filters */}
       <Fade in timeout={800}>
-        <Card sx={{
-          mb: 3,
-          borderRadius: 3,
-          background: (theme) =>
-            theme.palette.mode === 'light'
-              ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-              : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
-          backdropFilter: 'blur(20px)',
-          border: (theme) =>
-            theme.palette.mode === 'light'
-              ? `1px solid ${theme.palette.primary.main}1A`
-              : `1px solid ${theme.palette.primary.main}33`,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-        }}>
+        <Card
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            background: (theme) =>
+              theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                : 'linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: (theme) =>
+              theme.palette.mode === 'light'
+                ? `1px solid ${theme.palette.primary.main}1A`
+                : `1px solid ${theme.palette.primary.main}33`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+          }}
+        >
           <CardContent>
-          <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-            <TextField
-              placeholder="Search accounts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              size="small"
-              sx={{ flexGrow: 1, minWidth: 200 }}
-              InputProps={{
-                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-            />
-
-            <TextField
-              select
-              size="small"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              sx={{ minWidth: 150 }}
-              label="Sort By"
-            >
-              <MenuItem value="name">Name</MenuItem>
-              <MenuItem value="balance">Balance</MenuItem>
-              <MenuItem value="type">Type</MenuItem>
-              <MenuItem value="lastActivity">Last Activity</MenuItem>
-            </TextField>
-
-            <Tooltip title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}>
-              <IconButton
-                size="small"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              >
-                <SortIcon />
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title={showInactive ? 'Hide Inactive' : 'Show Inactive'}>
-              <IconButton size="small" onClick={() => setShowInactive(!showInactive)}>
-                {showInactive ? <VisibilityIcon /> : <VisibilityOffIcon />}
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title={showFilters ? 'Hide Filters' : 'Show Filters'}>
-              <IconButton size="small" onClick={() => setShowFilters(!showFilters)}>
-                <FilterIcon />
-              </IconButton>
-            </Tooltip>
-
-            <FormControlLabel
-              control={<Switch checked={groupByType} onChange={(e) => setGroupByType(e.target.checked)} />}
-              label="Group by Type"
-            />
-          </Box>
-
-          {/* Advanced Filters */}
-          <Collapse in={showFilters}>
-            <Box display="flex" gap={2} mt={2} flexWrap="wrap">
+            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
               <TextField
-                select
+                placeholder="Search accounts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 size="small"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                label="Account Type"
-                sx={{ minWidth: 150 }}
-              >
-                <MenuItem value="all">All Types</MenuItem>
-                {Object.entries(accountTypeConfig).map(([value, config]) => (
-                  <MenuItem key={value} value={value}>
-                    {config.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              <TextField
-                select
-                size="small"
-                value={filterCurrency}
-                onChange={(e) => setFilterCurrency(e.target.value)}
-                label="Currency"
-                sx={{ minWidth: 150 }}
-              >
-                <MenuItem value="all">All Currencies</MenuItem>
-                {getUniqueCurrencies().map((currency) => (
-                  <MenuItem key={currency} value={currency}>
-                    {CURRENCIES[currency]?.symbol || ''} {currency}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              <TextField
-                select
-                size="small"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                label="Status"
-                sx={{ minWidth: 150 }}
-              >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="active">Active Only</MenuItem>
-                <MenuItem value="inactive">Inactive Only</MenuItem>
-              </TextField>
-
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setSearchQuery('');
-                  setFilterType('all');
-                  setFilterCurrency('all');
-                  setFilterStatus('active');
-                  setSortBy('name');
-                  setSortOrder('asc');
+                sx={{ flexGrow: 1, minWidth: 200 }}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
+              />
+
+              <TextField
+                select
+                size="small"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                sx={{ minWidth: 150 }}
+                label="Sort By"
               >
-                Clear Filters
-              </Button>
+                <MenuItem value="name">Name</MenuItem>
+                <MenuItem value="balance">Balance</MenuItem>
+                <MenuItem value="type">Type</MenuItem>
+                <MenuItem value="lastActivity">Last Activity</MenuItem>
+              </TextField>
+
+              <Tooltip title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}>
+                <IconButton
+                  size="small"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                >
+                  <SortIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title={showInactive ? 'Hide Inactive' : 'Show Inactive'}>
+                <IconButton size="small" onClick={() => setShowInactive(!showInactive)}>
+                  {showInactive ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title={showFilters ? 'Hide Filters' : 'Show Filters'}>
+                <IconButton size="small" onClick={() => setShowFilters(!showFilters)}>
+                  <FilterIcon />
+                </IconButton>
+              </Tooltip>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={groupByType}
+                    onChange={(e) => setGroupByType(e.target.checked)}
+                  />
+                }
+                label="Group by Type"
+              />
             </Box>
-          </Collapse>
-        </CardContent>
+
+            {/* Advanced Filters */}
+            <Collapse in={showFilters}>
+              <Box display="flex" gap={2} mt={2} flexWrap="wrap">
+                <TextField
+                  select
+                  size="small"
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  label="Account Type"
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="all">All Types</MenuItem>
+                  {Object.entries(accountTypeConfig).map(([value, config]) => (
+                    <MenuItem key={value} value={value}>
+                      {config.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  size="small"
+                  value={filterCurrency}
+                  onChange={(e) => setFilterCurrency(e.target.value)}
+                  label="Currency"
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="all">All Currencies</MenuItem>
+                  {getUniqueCurrencies().map((currency) => (
+                    <MenuItem key={currency} value={currency}>
+                      {CURRENCIES[currency]?.symbol || ''} {currency}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  size="small"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  label="Status"
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="active">Active Only</MenuItem>
+                  <MenuItem value="inactive">Inactive Only</MenuItem>
+                </TextField>
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterType('all');
+                    setFilterCurrency('all');
+                    setFilterStatus('active');
+                    setSortBy('name');
+                    setSortOrder('asc');
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </Box>
+            </Collapse>
+          </CardContent>
         </Card>
       </Fade>
 
       {/* Summary Cards */}
       <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ md: 4, xs: 12 }}>
           <Zoom in timeout={900}>
-            <Card sx={{
-              borderRadius: 3,
-              background: (theme) => theme.palette.gradient.primary,
-              color: 'white',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                background: (theme) => theme.palette.gradient.primary,
+                color: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: (theme) => `0 12px 32px ${theme.palette.primary.main}50`,
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Net Worth
                   </Typography>
                   <BalanceIcon sx={{ opacity: 0.7 }} />
                 </Box>
-                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                <Typography
+                  variant="h4"
+                  fontWeight={800}
+                  sx={{ letterSpacing: '-0.02em', mb: 0.5 }}
+                >
                   {formatCurrency(netWorth)}
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
@@ -1272,39 +1319,61 @@ const Accounts: React.FC = () => {
             </Card>
           </Zoom>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ md: 4, xs: 12 }}>
           <Zoom in timeout={1000}>
-            <Card sx={{
-              borderRadius: 3,
-              background: (theme) => theme.palette.gradient.success,
-              color: 'white',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                background: (theme) => theme.palette.gradient.success,
+                color: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: '0 12px 32px rgba(16, 185, 129, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Total Assets
                   </Typography>
                   <TrendingUp sx={{ opacity: 0.7 }} />
                 </Box>
-                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                <Typography
+                  variant="h4"
+                  fontWeight={800}
+                  sx={{ letterSpacing: '-0.02em', mb: 0.5 }}
+                >
                   {formatCurrency(totalAssets)}
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
@@ -1314,39 +1383,61 @@ const Accounts: React.FC = () => {
             </Card>
           </Zoom>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ md: 4, xs: 12 }}>
           <Zoom in timeout={1100}>
-            <Card sx={{
-              borderRadius: 3,
-              background: (theme) => theme.palette.gradient.error,
-              color: 'white',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              },
-            }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                background: (theme) => theme.palette.gradient.error,
+                color: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: '0 4px 20px rgba(239, 68, 68, 0.25)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: '0 12px 32px rgba(239, 68, 68, 0.35)',
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                },
+              }}
+            >
               <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.7rem',
+                    }}
+                  >
                     Total Liabilities
                   </Typography>
                   <TrendingDown sx={{ opacity: 0.7 }} />
                 </Box>
-                <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+                <Typography
+                  variant="h4"
+                  fontWeight={800}
+                  sx={{ letterSpacing: '-0.02em', mb: 0.5 }}
+                >
                   {formatCurrency(totalLiabilitiesWithCreditCards)}
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.85, mt: 1 }}>
@@ -1411,8 +1502,6 @@ const Accounts: React.FC = () => {
         </Grid>
       )}
 
-
-
       {/* Add/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle
@@ -1434,7 +1523,9 @@ const Accounts: React.FC = () => {
             },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}
+          >
             <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
               <BankIcon />
             </Avatar>
@@ -1546,14 +1637,35 @@ const Accounts: React.FC = () => {
                 }}
               >
                 {/* Preset Colors */}
-                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  gutterBottom
+                  display="block"
+                  mb={1}
+                >
                   Quick Select
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
                   {[
-                    '#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#689f38', '#d32f2f',
-                    '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
-                    '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#64748b', '#475569',
+                    '#1976d2',
+                    '#388e3c',
+                    '#f57c00',
+                    '#7b1fa2',
+                    '#689f38',
+                    '#d32f2f',
+                    '#ef4444',
+                    '#f97316',
+                    '#eab308',
+                    '#22c55e',
+                    '#14b8a6',
+                    '#06b6d4',
+                    '#3b82f6',
+                    '#6366f1',
+                    '#8b5cf6',
+                    '#ec4899',
+                    '#64748b',
+                    '#475569',
                   ].map((presetColor) => (
                     <Box
                       key={presetColor}
@@ -1565,9 +1677,13 @@ const Accounts: React.FC = () => {
                         bgcolor: presetColor,
                         cursor: 'pointer',
                         border: '3px solid',
-                        borderColor: formData.color === presetColor ? 'primary.main' : 'transparent',
+                        borderColor:
+                          formData.color === presetColor ? 'primary.main' : 'transparent',
                         transition: 'all 0.2s ease',
-                        boxShadow: formData.color === presetColor ? '0 0 0 2px rgba(20, 184, 166, 0.2)' : 'none',
+                        boxShadow:
+                          formData.color === presetColor
+                            ? '0 0 0 2px rgba(20, 184, 166, 0.2)'
+                            : 'none',
                         '&:hover': {
                           transform: 'scale(1.1)',
                           boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
@@ -1577,7 +1693,13 @@ const Accounts: React.FC = () => {
                   ))}
                 </Box>
 
-                <Typography variant="caption" color="text.secondary" gutterBottom display="block" mb={1}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  gutterBottom
+                  display="block"
+                  mb={1}
+                >
                   Custom Color
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -1703,8 +1825,7 @@ const Accounts: React.FC = () => {
                       '& .MuiSwitch-switchBase.Mui-checked': {
                         color: (theme) => theme.palette.primary.main,
                         '&:hover': {
-                          backgroundColor: (theme) =>
-                            `${theme.palette.primary.main}15`,
+                          backgroundColor: (theme) => `${theme.palette.primary.main}15`,
                         },
                       },
                       '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
@@ -1733,8 +1854,7 @@ const Accounts: React.FC = () => {
                       '& .MuiSwitch-switchBase.Mui-checked': {
                         color: (theme) => theme.palette.primary.main,
                         '&:hover': {
-                          backgroundColor: (theme) =>
-                            `${theme.palette.primary.main}15`,
+                          backgroundColor: (theme) => `${theme.palette.primary.main}15`,
                         },
                       },
                       '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
@@ -1764,12 +1884,10 @@ const Accounts: React.FC = () => {
             gap: 1.5,
             borderTop: (theme) => `1px solid ${theme.palette.divider}`,
             background: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'rgba(248, 250, 252, 0.8)'
-                : 'rgba(15, 15, 15, 0.8)',
+              theme.palette.mode === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(15, 15, 15, 0.8)',
           }}
         >
-          <Button 
+          <Button
             onClick={handleCloseDialog}
             variant="outlined"
             sx={{
@@ -1781,9 +1899,9 @@ const Accounts: React.FC = () => {
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit} 
-            variant="contained" 
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
             disabled={!formData.name}
             sx={{
               borderRadius: 2,
@@ -1804,7 +1922,12 @@ const Accounts: React.FC = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle
           sx={{
             background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
@@ -1824,7 +1947,9 @@ const Accounts: React.FC = () => {
             },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}
+          >
             <Avatar
               sx={{
                 bgcolor: 'rgba(255,255,255,0.2)',
@@ -1841,7 +1966,7 @@ const Accounts: React.FC = () => {
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           <Typography>
-            Are you sure you want to delete "{accountToDelete?.name}"?
+            Are you sure you want to delete &quot;{accountToDelete?.name}&quot;?
             {accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount ? (
               <Alert severity="warning" sx={{ mt: 2 }}>
                 This account has {accountBalances.get(accountToDelete.id)?.transactionCount}{' '}
@@ -1862,9 +1987,7 @@ const Accounts: React.FC = () => {
             borderTop: 1,
             borderColor: 'divider',
             backgroundColor: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'rgba(248, 250, 252, 0.8)'
-                : 'rgba(15, 15, 15, 0.8)',
+              theme.palette.mode === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(15, 15, 15, 0.8)',
           }}
         >
           <Button
@@ -1929,7 +2052,9 @@ const Accounts: React.FC = () => {
             },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}
+          >
             <Avatar
               sx={{
                 bgcolor: 'rgba(255,255,255,0.2)',
@@ -2042,9 +2167,7 @@ const Accounts: React.FC = () => {
             borderTop: 1,
             borderColor: 'divider',
             backgroundColor: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'rgba(248, 250, 252, 0.8)'
-                : 'rgba(15, 15, 15, 0.8)',
+              theme.palette.mode === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(15, 15, 15, 0.8)',
           }}
         >
           <Button
@@ -2088,8 +2211,8 @@ const Accounts: React.FC = () => {
       </Dialog>
 
       {/* Transfer Money Dialog */}
-      <Dialog 
-        open={transferDialogOpen} 
+      <Dialog
+        open={transferDialogOpen}
         onClose={() => {
           setTransferDialogOpen(false);
           setTransferFromAccount(null);
@@ -2098,8 +2221,8 @@ const Accounts: React.FC = () => {
           setTransferAmount('');
           setTransferNotes('');
           setError('');
-        }} 
-        maxWidth="sm" 
+        }}
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle
@@ -2121,7 +2244,9 @@ const Accounts: React.FC = () => {
             },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}
+          >
             <Avatar
               sx={{
                 bgcolor: 'rgba(255,255,255,0.2)',
@@ -2148,10 +2273,10 @@ const Accounts: React.FC = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      {transferFromAccount && React.createElement(
-                        accountTypeConfig[transferFromAccount.type].icon,
-                        { fontSize: 'small' }
-                      )}
+                      {transferFromAccount &&
+                        React.createElement(accountTypeConfig[transferFromAccount.type].icon, {
+                          fontSize: 'small',
+                        })}
                     </InputAdornment>
                   ),
                 }}
@@ -2229,7 +2354,11 @@ const Accounts: React.FC = () => {
               fullWidth
               required
               InputProps={{
-                startAdornment: <InputAdornment position="start">{CURRENCIES[transferFromAccount?.currency || 'USD']?.symbol || '$'}</InputAdornment>,
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {CURRENCIES[transferFromAccount?.currency || 'USD']?.symbol || '$'}
+                  </InputAdornment>
+                ),
               }}
               inputProps={{ min: 0, step: 0.01 }}
             />
@@ -2269,9 +2398,7 @@ const Accounts: React.FC = () => {
             borderTop: 1,
             borderColor: 'divider',
             backgroundColor: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'rgba(248, 250, 252, 0.8)'
-                : 'rgba(15, 15, 15, 0.8)',
+              theme.palette.mode === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(15, 15, 15, 0.8)',
           }}
         >
           <Button
@@ -2294,9 +2421,9 @@ const Accounts: React.FC = () => {
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleTransferSubmit} 
-            variant="contained" 
+          <Button
+            onClick={handleTransferSubmit}
+            variant="contained"
             disabled={!transferFromAccount || !transferToAccountId || !transferAmount}
             sx={{
               borderRadius: 2,

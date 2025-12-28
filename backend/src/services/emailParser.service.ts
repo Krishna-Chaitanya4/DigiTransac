@@ -242,7 +242,7 @@ export class EmailParserService {
               matchedAccountId =
                 (await matchAccount(userId, accountsContainer as any, bank.name, cardLast4)) ||
                 undefined;
-            } catch (error) {
+            } catch {
               // Account matching failed, continue without it
             }
           }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { DatePicker, DatePickerProps } from '@mui/x-date-pickers/DatePicker';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { styled } from '@mui/material/styles';
 import { Dayjs } from 'dayjs';
 
@@ -25,13 +25,17 @@ const StyledDatePicker = styled(DatePicker)(({ theme }) => ({
   },
 })) as typeof DatePicker;
 
-interface ModernDatePickerProps extends Omit<DatePickerProps<Dayjs>, 'renderInput'> {
+interface ModernDatePickerProps {
   label?: string;
   error?: boolean;
   helperText?: string;
   fullWidth?: boolean;
   required?: boolean;
   format?: string;
+  value?: Dayjs | null;
+  onChange?: (value: Dayjs | null) => void;
+  maxDate?: Dayjs;
+  minDate?: Dayjs;
 }
 
 export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
@@ -79,11 +83,15 @@ export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
                 backgroundColor: 'rgba(20, 184, 166, 0.08)',
               },
               '&.Mui-selected': {
-                background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                background: (theme) =>
+                  theme.palette.gradient?.primary ||
+                  'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                 color: 'white',
                 fontWeight: 700,
                 '&:hover': {
-                  background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                  background: (theme) =>
+                    theme.palette.gradient?.primary ||
+                    'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                   opacity: 0.9,
                 },
               },
@@ -100,7 +108,9 @@ export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
             '& .MuiPickersYear-yearButton': {
               borderRadius: 2,
               '&.Mui-selected': {
-                background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                background: (theme) =>
+                  theme.palette.gradient?.primary ||
+                  'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                 color: 'white',
                 fontWeight: 700,
               },
@@ -108,7 +118,9 @@ export const ModernDatePicker: React.FC<ModernDatePickerProps> = ({
             '& .MuiPickersMonth-monthButton': {
               borderRadius: 2,
               '&.Mui-selected': {
-                background: (theme) => theme.palette.gradient?.primary || 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                background: (theme) =>
+                  theme.palette.gradient?.primary ||
+                  'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                 color: 'white',
                 fontWeight: 700,
               },

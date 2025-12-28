@@ -8,11 +8,7 @@ interface PullToRefreshProps {
   threshold?: number; // Pull distance needed to trigger refresh (default: 80px)
 }
 
-const PullToRefresh: React.FC<PullToRefreshProps> = ({
-  onRefresh,
-  children,
-  threshold = 80,
-}) => {
+const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, threshold = 80 }) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);

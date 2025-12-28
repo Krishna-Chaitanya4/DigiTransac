@@ -58,7 +58,7 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeContext();
-  
+
   const [emailIntegration, setEmailIntegration] = useState({
     enabled: false,
     provider: null as 'gmail' | 'outlook' | null,
@@ -101,13 +101,13 @@ const Profile: React.FC = () => {
           totalEmailsProcessed: response.data.emailIntegration.totalEmailsProcessed || 0,
           lastProcessedAt: response.data.emailIntegration.lastProcessedAt || null,
         });
-        
+
         // Set last sync time if available
         if (response.data.emailIntegration.lastProcessedAt) {
           setLastSyncTime(new Date(response.data.emailIntegration.lastProcessedAt));
         }
       }
-      
+
       // TODO: Fetch pending transaction count from review queue API
       // For now, hardcoded as 0
       setPendingCount(0);
@@ -121,16 +121,15 @@ const Profile: React.FC = () => {
   const handleConnectGmail = async () => {
     try {
       console.log('Connecting to Gmail...');
-      
+
       // Get OAuth URL from backend
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/connect`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/connect`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       console.log('Got auth URL:', response.data);
       const { authUrl } = response.data;
-      
+
       // Open OAuth in popup
       const width = 600;
       const height = 700;
@@ -161,10 +160,10 @@ const Profile: React.FC = () => {
             fetchUserProfile();
             setSuccess('Gmail account connected successfully!');
           }
-        } catch (e) {
+        } catch {
           // Cross-origin error means still on Google OAuth page
         }
-        
+
         // Check if popup was closed
         if (popup?.closed) {
           console.log('Popup closed, refreshing profile...');
@@ -273,18 +272,18 @@ const Profile: React.FC = () => {
     try {
       setSyncing(true);
       setSyncStatus('syncing');
-      
+
       // Trigger manual sync
       await axios.post(
         `${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       setSyncStatus('idle');
       setLastSyncTime(new Date());
       setSuccess('Email sync completed successfully!');
-      
+
       // Refresh profile to get updated stats
       await fetchUserProfile();
     } catch (err: any) {
@@ -299,7 +298,7 @@ const Profile: React.FC = () => {
     if (!user?.fullName) return '?';
     return user.fullName
       .split(' ')
-      .map(n => n[0])
+      .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -392,11 +391,7 @@ const Profile: React.FC = () => {
                 icon={<CheckCircleIcon />}
               />
             )}
-            <Chip
-              label={user?.currency || 'USD'}
-              variant="outlined"
-              size="small"
-            />
+            <Chip label={user?.currency || 'USD'} variant="outlined" size="small" />
           </Stack>
         </Box>
 
@@ -516,7 +511,7 @@ const Profile: React.FC = () => {
                   onChange={(newValue) => {
                     setEditedData({
                       ...editedData,
-                      dateOfBirth: newValue ? newValue.format('YYYY-MM-DD') : ''
+                      dateOfBirth: newValue ? newValue.format('YYYY-MM-DD') : '',
                     });
                   }}
                   fullWidth
@@ -554,7 +549,7 @@ const Profile: React.FC = () => {
           mb: 3,
           borderRadius: 3,
           borderLeft: emailIntegration.enabled ? `4px solid ${theme.palette.primary.main}` : 'none',
-          backgroundColor: emailIntegration.enabled 
+          backgroundColor: emailIntegration.enabled
             ? `${theme.palette.primary.main}08`
             : 'transparent',
         }}
@@ -564,9 +559,7 @@ const Profile: React.FC = () => {
           <Typography variant="h6" fontWeight={600}>
             Email Integration
           </Typography>
-          {emailIntegration.enabled && (
-            <Chip label="Active" color="success" size="small" />
-          )}
+          {emailIntegration.enabled && <Chip label="Active" color="success" size="small" />}
         </Box>
         <Divider sx={{ mb: 3 }} />
 
@@ -611,9 +604,17 @@ const Profile: React.FC = () => {
                   </Typography>
                 </Box>
                 <Chip
-                  label={syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Error' : 'Idle'}
+                  label={
+                    syncStatus === 'syncing'
+                      ? 'Syncing...'
+                      : syncStatus === 'error'
+                        ? 'Error'
+                        : 'Idle'
+                  }
                   size="small"
-                  color={syncStatus === 'syncing' ? 'info' : syncStatus === 'error' ? 'error' : 'default'}
+                  color={
+                    syncStatus === 'syncing' ? 'info' : syncStatus === 'error' ? 'error' : 'default'
+                  }
                   sx={{ fontSize: '0.7rem' }}
                 />
               </Stack>
@@ -685,7 +686,9 @@ const Profile: React.FC = () => {
                       }}
                     />
                   )}
-                  <NotificationsIcon sx={{ fontSize: 32, color: theme.palette.primary.main, mb: 0.5 }} />
+                  <NotificationsIcon
+                    sx={{ fontSize: 32, color: theme.palette.primary.main, mb: 0.5 }}
+                  />
                   <Typography variant="caption" color="text.secondary">
                     Pending Review
                   </Typography>
@@ -697,7 +700,9 @@ const Profile: React.FC = () => {
             <Stack spacing={2} sx={{ mb: 2 }}>
               <Button
                 variant="contained"
-                startIcon={syncing ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <SyncIcon />}
+                startIcon={
+                  syncing ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <SyncIcon />
+                }
                 onClick={handleManualSync}
                 disabled={syncing || !emailIntegration.enabled}
                 fullWidth
@@ -775,7 +780,10 @@ const Profile: React.FC = () => {
       </Paper>
 
       {/* Preferences Section */}
-      <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+      <Paper
+        elevation={0}
+        sx={{ p: 3, mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}
+      >
         <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 3 }}>
           Preferences
         </Typography>
@@ -807,11 +815,7 @@ const Profile: React.FC = () => {
               </Typography>
             </Box>
           </Box>
-          <Switch
-            checked={mode === 'dark'}
-            onChange={toggleTheme}
-            color="primary"
-          />
+          <Switch checked={mode === 'dark'} onChange={toggleTheme} color="primary" />
         </Box>
 
         {/* Logout Button */}
@@ -882,8 +886,8 @@ const Profile: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 3 }}>
-            This action <strong>cannot be undone</strong>. This will permanently delete your
-            account and remove all your data from our servers.
+            This action <strong>cannot be undone</strong>. This will permanently delete your account
+            and remove all your data from our servers.
           </DialogContentText>
 
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -892,10 +896,8 @@ const Profile: React.FC = () => {
             </Typography>
             <Typography variant="caption" component="div">
               • Username: <strong>{user?.username}</strong>
-              <br />
-              • Full Name: <strong>{user?.fullName}</strong>
-              <br />
-              • Email: <strong>{user?.email || 'Not provided'}</strong>
+              <br />• Full Name: <strong>{user?.fullName}</strong>
+              <br />• Email: <strong>{user?.email || 'Not provided'}</strong>
               <br />• Phone: <strong>{user?.phone || 'Not provided'}</strong>
             </Typography>
           </Alert>

@@ -60,7 +60,7 @@ class ErrorBoundary extends Component<Props, State> {
             </Typography>
 
             <Typography variant="body1" color="text.secondary" paragraph>
-              We're sorry, but something unexpected happened. Our team has been notified and is
+              We&apos;re sorry, but something unexpected happened. Our team has been notified and is
               working to fix the issue.
             </Typography>
 
