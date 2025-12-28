@@ -2054,7 +2054,6 @@ const Transactions: React.FC = () => {
 
                         return (
                           <Chip
-                            key={option.id || index}
                             label={label}
                             size="small"
                             style={{ backgroundColor: option.color || '#667eea', color: '#fff' }}
@@ -2184,7 +2183,6 @@ const Transactions: React.FC = () => {
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
                         <Chip
-                          key={`include-${index}-${option}`}
                           label={option}
                           size="small"
                           color="success"
@@ -2212,7 +2210,6 @@ const Transactions: React.FC = () => {
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
                         <Chip
-                          key={`exclude-${index}-${option}`}
                           label={option}
                           size="small"
                           color="error"
@@ -3477,7 +3474,6 @@ const Transactions: React.FC = () => {
                         renderTags={(value, getTagProps) =>
                           value.map((option, index) => (
                             <Chip
-                              key={`tag-${index}-${option}`}
                               icon={<TagIcon />}
                               label={option}
                               size="small"
