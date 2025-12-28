@@ -396,6 +396,9 @@ jobs:
     needs: [backend-build-test, frontend-build-test]
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
     - name: Download backend image
       uses: actions/download-artifact@v4
       with:
@@ -421,6 +424,16 @@ jobs:
         output: 'backend-trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
     
+    - name: Verify Backend SARIF file exists
+      run: |
+        if [ -f "backend-trivy-results.sarif" ]; then
+          echo "✅ Backend SARIF file created"
+          ls -lh backend-trivy-results.sarif
+        else
+          echo "❌ Backend SARIF file not found"
+          exit 1
+        fi
+    
     - name: Upload Backend Trivy results to GitHub Security
       uses: github/codeql-action/upload-sarif@v3
       if: always()
@@ -435,6 +448,16 @@ jobs:
         format: 'sarif'
         output: 'frontend-trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
+    
+    - name: Verify Frontend SARIF file exists
+      run: |
+        if [ -f "frontend-trivy-results.sarif" ]; then
+          echo "✅ Frontend SARIF file created"
+          ls -lh frontend-trivy-results.sarif
+        else
+          echo "❌ Frontend SARIF file not found"
+          exit 1
+        fi
     
     - name: Upload Frontend Trivy results to GitHub Security
       uses: github/codeql-action/upload-sarif@v3
