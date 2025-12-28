@@ -2058,6 +2058,7 @@ const Transactions: React.FC = () => {
                             size="small"
                             style={{ backgroundColor: option.color || '#667eea', color: '#fff' }}
                             {...getTagProps({ index })}
+                            key={option.id || index}
                           />
                         );
                       });
@@ -2187,6 +2188,7 @@ const Transactions: React.FC = () => {
                           size="small"
                           color="success"
                           {...getTagProps({ index })}
+                          key={index}
                         />
                       ))
                     }
@@ -2214,6 +2216,7 @@ const Transactions: React.FC = () => {
                           size="small"
                           color="error"
                           {...getTagProps({ index })}
+                          key={index}
                         />
                       ))
                     }
@@ -3478,6 +3481,7 @@ const Transactions: React.FC = () => {
                               label={option}
                               size="small"
                               {...getTagProps({ index })}
+                              key={index}
                             />
                           ))
                         }
