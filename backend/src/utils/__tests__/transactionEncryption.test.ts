@@ -1,4 +1,8 @@
-import { encryptTransaction, decryptTransaction, decryptTransactions } from '../transactionEncryption';
+import {
+  encryptTransaction,
+  decryptTransaction,
+  decryptTransactions,
+} from '../transactionEncryption';
 import { encryptionService } from '../../services/encryption.service';
 import { Transaction } from '../../models/types';
 import { logger } from '../logger';

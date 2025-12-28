@@ -156,7 +156,10 @@ describe('BudgetHelpers', () => {
         { id: '2', date: new Date('2024-01-20'), type: 'debit', amount: 300, categoryId: 'cat2' },
       ];
 
-      const expensesByCategory = new Map([['cat1', [expenses[0]]], ['cat2', [expenses[1]]]]);
+      const expensesByCategory = new Map([
+        ['cat1', [expenses[0]]],
+        ['cat2', [expenses[1]]],
+      ]);
       const categoryToDescendantsMap = new Map();
 
       const result = await calculateBudgetSpending(
@@ -188,11 +191,20 @@ describe('BudgetHelpers', () => {
       };
 
       const expenses = [
-        { id: '1', date: new Date('2024-01-15'), type: 'debit', amount: 500, categoryId: 'catChild1' },
+        {
+          id: '1',
+          date: new Date('2024-01-15'),
+          type: 'debit',
+          amount: 500,
+          categoryId: 'catChild1',
+        },
         { id: '2', date: new Date('2024-01-20'), type: 'debit', amount: 300, categoryId: 'cat1' },
       ];
 
-      const expensesByCategory = new Map([['catChild1', [expenses[0]]], ['cat1', [expenses[1]]]]);
+      const expensesByCategory = new Map([
+        ['catChild1', [expenses[0]]],
+        ['cat1', [expenses[1]]],
+      ]);
       const categoryToDescendantsMap = new Map([['catFolder', ['catChild1']]]);
 
       const result = await calculateBudgetSpending(
