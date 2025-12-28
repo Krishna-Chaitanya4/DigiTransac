@@ -186,129 +186,17 @@ jobs:
         npm outdated --long || echo "Some packages are outdated"
       continue-on-error: true
     
+    - name: Install dependencies for package checks
+      run: |
+        cd backend && npm ci
+        cd ../frontend && npm ci
+    
     - name: Check for severely outdated packages
       # STRICTNESS controlled at workflow level (top env section)
       # BALANCED: allows 1 version behind | STRICT: must be latest
       run: |
         node .github/scripts/check-outdated-packages.js backend backend
         node .github/scripts/check-outdated-packages.js frontend frontend
-        cd backend
-        echo "Checking backend packages..."
-        
-        if [ "$STRICTNESS" = "STRICT" ]; then
-          echo "🔒 STRICT MODE: Checking for ANY outdated packages..."
-          npm outdated --json > /tmp/outdated.json 2>&1 || true
-          
-          node -e "
-            const fs = require('fs');
-            let data = {};
-            try {
-              const content = fs.readFileSync('/tmp/outdated.json', 'utf-8');
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                data = JSON.parse(jsonMatch[0]);
-              }
-            } catch (e) {
-              console.log('⚠️ Could not parse outdated packages');
-            }
-            
-            const outdated = Object.entries(data);
-            if (outdated.length > 0) {
-              console.log('❌ Outdated packages found (strict mode):');
-              outdated.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
-              process.exit(1);
-            }
-            console.log('✅ All backend packages are on latest version');
-          "
-        else
-          echo "⚖️ BALANCED MODE: Checking for severely outdated (2+ major versions)..."
-          npm outdated --json > /tmp/outdated.json 2>&1 || true
-          
-          node -e "
-            const fs = require('fs');
-            let data = {};
-            try {
-              const content = fs.readFileSync('/tmp/outdated.json', 'utf-8');
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                data = JSON.parse(jsonMatch[0]);
-              }
-            } catch (e) {
-              console.log('⚠️ Could not parse outdated packages');
-            }
-            
-            const severe = Object.entries(data).filter(([_, v]) => {
-              const current = v.current?.split('.')[0] || '0';
-              const latest = v.latest?.split('.')[0] || '0';
-              return parseInt(latest) - parseInt(current) >= 2;
-            });
-            if (severe.length > 0) {
-              console.log('❌ Severely outdated packages (2+ major versions behind):');
-              severe.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
-              process.exit(1);
-            }
-            console.log('✅ No severely outdated backend packages');
-          "
-        fi
-        
-        cd ../frontend
-        echo "Checking frontend packages..."
-        
-        if [ "$STRICTNESS" = "STRICT" ]; then
-          echo "🔒 STRICT MODE: Checking for ANY outdated packages..."
-          npm outdated --json > /tmp/outdated.json 2>&1 || true
-          
-          node -e "
-            const fs = require('fs');
-            let data = {};
-            try {
-              const content = fs.readFileSync('/tmp/outdated.json', 'utf-8');
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                data = JSON.parse(jsonMatch[0]);
-              }
-            } catch (e) {
-              console.log('⚠️ Could not parse outdated packages');
-            }
-            
-            const outdated = Object.entries(data);
-            if (outdated.length > 0) {
-              console.log('❌ Outdated packages found (strict mode):');
-              outdated.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
-              process.exit(1);
-            }
-            console.log('✅ All frontend packages are on latest version');
-          "
-        else
-          echo "⚖️ BALANCED MODE: Checking for severely outdated (2+ major versions)..."
-          npm outdated --json > /tmp/outdated.json 2>&1 || true
-          
-          node -e "
-            const fs = require('fs');
-            let data = {};
-            try {
-              const content = fs.readFileSync('/tmp/outdated.json', 'utf-8');
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                data = JSON.parse(jsonMatch[0]);
-              }
-            } catch (e) {
-              console.log('⚠️ Could not parse outdated packages');
-            }
-            
-            const severe = Object.entries(data).filter(([_, v]) => {
-              const current = v.current?.split('.')[0] || '0';
-              const latest = v.latest?.split('.')[0] || '0';
-              return parseInt(latest) - parseInt(current) >= 2;
-            });
-            if (severe.length > 0) {
-              console.log('❌ Severely outdated packages (2+ major versions behind):');
-              severe.forEach(([name, v]) => console.log(\`  - \${name}: \${v.current} → \${v.latest}\`));
-              process.exit(1);
-            }
-            console.log('✅ No severely outdated frontend packages');
-          "
-        fi
     
     - name: License compliance check
       run: |
