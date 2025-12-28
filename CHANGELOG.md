@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-12-28
+
+### Added
+- **Enterprise-grade CI/CD pipeline** with 6-stage multi-job workflow
+- **Validation stage**: Version checks, changelog validation, semver compliance
+- **Security stage**: Secret scanning, vulnerability audits (high/critical), license compliance
+- **Build & Test stage**: Parallel backend/frontend builds with strict quality gates
+- **Container Security stage**: Trivy vulnerability scanning for Docker images
+- **Deploy stage**: Automated deployment to Azure Container Apps
+- **Strict quality gates**: 
+  - Linting with zero warnings tolerance (`--max-warnings 0`)
+  - Prettier formatting checks enforced
+  - Code coverage thresholds: 70% lines, 60% branches, 70% functions
+  - STRICT dependency mode: all packages must be latest version
+- **Package health checks**: Deprecated package detection, outdated package warnings
+- **Bundle size monitoring**: Frontend build size tracking
+- **Parallel execution**: Build jobs run simultaneously for faster feedback
+
+### Changed
+- Upgraded Node.js Docker base image from 20-alpine to 25-alpine
+- Updated all GitHub Actions to latest versions (checkout v6, setup-node v6, etc.)
+- Upgraded development and production dependencies to latest versions
+- Improved code quality: replaced 10 `any` types with proper TypeScript types
+- Added missing React `key` props to all iterator components
+- Removed console.log statements (replaced with comments)
+- Escaped JSX apostrophes with `&apos;`
+- Wrapped case block lexical declarations to fix ESLint errors
+
+### Fixed
+- 30 linting violations across backend and frontend
+- TypeScript strict type checking issues
+- React component iterator key warnings
+- Code formatting inconsistencies
+
 ## [1.3.2] - 2025-12-28
 
 ### Fixed
