@@ -67,7 +67,7 @@ export const detectCountry = (): string => {
       if (timezoneToCountry[timezone]) {
         return timezoneToCountry[timezone];
       }
-    } catch (tzError) {
+    } catch {
       // Continue to fallback
     }
 
@@ -86,7 +86,7 @@ export const detectCountry = (): string => {
 
     // Fallback to US
     return 'US';
-  } catch (error) {
+  } catch {
     return 'US';
   }
 };

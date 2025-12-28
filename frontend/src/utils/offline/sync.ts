@@ -46,7 +46,7 @@ export class SyncManager {
           await this.syncItem(item);
           await offlineDB.removeSyncQueueItem(item.id);
           successCount++;
-        } catch (error) {
+        } catch {
           failedCount++;
 
           // Increment retry count

@@ -2026,7 +2026,7 @@ const Categories: React.FC = () => {
             // Tag is in use - show usage and offer replacement
             <Box>
               <Alert severity="warning" sx={{ mb: 2 }}>
-                This tag cannot be deleted because it's currently in use.
+                This tag cannot be deleted because it&apos;s currently in use.
               </Alert>
 
               <Typography variant="body1" gutterBottom fontWeight={600}>
@@ -2085,7 +2085,7 @@ const Categories: React.FC = () => {
                   Replace with another tag:
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                  Select a tag to replace all occurrences of "{deleteTagDialog.tag?.name}" in your
+                  Select a tag to replace all occurrences of &quot;{deleteTagDialog.tag?.name}&quot; in your
                   transactions and budgets.
                 </Typography>
                 <TextField
@@ -2203,7 +2203,7 @@ const Categories: React.FC = () => {
         )}
         <MenuItem
           onClick={() => {
-            handleEditCategory(contextMenu?.category!);
+            if (contextMenu?.category) handleEditCategory(contextMenu.category);
             handleCloseContextMenu();
           }}
         >
@@ -2214,7 +2214,7 @@ const Categories: React.FC = () => {
         </MenuItem>
         <MenuItem
           onClick={() => {
-            handleDeleteCategory(contextMenu?.category!);
+            if (contextMenu?.category) handleDeleteCategory(contextMenu.category);
             handleCloseContextMenu();
           }}
           sx={{ color: 'error.main' }}

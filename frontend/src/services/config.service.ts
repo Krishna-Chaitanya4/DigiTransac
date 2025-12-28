@@ -27,7 +27,7 @@ class ConfigService {
 
       this.config = await response.json();
       logEnvironmentInfo();
-    } catch (error) {
+    } catch {
       // Use environment-aware fallback
       const fallbackApiUrl = getBackendUrl();
 

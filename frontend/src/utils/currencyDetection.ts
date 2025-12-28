@@ -158,7 +158,7 @@ export const detectCurrency = (): string => {
       if (timezoneToCurrency[timezone]) {
         return timezoneToCurrency[timezone];
       }
-    } catch (tzError) {
+    } catch {
       // Timezone detection failed, continue to fallback
     }
 
@@ -224,7 +224,7 @@ export const detectCurrency = (): string => {
 
     // Fallback to USD
     return 'USD';
-  } catch (error) {
+  } catch {
     return 'USD';
   }
 };

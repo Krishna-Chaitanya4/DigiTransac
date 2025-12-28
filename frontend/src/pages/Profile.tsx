@@ -160,7 +160,7 @@ const Profile: React.FC = () => {
             fetchUserProfile();
             setSuccess('Gmail account connected successfully!');
           }
-        } catch (e) {
+        } catch {
           // Cross-origin error means still on Google OAuth page
         }
 

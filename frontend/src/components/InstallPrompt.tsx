@@ -38,7 +38,6 @@ export const InstallPrompt: React.FC = () => {
     if (dismissedAt) {
       const daysSinceDismissed = (Date.now() - parseInt(dismissedAt)) / (1000 * 60 * 60 * 24);
       if (daysSinceDismissed < 7) {
-        setDismissed(true);
         return;
       }
     }

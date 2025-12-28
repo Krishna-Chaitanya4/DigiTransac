@@ -207,7 +207,7 @@ const Analytics: React.FC = () => {
       setTransactions(txnData);
       setCategories(catData);
       setBudgets(budgetData);
-    } catch (err: any) {
+    } catch {
       setError('Failed to load analytics data');
     } finally {
       setLoading(false);

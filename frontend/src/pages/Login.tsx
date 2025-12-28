@@ -729,7 +729,7 @@ const Login: React.FC = () => {
 
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                      Don't have an account?{' '}
+                      Don&apos;t have an account?{' '}
                       <Link
                         component={RouterLink}
                         to="/register"

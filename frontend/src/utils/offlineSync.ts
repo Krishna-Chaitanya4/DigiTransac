@@ -51,9 +51,9 @@ export const syncFromAPI = async (token: string): Promise<void> => {
         (tagsRes.data || []).map((tag: string) => ({ name: tag }))
       ),
     ]);
-  } catch (error) {
-    console.error('Failed to sync from API:', error);
-    throw error;
+  } catch (err) {
+    console.error('Failed to sync from API:', err);
+    throw err;
   }
 };
 
@@ -115,7 +115,7 @@ export const syncToAPI = async (token: string): Promise<void> => {
             }
             break;
         }
-      } catch (error) {
+      } catch {
         // Continue with next item
       }
     }
@@ -135,7 +135,7 @@ export const getOfflineData = async <T>(storeName: string): Promise<T[]> => {
   try {
     await initDB();
     return await getAllItems<T>(storeName);
-  } catch (error) {
+  } catch {
     return [];
   }
 };

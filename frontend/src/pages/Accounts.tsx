@@ -1966,7 +1966,7 @@ const Accounts: React.FC = () => {
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           <Typography>
-            Are you sure you want to delete "{accountToDelete?.name}"?
+            Are you sure you want to delete &quot;{accountToDelete?.name}&quot;?
             {accountToDelete && accountBalances.get(accountToDelete.id)?.transactionCount ? (
               <Alert severity="warning" sx={{ mt: 2 }}>
                 This account has {accountBalances.get(accountToDelete.id)?.transactionCount}{' '}

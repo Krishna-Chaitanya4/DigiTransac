@@ -498,34 +498,8 @@ const Dashboard: React.FC = () => {
         filters.accounts.forEach((accountId) => trendParams.append('accountIds', accountId));
       }
 
-      const trendsRes = await axios.get(`/api/transactions?${trendParams}`, {
+      await axios.get(`/api/transactions?${trendParams}`, {
         headers: { Authorization: `Bearer ${token}` },
-      });
-      let allTransactions = trendsRes.data.transactions || [];
-
-      // Apply same client-side filtering
-      allTransactions = allTransactions.filter((t: any) => {
-        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
-          return false;
-        }
-        if (filters.categories.length > 0) {
-          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
-          const hasMatchingCategory = txnCategories.some((catId: string) =>
-            filters.categories.includes(catId)
-          );
-          if (!hasMatchingCategory) return false;
-        }
-        if (filters.includeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
-          if (!hasIncludedTag) return false;
-        }
-        if (filters.excludeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
-          if (hasExcludedTag) return false;
-        }
-        return true;
       });
 
       // Get upcoming recurring transactions
@@ -541,7 +515,7 @@ const Dashboard: React.FC = () => {
           const lastCreated = t.recurrencePattern.lastCreated
             ? new Date(t.recurrencePattern.lastCreated)
             : new Date(t.date);
-          let nextDate = new Date(lastCreated);
+          const nextDate = new Date(lastCreated);
 
           switch (t.recurrencePattern.frequency) {
             case 'daily':

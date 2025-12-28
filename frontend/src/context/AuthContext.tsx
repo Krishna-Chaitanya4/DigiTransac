@@ -113,7 +113,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setToken(savedToken);
           setUser(JSON.parse(savedUser));
           axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-        } catch (error) {
+        } catch {
           localStorage.removeItem('auth-token');
           localStorage.removeItem('auth-user');
           setToken(null);

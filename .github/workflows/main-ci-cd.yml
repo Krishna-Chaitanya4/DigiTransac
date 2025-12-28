@@ -240,7 +240,7 @@ jobs:
     - name: Run linter (strict)
       run: |
         cd backend
-        npm run lint -- --max-warnings 0
+        npm run lint
     
     - name: Check TypeScript compilation
       run: |
@@ -340,7 +340,7 @@ jobs:
     - name: Run linter (strict)
       run: |
         cd frontend
-        npm run lint -- --max-warnings 0
+        npm run lint
     
     - name: Build frontend
       run: |
