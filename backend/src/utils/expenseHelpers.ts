@@ -1,6 +1,7 @@
 ﻿import { mongoDBService } from '../config/mongodb';
 import { decryptTransaction } from './transactionEncryption';
 import { buildExpenseFilter } from './transactionFilters';
+import { Transaction } from '../models/types';
 
 /**
  * Helper functions to work with the new transaction/splits model
@@ -35,7 +36,7 @@ export async function getExpensesFromTransactions(
   const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
   // Use centralized filter builder - defaults to approved if reviewStatus provided
-  const filter: any = reviewStatus
+  const filter = reviewStatus
     ? buildExpenseFilter(userId, startDate, endDate)
     : { userId, type: 'debit', date: { $gte: startDate, $lte: endDate } };
 
@@ -44,17 +45,19 @@ export async function getExpensesFromTransactions(
   if (transactions.length === 0) return [];
 
   // Decrypt transactions
-  const decryptedTransactions = transactions.map((t: any) => decryptTransaction(t));
+  const decryptedTransactions = transactions.map((t) =>
+    decryptTransaction(t as unknown as Transaction)
+  );
 
   // Get splits for these transactions
   const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
-  const transactionIds = decryptedTransactions.map((t: any) => t.id);
+  const transactionIds = decryptedTransactions.map((t) => t.id);
 
   const splits = await splitsContainer.find({ transactionId: { $in: transactionIds } }).toArray();
 
   // Create expense-like objects from splits with transaction data
-  const expenses: ExpenseFromSplit[] = splits.map((split: any) => {
-    const transaction = decryptedTransactions.find((t: any) => t.id === split.transactionId);
+  const expenses: ExpenseFromSplit[] = splits.map((split) => {
+    const transaction = decryptedTransactions.find((t) => t.id === split.transactionId);
     return {
       id: split.id,
       userId: split.userId,
@@ -92,7 +95,7 @@ export async function getExpenseById(
   if (!transaction) return null;
 
   // Decrypt transaction
-  const decryptedTransaction = decryptTransaction(transaction as any);
+  const decryptedTransaction = decryptTransaction(transaction as unknown as Transaction);
 
   return {
     id: split.id,
@@ -113,10 +116,13 @@ export async function getExpenseById(
 /**
  * Count expenses (debit transaction splits) matching criteria
  */
-export async function countExpenses(userId: string, filter: any = {}): Promise<number> {
+export async function countExpenses(
+  userId: string,
+  filter: Record<string, unknown> = {}
+): Promise<number> {
   const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-  const txFilter: any = {
+  const txFilter = {
     userId,
     type: 'debit',
     ...filter,
@@ -129,7 +135,7 @@ export async function countExpenses(userId: string, filter: any = {}): Promise<n
 
   // Count splits for these transactions
   const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
-  const transactionIds = transactions.map((t: any) => t.id);
+  const transactionIds = transactions.map((t) => (t as unknown as Transaction).id);
 
   const count = await splitsContainer.countDocuments({
     transactionId: { $in: transactionIds },

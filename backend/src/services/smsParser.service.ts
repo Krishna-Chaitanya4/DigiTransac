@@ -475,63 +475,75 @@ export class SMSParserService {
   }
 
   /**
-   * Parse date from various formats
+   * Parse date from various formats with improved error handling
    */
-  private parseDate(dateStr: string): Date | undefined {
-    if (!dateStr) return undefined;
+  private parseDate(dateStr: string | undefined): Date | undefined {
+    if (!dateStr?.trim()) return undefined;
+
+    const trimmedDate = dateStr.trim();
+
+    // Month name to number mapping
+    const monthMap: Record<string, number> = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    };
 
     // Try different date formats
-    const formats = [
+    const formats: Array<{
+      regex: RegExp;
+      hasMonthName: boolean;
+    }> = [
       // 23-Dec-25 or 23-Dec-2025
-      /(\d{1,2})[/](\w{3})[/](\d{2,4})/,
+      { regex: /(\d{1,2})[-/](\w{3})[-/](\d{2,4})/i, hasMonthName: true },
       // 23/12/25 or 23/12/2025 or 23-12-25
-      /(\d{1,2})[/](\d{1,2})[/](\d{2,4})/,
+      { regex: /(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/, hasMonthName: false },
       // 23Dec25 or 23Dec2025
-      /(\d{1,2})(\w{3})(\d{2,4})/,
+      { regex: /(\d{1,2})(\w{3})(\d{2,4})/i, hasMonthName: true },
     ];
 
     for (const format of formats) {
-      const match = dateStr.match(format);
-      if (match) {
-        const [, day, monthOrDay, year] = match;
+      const match = trimmedDate.match(format.regex);
+      if (!match) continue;
 
-        // Check if month is text (Jan, Feb, etc.)
-        const monthMap: { [key: string]: number } = {
-          jan: 0,
-          feb: 1,
-          mar: 2,
-          apr: 3,
-          may: 4,
-          jun: 5,
-          jul: 6,
-          aug: 7,
-          sep: 8,
-          oct: 9,
-          nov: 10,
-          dec: 11,
-        };
+      const [, day, monthOrDay, year] = match;
 
-        let month: number;
-        let actualDay: number;
+      let month: number;
+      const actualDay = parseInt(day, 10);
 
-        if (monthMap[monthOrDay.toLowerCase()] !== undefined) {
-          month = monthMap[monthOrDay.toLowerCase()];
-          actualDay = parseInt(day);
-        } else {
-          month = parseInt(monthOrDay) - 1;
-          actualDay = parseInt(day);
-        }
+      if (format.hasMonthName) {
+        const monthKey = monthOrDay.toLowerCase().substring(0, 3);
+        month = monthMap[monthKey];
+        if (month === undefined) continue; // Invalid month name
+      } else {
+        month = parseInt(monthOrDay, 10) - 1;
+        if (month < 0 || month > 11) continue; // Invalid month number
+      }
 
-        // Handle 2-digit years
-        let fullYear = parseInt(year);
-        if (fullYear < 100) {
-          fullYear = 2000 + fullYear;
-        }
+      // Validate day
+      if (actualDay < 1 || actualDay > 31) continue;
 
-        const date = new Date(fullYear, month, actualDay);
-        if (!isNaN(date.getTime())) {
-          return date;
-        }
+      // Handle 2-digit years (assume 2000s)
+      let fullYear = parseInt(year, 10);
+      if (fullYear < 100) {
+        fullYear = 2000 + fullYear;
+      }
+
+      // Validate year (between 2000 and 2100)
+      if (fullYear < 2000 || fullYear > 2100) continue;
+
+      const date = new Date(fullYear, month, actualDay);
+      if (!isNaN(date.getTime()) && date.getDate() === actualDay) {
+        return date;
       }
     }
 
@@ -540,23 +552,22 @@ export class SMSParserService {
 
   /**
    * Extract merchant name from description
-   * Cleans up common prefixes and suffixes
+   * Cleans up common payment prefixes and reference numbers
    */
   extractMerchant(description: string): string {
-    if (!description) return 'Unknown';
+    if (!description?.trim()) return 'Unknown';
 
     let merchant = description.trim();
 
-    // Remove common prefixes
-    merchant = merchant.replace(/^(UPI-|UPI\/|IMPS-|NEFT-|RTGS-)/i, '');
+    // Remove common payment method prefixes
+    merchant = merchant.replace(/^(UPI-|UPI\/|IMPS-|NEFT-|RTGS-|NETBANKING-)/i, '');
 
-    // Remove reference numbers
-    merchant = merchant.replace(/Ref.*$/i, '');
-    merchant = merchant.replace(/\d{12,}/g, '');
+    // Remove reference numbers and transaction IDs
+    merchant = merchant.replace(/Ref\s*[:.]?.*$/i, ''); // Remove "Ref: ..." or "Ref ..." or "Ref. ..."
+    merchant = merchant.replace(/\d{12,}/g, ''); // Remove long number sequences (12+ digits)
 
-    // Clean up
-    merchant = merchant.trim();
-    merchant = merchant.replace(/\s+/g, ' ');
+    // Normalize whitespace
+    merchant = merchant.replace(/\s+/g, ' ').trim();
 
     return merchant || 'Unknown';
   }
