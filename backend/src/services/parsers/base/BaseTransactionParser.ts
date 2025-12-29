@@ -104,7 +104,7 @@ export abstract class BaseTransactionParser {
 
     // First try to match by sender (if sender is provided and meaningful)
     if (sender && sender !== 'unknown-user') {
-      let pattern = getBankPatternBySender(sender);
+      const pattern = getBankPatternBySender(sender);
       if (pattern) {
         return pattern;
       }
