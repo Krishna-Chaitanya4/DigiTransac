@@ -6,17 +6,16 @@ import { calculateBudgetSpendingInRange } from '../utils/budgetHelpers';
 import { Budget, Category } from '../models/types';
 import { buildExpenseFilter } from '../utils/transactionFilters';
 import { logger } from '../utils/logger';
-import { asyncHandler } from '../utils/asyncHandler';
-import { ApiResponse } from '../utils/apiResponse';
 
 const router = Router();
 
 router.use(authenticate);
 
 // GET /api/analytics/overview - Get spending overview for dashboard
-router.get('/overview', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { startDate, endDate, accounts, tags, categories, compareWithPrevious } = req.query;
+router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { startDate, endDate, accounts, tags, categories, compareWithPrevious } = req.query;
 
     const start = startDate
       ? new Date(startDate as string)
@@ -109,8 +108,8 @@ router.get('/overview', asyncHandler(async (req: AuthRequest, res: Response) => 
       };
     }
 
-    logger.info({ userId, totalSpent, expenseCount }, 'Overview fetched successfully');
-    ApiResponse.success(res, {
+    res.json({
+      success: true,
       overview: {
         totalSpent,
         totalBudget,
@@ -124,7 +123,14 @@ router.get('/overview', asyncHandler(async (req: AuthRequest, res: Response) => 
         comparison,
       },
     });
-}));
+  } catch (error) {
+    logger.error({ err: error, userId: req.userId }, 'Error fetching overview');
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching overview',
+    });
+  }
+});
 
 // GET /api/analytics/category-breakdown - Get spending by category with folder hierarchy
 router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promise<void> => {

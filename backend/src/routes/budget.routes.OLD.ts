@@ -4,107 +4,117 @@ import { mongoDBService } from '../config/mongodb';
 import { Budget, Category } from '../models/types';
 import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 import { calculateBudgetSpending } from '../utils/budgetHelpers';
-import { logger } from '../utils/logger';
-import { asyncHandler } from '../utils/asyncHandler';
-import { ApiResponse } from '../utils/apiResponse';
-import { DbHelper } from '../utils/dbHelpers';
 
 const router = Router();
 
 router.use(authenticate);
 
 // GET /api/budgets - Get all budgets with spending info
-router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
 
-  const budgetsContainer = await mongoDBService.getBudgetsContainer();
-  const budgets = await DbHelper.findAllByUser<Budget>(budgetsContainer, userId);
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
+    const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
-  if (budgets.length === 0) {
-    logger.info({ userId }, 'No budgets found');
-    return ApiResponse.success(res, { budgets: [] });
-  }
-
-  // Fetch all categories once
-  const categoriesContainer = await mongoDBService.getCategoriesContainer();
-  const categories = await DbHelper.findAllByUser<Category>(categoriesContainer, userId);
-
-  // Build category hierarchy map for efficient lookups
-  const categoryToDescendantsMap = new Map<string, string[]>();
-  const buildDescendants = (parentId: string): string[] => {
-    if (categoryToDescendantsMap.has(parentId)) {
-      return categoryToDescendantsMap.get(parentId)!;
+    if (budgets.length === 0) {
+      res.json({ success: true, budgets: [] });
+      return;
     }
 
-    const descendants: string[] = [];
-    const children = categories.filter((cat) => cat.parentId === parentId);
+    // Fetch all categories once
+    const categoriesContainer = await mongoDBService.getCategoriesContainer();
 
-    for (const child of children) {
-      if (!child.isFolder) {
-        descendants.push(child.id);
+    const categories = (await categoriesContainer
+      .find({ userId })
+      .toArray()) as unknown as Category[];
+
+    // Build category hierarchy map for efficient lookups
+    const categoryToDescendantsMap = new Map<string, string[]>();
+    const buildDescendants = (parentId: string): string[] => {
+      if (categoryToDescendantsMap.has(parentId)) {
+        return categoryToDescendantsMap.get(parentId)!;
       }
-      descendants.push(...buildDescendants(child.id));
-    }
 
-    categoryToDescendantsMap.set(parentId, descendants);
-    return descendants;
-  };
+      const descendants: string[] = [];
+      const children = categories.filter((cat) => cat.parentId === parentId);
 
-  // Pre-compute descendants for all categories
-  categories.forEach((cat) => buildDescendants(cat.id));
+      for (const child of children) {
+        if (!child.isFolder) {
+          descendants.push(child.id);
+        }
+        descendants.push(...buildDescendants(child.id));
+      }
 
-  // Fetch ALL relevant expenses in ONE query using helper
-  const minStartDate = new Date(Math.min(...budgets.map((b) => new Date(b.startDate).getTime())));
-  const allExpenses = await getExpensesFromTransactions(
-    userId,
-    minStartDate,
-    new Date(),
-    'approved'
-  );
+      categoryToDescendantsMap.set(parentId, descendants);
+      return descendants;
+    };
 
-  // Group expenses by category for fast lookup
-  const expensesByCategory = new Map<string, any[]>();
-  allExpenses.forEach((exp: any) => {
-    if (!expensesByCategory.has(exp.categoryId)) {
-      expensesByCategory.set(exp.categoryId, []);
-    }
-    expensesByCategory.get(exp.categoryId)!.push(exp);
-  });
+    // Pre-compute descendants for all categories
+    categories.forEach((cat) => buildDescendants(cat.id));
 
-  // Calculate spending for each budget using new logic
-  const budgetsWithSpending = await Promise.all(
-    budgets.map(async (budget) => {
-      const { spent } = await calculateBudgetSpending(
-        budget,
-        userId,
-        categories,
-        categoryToDescendantsMap,
-        expensesByCategory
-      );
+    // Fetch ALL relevant expenses in ONE query using helper
+    const minStartDate = new Date(Math.min(...budgets.map((b) => new Date(b.startDate).getTime())));
+    const allExpenses = await getExpensesFromTransactions(
+      userId,
+      minStartDate,
+      new Date(),
+      'approved'
+    );
 
-      // Apply rollover if enabled
-      const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
-      const remaining = effectiveBudget - spent;
-      const percentUsed = Math.round((spent / effectiveBudget) * 100);
+    // Group expenses by category for fast lookup
+    const expensesByCategory = new Map<string, any[]>();
+    allExpenses.forEach((exp: any) => {
+      if (!expensesByCategory.has(exp.categoryId)) {
+        expensesByCategory.set(exp.categoryId, []);
+      }
+      expensesByCategory.get(exp.categoryId)!.push(exp);
+    });
 
-      return {
-        ...budget,
-        spent,
-        remaining,
-        percentUsed,
-        isOverBudget: spent > effectiveBudget,
-      };
-    })
-  );
+    // Calculate spending for each budget using new logic
+    const budgetsWithSpending = await Promise.all(
+      budgets.map(async (budget) => {
+        const { spent } = await calculateBudgetSpending(
+          budget,
+          userId,
+          categories,
+          categoryToDescendantsMap,
+          expensesByCategory
+        );
 
-  logger.info({ userId, count: budgetsWithSpending.length }, 'Budgets fetched successfully');
-  ApiResponse.success(res, { budgets: budgetsWithSpending });
-}));
+        // Apply rollover if enabled
+        const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
+        const remaining = effectiveBudget - spent;
+        const percentUsed = Math.round((spent / effectiveBudget) * 100);
+
+        return {
+          ...budget,
+          spent,
+          remaining,
+          percentUsed,
+          isOverBudget: spent > effectiveBudget,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      budgets: budgetsWithSpending,
+    });
+  } catch (error) {
+    console.error('Error fetching budgets:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching budgets',
+    });
+  }
+});
 
 // POST /api/budgets - Create budget
-router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const {
+router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const {
       name,
       categoryIds,
       includeTagIds,
@@ -127,7 +137,11 @@ router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
     if (name && typeof name === 'string') {
       sanitizedName = name.trim();
       if (sanitizedName.length > 100) {
-        return ApiResponse.badRequest(res, 'Budget name must not exceed 100 characters');
+        res.status(400).json({
+          success: false,
+          message: 'Budget name must not exceed 100 characters',
+        });
+        return;
       }
       // Convert empty string to undefined
       if (sanitizedName.length === 0) {
@@ -142,29 +156,49 @@ router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
     const hasAccountFilter = accountIds && accountIds.length > 0;
 
     if (!hasCategoryFilter && !hasTagFilter && !hasAccountFilter) {
-      return ApiResponse.badRequest(res, 'At least one filter (categories, tags, or accounts) must be specified');
+      res.status(400).json({
+        success: false,
+        message: 'At least one filter (categories, tags, or accounts) must be specified',
+      });
+      return;
     }
 
     // Validate dates
     if (!startDate) {
-      return ApiResponse.badRequest(res, 'Start date is required');
+      res.status(400).json({
+        success: false,
+        message: 'Start date is required',
+      });
+      return;
     }
 
     const start = new Date(startDate);
     if (isNaN(start.getTime())) {
-      return ApiResponse.badRequest(res, 'Invalid start date');
+      res.status(400).json({
+        success: false,
+        message: 'Invalid start date',
+      });
+      return;
     }
 
     // Validate end date if provided
     if (endDate) {
       const end = new Date(endDate);
       if (isNaN(end.getTime())) {
-        return ApiResponse.badRequest(res, 'Invalid end date');
+        res.status(400).json({
+          success: false,
+          message: 'Invalid end date',
+        });
+        return;
       }
 
       // End date must be after start date
       if (end <= start) {
-        return ApiResponse.badRequest(res, 'End date must be after start date');
+        res.status(400).json({
+          success: false,
+          message: 'End date must be after start date',
+        });
+        return;
       }
     }
 
@@ -214,7 +248,8 @@ router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
 
     const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
-    const newBudget = await DbHelper.createDocument<Budget>(budgetsContainer, {
+    const newBudget: Budget = {
+      id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId,
       name: sanitizedName,
       categoryIds: hasCategoryFilter ? categoryIds : undefined,
@@ -231,11 +266,25 @@ router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
       notificationChannels,
       enableRollover: enableRollover || false,
       rolloverLimit: rolloverLimit ? parseFloat(rolloverLimit) : undefined,
-    });
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    logger.info({ userId, budgetId: newBudget.id }, 'Budget created successfully');
-    ApiResponse.created(res, { budget: newBudget }, 'Budget created successfully');
-}));
+    await budgetsContainer.insertOne(newBudget);
+
+    res.status(201).json({
+      success: true,
+      message: 'Budget created successfully',
+      budget: newBudget,
+    });
+  } catch (error) {
+    console.error('Error creating budget:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating budget',
+    });
+  }
+});
 
 // POST /api/budgets/:id/duplicate - Duplicate budget with optional date shift
 router.post('/:id/duplicate', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -480,22 +529,36 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // DELETE /api/budgets/:id - Delete budget
-router.delete('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
+router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
 
-  const budgetsContainer = await mongoDBService.getBudgetsContainer();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
-  const budget = await DbHelper.findByIdAndUser<Budget>(budgetsContainer, id, userId);
-  if (!budget) {
-    return ApiResponse.notFound(res, 'Budget not found');
+    const budget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
+    if (!budget) {
+      res.status(404).json({
+        success: false,
+        message: 'Budget not found',
+      });
+      return;
+    }
+
+    await budgetsContainer.deleteOne({ id, userId });
+
+    res.json({
+      success: true,
+      message: 'Budget deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting budget:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting budget',
+    });
   }
-
-  await DbHelper.deleteByIdAndUser(budgetsContainer, id, userId);
-
-  logger.info({ userId, budgetId: id }, 'Budget deleted successfully');
-  ApiResponse.success(res, null, 'Budget deleted successfully');
-}));
+});
 
 // GET /api/budgets/alerts - Get budget alerts
 router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => {

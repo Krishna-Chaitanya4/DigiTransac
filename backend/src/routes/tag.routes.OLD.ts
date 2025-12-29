@@ -2,10 +2,7 @@
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { mongoDBService } from '../config/mongodb';
 import { Tag, MongoFilter } from '../models/types';
-import { logger } from '../utils/logger';
-import { asyncHandler } from '../utils/asyncHandler';
-import { ApiResponse } from '../utils/apiResponse';
-import { DbHelper } from '../utils/dbHelpers';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -27,91 +24,129 @@ async function ensureDefaultTags(userId: string): Promise<void> {
     });
 
     if (!exists) {
-      await DbHelper.createDocument<Tag>(tagsContainer, {
+      const newTag: Tag = {
+        id: uuidv4(),
         userId,
         name: defaultTag.name,
         color: defaultTag.color,
         usageCount: 0,
-      });
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await tagsContainer.insertOne(newTag);
     }
   }
 }
 
 // GET /api/tags - Get all tags for a user
-router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
 
-  // Ensure default tags exist
-  await ensureDefaultTags(userId);
+    // Ensure default tags exist
+    await ensureDefaultTags(userId);
 
-  const tagsContainer = await mongoDBService.getTagsContainer();
-  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
-  const tags = await DbHelper.findAllByUser<Tag>(tagsContainer, userId);
+    const tags = (await tagsContainer.find({ userId }).toArray()) as unknown as Tag[];
 
-  // Calculate correct usage count for each tag from splits collection
-  const tagsWithCorrectCount = await Promise.all(
-    tags.map(async (tag) => {
-      const splitsWithTag = await splitsContainer
-        .find({
-          userId,
-          tags: tag.name,
-        })
-        .toArray();
+    // Calculate correct usage count for each tag from splits collection
+    const tagsWithCorrectCount = await Promise.all(
+      tags.map(async (tag) => {
+        const splitsWithTag = await splitsContainer
+          .find({
+            userId,
+            tags: tag.name,
+          })
+          .toArray();
 
-      // Get unique transaction IDs
-      const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
+        // Get unique transaction IDs
+        const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
 
-      return {
-        ...tag,
-        usageCount: transactionIds.length,
-      };
-    })
-  );
+        return {
+          ...tag,
+          usageCount: transactionIds.length,
+        };
+      })
+    );
 
-  // Sort by usage count
-  tagsWithCorrectCount.sort((a, b) => {
-    if (a.usageCount !== b.usageCount) {
-      return b.usageCount - a.usageCount;
-    }
-    return a.name.localeCompare(b.name);
-  });
+    // Sort by usage count
+    tagsWithCorrectCount.sort((a, b) => {
+      if (a.usageCount !== b.usageCount) {
+        return b.usageCount - a.usageCount;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
-  logger.info({ userId, count: tagsWithCorrectCount.length }, 'Tags fetched successfully');
-  ApiResponse.success(res, { tags: tagsWithCorrectCount });
-}));
+    res.json({
+      success: true,
+      tags: tagsWithCorrectCount,
+    });
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching tags',
+    });
+  }
+});
 
 // POST /api/tags - Create a new tag
-router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { name, color } = req.body;
+router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { name, color } = req.body;
 
-  if (!name) {
-    return ApiResponse.badRequest(res, 'Tag name is required');
+    if (!name) {
+      res.status(400).json({
+        success: false,
+        message: 'Tag name is required',
+      });
+      return;
+    }
+
+    const tagsContainer = await mongoDBService.getTagsContainer();
+
+    // Check if tag already exists
+    const existingTag = await tagsContainer.findOne({
+      userId,
+      name: { $regex: new RegExp(`^${name}$`, 'i') },
+    });
+
+    if (existingTag) {
+      res.status(400).json({
+        success: false,
+        message: 'Tag with this name already exists',
+      });
+      return;
+    }
+
+    const newTag: Tag = {
+      id: uuidv4(),
+      userId,
+      name: name.trim(),
+      color,
+      usageCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await tagsContainer.insertOne(newTag);
+
+    res.status(201).json({
+      success: true,
+      message: 'Tag created successfully',
+      tag: newTag,
+    });
+  } catch (error) {
+    console.error('Error creating tag:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating tag',
+    });
   }
-
-  const tagsContainer = await mongoDBService.getTagsContainer();
-
-  // Check if tag already exists
-  const existingTag = await tagsContainer.findOne({
-    userId,
-    name: { $regex: new RegExp(`^${name}$`, 'i') },
-  });
-
-  if (existingTag) {
-    return ApiResponse.badRequest(res, 'Tag with this name already exists');
-  }
-
-  const newTag = await DbHelper.createDocument<Tag>(tagsContainer, {
-    userId,
-    name: name.trim(),
-    color,
-    usageCount: 0,
-  });
-
-  logger.info({ userId, tagId: newTag.id, tagName: newTag.name }, 'Tag created successfully');
-  ApiResponse.created(res, { tag: newTag }, 'Tag created successfully');
-}));
+});
 
 // PUT /api/tags/:id - Update a tag
 router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -359,56 +394,73 @@ router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<voi
 });
 
 // DELETE /api/tags/:id - Delete a tag (only if not in use)
-router.delete('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
+router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id } = req.params;
 
-  const tagsContainer = await mongoDBService.getTagsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
-  const tag = await DbHelper.findByIdAndUser<Tag>(tagsContainer, id, userId);
-  if (!tag) {
-    return ApiResponse.notFound(res, 'Tag not found');
-  }
+    const tag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
+    if (!tag) {
+      res.status(404).json({
+        success: false,
+        message: 'Tag not found',
+      });
+      return;
+    }
 
-  // Check if tag is in use
-  // Tags are stored in the transactionSplits collection
-  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
+    // Check if tag is in use
+    // Tags are stored in the transactionSplits collection
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
-  const splitsWithTag = await splitsContainer
-    .find({
-      userId,
-      tags: tag.name,
-    })
-    .toArray();
+    const splitsWithTag = await splitsContainer
+      .find({
+        userId,
+        tags: tag.name,
+      })
+      .toArray();
 
-  const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
-  const transactionCount = transactionIds.length;
+    const transactionIds = [...new Set(splitsWithTag.map((split: any) => split.transactionId))];
+    const transactionCount = transactionIds.length;
 
-  const budgetsContainer = await mongoDBService.getBudgetsContainer();
-  const budgets = await budgetsContainer.find({ userId }).toArray();
+    const budgetsContainer = await mongoDBService.getBudgetsContainer();
+    const budgets = await budgetsContainer.find({ userId }).toArray();
 
-  const budgetsUsingTag = budgets.filter((budget: any) => {
-    const includeTags = budget.filters?.includeTags || [];
-    const excludeTags = budget.filters?.excludeTags || [];
-    return includeTags.includes(tag.name) || excludeTags.includes(tag.name);
-  });
+    const budgetsUsingTag = budgets.filter((budget: any) => {
+      const includeTags = budget.filters?.includeTags || [];
+      const excludeTags = budget.filters?.excludeTags || [];
+      return includeTags.includes(tag.name) || excludeTags.includes(tag.name);
+    });
 
-  if (transactionCount > 0 || budgetsUsingTag.length > 0) {
-    return ApiResponse.badRequest(res, 'Cannot delete tag that is in use', {
-      usage: {
-        transactions: transactionCount,
-        budgets: budgetsUsingTag.length,
-        budgetNames: budgetsUsingTag.map((b: any) => b.name),
-      },
+    if (transactionCount > 0 || budgetsUsingTag.length > 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Cannot delete tag that is in use',
+        usage: {
+          transactions: transactionCount,
+          budgets: budgetsUsingTag.length,
+          budgetNames: budgetsUsingTag.map((b: any) => b.name),
+        },
+      });
+      return;
+    }
+
+    // Tag is not in use, safe to delete
+    await tagsContainer.deleteOne({ id, userId });
+
+    res.json({
+      success: true,
+      message: 'Tag deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting tag:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting tag',
     });
   }
-
-  // Tag is not in use, safe to delete
-  await DbHelper.deleteByIdAndUser(tagsContainer, id, userId);
-
-  logger.info({ userId, tagId: id, tagName: tag.name }, 'Tag deleted successfully');
-  ApiResponse.success(res, null, 'Tag deleted successfully');
-}));
+});
 
 // GET /api/tags/suggestions - Get tag suggestions based on usage
 router.get('/suggestions', async (req: AuthRequest, res: Response): Promise<void> => {

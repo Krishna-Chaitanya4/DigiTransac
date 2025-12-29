@@ -1,12 +1,8 @@
-﻿import { Router, Request, Response } from 'express';
-import { authenticate } from '../middleware/auth';
-
-interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-    username: string;
-  };
-}
+﻿import { Router, Response } from 'express';
+import { authenticate, AuthRequest } from '../middleware/auth';
+import { logger } from '../utils/logger';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ApiResponse } from '../utils/apiResponse';
 
 const router = Router();
 
@@ -14,41 +10,38 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/users/profile
-router.get('/profile', async (_req, res) => {
-  res.json({ message: 'Get user profile' });
-});
+router.get('/profile', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  
+  logger.info({ userId }, 'Profile accessed');
+  ApiResponse.success(res, { message: 'Get user profile' });
+}));
 
 // PUT /api/users/profile
-router.put('/profile', async (_req, res) => {
-  res.json({ message: 'Update user profile' });
-});
+router.put('/profile', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  
+  logger.info({ userId }, 'Profile updated');
+  ApiResponse.success(res, { message: 'Update user profile' });
+}));
 
 // DELETE /api/users/profile - Delete account
-router.delete('/profile', async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
+router.delete('/profile', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const db = req.app.locals.db;
 
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+  // Delete all user data
+  await Promise.all([
+    db.collection('users').deleteOne({ _id: userId }),
+    db.collection('transactions').deleteMany({ userId }),
+    db.collection('budgets').deleteMany({ userId }),
+    db.collection('categories').deleteMany({ userId }),
+    db.collection('accounts').deleteMany({ userId }),
+    db.collection('tags').deleteMany({ userId }),
+  ]);
 
-    const db = req.app.locals.db;
-
-    // Delete all user data
-    await Promise.all([
-      db.collection('users').deleteOne({ _id: userId }),
-      db.collection('transactions').deleteMany({ userId }),
-      db.collection('budgets').deleteMany({ userId }),
-      db.collection('categories').deleteMany({ userId }),
-      db.collection('accounts').deleteMany({ userId }),
-      db.collection('tags').deleteMany({ userId }),
-    ]);
-
-    return res.json({ message: 'Account deleted successfully' });
-  } catch (error: any) {
-    console.error('Delete account error:', error);
-    return res.status(500).json({ message: 'Failed to delete account' });
-  }
-});
+  logger.info({ userId }, 'Account deleted');
+  ApiResponse.success(res, { message: 'Account deleted successfully' });
+}));
 
 export default router;
