@@ -5,6 +5,9 @@ import { mongoDBService } from '../config/mongodb';
 import { encryptionService } from '../services/encryption.service';
 import { oauthLimiter } from '../middleware/rateLimiter';
 import crypto from 'crypto';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ApiResponse } from '../utils/apiResponse';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 
@@ -71,6 +74,7 @@ router.get('/callback', oauthLimiter, async (req: Request, res: Response): Promi
     const { code, state } = req.query;
 
     if (!code || !state) {
+      logger.warn('Gmail callback missing code or state');
       res.status(400).send('Missing authorization code or state parameter');
       return;
     }
@@ -79,6 +83,7 @@ router.get('/callback', oauthLimiter, async (req: Request, res: Response): Promi
     const [userId, csrfToken] = (state as string).split(':');
 
     if (!userId || !csrfToken) {
+      logger.warn('Gmail callback invalid state parameter');
       res.status(400).send('Invalid state parameter');
       return;
     }
@@ -86,6 +91,7 @@ router.get('/callback', oauthLimiter, async (req: Request, res: Response): Promi
     // Validate CSRF token
     const storedData = csrfTokens.get(csrfToken);
     if (!storedData || storedData.userId !== userId) {
+      logger.warn({ userId, csrfToken }, 'Gmail callback CSRF validation failed');
       res.status(403).send('CSRF token validation failed');
       return;
     }
@@ -93,6 +99,7 @@ router.get('/callback', oauthLimiter, async (req: Request, res: Response): Promi
     // Check token age (15 minutes max)
     if (Date.now() - storedData.timestamp > 15 * 60 * 1000) {
       csrfTokens.delete(csrfToken);
+      logger.warn({ userId }, 'Gmail callback CSRF token expired');
       res.status(403).send('CSRF token expired');
       return;
     }
@@ -135,6 +142,8 @@ router.get('/callback', oauthLimiter, async (req: Request, res: Response): Promi
         },
       }
     );
+
+    logger.info({ userId, email: data.email }, 'Gmail integration connected successfully');
 
     // Close popup window with success message
     res.send(`
@@ -265,29 +274,24 @@ router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response)
 /**
  * Get Gmail Integration Status
  */
-router.get('/status', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId;
+router.get('/status', authenticate, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
 
-    const userContainer = await mongoDBService.getUsersContainer();
-    const user = await userContainer.findOne({ id: userId });
+  const userContainer = await mongoDBService.getUsersContainer();
+  const user = await userContainer.findOne({ id: userId });
 
-    if (!user || !user.emailIntegration) {
-      res.json({ connected: false });
-      return;
-    }
-
-    res.json({
-      connected: user.emailIntegration.enabled,
-      email: user.emailIntegration.email,
-      provider: user.emailIntegration.provider,
-      totalEmailsProcessed: user.emailIntegration.totalEmailsProcessed,
-      lastProcessedAt: user.emailIntegration.lastProcessedAt,
-    });
-  } catch (error: any) {
-    console.error('Error getting Gmail status:', error);
-    res.status(500).json({ message: error.message || 'Failed to get status' });
+  if (!user || !user.emailIntegration) {
+    return ApiResponse.success(res, { connected: false });
   }
-});
+
+  logger.info({ userId, connected: user.emailIntegration.enabled }, 'Gmail status checked');
+  ApiResponse.success(res, {
+    connected: user.emailIntegration.enabled,
+    email: user.emailIntegration.email,
+    provider: user.emailIntegration.provider,
+    totalEmailsProcessed: user.emailIntegration.totalEmailsProcessed,
+    lastProcessedAt: user.emailIntegration.lastProcessedAt,
+  });
+}));
 
 export default router;

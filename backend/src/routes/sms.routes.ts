@@ -3,6 +3,9 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { smsParserService, ParsedTransaction } from '../services/smsParser.service';
 import { mongoDBService } from '../config/mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ApiResponse } from '../utils/apiResponse';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -18,24 +21,20 @@ router.get('/supported-banks', authenticate, async (_req: AuthRequest, res: Resp
 });
 
 // Parse SMS and create pending transactions
-router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const { smsTexts } = req.body;
+router.post('/parse', authenticate, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { smsTexts } = req.body;
 
-    if (!smsTexts || !Array.isArray(smsTexts)) {
-      res.status(400).json({ error: 'smsTexts array is required' });
-      return;
-    }
+  if (!smsTexts || !Array.isArray(smsTexts)) {
+    return ApiResponse.badRequest(res, 'smsTexts array is required');
+  }
 
-    if (smsTexts.length === 0) {
-      res.status(400).json({ error: 'At least one SMS text is required' });
-      return;
-    }
+  if (smsTexts.length === 0) {
+    return ApiResponse.badRequest(res, 'At least one SMS text is required');
+  }
 
-    if (smsTexts.length > 50) {
-      res.status(400).json({ error: 'Maximum 50 SMS messages allowed per batch' });
-      return;
-    }
+  if (smsTexts.length > 50) {
+    return ApiResponse.badRequest(res, 'Maximum 50 SMS messages allowed per batch');
+  }
 
     const userId = req.userId!;
 
@@ -43,11 +42,9 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
     const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
 
     if (parsedTransactions.length === 0) {
-      res.status(400).json({
-        error: 'No valid transactions found in the provided SMS messages',
+      return ApiResponse.badRequest(res, 'No valid transactions found in the provided SMS messages', {
         failedCount: smsTexts.length,
       });
-      return;
     }
 
     // Get existing transactions for duplicate detection
@@ -147,64 +144,61 @@ router.post('/parse', authenticate, async (req: AuthRequest, res: Response): Pro
       }
     }
 
-    // Return summary
-    res.status(201).json({
-      success: true,
-      summary: {
-        total: smsTexts.length,
-        parsed: parsedTransactions.length,
-        created: savedTransactions.length,
-        duplicates: duplicates.length,
-        failed: smsTexts.length - parsedTransactions.length,
-      },
-      transactions: savedTransactions,
-      duplicateDetails: duplicates.map((d) => ({
-        amount: d.amount,
-        merchant: d.merchant,
-        date: d.date,
-      })),
-    });
-  } catch (error) {
-    console.error('Error parsing SMS:', error);
-    res.status(500).json({ error: 'Failed to parse SMS messages' });
-  }
-});
+  // Return summary
+  logger.info({
+    userId,
+    total: smsTexts.length,
+    parsed: parsedTransactions.length,
+    created: savedTransactions.length,
+    duplicates: duplicates.length,
+  }, 'SMS batch parsed and saved');
 
-// Parse SMS without saving (preview only)
-router.post('/preview', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const { smsTexts } = req.body;
-    const userId = req.userId!;
-
-    if (!smsTexts || !Array.isArray(smsTexts)) {
-      res.status(400).json({ error: 'smsTexts array is required' });
-      return;
-    }
-
-    const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
-
-    const preview = parsedTransactions.map((parsed) => ({
-      amount: parsed.amount,
-      type: parsed.type,
-      merchant: parsed.merchant ? smsParserService.extractMerchant(parsed.merchant) : 'Unknown',
-      date: parsed.date,
-      accountNumber: parsed.accountNumber,
-      bankName: parsed.bankName,
-      confidence: parsed.confidence,
-      originalText: parsed.originalText,
-    }));
-
-    res.json({
-      success: true,
+  ApiResponse.created(res, {
+    summary: {
       total: smsTexts.length,
       parsed: parsedTransactions.length,
+      created: savedTransactions.length,
+      duplicates: duplicates.length,
       failed: smsTexts.length - parsedTransactions.length,
-      transactions: preview,
-    });
-  } catch (error) {
-    console.error('Error previewing SMS:', error);
-    res.status(500).json({ error: 'Failed to preview SMS messages' });
+    },
+    transactions: savedTransactions,
+    duplicateDetails: duplicates.map((d) => ({
+      amount: d.amount,
+      merchant: d.merchant,
+      date: d.date,
+    })),
+  });
+}));
+
+// Parse SMS without saving (preview only)
+router.post('/preview', authenticate, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { smsTexts } = req.body;
+  const userId = req.userId!;
+
+  if (!smsTexts || !Array.isArray(smsTexts)) {
+    return ApiResponse.badRequest(res, 'smsTexts array is required');
   }
-});
+
+  const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
+
+  const preview = parsedTransactions.map((parsed) => ({
+    amount: parsed.amount,
+    type: parsed.type,
+    merchant: parsed.merchant ? smsParserService.extractMerchant(parsed.merchant) : 'Unknown',
+    date: parsed.date,
+    accountNumber: parsed.accountNumber,
+    bankName: parsed.bankName,
+    confidence: parsed.confidence,
+    originalText: parsed.originalText,
+  }));
+
+  logger.info({ userId, total: smsTexts.length, parsed: parsedTransactions.length }, 'SMS preview generated');
+  ApiResponse.success(res, {
+    total: smsTexts.length,
+    parsed: parsedTransactions.length,
+    failed: smsTexts.length - parsedTransactions.length,
+    transactions: preview,
+  });
+}));
 
 export default router;

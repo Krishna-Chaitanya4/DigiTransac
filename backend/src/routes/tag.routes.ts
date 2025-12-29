@@ -114,22 +114,17 @@ router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
 }));
 
 // PUT /api/tags/:id - Update a tag
-router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { id } = req.params;
-    const { name, color } = req.body;
+router.put('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { id } = req.params;
+  const { name, color } = req.body;
 
-    const tagsContainer = await mongoDBService.getTagsContainer();
+  const tagsContainer = await mongoDBService.getTagsContainer();
 
-    const tag = await tagsContainer.findOne({ id, userId });
-    if (!tag) {
-      res.status(404).json({
-        success: false,
-        message: 'Tag not found',
-      });
-      return;
-    }
+  const tag = await tagsContainer.findOne({ id, userId });
+  if (!tag) {
+    return ApiResponse.notFound(res, 'Tag not found');
+  }
 
     // Check if new name conflicts with existing tag
     if (name && name !== tag.name) {
@@ -140,11 +135,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       });
 
       if (existingTag) {
-        res.status(400).json({
-          success: false,
-          message: 'Tag with this name already exists',
-        });
-        return;
+        return ApiResponse.badRequest(res, 'Tag with this name already exists');
       }
     }
 
@@ -167,36 +158,21 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const updatedTag = await tagsContainer.findOne({ id, userId });
 
-    res.json({
-      success: true,
-      message: 'Tag updated successfully',
-      tag: updatedTag,
-    });
-  } catch (error) {
-    console.error('Error updating tag:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating tag',
-    });
-  }
-});
+  logger.info({ userId, tagId: id }, 'Tag updated successfully');
+  ApiResponse.success(res, { tag: updatedTag }, 'Tag updated successfully');
+}));
 
 // GET /api/tags/:id/usage - Check tag usage in transactions and budgets
-router.get('/:id/usage', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { id } = req.params;
+router.get('/:id/usage', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { id } = req.params;
 
-    const tagsContainer = await mongoDBService.getTagsContainer();
-    const tag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
+  const tagsContainer = await mongoDBService.getTagsContainer();
+  const tag = (await tagsContainer.findOne({ id, userId })) as unknown as Tag;
 
-    if (!tag) {
-      res.status(404).json({
-        success: false,
-        message: 'Tag not found',
-      });
-      return;
-    }
+  if (!tag) {
+    return ApiResponse.notFound(res, 'Tag not found');
+  }
 
     // Count transactions using this tag
     // Tags are stored in the transactionSplits collection, not in transactions
@@ -224,38 +200,26 @@ router.get('/:id/usage', async (req: AuthRequest, res: Response): Promise<void> 
       return includeTags.includes(tag.name) || excludeTags.includes(tag.name);
     });
 
-    res.json({
-      success: true,
-      usage: {
-        transactions: transactionCount,
-        budgets: budgetsUsingTag.length,
-        budgetNames: budgetsUsingTag.map((b: any) => b.name),
-        canDelete: transactionCount === 0 && budgetsUsingTag.length === 0,
-      },
-    });
-  } catch (error) {
-    console.error('Error checking tag usage:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error checking tag usage',
-    });
-  }
-});
+  logger.info({ userId, tagId: id, transactionCount, budgetCount: budgetsUsingTag.length }, 'Tag usage checked');
+  ApiResponse.success(res, {
+    usage: {
+      transactions: transactionCount,
+      budgets: budgetsUsingTag.length,
+      budgetNames: budgetsUsingTag.map((b: any) => b.name),
+      canDelete: transactionCount === 0 && budgetsUsingTag.length === 0,
+    },
+  });
+}));
 
 // POST /api/tags/:id/replace - Replace a tag with another tag
-router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { id } = req.params;
-    const { replacementTagId } = req.body;
+router.post('/:id/replace', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { id } = req.params;
+  const { replacementTagId } = req.body;
 
-    if (!replacementTagId) {
-      res.status(400).json({
-        success: false,
-        message: 'Replacement tag ID is required',
-      });
-      return;
-    }
+  if (!replacementTagId) {
+    return ApiResponse.badRequest(res, 'Replacement tag ID is required');
+  }
 
     const tagsContainer = await mongoDBService.getTagsContainer();
 
@@ -267,11 +231,7 @@ router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<voi
     })) as unknown as Tag;
 
     if (!oldTag || !newTag) {
-      res.status(404).json({
-        success: false,
-        message: 'Tag not found',
-      });
-      return;
+      return ApiResponse.notFound(res, 'Tag not found');
     }
 
     // Replace in transactions (via splits collection)
@@ -337,26 +297,20 @@ router.post('/:id/replace', async (req: AuthRequest, res: Response): Promise<voi
     // Delete old tag
     await tagsContainer.deleteOne({ id: oldTag.id, userId });
 
-    res.json({
-      success: true,
-      message: `Tag "${oldTag.name}" replaced with "${newTag.name}"`,
-      replaced: {
-        transactions: transactionIds.length,
-        budgets: budgets.filter((b: any) => {
-          const includeTags = b.filters?.includeTags || [];
-          const excludeTags = b.filters?.excludeTags || [];
-          return includeTags.includes(oldTag.name) || excludeTags.includes(oldTag.name);
-        }).length,
-      },
-    });
-  } catch (error) {
-    console.error('Error replacing tag:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error replacing tag',
-    });
-  }
-});
+    const replaced = {
+      transactions: transactionIds.length,
+      budgets: budgets.filter((b: any) => {
+        const includeTags = b.filters?.includeTags || [];
+        const excludeTags = b.filters?.excludeTags || [];
+        return includeTags.includes(oldTag.name) || excludeTags.includes(oldTag.name);
+      }).length,
+    };
+
+  logger.info({ userId, oldTagId: id, newTagId: replacementTagId, replaced }, `Tag "${oldTag.name}" replaced with "${newTag.name}"`);
+
+  logger.info({ userId, oldTagId: id, newTagId: replacementTagId, replaced }, `Tag "${oldTag.name}" replaced with "${newTag.name}"`);
+  ApiResponse.success(res, { replaced, message: `Tag "${oldTag.name}" replaced with "${newTag.name}"` });
+}));
 
 // DELETE /api/tags/:id - Delete a tag (only if not in use)
 router.delete('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -411,36 +365,26 @@ router.delete('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
 }));
 
 // GET /api/tags/suggestions - Get tag suggestions based on usage
-router.get('/suggestions', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { query } = req.query;
+router.get('/suggestions', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { query } = req.query;
 
-    const tagsContainer = await mongoDBService.getTagsContainer();
+  const tagsContainer = await mongoDBService.getTagsContainer();
 
-    const filter: MongoFilter<Tag> = { userId };
+  const filter: MongoFilter<Tag> = { userId };
 
-    if (query) {
-      filter.name = { $regex: query as string, $options: 'i' };
-    }
-
-    const tags = (await tagsContainer
-      .find(filter)
-      .sort({ usageCount: -1 })
-      .limit(10)
-      .toArray()) as unknown as Tag[];
-
-    res.json({
-      success: true,
-      suggestions: tags.map((t) => t.name),
-    });
-  } catch (error) {
-    console.error('Error fetching tag suggestions:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching tag suggestions',
-    });
+  if (query) {
+    filter.name = { $regex: query as string, $options: 'i' };
   }
-});
+
+  const tags = (await tagsContainer
+    .find(filter)
+    .sort({ usageCount: -1 })
+    .limit(10)
+    .toArray()) as unknown as Tag[];
+
+  logger.info({ userId, query, count: tags.length }, 'Tag suggestions fetched');
+  ApiResponse.success(res, { suggestions: tags.map((t) => t.name) });
+}));
 
 export default router;
