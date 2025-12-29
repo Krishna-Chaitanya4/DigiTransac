@@ -127,9 +127,8 @@ router.get('/overview', asyncHandler(async (req: AuthRequest, res: Response) => 
 }));
 
 // GET /api/analytics/category-breakdown - Get spending by category with folder hierarchy
-router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+router.get('/category-breakdown', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate
@@ -213,32 +212,21 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
     // Sort by amount descending
     breakdown.sort((a, b) => b.amount - a.amount);
 
-    res.json({
-      success: true,
-      breakdown,
-      total: totalAmount,
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching category breakdown');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching category breakdown',
-    });
-  }
-});
+    logger.info({ userId, categoryCount: breakdown.length, total: totalAmount }, 'Category breakdown fetched');
+    ApiResponse.success(res, { breakdown, total: totalAmount });
+}));
 
 // GET /api/analytics/folder-breakdown - Get spending aggregated by folders
-router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { startDate, endDate } = req.query;
+router.get('/folder-breakdown', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { startDate, endDate } = req.query;
 
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate
-      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
-      : new Date(new Date().setHours(23, 59, 59, 999));
+  const start = startDate
+    ? new Date(startDate as string)
+    : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = endDate
+    ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+    : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
@@ -312,25 +300,14 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
     // Sort by amount descending
     breakdown.sort((a, b) => b.amount - a.amount);
 
-    res.json({
-      success: true,
-      breakdown,
-      total: totalAmount,
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching folder breakdown');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching folder breakdown',
-    });
-  }
-});
+    logger.info({ userId, folderCount: breakdown.length, total: totalAmount }, 'Folder breakdown fetched');
+    ApiResponse.success(res, { breakdown, total: totalAmount });
+  }));
 
 // GET /api/analytics/trends - Get spending trends over time
-router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { startDate, endDate, groupBy = 'day' } = req.query;
+router.get('/trends', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { startDate, endDate, groupBy = 'day' } = req.query;
 
     const start = startDate
       ? new Date(startDate as string)
@@ -372,24 +349,13 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
       .map(([date, amount]) => ({ date, amount }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    res.json({
-      success: true,
-      trends,
-      groupBy,
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching trends');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching trends',
-    });
-  }
-});
+    logger.info({ userId, trendCount: trends.length, groupBy }, 'Trends fetched');
+    ApiResponse.success(res, { trends, groupBy });
+}));
 
 // GET /api/analytics/budget-comparison - Compare actual spending vs budgets (with folder support)
-router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+router.get('/budget-comparison', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate
@@ -539,23 +505,13 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       })
     );
 
-    res.json({
-      success: true,
-      comparisons,
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching budget comparison');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching budget comparison',
-    });
-  }
-});
+    logger.info({ userId, budgetCount: comparisons.length }, 'Budget comparison fetched');
+    ApiResponse.success(res, { comparisons });
+  }));
 
 // GET /api/analytics/top-expenses - Get top expenses
-router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+router.get('/top-expenses', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
     const { startDate, endDate, limit = '10' } = req.query;
 
     const start = startDate
@@ -586,23 +542,13 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
       };
     });
 
-    res.json({
-      success: true,
-      expenses: enrichedExpenses,
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching top expenses');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching top expenses',
-    });
-  }
-});
+    logger.info({ userId, count: enrichedExpenses.length }, 'Top expenses fetched');
+    ApiResponse.success(res, { topExpenses: enrichedExpenses });
+  }));
 
 // GET /api/analytics/payment-method-breakdown - Get spending by payment method
-router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+router.get('/payment-method-breakdown', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate
@@ -650,84 +596,64 @@ router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response):
       })
       .sort((a, b) => b.amount - a.amount);
 
-    res.json({
-      success: true,
-      breakdown,
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching payment method breakdown');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching payment method breakdown',
-    });
-  }
-});
+    logger.info({ userId, categoryCount: breakdown.length }, 'Category breakdown fetched');
+    ApiResponse.success(res, { breakdown });
+  }));
 
 // GET /api/analytics/top-merchants - Get top merchants from parsed email data
-router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { startDate, endDate, limit } = req.query;
+router.get('/top-merchants', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { startDate, endDate, limit } = req.query;
 
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate
-      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
-      : new Date(new Date().setHours(23, 59, 59, 999));
-    const topLimit = limit ? parseInt(limit as string) : 10;
+  const start = startDate
+    ? new Date(startDate as string)
+    : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = endDate
+    ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+    : new Date(new Date().setHours(23, 59, 59, 999));
+  const topLimit = limit ? parseInt(limit as string) : 10;
 
-    // Get all expenses first, then filter by merchantName (splits don't have merchantName)
-    const allExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
-    const expenses = allExpenses.filter((exp: any) => exp.merchantName);
+  // Get all expenses first, then filter by merchantName (splits don't have merchantName)
+  const allExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
+  const expenses = allExpenses.filter((exp: any) => exp.merchantName);
 
-    // Aggregate by merchant
-    const merchantMap = new Map<string, { amount: number; count: number }>();
+  // Aggregate by merchant
+  const merchantMap = new Map<string, { amount: number; count: number }>();
 
-    expenses.forEach((expense: any) => {
-      const merchant = expense.merchantName;
-      const current = merchantMap.get(merchant) || { amount: 0, count: 0 };
-      merchantMap.set(merchant, {
-        amount: current.amount + expense.amount,
-        count: current.count + 1,
-      });
+  expenses.forEach((expense: any) => {
+    const merchant = expense.merchantName;
+    const current = merchantMap.get(merchant) || { amount: 0, count: 0 };
+    merchantMap.set(merchant, {
+      amount: current.amount + expense.amount,
+      count: current.count + 1,
     });
+  });
 
-    const totalAmount = Array.from(merchantMap.values()).reduce((sum, m) => sum + m.amount, 0);
+  const totalAmount = Array.from(merchantMap.values()).reduce((sum, m) => sum + m.amount, 0);
 
-    const topMerchants = Array.from(merchantMap.entries())
-      .map(([merchantName, data]) => ({
-        merchantName,
-        amount: data.amount,
-        count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, topLimit);
+  const topMerchants = Array.from(merchantMap.entries())
+    .map(([merchantName, data]) => ({
+      merchantName,
+      amount: data.amount,
+      count: data.count,
+      percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, topLimit);
 
-    res.json({
-      success: true,
-      merchants: topMerchants,
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching top merchants');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching top merchants',
-    });
-  }
-});
+  logger.info({ userId, count: topMerchants.length }, 'Top merchants fetched');
+  ApiResponse.success(res, { topMerchants });
+}));
 
 // GET /api/analytics/smart-insights - Get AI-powered spending insights
-router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { startDate, endDate } = req.query;
+router.get('/smart-insights', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
+  const { startDate, endDate } = req.query;
 
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(endDate as string) : new Date();
+  const start = startDate
+    ? new Date(startDate as string)
+    : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = endDate ? new Date(endDate as string) : new Date();
     end.setHours(23, 59, 59, 999);
 
     const categoriesContainer = await mongoDBService.getCategoriesContainer();
@@ -893,34 +819,27 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
 
     folderTrends.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange));
 
-    res.json({
-      success: true,
-      insights: {
-        overallTrend: {
-          currentTotal,
-          previousTotal,
-          percentChange: Math.round(percentChange),
-          direction: percentChange > 0 ? 'up' : 'down',
-        },
-        overBudgetAlerts,
-        unusualExpenses,
-        categoryTrends: categoryTrends.slice(0, 5),
-        folderTrends: folderTrends.slice(0, 5),
-        summary: {
-          totalExpenses: currentExpenses.length,
-          avgDailySpending: Math.round(currentTotal / (periodDays || 1)),
-          topSpendingDay: await getTopSpendingDay(currentExpenses),
-        },
+    const insights = {
+      overallTrend: {
+        currentTotal,
+        previousTotal,
+        percentChange: Math.round(percentChange),
+        direction: percentChange > 0 ? 'up' : 'down',
       },
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching smart insights');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching smart insights',
-    });
-  }
-});
+      overBudgetAlerts,
+      unusualExpenses,
+      categoryTrends: categoryTrends.slice(0, 5),
+      folderTrends: folderTrends.slice(0, 5),
+      summary: {
+        totalExpenses: currentExpenses.length,
+        avgDailySpending: Math.round(currentTotal / (periodDays || 1)),
+        topSpendingDay: await getTopSpendingDay(currentExpenses),
+      },
+    };
+    
+    logger.info({ userId }, 'Smart insights generated');
+    ApiResponse.success(res, insights);
+  }));
 
 // Helper function to find the day with highest spending
 async function getTopSpendingDay(expenses: any[]): Promise<{ date: string; amount: number }> {
