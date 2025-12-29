@@ -861,55 +861,47 @@ async function getTopSpendingDay(expenses: any[]): Promise<{ date: string; amoun
 }
 
 // GET /api/analytics/review-queue-stats - Get review queue analytics
-router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+router.get('/review-queue-stats', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
 
-    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+  const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-    // Use aggregation to count by status efficiently
-    const [pending, approved, rejected, pendingTransactions] = await Promise.all([
-      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'pending' }),
-      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'approved' }),
-      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'rejected' }),
-      transactionsContainer
-        .find({ userId, type: 'debit', reviewStatus: 'pending' })
-        .sort({ date: -1 })
-        .limit(5)
-        .toArray(),
-    ]);
+  // Use aggregation to count by status efficiently
+  const [pending, approved, rejected, pendingTransactions] = await Promise.all([
+    transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'pending' }),
+    transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'approved' }),
+    transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'rejected' }),
+    transactionsContainer
+      .find({ userId, type: 'debit', reviewStatus: 'pending' })
+      .sort({ date: -1 })
+      .limit(5)
+      .toArray(),
+  ]);
 
-    const total = approved + rejected;
-    const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
+  const total = approved + rejected;
+  const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
-    // Get pending expenses details
-    const pendingExpensesFormatted = pendingTransactions.map((tx: any) => ({
-      id: tx.id,
-      description: tx.description,
-      amount: tx.amount,
-      date: tx.date,
-      daysSinceParsed: Math.floor(
-        (Date.now() - new Date(tx.createdAt || tx.date).getTime()) / (1000 * 60 * 60 * 24)
-      ),
-    }));
+  // Get pending expenses details
+  const pendingExpensesFormatted = pendingTransactions.map((tx: any) => ({
+    id: tx.id,
+    description: tx.description,
+    amount: tx.amount,
+    date: tx.date,
+    daysSinceParsed: Math.floor(
+      (Date.now() - new Date(tx.createdAt || tx.date).getTime()) / (1000 * 60 * 60 * 24)
+    ),
+  }));
 
-    res.json({
-      success: true,
-      stats: {
-        pending,
-        approved,
-        rejected,
-        approvalRate,
-        pendingExpenses: pendingExpensesFormatted,
-      },
-    });
-  } catch (error) {
-    logger.error({ err: error, userId: req.userId }, 'Error fetching review queue stats');
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching review queue stats',
-    });
-  }
-});
+  logger.info({ userId, pending, approved, rejected }, 'Review queue stats fetched');
+  ApiResponse.success(res, {
+    stats: {
+      pending,
+      approved,
+      rejected,
+      approvalRate,
+      pendingExpenses: pendingExpensesFormatted,
+    },
+  });
+}));
 
 export default router;
