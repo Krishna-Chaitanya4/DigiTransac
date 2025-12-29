@@ -4,6 +4,7 @@ import { mongoDBService } from '../config/mongodb';
 import { Account } from '../models/types';
 import { v4 as uuidv4 } from 'uuid';
 import { buildApprovedTransactionsFilter } from '../utils/transactionFilters';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       accounts,
     });
   } catch (error) {
-    console.error('Error fetching accounts:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching accounts');
     res.status(500).json({
       success: false,
       message: 'Error fetching accounts',
@@ -100,7 +101,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       account: newAccount,
     });
   } catch (error) {
-    console.error('Error creating account:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error creating account');
     res.status(500).json({
       success: false,
       message: 'Error creating account',
@@ -158,7 +159,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       account: updatedAccount,
     });
   } catch (error) {
-    console.error('Error updating account:', error);
+    logger.error({ err: error, userId: req.userId, accountId: req.params.id }, 'Error updating account');
     res.status(500).json({
       success: false,
       message: 'Error updating account',
@@ -201,7 +202,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
       message: 'Account deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting account:', error);
+    logger.error({ err: error, userId: req.userId, accountId: req.params.id }, 'Error deleting account');
     res.status(500).json({
       success: false,
       message: 'Error deleting account',
@@ -254,7 +255,7 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
       },
     });
   } catch (error) {
-    console.error('Error fetching account balance:', error);
+    logger.error({ err: error, userId: req.userId, accountId: req.params.id }, 'Error fetching account balance');
     res.status(500).json({
       success: false,
       message: 'Error fetching account balance',

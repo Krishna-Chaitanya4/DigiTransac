@@ -5,6 +5,7 @@ import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 import { calculateBudgetSpendingInRange } from '../utils/budgetHelpers';
 import { Budget, Category } from '../models/types';
 import { buildExpenseFilter } from '../utils/transactionFilters';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -123,7 +124,7 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
       },
     });
   } catch (error) {
-    console.error('Error fetching overview:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching overview');
     res.status(500).json({
       success: false,
       message: 'Error fetching overview',
@@ -224,7 +225,7 @@ router.get('/category-breakdown', async (req: AuthRequest, res: Response): Promi
       total: totalAmount,
     });
   } catch (error) {
-    console.error('Error fetching category breakdown:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching category breakdown');
     res.status(500).json({
       success: false,
       message: 'Error fetching category breakdown',
@@ -323,7 +324,7 @@ router.get('/folder-breakdown', async (req: AuthRequest, res: Response): Promise
       total: totalAmount,
     });
   } catch (error) {
-    console.error('Error fetching folder breakdown:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching folder breakdown');
     res.status(500).json({
       success: false,
       message: 'Error fetching folder breakdown',
@@ -383,7 +384,7 @@ router.get('/trends', async (req: AuthRequest, res: Response): Promise<void> => 
       groupBy,
     });
   } catch (error) {
-    console.error('Error fetching trends:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching trends');
     res.status(500).json({
       success: false,
       message: 'Error fetching trends',
@@ -549,7 +550,7 @@ router.get('/budget-comparison', async (req: AuthRequest, res: Response): Promis
       comparisons,
     });
   } catch (error) {
-    console.error('Error fetching budget comparison:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching budget comparison');
     res.status(500).json({
       success: false,
       message: 'Error fetching budget comparison',
@@ -596,7 +597,7 @@ router.get('/top-expenses', async (req: AuthRequest, res: Response): Promise<voi
       expenses: enrichedExpenses,
     });
   } catch (error) {
-    console.error('Error fetching top expenses:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching top expenses');
     res.status(500).json({
       success: false,
       message: 'Error fetching top expenses',
@@ -660,7 +661,7 @@ router.get('/payment-method-breakdown', async (req: AuthRequest, res: Response):
       breakdown,
     });
   } catch (error) {
-    console.error('Error fetching payment method breakdown:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching payment method breakdown');
     res.status(500).json({
       success: false,
       message: 'Error fetching payment method breakdown',
@@ -715,7 +716,7 @@ router.get('/top-merchants', async (req: AuthRequest, res: Response): Promise<vo
       merchants: topMerchants,
     });
   } catch (error) {
-    console.error('Error fetching top merchants:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching top merchants');
     res.status(500).json({
       success: false,
       message: 'Error fetching top merchants',
@@ -919,7 +920,7 @@ router.get('/smart-insights', async (req: AuthRequest, res: Response): Promise<v
       },
     });
   } catch (error) {
-    console.error('Error fetching smart insights:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching smart insights');
     res.status(500).json({
       success: false,
       message: 'Error fetching smart insights',
@@ -990,7 +991,7 @@ router.get('/review-queue-stats', async (req: AuthRequest, res: Response): Promi
       },
     });
   } catch (error) {
-    console.error('Error fetching review queue stats:', error);
+    logger.error({ err: error, userId: req.userId }, 'Error fetching review queue stats');
     res.status(500).json({
       success: false,
       message: 'Error fetching review queue stats',

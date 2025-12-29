@@ -1,606 +1,202 @@
-﻿/**
+/**
  * SMS Parser Service
- * Parses bank SMS messages and extracts transaction details
- * Supports major Indian banks with confidence scoring
+ * Parses bank SMS messages using centralized base parser
+ * Extends BaseTransactionParser for SMS-specific logic
  */
 
-import { detectTransactionTags } from '../utils/transactionTags';
-import { getLearnedMapping } from './merchantLearning.service';
-import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
-import { mongoDBService } from '../config/mongodb';
+import { BaseTransactionParser } from './parsers/base/BaseTransactionParser';
+import { ParsedTransaction } from './parsers/base/types';
+import { logger } from '../utils/logger';
+import { cleanMerchantName } from './parsers/utils/merchantNormalizer';
+import { confidenceToLevel } from './parsers/utils/confidenceScorer';
 
-export interface ParsedTransaction {
-  amount: number;
-  type: 'debit' | 'credit';
-  merchant?: string;
-  date?: Date;
-  accountNumber?: string;
-  referenceNumber?: string;
-  confidence: 'high' | 'medium' | 'low';
-  originalText: string;
-  bankName?: string;
-  tags?: string[]; // Auto-detected tags
-  learnedCategoryId?: string; // Auto-filled from learning
-  learnedAccountId?: string; // Auto-filled from learning
-  matchedAccountId?: string; // Auto-matched from SMS account info
-}
+// Re-export for backward compatibility
+export type { ParsedTransaction };
 
-interface BankPattern {
-  name: string;
-  patterns: {
-    regex: RegExp;
-    extract: (match: RegExpMatchArray) => Partial<ParsedTransaction>;
-  }[];
-}
-
-export class SMSParserService {
-  private bankPatterns: BankPattern[] = [
-    // HDFC Bank
-    {
-      name: 'HDFC',
-      patterns: [
-        {
-          // Standard: Rs.500.00 debited from A/c **1234/XX1234/....1234 on 23-Dec-25 to/at Swiggy
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:at|to|for)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            merchant: match[4].trim(),
-            confidence: 'high',
-            bankName: 'HDFC',
-          }),
-        },
-        {
-          // Alternative format: INR 500 debited for MERCHANT on 23-Dec-25 from **1234
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:for|at)\s+([A-Z][A-Za-z0-9\s*]+?)\s+on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:A\/c|from).*?([xX*.]{2,}\d{4}|\d{4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            merchant: match[2].trim(),
-            date: this.parseDate(match[3]),
-            accountNumber: match[4],
-            confidence: 'high',
-            bankName: 'HDFC',
-          }),
-        },
-        {
-          // Credit: Rs.1000.00 credited to A/c **1234/XX1234/....1234 on 23-Dec-25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:A\/c|account|to).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            confidence: 'high',
-            bankName: 'HDFC',
-          }),
-        },
-        {
-          // Credit from: Rs 5000 credited from SALARY on 25-Dec-24 to **1234
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)\s+on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}).*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            merchant: match[2].trim(),
-            date: this.parseDate(match[3]),
-            accountNumber: match[4],
-            confidence: 'high',
-            bankName: 'HDFC',
-          }),
-        },
-      ],
-    },
-
-    // ICICI Bank
-    {
-      name: 'ICICI',
-      patterns: [
-        {
-          // Standard: Your A/c **5678/XX5678/....5678 is debited with Rs 250 on 23-12-25. Info: UPI-Zomato
-          regex:
-            /(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?(?:debited|withdrawn).*?(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:Info|for|at):?\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[2].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[1],
-            date: this.parseDate(match[3]),
-            merchant: match[4].trim(),
-            confidence: 'high',
-            bankName: 'ICICI',
-          }),
-        },
-        {
-          // Alternative: Rs 250 debited from **5678 on 23-12-25 for MERCHANT
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:for|at)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            merchant: match[4].trim(),
-            confidence: 'high',
-            bankName: 'ICICI',
-          }),
-        },
-        {
-          // Credit: Your A/c **5678 is credited with Rs 1000 on 23-12-25
-          regex:
-            /(?:A\/c|account).*?([xX*.]{2,}\d{4}|\d{4}).*?credited.*?(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[2].replace(/,/g, '')),
-            type: 'credit',
-            accountNumber: match[1],
-            date: this.parseDate(match[3]),
-            confidence: 'high',
-            bankName: 'ICICI',
-          }),
-        },
-        {
-          // Credit from: Rs 5000 credited from SALARY to **5678 on 23-12-25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            merchant: match[2].trim(),
-            accountNumber: match[3],
-            date: this.parseDate(match[4]),
-            confidence: 'high',
-            bankName: 'ICICI',
-          }),
-        },
-      ],
-    },
-
-    // SBI (State Bank of India)
-    {
-      name: 'SBI',
-      patterns: [
-        {
-          // Card: Rs 1000.00 spent on SBI Card **9012/XX9012/....9012 at AMAZON on 23/12/25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:spent|debited).*?(?:card|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?at\s+([A-Z][A-Za-z0-9\s*]+?)\s+on\s+(\d{1,2}[/]\d{1,2}[/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            merchant: match[3].trim(),
-            date: this.parseDate(match[4]),
-            confidence: 'high',
-            bankName: 'SBI',
-          }),
-        },
-        {
-          // Standard debit: Rs.500 debited from A/c ....1234/**1234/XX1234 on 23-12-25 via UPI/IMPS/NEFT
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:via|for|to|Info)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            merchant: match[4].trim(),
-            confidence: 'high',
-            bankName: 'SBI',
-          }),
-        },
-        {
-          // Debit without merchant: Rs 500 debited from ....1234 on 23/12/25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            confidence: 'medium',
-            bankName: 'SBI',
-          }),
-        },
-        {
-          // Credit: Rs 2000 credited to A/c ....1234/**1234/XX1234 on 23/12/25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:A\/c|account|to).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            confidence: 'high',
-            bankName: 'SBI',
-          }),
-        },
-      ],
-    },
-
-    // Axis Bank
-    {
-      name: 'Axis',
-      patterns: [
-        {
-          // Debit: INR 750.00 debited from **3456/XX3456/....3456 on 23Dec for PAYTM
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}\s*\w{3}\s*\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}).*?(?:for|at)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            merchant: match[4].trim(),
-            confidence: 'high',
-            bankName: 'Axis',
-          }),
-        },
-        {
-          // Debit without merchant: Rs 500 debited from **3456 on 23-Dec-25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:from|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            confidence: 'medium',
-            bankName: 'Axis',
-          }),
-        },
-        {
-          // Credit: INR 5000 credited to **3456/XX3456/....3456 on 23-Dec-25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            confidence: 'high',
-            bankName: 'Axis',
-          }),
-        },
-      ],
-    },
-
-    // Kotak Mahindra Bank
-    {
-      name: 'Kotak',
-      patterns: [
-        {
-          // Debit: Rs.300.00 debited from A/c **7890/XX7890/....7890 on 23-12-25 at/for Uber
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/\d{1,2}[/\d{2,4}).*?(?:at|to|for)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Avl|Ref|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            merchant: match[4].trim(),
-            confidence: 'high',
-            bankName: 'Kotak',
-          }),
-        },
-        {
-          // Credit: Rs 1000 credited to **7890/XX7890/....7890 on 23-12-25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            confidence: 'high',
-            bankName: 'Kotak',
-          }),
-        },
-      ],
-    },
-
-    // Punjab National Bank (PNB)
-    {
-      name: 'PNB',
-      patterns: [
-        {
-          // Debit: Rs 400 debited from A/c **2345/XX2345/....2345 on 23/12/25 for UPI/Phonepe
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn).*?(?:A\/c|account|from).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}).*?(?:for|Info|via)\s*(.+?)(?:\s*\.|Ref|Avl|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            merchant: match[4].trim(),
-            confidence: 'high',
-            bankName: 'PNB',
-          }),
-        },
-        {
-          // Credit: Rs 2000 credited to **2345/XX2345/....2345 on 23/12/25
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|A\/c).*?([xX*.]{2,}\d{4}|\d{4}).*?on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            accountNumber: match[2],
-            date: this.parseDate(match[3]),
-            confidence: 'high',
-            bankName: 'PNB',
-          }),
-        },
-      ],
-    },
-
-    // Generic UPI pattern (fallback for any bank)
-    {
-      name: 'Generic',
-      patterns: [
-        {
-          // Generic debit with merchant: Rs/INR amount debited from **1234/XX1234/....1234/1234 for/at MERCHANT
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn|spent).*?(?:from|on|A\/c|account|card).*?([xX*.]{2,}\d{4}|\d{4}).*?(?:for|at|to|via)\s+([A-Z][A-Za-z0-9\s*]+?)(?:\s*\.|Ref|Avl|$)/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            merchant: match[3].trim(),
-            confidence: 'medium',
-          }),
-        },
-        {
-          // Generic debit without merchant: Rs/INR amount debited from account
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+(?:debited|withdrawn|spent).*?(?:from|on|A\/c|account|card).*?([xX*.]{2,}\d{4}|\d{4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'debit',
-            accountNumber: match[2],
-            confidence: 'low',
-          }),
-        },
-        {
-          // Generic credit with source: Rs/INR amount credited from SOURCE to **1234
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?from\s+([A-Z][A-Za-z0-9\s]+?)(?:to|in|A\/c).*?([xX*.]{2,}\d{4}|\d{4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            merchant: match[2].trim(),
-            accountNumber: match[3],
-            confidence: 'medium',
-          }),
-        },
-        {
-          // Generic credit without source: Rs/INR amount credited to account
-          regex:
-            /(?:Rs\.?|INR)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s+credited.*?(?:to|in|A\/c|account).*?([xX*.]{2,}\d{4}|\d{4})/i,
-          extract: (match) => ({
-            amount: parseFloat(match[1].replace(/,/g, '')),
-            type: 'credit',
-            accountNumber: match[2],
-            confidence: 'low',
-          }),
-        },
-      ],
-    },
-  ];
-
+/**
+ * SMS-specific transaction parser
+ * Inherits common parsing logic from BaseTransactionParser
+ * Adds SMS-specific pattern handling
+ */
+export class SMSParserService extends BaseTransactionParser {
   /**
-   * Parse single SMS message
+   * Parse transaction from SMS text
+   * @param smsText - SMS message text
+   * @param senderOrUserId - SMS sender ID or userId (for backward compatibility) - optional
+   * @param userIdOptional - User ID (optional, for backward compatibility with 2-param calls)
+   * @returns Parsed transaction or null if parsing fails
    */
-  async parseSMS(smsText: string, userId?: string): Promise<ParsedTransaction | null> {
-    if (!smsText || smsText.trim().length === 0) {
+  async parseSMS(
+    smsText: string,
+    senderOrUserId?: string,
+    userIdOptional?: string
+  ): Promise<ParsedTransaction | null> {
+    // Handle backward compatibility: 
+    // - parseSMS(text) - no auth, detect sender
+    // - parseSMS(text, userId) - auth, detect sender
+    // - parseSMS(text, sender, userId) - full explicit
+    let sender: string;
+    let userId: string;
+
+    if (!senderOrUserId) {
+      // 1-param call: parseSMS(text) - no auth
+      sender = this.detectSender(smsText) || 'UNKNOWN';
+      userId = 'anonymous';
+    } else if (userIdOptional) {
+      // 3-param call: parseSMS(text, sender, userId)
+      sender = senderOrUserId;
+      userId = userIdOptional;
+    } else {
+      // 2-param call: parseSMS(text, userId) - detect sender from text
+      userId = senderOrUserId;
+      sender = this.detectSender(smsText) || 'UNKNOWN';
+    }
+
+    const transaction = await super.parseTransaction(smsText, sender, userId, {
+      enableLearning: userId !== 'anonymous',
+      enableTagging: userId !== 'anonymous',
+      enableAccountMatching: userId !== 'anonymous',
+    });
+
+    if (!transaction) {
       return null;
     }
 
-    const cleanText = smsText.trim();
+    // Convert numeric confidence to level string for SMS compatibility
+    if (typeof transaction.confidence === 'number') {
+      const confidenceLevel = confidenceToLevel(transaction.confidence);
+      // Create a new object with the SMS-specific format
+      return {
+        ...transaction,
+        confidence: confidenceLevel as any, // Keep numeric internally but expose as level
+        originalText: transaction.rawText, // Add alias for backward compatibility
+        type: transaction.type || 'debit', // Default to debit for SMS
+      };
+    }
 
-    // Try each bank pattern
-    for (const bankPattern of this.bankPatterns) {
-      for (const pattern of bankPattern.patterns) {
-        const match = cleanText.match(pattern.regex);
-        if (match) {
-          const parsed = pattern.extract(match);
+    return transaction;
+  }
 
-          // Normalize merchant name for consistency
-          const normalizedMerchant = parsed.merchant
-            ? normalizeMerchantName(parsed.merchant)
-            : undefined;
+  /**
+   * Check if SMS text is a transaction message
+   * @param text - SMS message text
+   * @returns true if text contains transaction information
+   */
+  public isTransactionSMS(text: string): boolean {
+    return this.isTransactionMessage(text);
+  }
 
-          // Auto-detect and assign tags based on transaction type and content
-          const tagDetection = detectTransactionTags(
-            parsed.type || 'debit',
-            cleanText,
-            normalizedMerchant
-          );
+  /**
+   * Get list of supported banks
+   * @returns Array of bank names
+   */
+  public getSupportedBanks(): string[] {
+    return this.bankPatterns.map((bp) => bp.name);
+  }
 
-          // Check if we have learned category/account for this merchant
-          let learnedCategoryId: string | undefined;
-          let learnedAccountId: string | undefined;
+  /**
+   * Parse multiple SMS messages in batch
+   * @param smsTexts - Array of SMS message texts
+   * @param userId - User ID for learning and matching
+   * @returns Array of parsed transactions
+   */
+  public async parseMultipleSMS(smsTexts: string[], userId: string): Promise<ParsedTransaction[]> {
+    const results: ParsedTransaction[] = [];
 
-          if (userId && normalizedMerchant) {
-            const learned = await getLearnedMapping(userId, normalizedMerchant);
-            if (learned) {
-              learnedCategoryId = learned.categoryId;
-              learnedAccountId = learned.accountId;
-            }
-          }
-
-          // Match SMS account info to user's accounts
-          let matchedAccountId: string | undefined;
-
-          if (userId && (parsed.bankName || parsed.accountNumber)) {
-            try {
-              const accountsContainer = await mongoDBService.getAccountsContainer();
-              matchedAccountId =
-                (await matchAccount(
-                  userId,
-                  accountsContainer as any,
-                  parsed.bankName,
-                  parsed.accountNumber
-                )) || undefined;
-            } catch {
-              // Account matching failed, continue without it
-            }
-          }
-
-          return {
-            ...parsed,
-            merchant: normalizedMerchant,
-            originalText: cleanText,
-            // Default to today if no date found
-            date: parsed.date || new Date(),
-            tags: tagDetection.tags,
-            learnedCategoryId,
-            learnedAccountId,
-            matchedAccountId,
-          } as ParsedTransaction;
+    for (const text of smsTexts) {
+      try {
+        // Try to detect sender from text content (fallback to 'UNKNOWN')
+        const sender = this.detectSender(text) || 'UNKNOWN';
+        const parsed = await this.parseSMS(text, sender, userId);
+        if (parsed) {
+          results.push(parsed);
         }
+      } catch (error) {
+        logger.error({ err: error }, 'Error parsing SMS');
       }
     }
 
-    return null;
+    return results;
   }
 
   /**
-   * Parse multiple SMS messages (batch)
+   * Detect sender/bank from SMS text content
    */
-  async parseMultipleSMS(smsTexts: string[], userId?: string): Promise<ParsedTransaction[]> {
-    const results = await Promise.all(smsTexts.map((text) => this.parseSMS(text, userId)));
-    return results.filter((parsed): parsed is ParsedTransaction => parsed !== null);
-  }
+  private detectSender(text: string): string | undefined {
+    const lowerText = text.toLowerCase();
 
-  /**
-   * Parse date from various formats with improved error handling
-   */
-  private parseDate(dateStr: string | undefined): Date | undefined {
-    if (!dateStr?.trim()) return undefined;
-
-    const trimmedDate = dateStr.trim();
-
-    // Month name to number mapping
-    const monthMap: Record<string, number> = {
-      jan: 0,
-      feb: 1,
-      mar: 2,
-      apr: 3,
-      may: 4,
-      jun: 5,
-      jul: 6,
-      aug: 7,
-      sep: 8,
-      oct: 9,
-      nov: 10,
-      dec: 11,
-    };
-
-    // Try different date formats
-    const formats: Array<{
-      regex: RegExp;
-      hasMonthName: boolean;
-    }> = [
-      // 23-Dec-25 or 23-Dec-2025
-      { regex: /(\d{1,2})[-/](\w{3})[-/](\d{2,4})/i, hasMonthName: true },
-      // 23/12/25 or 23/12/2025 or 23-12-25
-      { regex: /(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/, hasMonthName: false },
-      // 23Dec25 or 23Dec2025
-      { regex: /(\d{1,2})(\w{3})(\d{2,4})/i, hasMonthName: true },
-    ];
-
-    for (const format of formats) {
-      const match = trimmedDate.match(format.regex);
-      if (!match) continue;
-
-      const [, day, monthOrDay, year] = match;
-
-      let month: number;
-      const actualDay = parseInt(day, 10);
-
-      if (format.hasMonthName) {
-        const monthKey = monthOrDay.toLowerCase().substring(0, 3);
-        month = monthMap[monthKey];
-        if (month === undefined) continue; // Invalid month name
-      } else {
-        month = parseInt(monthOrDay, 10) - 1;
-        if (month < 0 || month > 11) continue; // Invalid month number
-      }
-
-      // Validate day
-      if (actualDay < 1 || actualDay > 31) continue;
-
-      // Handle 2-digit years (assume 2000s)
-      let fullYear = parseInt(year, 10);
-      if (fullYear < 100) {
-        fullYear = 2000 + fullYear;
-      }
-
-      // Validate year (between 2000 and 2100)
-      if (fullYear < 2000 || fullYear > 2100) continue;
-
-      const date = new Date(fullYear, month, actualDay);
-      if (!isNaN(date.getTime()) && date.getDate() === actualDay) {
-        return date;
-      }
-    }
+    // Try to detect bank from common keywords
+    if (lowerText.includes('hdfc')) return 'HDFCBK';
+    if (lowerText.includes('icici')) return 'ICICIB';
+    if (lowerText.includes('sbi') || lowerText.includes('state bank')) return 'SBIIN';
+    if (lowerText.includes('axis')) return 'AXISBK';
+    if (lowerText.includes('kotak')) return 'KOTAKB';
+    if (lowerText.includes('pnb') || lowerText.includes('punjab')) return 'PNBSMS';
+    if (lowerText.includes('bob') || lowerText.includes('baroda')) return 'BOBIN';
+    if (lowerText.includes('canara')) return 'CANBNK';
+    if (lowerText.includes('union bank')) return 'UBOI';
+    if (lowerText.includes('idbi')) return 'IDBIBN';
 
     return undefined;
   }
 
   /**
-   * Extract merchant name from description
-   * Cleans up common payment prefixes and reference numbers
+   * Check if transaction is duplicate
+   * @param parsed - Parsed transaction
+   * @param existing - Existing transactions
+   * @returns true if duplicate found
    */
-  extractMerchant(description: string): string {
-    if (!description?.trim()) return 'Unknown';
-
-    let merchant = description.trim();
-
-    // Remove common payment method prefixes
-    merchant = merchant.replace(/^(UPI-|UPI\/|IMPS-|NEFT-|RTGS-|NETBANKING-)/i, '');
-
-    // Remove reference numbers and transaction IDs
-    merchant = merchant.replace(/Ref\s*[:.]?.*$/i, ''); // Remove "Ref: ..." or "Ref ..." or "Ref. ..."
-    merchant = merchant.replace(/\d{12,}/g, ''); // Remove long number sequences (12+ digits)
-
-    // Normalize whitespace
-    merchant = merchant.replace(/\s+/g, ' ').trim();
-
-    return merchant || 'Unknown';
-  }
-
-  /**
-   * Detect duplicate transactions
-   */
-  isDuplicate(
+  public isDuplicate(
     parsed: ParsedTransaction,
-    existingTransactions: Array<{
-      amount: number;
-      date: Date;
-      description?: string;
-    }>
+    existing: Array<{ amount: number; date: Date; description?: string }>
   ): boolean {
-    return existingTransactions.some((existing) => {
-      const sameAmount = Math.abs(existing.amount - parsed.amount) < 0.01;
-      const sameDay = existing.date.toDateString() === parsed.date?.toDateString();
-      const similarDescription =
-        existing.description &&
-        parsed.merchant &&
-        existing.description.toLowerCase().includes(parsed.merchant.toLowerCase());
+    const parsedAmount = Math.abs(parsed.amount);
+    const parsedDate = parsed.date;
 
-      return sameAmount && sameDay && similarDescription;
-    });
+    if (!parsedDate) {
+      return false;
+    }
+
+    // Check for exact match within same day
+    for (const existingTxn of existing) {
+      const existingAmount = Math.abs(existingTxn.amount);
+      const existingDate = existingTxn.date;
+
+      // Same amount check
+      if (Math.abs(existingAmount - parsedAmount) < 0.01) {
+        // Same day check
+        if (
+          existingDate.getFullYear() === parsedDate.getFullYear() &&
+          existingDate.getMonth() === parsedDate.getMonth() &&
+          existingDate.getDate() === parsedDate.getDate()
+        ) {
+          // Same merchant check (if available)
+          if (parsed.merchant && existingTxn.description) {
+            const normalizedParsed = parsed.merchant.toLowerCase();
+            const normalizedExisting = existingTxn.description.toLowerCase();
+            if (normalizedExisting.includes(normalizedParsed) || normalizedParsed.includes(normalizedExisting)) {
+              return true;
+            }
+          } else {
+            // If no merchant info, consider it duplicate based on amount + date
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
-   * Get supported banks list
+   * Extract clean merchant name
+   * @param merchant - Raw merchant name
+   * @returns Cleaned merchant name
    */
-  getSupportedBanks(): string[] {
-    return this.bankPatterns.filter((bp) => bp.name !== 'Generic').map((bp) => bp.name);
+  public extractMerchant(merchant: string): string {
+    return cleanMerchantName(merchant);
   }
 }
 
+// Export singleton instance for backward compatibility
 export const smsParserService = new SMSParserService();

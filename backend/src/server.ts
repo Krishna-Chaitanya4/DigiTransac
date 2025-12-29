@@ -2,7 +2,6 @@
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import mongoSanitize from 'express-mongo-sanitize';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
@@ -135,21 +134,27 @@ app.use(requestIdMiddleware as express.RequestHandler);
 app.use(httpLogger as express.RequestHandler);
 
 // Log all OPTIONS requests for debugging
-app.options('*', (req, res) => {
-  logger.debug(
-    {
-      url: req.url,
-      origin: req.headers.origin,
-      method: req.method,
-    },
-    '🔍 OPTIONS preflight request received'
-  );
-  res.status(204).end();
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    logger.debug(
+      {
+        url: req.url,
+        origin: req.headers.origin,
+        method: req.method,
+      },
+      '🔍 OPTIONS preflight request received'
+    );
+    res.status(204).end();
+    return;
+  }
+  next();
 });
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(mongoSanitize());
+// TODO: express-mongo-sanitize has compatibility issues with current Express version
+// Input sanitization is handled in validation middleware instead
+// app.use(mongoSanitize());
 app.use(globalLimiter);
 
 // API routes (with CORS protection)
