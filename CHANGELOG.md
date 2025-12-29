@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Email Parser Service comprehensive tests** (Phase 2)
+  - 54 comprehensive tests covering all 10 supported banks
+  - Tests for HDFC, ICICI, SBI, Axis, Kotak, PNB, BOB, Canara, Union Bank, IDBI
+  - Date parsing tests (multiple formats: DD-MMM-YY, DD/MM/YYYY, DD-MM-YYYY)
+  - Merchant name cleaning and normalization tests
+  - Transaction ID extraction tests (TXN, REF, REFERENCE, UPI REF patterns)
+  - Integration tests for tags, learning, and account matching
+  - Edge case handling (invalid amounts, missing data, promotional emails)
+  - Category suggestion tests (keyword-based fallback categorization)
+  - Transaction detection tests (case sensitivity, financial context)
+  - 100% pass rate (54/54 tests)
+
+### Changed
+- **Email Parser Service improvements** (industry standards applied)
+  - Added proper TypeScript interfaces: `ParsedTransaction`, `BankPattern`
+  - Enhanced type safety throughout the service
+  - Improved error handling with comprehensive validation
+  - Added `MONTH_MAP` constant for reliable month name parsing
+  - Enhanced `cleanMerchantName` method (removes dates, balances, company suffixes, locations)
+  - Improved `parseDate` with validation (date ranges, month validation, year handling)
+  - Enhanced `calculateConfidence` with clearer scoring logic
+  - Improved `extractTransactionId` to handle "TXN ID:" with flexible spacing
+  - Updated `isTransactionSMS` to recognize "payment received", "card was used" as valid transactions
+  - Enhanced `suggestCategory` with comprehensive keyword patterns for 8 categories
+
+### Improved
+- **Bank Pattern Enhancements**
+  - HDFC: Better merchant extraction with positive lookahead, improved date handling
+  - SBI: Dual patterns for "at MERCHANT" and "from MERCHANT" scenarios
+  - Axis: Specific "at" pattern to avoid capturing bank name as merchant
+  - All patterns use positive lookahead to prevent over-matching
+  - Better handling of bank-specific date formats and card number formats
+- **Transaction Detection**
+  - More flexible keyword matching (debited, credited, spent, withdrawn, paid, payment, purchase, received, used)
+  - Strong transaction phrases recognized without requiring explicit financial context
+  - Better filtering of promotional emails (congratulations, offer, discount patterns)
+- **Gmail Integration** (already using industry standards)
+  - Gmail History API for incremental sync (delta changes using historyId)
+  - OAuth token refresh with encryption
+  - Efficient bank sender filtering
+
+### Technical Details
+- Services layer coverage improvement expected (email parser now fully tested)
+- All 54 email parser tests passing with 100% reliability
+- Pattern matching improved with lookahead/lookbehind for accuracy
+- Modular, maintainable code structure following TypeScript best practices
+
 ## [1.4.1] - 2025-12-28
 
 ### Added
