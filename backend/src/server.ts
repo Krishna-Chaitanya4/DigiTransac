@@ -13,6 +13,7 @@ import { validateEnv } from './utils/envValidator';
 import { setupSwagger } from './config/swagger';
 import { mongoDBService } from './config/mongodb';
 import { encryptionService } from './services/encryption.service';
+import { setupDatabaseIndexes } from './config/indexes';
 import configRoutes from './routes/config.routes';
 import v1Routes from './routes/v1';
 import { startEmailPollingJob } from './jobs/emailPolling.job';
@@ -193,6 +194,11 @@ const startServer = async () => {
 
     // Initialize encryption service
     await encryptionService.initialize();
+
+    // Setup database indexes for performance (non-blocking)
+    setupDatabaseIndexes().catch((err) =>
+      logger.warn({ error: err }, 'Index creation had warnings')
+    );
 
     // Start email polling cron job
     startEmailPollingJob();
