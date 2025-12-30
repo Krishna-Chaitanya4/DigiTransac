@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2025-12-30
+
+### Added
+- **Centralized FilterPanel component** for reusable filter UI across pages
+  - Configurable filter options (search, transaction type, account, categories, tags, date range, amount range)
+  - Inline mode with compact 400px dropdown using Popper component
+  - ClickAwayListener for better UX when clicking outside filters
+  - Collapsible advanced filters with proper state management
+  - Currency symbol support for amount range inputs
+  - Active filter indicators with clear all functionality
+  - Quick date presets (Today, Last 7 Days, Last 30 Days, This Month, etc.)
+
+### Changed
+- **Transactions page**: Integrated centralized FilterPanel component
+  - Removed ~600 lines of duplicate filter code
+  - Added separate search field next to inline Filters button
+  - Review status chips (All/Pending/Approved/Rejected) remain page-specific
+  - All filter state consolidated into single `filterValues` object
+  - Improved layout with review status, search, and filters in one compact row
+- **Analytics page**: Integrated centralized FilterPanel component  
+  - Uses inline FilterPanel without search (not needed for analytics)
+  - Filters button positioned next to Refresh and Download buttons
+  - Clean, space-efficient layout
+
+### Improved
+- **FilterPanel layout optimization**
+  - All filter fields stack vertically (full width) for compact display
+  - Fixed 400px width for dropdown panel
+  - Reduced padding and spacing for tighter layout
+  - Proper z-index layering to prevent clipping
+  - Responsive design with maxWidth constraints
+- **Code organization**
+  - Eliminated 600+ lines of duplicate filter code between pages
+  - Single source of truth for filter UI and logic
+  - Consistent filter behavior across Transactions and Analytics
+
+## [1.4.1] - Previous Release
+
 ### Added
 - **Email Parser Service comprehensive tests** (Phase 2)
   - 54 comprehensive tests covering all 10 supported banks
