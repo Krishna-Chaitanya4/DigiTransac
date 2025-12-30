@@ -503,11 +503,14 @@ const Layout: React.FC = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 2, sm: 2.5, md: 3 },
+          pb: { xs: 10, md: 3 }, // Extra padding bottom for mobile nav
           width: { md: `calc(100% - ${currentWidth}px)` },
           minHeight: '100vh',
           backgroundColor: 'background.default',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          // Optimize for touch devices
+          touchAction: 'pan-y pinch-zoom',
         }}
       >
         <Outlet />
