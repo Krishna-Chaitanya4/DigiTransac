@@ -65,7 +65,7 @@ export function parseDate(dateStr: string): Date | undefined {
       }
 
       const date = new Date(year, month, day);
-      
+
       // Verify the date is valid (handles invalid dates like Feb 31)
       if (date.getDate() !== day || date.getMonth() !== month || date.getFullYear() !== year) {
         logger.warn(`Invalid date: ${dateStr} resulted in ${date.toISOString()}`);
@@ -90,7 +90,7 @@ export function parseDate(dateStr: string): Date | undefined {
       }
 
       const date = new Date(year, month, day);
-      
+
       // Verify the date is valid
       if (date.getDate() !== day || date.getMonth() !== month || date.getFullYear() !== year) {
         logger.warn(`Invalid date: ${dateStr} resulted in ${date.toISOString()}`);
@@ -115,7 +115,7 @@ export function parseDate(dateStr: string): Date | undefined {
       }
 
       const date = new Date(year, month, day);
-      
+
       // Verify the date is valid
       if (date.getDate() !== day || date.getMonth() !== month || date.getFullYear() !== year) {
         logger.warn(`Invalid date: ${dateStr} resulted in ${date.toISOString()}`);
@@ -143,7 +143,7 @@ export function parseDate(dateStr: string): Date | undefined {
       }
 
       const date = new Date(year, month, day);
-      
+
       // Verify the date is valid
       if (date.getDate() !== day || date.getMonth() !== month || date.getFullYear() !== year) {
         logger.warn(`Invalid date: ${dateStr} resulted in ${date.toISOString()}`);

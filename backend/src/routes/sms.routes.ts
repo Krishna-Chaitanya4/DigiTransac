@@ -21,20 +21,23 @@ router.get('/supported-banks', authenticate, async (_req: AuthRequest, res: Resp
 });
 
 // Parse SMS and create pending transactions
-router.post('/parse', authenticate, asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { smsTexts } = req.body;
+router.post(
+  '/parse',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { smsTexts } = req.body;
 
-  if (!smsTexts || !Array.isArray(smsTexts)) {
-    return ApiResponse.badRequest(res, 'smsTexts array is required');
-  }
+    if (!smsTexts || !Array.isArray(smsTexts)) {
+      return ApiResponse.badRequest(res, 'smsTexts array is required');
+    }
 
-  if (smsTexts.length === 0) {
-    return ApiResponse.badRequest(res, 'At least one SMS text is required');
-  }
+    if (smsTexts.length === 0) {
+      return ApiResponse.badRequest(res, 'At least one SMS text is required');
+    }
 
-  if (smsTexts.length > 50) {
-    return ApiResponse.badRequest(res, 'Maximum 50 SMS messages allowed per batch');
-  }
+    if (smsTexts.length > 50) {
+      return ApiResponse.badRequest(res, 'Maximum 50 SMS messages allowed per batch');
+    }
 
     const userId = req.userId!;
 
@@ -42,9 +45,13 @@ router.post('/parse', authenticate, asyncHandler(async (req: AuthRequest, res: R
     const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
 
     if (parsedTransactions.length === 0) {
-      return ApiResponse.badRequest(res, 'No valid transactions found in the provided SMS messages', {
-        failedCount: smsTexts.length,
-      });
+      return ApiResponse.badRequest(
+        res,
+        'No valid transactions found in the provided SMS messages',
+        {
+          failedCount: smsTexts.length,
+        }
+      );
     }
 
     // Get existing transactions for duplicate detection
@@ -144,61 +151,72 @@ router.post('/parse', authenticate, asyncHandler(async (req: AuthRequest, res: R
       }
     }
 
-  // Return summary
-  logger.info({
-    userId,
-    total: smsTexts.length,
-    parsed: parsedTransactions.length,
-    created: savedTransactions.length,
-    duplicates: duplicates.length,
-  }, 'SMS batch parsed and saved');
+    // Return summary
+    logger.info(
+      {
+        userId,
+        total: smsTexts.length,
+        parsed: parsedTransactions.length,
+        created: savedTransactions.length,
+        duplicates: duplicates.length,
+      },
+      'SMS batch parsed and saved'
+    );
 
-  ApiResponse.created(res, {
-    summary: {
-      total: smsTexts.length,
-      parsed: parsedTransactions.length,
-      created: savedTransactions.length,
-      duplicates: duplicates.length,
-      failed: smsTexts.length - parsedTransactions.length,
-    },
-    transactions: savedTransactions,
-    duplicateDetails: duplicates.map((d) => ({
-      amount: d.amount,
-      merchant: d.merchant,
-      date: d.date,
-    })),
-  });
-}));
+    ApiResponse.created(res, {
+      summary: {
+        total: smsTexts.length,
+        parsed: parsedTransactions.length,
+        created: savedTransactions.length,
+        duplicates: duplicates.length,
+        failed: smsTexts.length - parsedTransactions.length,
+      },
+      transactions: savedTransactions,
+      duplicateDetails: duplicates.map((d) => ({
+        amount: d.amount,
+        merchant: d.merchant,
+        date: d.date,
+      })),
+    });
+  })
+);
 
 // Parse SMS without saving (preview only)
-router.post('/preview', authenticate, asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { smsTexts } = req.body;
-  const userId = req.userId!;
+router.post(
+  '/preview',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { smsTexts } = req.body;
+    const userId = req.userId!;
 
-  if (!smsTexts || !Array.isArray(smsTexts)) {
-    return ApiResponse.badRequest(res, 'smsTexts array is required');
-  }
+    if (!smsTexts || !Array.isArray(smsTexts)) {
+      return ApiResponse.badRequest(res, 'smsTexts array is required');
+    }
 
-  const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
+    const parsedTransactions = await smsParserService.parseMultipleSMS(smsTexts, userId);
 
-  const preview = parsedTransactions.map((parsed) => ({
-    amount: parsed.amount,
-    type: parsed.type,
-    merchant: parsed.merchant ? smsParserService.extractMerchant(parsed.merchant) : 'Unknown',
-    date: parsed.date,
-    accountNumber: parsed.accountNumber,
-    bankName: parsed.bankName,
-    confidence: parsed.confidence,
-    originalText: parsed.originalText,
-  }));
+    const preview = parsedTransactions.map((parsed) => ({
+      amount: parsed.amount,
+      type: parsed.type,
+      merchant: parsed.merchant ? smsParserService.extractMerchant(parsed.merchant) : 'Unknown',
+      date: parsed.date,
+      accountNumber: parsed.accountNumber,
+      bankName: parsed.bankName,
+      confidence: parsed.confidence,
+      originalText: parsed.originalText,
+    }));
 
-  logger.info({ userId, total: smsTexts.length, parsed: parsedTransactions.length }, 'SMS preview generated');
-  ApiResponse.success(res, {
-    total: smsTexts.length,
-    parsed: parsedTransactions.length,
-    failed: smsTexts.length - parsedTransactions.length,
-    transactions: preview,
-  });
-}));
+    logger.info(
+      { userId, total: smsTexts.length, parsed: parsedTransactions.length },
+      'SMS preview generated'
+    );
+    ApiResponse.success(res, {
+      total: smsTexts.length,
+      parsed: parsedTransactions.length,
+      failed: smsTexts.length - parsedTransactions.length,
+      transactions: preview,
+    });
+  })
+);
 
 export default router;

@@ -50,7 +50,11 @@ export class ApiResponse {
   /**
    * Send created response (201)
    */
-  static created<T>(res: Response, data: T, message: string = 'Resource created successfully'): void {
+  static created<T>(
+    res: Response,
+    data: T,
+    message: string = 'Resource created successfully'
+  ): void {
     this.success(res, data, message, 201);
   }
 
@@ -111,7 +115,12 @@ export class ApiResponse {
   /**
    * Common error responses
    */
-  static badRequest(res: Response, message: string = 'Bad request', details?: any, req?: any): void {
+  static badRequest(
+    res: Response,
+    message: string = 'Bad request',
+    details?: any,
+    req?: any
+  ): void {
     this.error(res, message, 400, details, req);
   }
 
@@ -127,7 +136,12 @@ export class ApiResponse {
     this.error(res, message, 404, undefined, req);
   }
 
-  static conflict(res: Response, message: string = 'Resource conflict', details?: any, req?: any): void {
+  static conflict(
+    res: Response,
+    message: string = 'Resource conflict',
+    details?: any,
+    req?: any
+  ): void {
     this.error(res, message, 409, details, req);
   }
 
@@ -139,7 +153,11 @@ export class ApiResponse {
     this.error(res, 'Internal server error', 500, error, req);
   }
 
-  static serviceUnavailable(res: Response, message: string = 'Service unavailable', req?: any): void {
+  static serviceUnavailable(
+    res: Response,
+    message: string = 'Service unavailable',
+    req?: any
+  ): void {
     this.error(res, message, 503, undefined, req);
   }
 }

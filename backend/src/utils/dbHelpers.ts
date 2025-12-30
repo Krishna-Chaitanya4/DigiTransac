@@ -92,11 +92,11 @@ export class DbHelper {
     try {
       const result = await container.updateOne(
         { id, userId },
-        { 
-          $set: { 
-            ...update, 
-            updatedAt: new Date() 
-          } 
+        {
+          $set: {
+            ...update,
+            updatedAt: new Date(),
+          },
         }
       );
       return result.modifiedCount > 0;
@@ -109,11 +109,7 @@ export class DbHelper {
   /**
    * Delete document by ID and userId
    */
-  static async deleteByIdAndUser(
-    container: any,
-    id: string,
-    userId: string
-  ): Promise<boolean> {
+  static async deleteByIdAndUser(container: any, id: string, userId: string): Promise<boolean> {
     try {
       const result = await container.deleteOne({ id, userId });
       return result.deletedCount > 0;

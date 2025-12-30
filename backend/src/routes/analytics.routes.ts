@@ -14,9 +14,11 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/analytics/overview - Get spending overview for dashboard
-router.get('/overview', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { startDate, endDate, accounts, tags, categories, compareWithPrevious } = req.query;
+router.get(
+  '/overview',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { startDate, endDate, accounts, tags, categories, compareWithPrevious } = req.query;
 
     const start = startDate
       ? new Date(startDate as string)
@@ -124,11 +126,14 @@ router.get('/overview', asyncHandler(async (req: AuthRequest, res: Response) => 
         comparison,
       },
     });
-}));
+  })
+);
 
 // GET /api/analytics/category-breakdown - Get spending by category with folder hierarchy
-router.get('/category-breakdown', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+router.get(
+  '/category-breakdown',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate
@@ -212,21 +217,27 @@ router.get('/category-breakdown', asyncHandler(async (req: AuthRequest, res: Res
     // Sort by amount descending
     breakdown.sort((a, b) => b.amount - a.amount);
 
-    logger.info({ userId, categoryCount: breakdown.length, total: totalAmount }, 'Category breakdown fetched');
+    logger.info(
+      { userId, categoryCount: breakdown.length, total: totalAmount },
+      'Category breakdown fetched'
+    );
     ApiResponse.success(res, { breakdown, total: totalAmount });
-}));
+  })
+);
 
 // GET /api/analytics/folder-breakdown - Get spending aggregated by folders
-router.get('/folder-breakdown', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { startDate, endDate } = req.query;
+router.get(
+  '/folder-breakdown',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { startDate, endDate } = req.query;
 
-  const start = startDate
-    ? new Date(startDate as string)
-    : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const end = endDate
-    ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
-    : new Date(new Date().setHours(23, 59, 59, 999));
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
 
     const expenses = await getExpensesFromTransactions(userId, start, end, 'approved');
 
@@ -300,14 +311,20 @@ router.get('/folder-breakdown', asyncHandler(async (req: AuthRequest, res: Respo
     // Sort by amount descending
     breakdown.sort((a, b) => b.amount - a.amount);
 
-    logger.info({ userId, folderCount: breakdown.length, total: totalAmount }, 'Folder breakdown fetched');
+    logger.info(
+      { userId, folderCount: breakdown.length, total: totalAmount },
+      'Folder breakdown fetched'
+    );
     ApiResponse.success(res, { breakdown, total: totalAmount });
-  }));
+  })
+);
 
 // GET /api/analytics/trends - Get spending trends over time
-router.get('/trends', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { startDate, endDate, groupBy = 'day' } = req.query;
+router.get(
+  '/trends',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { startDate, endDate, groupBy = 'day' } = req.query;
 
     const start = startDate
       ? new Date(startDate as string)
@@ -351,11 +368,14 @@ router.get('/trends', asyncHandler(async (req: AuthRequest, res: Response) => {
 
     logger.info({ userId, trendCount: trends.length, groupBy }, 'Trends fetched');
     ApiResponse.success(res, { trends, groupBy });
-}));
+  })
+);
 
 // GET /api/analytics/budget-comparison - Compare actual spending vs budgets (with folder support)
-router.get('/budget-comparison', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+router.get(
+  '/budget-comparison',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate
@@ -507,11 +527,14 @@ router.get('/budget-comparison', asyncHandler(async (req: AuthRequest, res: Resp
 
     logger.info({ userId, budgetCount: comparisons.length }, 'Budget comparison fetched');
     ApiResponse.success(res, { comparisons });
-  }));
+  })
+);
 
 // GET /api/analytics/top-expenses - Get top expenses
-router.get('/top-expenses', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+router.get(
+  '/top-expenses',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
     const { startDate, endDate, limit = '10' } = req.query;
 
     const start = startDate
@@ -544,11 +567,14 @@ router.get('/top-expenses', asyncHandler(async (req: AuthRequest, res: Response)
 
     logger.info({ userId, count: enrichedExpenses.length }, 'Top expenses fetched');
     ApiResponse.success(res, { topExpenses: enrichedExpenses });
-  }));
+  })
+);
 
 // GET /api/analytics/payment-method-breakdown - Get spending by payment method
-router.get('/payment-method-breakdown', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+router.get(
+  '/payment-method-breakdown',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
     const { startDate, endDate } = req.query;
 
     const start = startDate
@@ -598,62 +624,68 @@ router.get('/payment-method-breakdown', asyncHandler(async (req: AuthRequest, re
 
     logger.info({ userId, categoryCount: breakdown.length }, 'Category breakdown fetched');
     ApiResponse.success(res, { breakdown });
-  }));
+  })
+);
 
 // GET /api/analytics/top-merchants - Get top merchants from parsed email data
-router.get('/top-merchants', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { startDate, endDate, limit } = req.query;
+router.get(
+  '/top-merchants',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { startDate, endDate, limit } = req.query;
 
-  const start = startDate
-    ? new Date(startDate as string)
-    : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const end = endDate
-    ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
-    : new Date(new Date().setHours(23, 59, 59, 999));
-  const topLimit = limit ? parseInt(limit as string) : 10;
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate
+      ? new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      : new Date(new Date().setHours(23, 59, 59, 999));
+    const topLimit = limit ? parseInt(limit as string) : 10;
 
-  // Get all expenses first, then filter by merchantName (splits don't have merchantName)
-  const allExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
-  const expenses = allExpenses.filter((exp: any) => exp.merchantName);
+    // Get all expenses first, then filter by merchantName (splits don't have merchantName)
+    const allExpenses = await getExpensesFromTransactions(userId, start, end, 'approved');
+    const expenses = allExpenses.filter((exp: any) => exp.merchantName);
 
-  // Aggregate by merchant
-  const merchantMap = new Map<string, { amount: number; count: number }>();
+    // Aggregate by merchant
+    const merchantMap = new Map<string, { amount: number; count: number }>();
 
-  expenses.forEach((expense: any) => {
-    const merchant = expense.merchantName;
-    const current = merchantMap.get(merchant) || { amount: 0, count: 0 };
-    merchantMap.set(merchant, {
-      amount: current.amount + expense.amount,
-      count: current.count + 1,
+    expenses.forEach((expense: any) => {
+      const merchant = expense.merchantName;
+      const current = merchantMap.get(merchant) || { amount: 0, count: 0 };
+      merchantMap.set(merchant, {
+        amount: current.amount + expense.amount,
+        count: current.count + 1,
+      });
     });
-  });
 
-  const totalAmount = Array.from(merchantMap.values()).reduce((sum, m) => sum + m.amount, 0);
+    const totalAmount = Array.from(merchantMap.values()).reduce((sum, m) => sum + m.amount, 0);
 
-  const topMerchants = Array.from(merchantMap.entries())
-    .map(([merchantName, data]) => ({
-      merchantName,
-      amount: data.amount,
-      count: data.count,
-      percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
-    }))
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, topLimit);
+    const topMerchants = Array.from(merchantMap.entries())
+      .map(([merchantName, data]) => ({
+        merchantName,
+        amount: data.amount,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, topLimit);
 
-  logger.info({ userId, count: topMerchants.length }, 'Top merchants fetched');
-  ApiResponse.success(res, { topMerchants });
-}));
+    logger.info({ userId, count: topMerchants.length }, 'Top merchants fetched');
+    ApiResponse.success(res, { topMerchants });
+  })
+);
 
 // GET /api/analytics/smart-insights - Get AI-powered spending insights
-router.get('/smart-insights', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { startDate, endDate } = req.query;
+router.get(
+  '/smart-insights',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { startDate, endDate } = req.query;
 
-  const start = startDate
-    ? new Date(startDate as string)
-    : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const end = endDate ? new Date(endDate as string) : new Date();
+    const start = startDate
+      ? new Date(startDate as string)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(endDate as string) : new Date();
     end.setHours(23, 59, 59, 999);
 
     const categoriesContainer = await mongoDBService.getCategoriesContainer();
@@ -836,10 +868,11 @@ router.get('/smart-insights', asyncHandler(async (req: AuthRequest, res: Respons
         topSpendingDay: await getTopSpendingDay(currentExpenses),
       },
     };
-    
+
     logger.info({ userId }, 'Smart insights generated');
     ApiResponse.success(res, insights);
-  }));
+  })
+);
 
 // Helper function to find the day with highest spending
 async function getTopSpendingDay(expenses: any[]): Promise<{ date: string; amount: number }> {
@@ -861,47 +894,50 @@ async function getTopSpendingDay(expenses: any[]): Promise<{ date: string; amoun
 }
 
 // GET /api/analytics/review-queue-stats - Get review queue analytics
-router.get('/review-queue-stats', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+router.get(
+  '/review-queue-stats',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
 
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-  // Use aggregation to count by status efficiently
-  const [pending, approved, rejected, pendingTransactions] = await Promise.all([
-    transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'pending' }),
-    transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'approved' }),
-    transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'rejected' }),
-    transactionsContainer
-      .find({ userId, type: 'debit', reviewStatus: 'pending' })
-      .sort({ date: -1 })
-      .limit(5)
-      .toArray(),
-  ]);
+    // Use aggregation to count by status efficiently
+    const [pending, approved, rejected, pendingTransactions] = await Promise.all([
+      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'pending' }),
+      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'approved' }),
+      transactionsContainer.countDocuments({ userId, type: 'debit', reviewStatus: 'rejected' }),
+      transactionsContainer
+        .find({ userId, type: 'debit', reviewStatus: 'pending' })
+        .sort({ date: -1 })
+        .limit(5)
+        .toArray(),
+    ]);
 
-  const total = approved + rejected;
-  const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
+    const total = approved + rejected;
+    const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
-  // Get pending expenses details
-  const pendingExpensesFormatted = pendingTransactions.map((tx: any) => ({
-    id: tx.id,
-    description: tx.description,
-    amount: tx.amount,
-    date: tx.date,
-    daysSinceParsed: Math.floor(
-      (Date.now() - new Date(tx.createdAt || tx.date).getTime()) / (1000 * 60 * 60 * 24)
-    ),
-  }));
+    // Get pending expenses details
+    const pendingExpensesFormatted = pendingTransactions.map((tx: any) => ({
+      id: tx.id,
+      description: tx.description,
+      amount: tx.amount,
+      date: tx.date,
+      daysSinceParsed: Math.floor(
+        (Date.now() - new Date(tx.createdAt || tx.date).getTime()) / (1000 * 60 * 60 * 24)
+      ),
+    }));
 
-  logger.info({ userId, pending, approved, rejected }, 'Review queue stats fetched');
-  ApiResponse.success(res, {
-    stats: {
-      pending,
-      approved,
-      rejected,
-      approvalRate,
-      pendingExpenses: pendingExpensesFormatted,
-    },
-  });
-}));
+    logger.info({ userId, pending, approved, rejected }, 'Review queue stats fetched');
+    ApiResponse.success(res, {
+      stats: {
+        pending,
+        approved,
+        rejected,
+        approvalRate,
+        pendingExpenses: pendingExpensesFormatted,
+      },
+    });
+  })
+);
 
 export default router;

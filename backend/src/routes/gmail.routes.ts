@@ -274,24 +274,28 @@ router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response)
 /**
  * Get Gmail Integration Status
  */
-router.get('/status', authenticate, asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId;
+router.get(
+  '/status',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId;
 
-  const userContainer = await mongoDBService.getUsersContainer();
-  const user = await userContainer.findOne({ id: userId });
+    const userContainer = await mongoDBService.getUsersContainer();
+    const user = await userContainer.findOne({ id: userId });
 
-  if (!user || !user.emailIntegration) {
-    return ApiResponse.success(res, { connected: false });
-  }
+    if (!user || !user.emailIntegration) {
+      return ApiResponse.success(res, { connected: false });
+    }
 
-  logger.info({ userId, connected: user.emailIntegration.enabled }, 'Gmail status checked');
-  ApiResponse.success(res, {
-    connected: user.emailIntegration.enabled,
-    email: user.emailIntegration.email,
-    provider: user.emailIntegration.provider,
-    totalEmailsProcessed: user.emailIntegration.totalEmailsProcessed,
-    lastProcessedAt: user.emailIntegration.lastProcessedAt,
-  });
-}));
+    logger.info({ userId, connected: user.emailIntegration.enabled }, 'Gmail status checked');
+    ApiResponse.success(res, {
+      connected: user.emailIntegration.enabled,
+      email: user.emailIntegration.email,
+      provider: user.emailIntegration.provider,
+      totalEmailsProcessed: user.emailIntegration.totalEmailsProcessed,
+      lastProcessedAt: user.emailIntegration.lastProcessedAt,
+    });
+  })
+);
 
 export default router;

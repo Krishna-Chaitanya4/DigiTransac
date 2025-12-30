@@ -44,7 +44,7 @@ export class EmailParserService extends BaseTransactionParser {
     userId?: string
   ): Promise<ParsedTransaction | null> {
     const baseTransaction = await super.parseTransaction(
-      text, 
+      text,
       sender || '', // Empty string means no sender info, UNKNOWN means explicitly unknown
       userId || 'unknown-user',
       {
@@ -74,9 +74,7 @@ export class EmailParserService extends BaseTransactionParser {
       cardLast4: baseTransaction.cardLast4,
       transactionId: baseTransaction.transactionId,
       rawText: baseTransaction.rawText,
-      confidence: typeof baseTransaction.confidence === 'number' 
-        ? baseTransaction.confidence 
-        : 0.8, // Default numeric confidence
+      confidence: typeof baseTransaction.confidence === 'number' ? baseTransaction.confidence : 0.8, // Default numeric confidence
       tags: baseTransaction.tags,
       learnedCategoryId: baseTransaction.learnedCategoryId,
       learnedAccountId: baseTransaction.learnedAccountId,

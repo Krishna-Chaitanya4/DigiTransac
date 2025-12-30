@@ -39,9 +39,11 @@ router.use(authenticate);
  * - Search queries limited to 1000 recent transactions to prevent memory issues
  * - Users with >1000 transactions should use date filters to narrow search scope
  */
-router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const {
+router.get(
+  '/',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const {
       accountId,
       categoryId, // Deprecated: for backwards compatibility
       categoryIds, // New: multiple categories
@@ -261,103 +263,119 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
         hasMore: total > skipNum + limitNum,
       },
     });
-    logger.info({ userId, count: decryptedTransactions.length, total }, 'Transactions fetched successfully');
-}));
+    logger.info(
+      { userId, count: decryptedTransactions.length, total },
+      'Transactions fetched successfully'
+    );
+  })
+);
 
 // GET /api/transactions/:id - Get single transaction
-router.get('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
+router.get(
+  '/:id',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { id } = req.params;
 
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
-  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
-  const transaction = await DbHelper.findByIdAndUser<Transaction>(transactionsContainer, id, userId);
-  if (!transaction) {
-    return ApiResponse.notFound(res, 'Transaction not found');
-  }
+    const transaction = await DbHelper.findByIdAndUser<Transaction>(
+      transactionsContainer,
+      id,
+      userId
+    );
+    if (!transaction) {
+      return ApiResponse.notFound(res, 'Transaction not found');
+    }
 
-  // Fetch splits for this transaction
-  const splits = (await splitsContainer
-    .find({ transactionId: id })
-    .toArray()) as unknown as TransactionSplit[];
+    // Fetch splits for this transaction
+    const splits = (await splitsContainer
+      .find({ transactionId: id })
+      .toArray()) as unknown as TransactionSplit[];
 
-  // Sort splits in-memory by order
-  splits.sort((a, b) => a.order - b.order);
+    // Sort splits in-memory by order
+    splits.sort((a, b) => a.order - b.order);
 
-  // Decrypt transaction before sending to client
-  const decryptedTransaction = decryptTransaction(transaction);
+    // Decrypt transaction before sending to client
+    const decryptedTransaction = decryptTransaction(transaction);
 
-  logger.info({ userId, transactionId: id }, 'Transaction fetched successfully');
-  ApiResponse.success(res, {
-    transaction: {
-      ...decryptedTransaction,
-      splits,
-    },
-  });
-}));
+    logger.info({ userId, transactionId: id }, 'Transaction fetched successfully');
+    ApiResponse.success(res, {
+      transaction: {
+        ...decryptedTransaction,
+        splits,
+      },
+    });
+  })
+);
 
 // POST /api/transactions - Create a new transaction
-router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const {
-    type,
-    amount,
-    accountId,
-    description,
-    splits, // Array of splits
-    date,
-    isRecurring,
-    recurrencePattern,
-    source,
-    merchantName,
-    reviewStatus,
-  } = req.body;
+router.post(
+  '/',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const {
+      type,
+      amount,
+      accountId,
+      description,
+      splits, // Array of splits
+      date,
+      isRecurring,
+      recurrencePattern,
+      source,
+      merchantName,
+      reviewStatus,
+    } = req.body;
 
-  // Validation
-  if (!type || !amount || !accountId || !description) {
-    return ApiResponse.badRequest(res, 'Type, amount, accountId, and description are required');
-  }
-
-  if (type !== 'credit' && type !== 'debit') {
-    return ApiResponse.badRequest(res, 'Type must be either "credit" or "debit"');
-  }
-
-  if (amount <= 0) {
-    return ApiResponse.badRequest(res, 'Amount must be positive');
-  }
-
-  // Validate splits
-  if (!splits || !Array.isArray(splits) || splits.length === 0) {
-    return ApiResponse.badRequest(res, 'At least one split is required');
-  }
-
-  // Validate each split has required fields
-  for (const split of splits) {
-    if (!split.categoryId || !split.amount || split.amount <= 0) {
-      return ApiResponse.badRequest(res, 'Each split must have a categoryId and positive amount');
+    // Validation
+    if (!type || !amount || !accountId || !description) {
+      return ApiResponse.badRequest(res, 'Type, amount, accountId, and description are required');
     }
-  }
 
-  // Validate sum of splits equals total amount
-  const splitsTotal = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
-  if (Math.abs(splitsTotal - amount) > 0.01) {
-    // Allow for small floating point differences
-    return ApiResponse.badRequest(res, `Sum of splits (${splitsTotal}) must equal total amount (${amount})`);
-  }
+    if (type !== 'credit' && type !== 'debit') {
+      return ApiResponse.badRequest(res, 'Type must be either "credit" or "debit"');
+    }
 
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
-  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
-  const accountsContainer = await mongoDBService.getAccountsContainer();
-  const tagsContainer = await mongoDBService.getTagsContainer();
+    if (amount <= 0) {
+      return ApiResponse.badRequest(res, 'Amount must be positive');
+    }
 
-  // Verify account exists
-  const account = await accountsContainer.findOne({ id: accountId, userId });
-  if (!account) {
-    return ApiResponse.notFound(res, 'Account not found');
-  }
+    // Validate splits
+    if (!splits || !Array.isArray(splits) || splits.length === 0) {
+      return ApiResponse.badRequest(res, 'At least one split is required');
+    }
 
-  const transactionId = uuidv4();
+    // Validate each split has required fields
+    for (const split of splits) {
+      if (!split.categoryId || !split.amount || split.amount <= 0) {
+        return ApiResponse.badRequest(res, 'Each split must have a categoryId and positive amount');
+      }
+    }
+
+    // Validate sum of splits equals total amount
+    const splitsTotal = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
+    if (Math.abs(splitsTotal - amount) > 0.01) {
+      // Allow for small floating point differences
+      return ApiResponse.badRequest(
+        res,
+        `Sum of splits (${splitsTotal}) must equal total amount (${amount})`
+      );
+    }
+
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
+
+    // Verify account exists
+    const account = await accountsContainer.findOne({ id: accountId, userId });
+    if (!account) {
+      return ApiResponse.notFound(res, 'Account not found');
+    }
+
+    const transactionId = uuidv4();
 
     // Encrypt sensitive fields before storing
     const encryptedData = encryptTransaction({
@@ -433,49 +451,56 @@ router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
       );
     }
 
-  // Decrypt transaction before sending to client
-  const decryptedTransaction = decryptTransaction(newTransaction);
+    // Decrypt transaction before sending to client
+    const decryptedTransaction = decryptTransaction(newTransaction);
 
-  logger.info({ userId, transactionId, amount, type }, 'Transaction created successfully');
-  ApiResponse.created(res, {
-    transaction: {
-      ...decryptedTransaction,
-      splits: splitRecords,
-    },
-  }, 'Transaction created successfully');
-}));
+    logger.info({ userId, transactionId, amount, type }, 'Transaction created successfully');
+    ApiResponse.created(
+      res,
+      {
+        transaction: {
+          ...decryptedTransaction,
+          splits: splitRecords,
+        },
+      },
+      'Transaction created successfully'
+    );
+  })
+);
 
 // PUT /api/transactions/:id - Update a transaction
-router.put('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
-  const {
-    type,
-    amount,
-    accountId,
-    categoryId,
-    description,
-    tags,
-    paymentMethodId,
-    date,
-    isRecurring,
-    recurrencePattern,
-    merchantName,
-    reviewStatus,
-    splits, // Add splits support
-  } = req.body;
+router.put(
+  '/:id',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const {
+      type,
+      amount,
+      accountId,
+      categoryId,
+      description,
+      tags,
+      paymentMethodId,
+      date,
+      isRecurring,
+      recurrencePattern,
+      merchantName,
+      reviewStatus,
+      splits, // Add splits support
+    } = req.body;
 
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
-  const accountsContainer = await mongoDBService.getAccountsContainer();
-  const tagsContainer = await mongoDBService.getTagsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
-  const existingTransaction = (await transactionsContainer.findOne({
-    id,
-    userId,
-  })) as unknown as Transaction;
-  if (!existingTransaction) {
-    return ApiResponse.notFound(res, 'Transaction not found');
-  }
+    const existingTransaction = (await transactionsContainer.findOne({
+      id,
+      userId,
+    })) as unknown as Transaction;
+    if (!existingTransaction) {
+      return ApiResponse.notFound(res, 'Transaction not found');
+    }
 
     // If amount or type or account changed, update balances
     const oldAmount = existingTransaction.amount;
@@ -580,64 +605,78 @@ router.put('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
       }
     }
 
-  const updatedTransaction = await transactionsContainer.findOne({ id, userId });
+    const updatedTransaction = await transactionsContainer.findOne({ id, userId });
 
-  // Decrypt before sending to client
-  const decryptedTransaction = decryptTransaction(updatedTransaction as unknown as Transaction);
+    // Decrypt before sending to client
+    const decryptedTransaction = decryptTransaction(updatedTransaction as unknown as Transaction);
 
-  logger.info({ userId, transactionId: id }, 'Transaction updated successfully');
-  ApiResponse.success(res, { transaction: decryptedTransaction }, 'Transaction updated successfully');
-}));
+    logger.info({ userId, transactionId: id }, 'Transaction updated successfully');
+    ApiResponse.success(
+      res,
+      { transaction: decryptedTransaction },
+      'Transaction updated successfully'
+    );
+  })
+);
 
 // DELETE /api/transactions/:id - Delete a transaction
-router.delete('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
+router.delete(
+  '/:id',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { id } = req.params;
 
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
-  const accountsContainer = await mongoDBService.getAccountsContainer();
-  const tagsContainer = await mongoDBService.getTagsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
-  const transaction = await DbHelper.findByIdAndUser<Transaction>(transactionsContainer, id, userId);
-  if (!transaction) {
-    return ApiResponse.notFound(res, 'Transaction not found');
-  }
-
-  // Reverse transaction effect on account balance
-  const balanceChange = transaction.type === 'credit' ? -transaction.amount : transaction.amount;
-  await accountsContainer.updateOne(
-    { id: transaction.accountId, userId },
-    {
-      $inc: { balance: balanceChange },
-      $set: { updatedAt: new Date() },
+    const transaction = await DbHelper.findByIdAndUser<Transaction>(
+      transactionsContainer,
+      id,
+      userId
+    );
+    if (!transaction) {
+      return ApiResponse.notFound(res, 'Transaction not found');
     }
-  );
 
-  // Decrement tag usage counts
-  if (transaction.tags && transaction.tags.length > 0) {
-    for (const tagName of transaction.tags) {
-      await tagsContainer.updateOne({ userId, name: tagName }, { $inc: { usageCount: -1 } });
+    // Reverse transaction effect on account balance
+    const balanceChange = transaction.type === 'credit' ? -transaction.amount : transaction.amount;
+    await accountsContainer.updateOne(
+      { id: transaction.accountId, userId },
+      {
+        $inc: { balance: balanceChange },
+        $set: { updatedAt: new Date() },
+      }
+    );
+
+    // Decrement tag usage counts
+    if (transaction.tags && transaction.tags.length > 0) {
+      for (const tagName of transaction.tags) {
+        await tagsContainer.updateOne({ userId, name: tagName }, { $inc: { usageCount: -1 } });
+      }
     }
-  }
 
-  await DbHelper.deleteByIdAndUser(transactionsContainer, id, userId);
+    await DbHelper.deleteByIdAndUser(transactionsContainer, id, userId);
 
-  logger.info({ userId, transactionId: id }, 'Transaction deleted successfully');
-  ApiResponse.success(res, null, 'Transaction deleted successfully');
-}));
+    logger.info({ userId, transactionId: id }, 'Transaction deleted successfully');
+    ApiResponse.success(res, null, 'Transaction deleted successfully');
+  })
+);
 
 // POST /api/transactions/bulk - Bulk create transactions
-router.post('/bulk', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { transactions } = req.body;
+router.post(
+  '/bulk',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { transactions } = req.body;
 
-  if (!Array.isArray(transactions) || transactions.length === 0) {
-    return ApiResponse.badRequest(res, 'Transactions array is required');
-  }
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return ApiResponse.badRequest(res, 'Transactions array is required');
+    }
 
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
-  const accountsContainer = await mongoDBService.getAccountsContainer();
-  const tagsContainer = await mongoDBService.getTagsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
 
     const newTransactions: Transaction[] = [];
     const accountBalanceChanges: { [accountId: string]: number } = {};
@@ -706,31 +745,38 @@ router.post('/bulk', asyncHandler(async (req: AuthRequest, res: Response) => {
     }
 
     logger.info({ userId, count: newTransactions.length }, 'Bulk transactions created');
-    ApiResponse.created(res, { transactions: newTransactions }, `${newTransactions.length} transactions created successfully`);
-  }));
+    ApiResponse.created(
+      res,
+      { transactions: newTransactions },
+      `${newTransactions.length} transactions created successfully`
+    );
+  })
+);
 
 // DELETE /api/transactions/bulk - Bulk delete transactions
-router.delete('/bulk', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { ids } = req.body;
+router.delete(
+  '/bulk',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { ids } = req.body;
 
-  if (!Array.isArray(ids) || ids.length === 0) {
-    return ApiResponse.badRequest(res, 'Transaction IDs array is required');
-  }
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return ApiResponse.badRequest(res, 'Transaction IDs array is required');
+    }
 
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
-  const accountsContainer = await mongoDBService.getAccountsContainer();
-  const tagsContainer = await mongoDBService.getTagsContainer();
-  const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
+    const accountsContainer = await mongoDBService.getAccountsContainer();
+    const tagsContainer = await mongoDBService.getTagsContainer();
+    const splitsContainer = await mongoDBService.getTransactionSplitsContainer();
 
-  // Get all transactions to delete
-  const transactions = (await transactionsContainer
-    .find({ id: { $in: ids }, userId })
-    .toArray()) as unknown as Transaction[];
+    // Get all transactions to delete
+    const transactions = (await transactionsContainer
+      .find({ id: { $in: ids }, userId })
+      .toArray()) as unknown as Transaction[];
 
-  if (transactions.length === 0) {
-    return ApiResponse.notFound(res, 'No transactions found');
-  }
+    if (transactions.length === 0) {
+      return ApiResponse.notFound(res, 'No transactions found');
+    }
 
     // Get splits for these transactions to update tag counts
     const splits = await splitsContainer.find({ transactionId: { $in: ids }, userId }).toArray();
@@ -787,36 +833,46 @@ router.delete('/bulk', asyncHandler(async (req: AuthRequest, res: Response) => {
 
     logger.info({ userId, count: transactions.length }, 'Bulk transactions deleted');
     ApiResponse.success(res, null, `${transactions.length} transactions deleted successfully`);
-  }));
+  })
+);
 
 // GET /api/transactions/pending/count - Get count of pending transactions
-router.get('/pending/count', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
+router.get(
+  '/pending/count',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-  const count = await transactionsContainer.countDocuments({
-    userId,
-    reviewStatus: 'pending',
-  });
+    const count = await transactionsContainer.countDocuments({
+      userId,
+      reviewStatus: 'pending',
+    });
 
-  logger.info({ userId, count }, 'Pending transactions count fetched');
-  ApiResponse.success(res, { count });
-}));
+    logger.info({ userId, count }, 'Pending transactions count fetched');
+    ApiResponse.success(res, { count });
+  })
+);
 
 // PATCH /api/transactions/:id/approve - Approve a pending transaction
-router.patch('/:id/approve', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
+router.patch(
+  '/:id/approve',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-  // Find the transaction
-  const existingTransaction = await DbHelper.findByIdAndUser<Transaction>(transactionsContainer, id, userId);
+    // Find the transaction
+    const existingTransaction = await DbHelper.findByIdAndUser<Transaction>(
+      transactionsContainer,
+      id,
+      userId
+    );
 
-  if (!existingTransaction) {
-    return ApiResponse.notFound(res, 'Transaction not found');
-  }
+    if (!existingTransaction) {
+      return ApiResponse.notFound(res, 'Transaction not found');
+    }
 
-  if (existingTransaction.reviewStatus !== 'pending') {
+    if (existingTransaction.reviewStatus !== 'pending') {
       res.status(400).json({ error: 'Transaction is not pending review' });
       return;
     }
@@ -860,25 +916,32 @@ router.patch('/:id/approve', asyncHandler(async (req: AuthRequest, res: Response
 
     logger.info({ userId, transactionId: id }, 'Transaction approved successfully');
     ApiResponse.success(res, decryptTransaction(updatedTransaction));
-}));
+  })
+);
 
 // PATCH /api/transactions/:id/reject - Reject a pending transaction
-router.patch('/:id/reject', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
-  const { reason } = req.body;
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
+router.patch(
+  '/:id/reject',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { reason } = req.body;
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-  // Find the transaction
-  const existingTransaction = await DbHelper.findByIdAndUser<Transaction>(transactionsContainer, id, userId);
+    // Find the transaction
+    const existingTransaction = await DbHelper.findByIdAndUser<Transaction>(
+      transactionsContainer,
+      id,
+      userId
+    );
 
-  if (!existingTransaction) {
-    return ApiResponse.notFound(res, 'Transaction not found');
-  }
+    if (!existingTransaction) {
+      return ApiResponse.notFound(res, 'Transaction not found');
+    }
 
-  if (existingTransaction.reviewStatus !== 'pending') {
-    return ApiResponse.badRequest(res, 'Transaction is not pending review');
-  }
+    if (existingTransaction.reviewStatus !== 'pending') {
+      return ApiResponse.badRequest(res, 'Transaction is not pending review');
+    }
 
     // Update review status
     await transactionsContainer.updateOne(
@@ -900,26 +963,33 @@ router.patch('/:id/reject', asyncHandler(async (req: AuthRequest, res: Response)
 
     logger.info({ userId, transactionId: id, reason }, 'Transaction rejected successfully');
     ApiResponse.success(res, decryptTransaction(updatedTransaction));
-}));
+  })
+);
 
 // PATCH /api/transactions/:id/status - Change transaction review status (flexible endpoint)
-router.patch('/:id/status', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { id } = req.params;
-  const { status, reason } = req.body;
-  const transactionsContainer = await mongoDBService.getTransactionsContainer();
+router.patch(
+  '/:id/status',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { status, reason } = req.body;
+    const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-  // Validate status
-  const validStatuses = ['pending', 'approved', 'rejected'];
-  if (!status || !validStatuses.includes(status)) {
-    return ApiResponse.badRequest(res, 'Invalid status. Must be: pending, approved, or rejected');
-  }
+    // Validate status
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    if (!status || !validStatuses.includes(status)) {
+      return ApiResponse.badRequest(res, 'Invalid status. Must be: pending, approved, or rejected');
+    }
 
-  // Find the transaction
-  const existingTransaction = await DbHelper.findByIdAndUser<Transaction>(transactionsContainer, id, userId);
-  if (!existingTransaction) {
-    return ApiResponse.notFound(res, 'Transaction not found');
-  }
+    // Find the transaction
+    const existingTransaction = await DbHelper.findByIdAndUser<Transaction>(
+      transactionsContainer,
+      id,
+      userId
+    );
+    if (!existingTransaction) {
+      return ApiResponse.notFound(res, 'Transaction not found');
+    }
 
     // Build update object
     const updateFields: any = {
@@ -972,16 +1042,19 @@ router.patch('/:id/status', asyncHandler(async (req: AuthRequest, res: Response)
 
     logger.info({ userId, transactionId: id, status }, 'Transaction status updated successfully');
     ApiResponse.success(res, decryptTransaction(updatedTransaction));
-}));
+  })
+);
 
 // POST /api/transactions/bulk-approve - Approve multiple transactions
-router.post('/bulk-approve', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { transactionIds }: { transactionIds: string[] } = req.body;
+router.post(
+  '/bulk-approve',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { transactionIds }: { transactionIds: string[] } = req.body;
 
-  if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
-    return ApiResponse.badRequest(res, 'transactionIds array is required');
-  }
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+      return ApiResponse.badRequest(res, 'transactionIds array is required');
+    }
 
     const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
@@ -1006,16 +1079,19 @@ router.post('/bulk-approve', asyncHandler(async (req: AuthRequest, res: Response
       message: `${result.modifiedCount} transactions approved`,
       approvedCount: result.modifiedCount,
     });
-}));
+  })
+);
 
 // POST /api/transactions/bulk-reject - Reject multiple transactions
-router.post('/bulk-reject', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { transactionIds, reason }: { transactionIds: string[]; reason?: string } = req.body;
+router.post(
+  '/bulk-reject',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const { transactionIds, reason }: { transactionIds: string[]; reason?: string } = req.body;
 
-  if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
-    return ApiResponse.badRequest(res, 'transactionIds array is required');
-  }
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+      return ApiResponse.badRequest(res, 'transactionIds array is required');
+    }
 
     const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
@@ -1041,10 +1117,13 @@ router.post('/bulk-reject', asyncHandler(async (req: AuthRequest, res: Response)
       message: `${result.modifiedCount} transactions rejected`,
       rejectedCount: result.modifiedCount,
     });
-}));
+  })
+);
 
 // POST /api/transactions/transfer - Create a transfer between accounts
-router.post('/transfer', asyncHandler(async (req: AuthRequest, res: Response) => {
+router.post(
+  '/transfer',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const { fromAccountId, toAccountId, amount, date, notes } = req.body;
 
@@ -1244,22 +1323,27 @@ router.post('/transfer', asyncHandler(async (req: AuthRequest, res: Response) =>
     });
 
     logger.info({ userId, fromAccountId, toAccountId, amount }, 'Transfer created successfully');
-    ApiResponse.created(res, {
-      transfer: {
-        fromAccountId,
-        toAccountId,
-        amount,
-        date: transferDate,
-        debitTransaction: {
-          ...decryptedDebitTxn,
-          splits: [debitSplit],
-        },
-        creditTransaction: {
-          ...decryptedCreditTxn,
-          splits: [creditSplit],
+    ApiResponse.created(
+      res,
+      {
+        transfer: {
+          fromAccountId,
+          toAccountId,
+          amount,
+          date: transferDate,
+          debitTransaction: {
+            ...decryptedDebitTxn,
+            splits: [debitSplit],
+          },
+          creditTransaction: {
+            ...decryptedCreditTxn,
+            splits: [creditSplit],
+          },
         },
       },
-    }, 'Transfer created successfully');
-}));
+      'Transfer created successfully'
+    );
+  })
+);
 
 export default router;

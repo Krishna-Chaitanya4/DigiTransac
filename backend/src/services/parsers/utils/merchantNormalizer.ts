@@ -19,7 +19,10 @@ export function cleanMerchantName(merchant: string): string {
   cleaned = cleaned.replace(/\s+\d{1,2}[-/]\d{1,2}[-/]\d{2,4}/g, '');
 
   // Remove balance info (e.g., "Avl Bal:Rs.5000", "Available Balance: 5000")
-  cleaned = cleaned.replace(/\s*(?:Avl|Available)\s*(?:Bal|Balance)[:\s]*(?:Rs\.?|INR)?\s*[\d,]+\.?\d*/gi, '');
+  cleaned = cleaned.replace(
+    /\s*(?:Avl|Available)\s*(?:Bal|Balance)[:\s]*(?:Rs\.?|INR)?\s*[\d,]+\.?\d*/gi,
+    ''
+  );
 
   // Remove card references (e.g., "Card XX1234", "A/c **5678")
   cleaned = cleaned.replace(/\s*(?:Card|A\/c|Account)\s+[xX*.]{2,}\d{4}/gi, '');
@@ -28,7 +31,10 @@ export function cleanMerchantName(merchant: string): string {
   cleaned = cleaned.replace(/\s+(?:PVT|LTD|PRIVATE|LIMITED|INC|CORP|CORPORATION)\.?$/gi, '');
 
   // Remove location suffixes (e.g., "BANGALORE", "MUMBAI")
-  cleaned = cleaned.replace(/\s+(?:BANGALORE|MUMBAI|DELHI|CHENNAI|KOLKATA|HYDERABAD|PUNE|AHMEDABAD)$/gi, '');
+  cleaned = cleaned.replace(
+    /\s+(?:BANGALORE|MUMBAI|DELHI|CHENNAI|KOLKATA|HYDERABAD|PUNE|AHMEDABAD)$/gi,
+    ''
+  );
 
   // Remove excess whitespace
   cleaned = cleaned.replace(/\s+/g, ' ').trim();

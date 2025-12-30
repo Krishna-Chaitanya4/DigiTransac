@@ -301,7 +301,9 @@ class GmailPollingService {
             continue;
           }
 
-          logger.info(`Parsed transaction: ${parsedTransaction.amount} at ${parsedTransaction.merchant} (${parsedTransaction.bankName})`);
+          logger.info(
+            `Parsed transaction: ${parsedTransaction.amount} at ${parsedTransaction.merchant} (${parsedTransaction.bankName})`
+          );
 
           // Fallback hierarchy for category:
           // 1. MerchantLearning (auto-learned from approvals)

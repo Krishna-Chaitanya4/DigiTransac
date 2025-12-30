@@ -69,7 +69,7 @@ export abstract class BaseTransactionParser {
     // Clean merchant name if present
     if (transaction.merchant) {
       transaction.merchant = cleanMerchantName(transaction.merchant);
-      
+
       // Validate cleaned merchant name
       if (!isValidMerchantName(transaction.merchant)) {
         transaction.merchant = undefined;
@@ -173,9 +173,18 @@ export abstract class BaseTransactionParser {
     // Extract transaction type if not already set
     if (!extracted.type) {
       const lowerText = text.toLowerCase();
-      if (lowerText.includes('credited') || lowerText.includes('received') || lowerText.includes('deposit')) {
+      if (
+        lowerText.includes('credited') ||
+        lowerText.includes('received') ||
+        lowerText.includes('deposit')
+      ) {
         extracted.type = 'credit';
-      } else if (lowerText.includes('debited') || lowerText.includes('spent') || lowerText.includes('withdrawn') || lowerText.includes('paid')) {
+      } else if (
+        lowerText.includes('debited') ||
+        lowerText.includes('spent') ||
+        lowerText.includes('withdrawn') ||
+        lowerText.includes('paid')
+      ) {
         extracted.type = 'debit';
       }
     }
@@ -358,9 +367,7 @@ export abstract class BaseTransactionParser {
       'money credited',
     ];
 
-    const hasStrongPhrase = strongTransactionPhrases.some((phrase) =>
-      lowerText.includes(phrase)
-    );
+    const hasStrongPhrase = strongTransactionPhrases.some((phrase) => lowerText.includes(phrase));
 
     if (!hasFinancialContext && !hasStrongPhrase) {
       return false;

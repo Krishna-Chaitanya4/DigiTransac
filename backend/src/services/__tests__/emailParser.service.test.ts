@@ -72,8 +72,7 @@ describe('EmailParserService', () => {
     });
 
     it('should extract transaction ID from HDFC email', async () => {
-      const email =
-        'Rs.1000 debited at Uber on 20-Dec-25. TXN ID: ABC123456789. Card XX1234';
+      const email = 'Rs.1000 debited at Uber on 20-Dec-25. TXN ID: ABC123456789. Card XX1234';
 
       const result = await parser.parseTransaction(email, 'HDFCBK', mockUserId);
 
@@ -290,7 +289,11 @@ describe('EmailParserService', () => {
 
       const result = await parser.parseTransaction(email, 'HDFCBK', mockUserId);
 
-      expect(detectTransactionTags).toHaveBeenCalledWith('debit', expect.any(String), expect.any(String));
+      expect(detectTransactionTags).toHaveBeenCalledWith(
+        'debit',
+        expect.any(String),
+        expect.any(String)
+      );
       expect(result?.tags).toEqual(['food', 'delivery']);
     });
   });
@@ -332,12 +335,7 @@ describe('EmailParserService', () => {
 
       const result = await parser.parseTransaction(email, 'HDFCBK', mockUserId);
 
-      expect(matchAccount).toHaveBeenCalledWith(
-        mockUserId,
-        expect.anything(),
-        'HDFC Bank',
-        '1234'
-      );
+      expect(matchAccount).toHaveBeenCalledWith(mockUserId, expect.anything(), 'HDFC Bank', '1234');
       expect(result?.matchedAccountId).toBe('acc-matched-789');
     });
 
@@ -355,8 +353,7 @@ describe('EmailParserService', () => {
 
   describe('Confidence Scoring', () => {
     it('should calculate high confidence with all details', async () => {
-      const email =
-        'Rs.1000.00 spent on HDFC Card XX1234 at AMAZON on 20-Dec-25. TXN: ABC123';
+      const email = 'Rs.1000.00 spent on HDFC Card XX1234 at AMAZON on 20-Dec-25. TXN: ABC123';
 
       const result = await parser.parseTransaction(email, 'HDFCBK', mockUserId);
 

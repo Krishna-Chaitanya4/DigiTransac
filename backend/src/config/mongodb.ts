@@ -31,8 +31,9 @@ class MongoDBService {
         process.env.MONGODB_DATABASE_NAME || process.env.COSMOS_DATABASE_NAME || 'DigiTransacDB';
 
       // Azure Document DB optimized settings
-      const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-      
+      const isDevelopment =
+        process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
       // Initialize MongoDB client with secure options and connection pooling
       this.client = new MongoClient(connectionString, {
         tls: true,
@@ -73,9 +74,10 @@ class MongoDBService {
         '✅ All MongoDB collections are ready'
       );
     } catch (error) {
-      const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+      const isDevelopment =
+        process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
       logger.error({ error }, 'Failed to initialize MongoDB');
-      
+
       if (isDevelopment) {
         logger.warn('💡 Troubleshooting tips for Azure Document DB connection:');
         logger.warn('   1. Check if your IP is whitelisted in Azure Document DB firewall');
@@ -83,7 +85,7 @@ class MongoDBService {
         logger.warn('   3. Ensure Azure Document DB instance is running');
         logger.warn('   4. Check VPN/network connectivity to Azure');
       }
-      
+
       throw error;
     }
   }

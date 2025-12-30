@@ -18,10 +18,10 @@ export async function setupDatabaseIndexes(): Promise<void> {
       transactionsContainer.createIndex({ userId: 1, accountId: 1, date: -1 }),
       transactionsContainer.createIndex({ userId: 1, categoryId: 1, date: -1 }),
       transactionsContainer.createIndex({ userId: 1, reviewStatus: 1, date: -1 }),
-      
+
       // Unique constraint
       transactionsContainer.createIndex({ id: 1, userId: 1 }, { unique: true }),
-      
+
       // Full-text search (if needed)
       // transactionsContainer.createIndex({ description: 'text', merchant: 'text' }),
     ]);

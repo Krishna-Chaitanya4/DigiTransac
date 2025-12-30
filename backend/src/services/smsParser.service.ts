@@ -31,7 +31,7 @@ export class SMSParserService extends BaseTransactionParser {
     senderOrUserId?: string,
     userIdOptional?: string
   ): Promise<ParsedTransaction | null> {
-    // Handle backward compatibility: 
+    // Handle backward compatibility:
     // - parseSMS(text) - no auth, detect sender
     // - parseSMS(text, userId) - auth, detect sender
     // - parseSMS(text, sender, userId) - full explicit
@@ -174,7 +174,10 @@ export class SMSParserService extends BaseTransactionParser {
           if (parsed.merchant && existingTxn.description) {
             const normalizedParsed = parsed.merchant.toLowerCase();
             const normalizedExisting = existingTxn.description.toLowerCase();
-            if (normalizedExisting.includes(normalizedParsed) || normalizedParsed.includes(normalizedExisting)) {
+            if (
+              normalizedExisting.includes(normalizedParsed) ||
+              normalizedParsed.includes(normalizedExisting)
+            ) {
               return true;
             }
           } else {

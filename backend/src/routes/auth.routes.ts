@@ -216,19 +216,23 @@ router.post(
 );
 
 // POST /api/auth/refresh - Generate new JWT token
-router.post('/refresh', authenticate, asyncHandler(async (req: any, res: Response) => {
-  // User is already authenticated via middleware
-  const userId = req.userId;
-  const email = req.user?.email;
+router.post(
+  '/refresh',
+  authenticate,
+  asyncHandler(async (req: any, res: Response) => {
+    // User is already authenticated via middleware
+    const userId = req.userId;
+    const email = req.user?.email;
 
-  // Generate new JWT token with secret from Key Vault
-  const jwtSecret = await getJWTSecret();
-  const token = jwt.sign({ userId, email }, jwtSecret, {
-    expiresIn: process.env.JWT_EXPIRE || '7d',
-  } as jwt.SignOptions);
+    // Generate new JWT token with secret from Key Vault
+    const jwtSecret = await getJWTSecret();
+    const token = jwt.sign({ userId, email }, jwtSecret, {
+      expiresIn: process.env.JWT_EXPIRE || '7d',
+    } as jwt.SignOptions);
 
-  logger.info({ userId, email }, 'Token refreshed successfully');
-  ApiResponse.success(res, { token }, 'Token refreshed successfully');
-}));
+    logger.info({ userId, email }, 'Token refreshed successfully');
+    ApiResponse.success(res, { token }, 'Token refreshed successfully');
+  })
+);
 
 export default router;

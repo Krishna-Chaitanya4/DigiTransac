@@ -21,18 +21,18 @@ export interface ParsedTransaction {
   merchant?: string;
   date?: Date;
   bankName?: string;
-  
+
   // Channel-specific fields
   cardLast4?: string; // Email: card transactions
   accountNumber?: string; // SMS: account-based transactions
   transactionId?: string; // Email: TXN ID, REF
   referenceNumber?: string; // SMS: reference number
-  
+
   // Metadata
   rawText: string;
   confidence: number | ConfidenceLevel; // Number (0-1) or level string
   originalText?: string; // Alias for rawText (for SMS compatibility)
-  
+
   // Integration fields
   tags?: string[]; // Auto-detected tags
   learnedCategoryId?: string; // Auto-filled from learning
