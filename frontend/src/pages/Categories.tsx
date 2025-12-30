@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
+import { api } from '../services/api';
 import {
   Typography,
   Box,
@@ -43,8 +44,16 @@ import {
   UnfoldLess as CollapseAllIcon,
   Clear as ClearIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
+import {
+  useCategoryStats,
+  useCreateCategory,
+  useUpdateCategory,
+  useDeleteCategory,
+  useTags,
+  useCreateTag,
+  useUpdateTag,
+  useDeleteTag,
+} from '../hooks/useApi';
 
 interface Category {
   id: string;
@@ -79,22 +88,34 @@ interface Tag {
 }
 
 const Categories: React.FC = () => {
-  const { token } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
 
+  // React Query hooks
+  const { data: categoryStatsData, isLoading: loading, error: categoryError } = useCategoryStats();
+  const { data: tagsData, isLoading: tagsLoading } = useTags();
+  const createCategory = useCreateCategory();
+  const updateCategory = useUpdateCategory();
+  const deleteCategory = useDeleteCategory();
+  const createTag = useCreateTag();
+  const updateTag = useUpdateTag();
+  const deleteTag = useDeleteTag();
+
+  // Extract data from React Query responses
+  const categories = categoryStatsData?.data?.categories || [];
+  const tags = tagsData?.data?.tags || [];
+  const error = categoryError ? (categoryError as any).message || 'Failed to fetch categories' : '';
+
+  // Local error state for UI alerts
+  const [localError, setLocalError] = useState('');
+
   // Category state
-  const [categories, setCategories] = useState<Category[]>([]);
   const [treeData, setTreeData] = useState<CategoryNode[]>([]);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [parentForNew, setParentForNew] = useState<Category | null>(null);
 
   // Tag state
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
   const [openTagDialog, setOpenTagDialog] = useState(false);
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [tagFormData, setTagFormData] = useState({
@@ -146,11 +167,6 @@ const Categories: React.FC = () => {
     parentId: null as string | null,
   });
 
-  useEffect(() => {
-    fetchCategories();
-    fetchTags(); // Fetch tags on page load for accurate count
-  }, []);
-
   // Debounce search query (performance optimization - industry standard)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -174,31 +190,7 @@ const Categories: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, debouncedSearchQuery, filterType, sortBy]);
 
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      // Fetch categories with usage statistics
-      const response = await axios.get(`/api/categories/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // Normalize data: ensure all categories have required fields
-      const normalizedCategories = (response.data.categories || []).map((cat: any) => ({
-        ...cat,
-        path: cat.path || [], // Ensure path is always an array
-        transactionCount: cat.transactionCount || 0,
-        lastUsed: cat.lastUsed || null,
-        totalAmount: cat.totalAmount || 0,
-      }));
-
-      setCategories(normalizedCategories);
-      setError('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch categories');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Remove old fetchCategories function - React Query handles this
 
   const buildTree = useCallback(() => {
     if (categories.length === 0) {
@@ -208,7 +200,7 @@ const Categories: React.FC = () => {
     // If searching, show flattened list with breadcrumbs (industry standard)
     if (debouncedSearchQuery) {
       // Find all categories that match the search query and type filter
-      const matchingCategories = categories.filter((cat) => {
+      const matchingCategories = categories.filter((cat: Category) => {
         const matchesSearch = cat.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
         const matchesType =
           filterType === 'all' ||
@@ -218,7 +210,7 @@ const Categories: React.FC = () => {
       });
 
       // Sort matching categories
-      const sorted = matchingCategories.sort((a, b) => {
+      const sorted = matchingCategories.sort((a: Category, b: Category) => {
         if (sortBy === 'usage') {
           return (b.transactionCount || 0) - (a.transactionCount || 0);
         } else if (sortBy === 'recent') {
@@ -232,7 +224,7 @@ const Categories: React.FC = () => {
       });
 
       // Convert to flat list (no tree structure when searching)
-      const flatList: CategoryNode[] = sorted.map((cat) => ({
+      const flatList: CategoryNode[] = sorted.map((cat: Category) => ({
         ...cat,
         children: [],
         level: 0, // All at same level in flat list
@@ -243,7 +235,7 @@ const Categories: React.FC = () => {
       setExpandedNodes(new Set()); // No expansion needed in flat view
     } else {
       // Normal view: filter by type only
-      let filtered = categories.filter((cat) => {
+      let filtered = categories.filter((cat: Category) => {
         const matchesType =
           filterType === 'all' ||
           (filterType === 'folder' && cat.isFolder) ||
@@ -252,7 +244,7 @@ const Categories: React.FC = () => {
       });
 
       // Sort categories
-      filtered = filtered.sort((a, b) => {
+      filtered = filtered.sort((a: Category, b: Category) => {
         if (sortBy === 'usage') {
           return (b.transactionCount || 0) - (a.transactionCount || 0);
         } else if (sortBy === 'recent') {
@@ -267,12 +259,12 @@ const Categories: React.FC = () => {
 
       const nodeMap = new Map<string, CategoryNode>();
 
-      filtered.forEach((cat) => {
+      filtered.forEach((cat: Category) => {
         nodeMap.set(cat.id, { ...cat, children: [], level: cat.path.length, isMatch: false });
       });
 
       const roots: CategoryNode[] = [];
-      filtered.forEach((cat) => {
+      filtered.forEach((cat: Category) => {
         const node = nodeMap.get(cat.id)!;
         if (cat.parentId && nodeMap.has(cat.parentId)) {
           const parent = nodeMap.get(cat.parentId)!;
@@ -284,7 +276,7 @@ const Categories: React.FC = () => {
 
       // Sort children recursively
       const sortNodes = (nodes: CategoryNode[]) => {
-        nodes.sort((a, b) => {
+        nodes.sort((a: CategoryNode, b: CategoryNode) => {
           if (sortBy === 'usage') {
             return (b.transactionCount || 0) - (a.transactionCount || 0);
           } else if (sortBy === 'recent') {
@@ -295,7 +287,7 @@ const Categories: React.FC = () => {
           if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
           return a.name.localeCompare(b.name);
         });
-        nodes.forEach((node) => {
+        nodes.forEach((node: CategoryNode) => {
           if (node.children.length > 0) sortNodes(node.children);
         });
       };
@@ -319,7 +311,7 @@ const Categories: React.FC = () => {
 
   const handleExpandAll = useCallback(() => {
     const allFolderIds = new Set<string>();
-    categories.forEach((cat) => {
+    categories.forEach((cat: Category) => {
       if (cat.isFolder) allFolderIds.add(cat.id);
     });
     setExpandedNodes(allFolderIds);
@@ -343,10 +335,10 @@ const Categories: React.FC = () => {
     (category: Category): string => {
       if (!category.parentId) return '';
       const path: string[] = [];
-      let current = categories.find((c) => c.id === category.parentId);
+      let current = categories.find((c: Category) => c.id === category.parentId);
       while (current) {
         path.unshift(current.name);
-        current = categories.find((c) => c.id === current!.parentId);
+        current = categories.find((c: Category) => c.id === current!.parentId);
       }
       return path.join(' > ');
     },
@@ -412,28 +404,24 @@ const Categories: React.FC = () => {
   const handleSubmit = async () => {
     try {
       if (editingCategory) {
-        await axios.put(
-          `/api/categories/${editingCategory.id}`,
-          {
+        await updateCategory.mutateAsync({
+          id: editingCategory.id,
+          data: {
             name: formData.name,
             color: formData.color,
             parentId: formData.parentId,
           },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        });
       } else {
-        await axios.post(
-          `/api/categories`,
-          { ...formData, parentId: formData.parentId },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await createCategory.mutateAsync({
+          ...formData,
+          parentId: formData.parentId,
+        });
       }
-      fetchCategories();
       handleCloseDialog();
     } catch (err: any) {
       console.error('Error saving category:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to save category';
-      setError(errorMessage);
+      // Error is handled by React Query mutation hooks
     }
   };
 
@@ -443,31 +431,15 @@ const Categories: React.FC = () => {
     }
 
     try {
-      await axios.delete(`/api/categories/${category.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchCategories();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete category');
+      await deleteCategory.mutateAsync(category.id);
+    } catch {
+      // Error is handled by React Query mutation hooks
     }
   };
 
   // ============= TAG MANAGEMENT FUNCTIONS =============
 
-  const fetchTags = async () => {
-    try {
-      setTagsLoading(true);
-      const response = await axios.get('/api/tags', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTags(response.data.tags || response.data);
-    } catch (err: any) {
-      console.error('Error fetching tags:', err);
-      setError('Failed to fetch tags');
-    } finally {
-      setTagsLoading(false);
-    }
-  };
+  // Remove old fetchTags function - React Query handles this
 
   const handleOpenTagDialog = (tag?: Tag) => {
     if (tag) {
@@ -497,26 +469,18 @@ const Categories: React.FC = () => {
 
   const handleSubmitTag = async () => {
     if (!tagFormData.name.trim()) {
-      setError('Tag name is required');
       return;
     }
 
     try {
       if (editingTag) {
-        await axios.put(`/api/tags/${editingTag.id}`, tagFormData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await updateTag.mutateAsync({ id: editingTag.id, data: tagFormData });
       } else {
-        await axios.post('/api/tags', tagFormData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await createTag.mutateAsync(tagFormData);
       }
       handleCloseTagDialog();
-      fetchTags();
     } catch (err: any) {
       console.error('Error saving tag:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to save tag';
-      setError(errorMessage);
     }
   };
 
@@ -531,18 +495,15 @@ const Categories: React.FC = () => {
     setReplaceTagId('');
 
     try {
-      const response = await axios.get(`/api/tags/${tag.id}/usage`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get(`/api/tags/${tag.id}/usage`);
 
       setDeleteTagDialog({
         open: true,
         tag,
-        usage: response.data.usage,
+        usage: response.usage,
         loading: false,
       });
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to check tag usage');
+    } catch {
       setDeleteTagDialog({
         open: false,
         tag: null,
@@ -556,9 +517,7 @@ const Categories: React.FC = () => {
     if (!deleteTagDialog.tag) return;
 
     try {
-      await axios.delete(`/api/tags/${deleteTagDialog.tag.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await deleteTag.mutateAsync(deleteTagDialog.tag.id);
 
       setDeleteTagDialog({
         open: false,
@@ -566,9 +525,8 @@ const Categories: React.FC = () => {
         usage: null,
         loading: false,
       });
-      fetchTags();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete tag');
+      console.error('Error deleting tag:', err);
     }
   };
 
@@ -576,11 +534,9 @@ const Categories: React.FC = () => {
     if (!deleteTagDialog.tag || !replaceTagId) return;
 
     try {
-      const response = await axios.post(
-        `/api/tags/${deleteTagDialog.tag.id}/replace`,
-        { replacementTagId: replaceTagId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.post(`/api/tags/${deleteTagDialog.tag.id}/replace`, {
+        replacementTagId: replaceTagId,
+      });
 
       setDeleteTagDialog({
         open: false,
@@ -589,15 +545,8 @@ const Categories: React.FC = () => {
         loading: false,
       });
       setReplaceTagId('');
-      fetchTags();
-
-      // Show success message
-      setError(''); // Clear any previous errors
-      setTimeout(() => {
-        setError(response.data.message);
-      }, 100);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to replace tag');
+      console.error('Error replacing tag:', err);
     }
   };
 
@@ -608,11 +557,11 @@ const Categories: React.FC = () => {
     // Search filter
     if (debouncedTagSearchQuery) {
       const searchLower = debouncedTagSearchQuery.toLowerCase();
-      filtered = filtered.filter((tag) => tag.name.toLowerCase().includes(searchLower));
+      filtered = filtered.filter((tag: Tag) => tag.name.toLowerCase().includes(searchLower));
     }
 
     // Sort
-    filtered.sort((a, b) => {
+    filtered.sort((a: Tag, b: Tag) => {
       if (tagSortBy === 'name') {
         return a.name.localeCompare(b.name);
       } else if (tagSortBy === 'usage') {
@@ -631,7 +580,7 @@ const Categories: React.FC = () => {
   // ============= END TAG MANAGEMENT FUNCTIONS =============
 
   const renderTree = (nodes: CategoryNode[]) => {
-    return nodes.map((node) => (
+    return nodes.map((node: CategoryNode) => (
       <Box key={node.id} onContextMenu={(e) => handleContextMenu(e, node)}>
         {/* Tree Node */}
         <Box
@@ -920,11 +869,15 @@ const Categories: React.FC = () => {
                 >
                   {categories.length + tags.length}{' '}
                   {categories.length + tags.length === 1 ? 'item' : 'items'} •{' '}
-                  {categories.filter((c) => c.isFolder).length}{' '}
-                  {categories.filter((c) => c.isFolder).length === 1 ? 'folder' : 'folders'} •{' '}
-                  {categories.filter((c) => !c.isFolder).length}{' '}
-                  {categories.filter((c) => !c.isFolder).length === 1 ? 'category' : 'categories'} •{' '}
-                  {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
+                  {categories.filter((c: Category) => c.isFolder).length}{' '}
+                  {categories.filter((c: Category) => c.isFolder).length === 1
+                    ? 'folder'
+                    : 'folders'}{' '}
+                  • {categories.filter((c: Category) => !c.isFolder).length}{' '}
+                  {categories.filter((c: Category) => !c.isFolder).length === 1
+                    ? 'category'
+                    : 'categories'}{' '}
+                  • {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
@@ -1027,8 +980,14 @@ const Categories: React.FC = () => {
       </Fade>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError('')}>
           {error}
+        </Alert>
+      )}
+
+      {localError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError('')}>
+          {localError}
         </Alert>
       )}
 
@@ -1192,8 +1151,14 @@ const Categories: React.FC = () => {
           </Fade>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError('')}>
               {error}
+            </Alert>
+          )}
+
+          {localError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError('')}>
+              {localError}
             </Alert>
           )}
 
@@ -1345,7 +1310,7 @@ const Categories: React.FC = () => {
                     <em>Root Level (No Parent)</em>
                   </MenuItem>
                   {categories
-                    .filter((cat) => {
+                    .filter((cat: Category) => {
                       // Only show folders
                       if (!cat.isFolder) return false;
                       // When editing, exclude self and descendants to prevent circular refs
@@ -1355,7 +1320,7 @@ const Categories: React.FC = () => {
                       }
                       return true;
                     })
-                    .map((folder) => (
+                    .map((folder: Category) => (
                       <MenuItem key={folder.id} value={folder.id}>
                         {'  '.repeat(folder.path?.length || 0)} 📁 {folder.name}
                       </MenuItem>
@@ -1408,7 +1373,7 @@ const Categories: React.FC = () => {
                         '#ec4899',
                         '#f43f5e',
                         '#64748b',
-                      ].map((presetColor) => (
+                      ].map((presetColor: string) => (
                         <Box
                           key={presetColor}
                           onClick={() => setFormData({ ...formData, color: presetColor })}
@@ -1700,7 +1665,7 @@ const Categories: React.FC = () => {
                 gap: 2,
               }}
             >
-              {getFilteredAndSortedTags().map((tag) => (
+              {getFilteredAndSortedTags().map((tag: Tag) => (
                 <Fade in key={tag.id}>
                   <Card
                     sx={{
@@ -1843,7 +1808,7 @@ const Categories: React.FC = () => {
                   '#ec4899',
                   '#f43f5e',
                   '#64748b',
-                ].map((presetColor) => (
+                ].map((presetColor: string) => (
                   <Box
                     key={presetColor}
                     onClick={() => setTagFormData({ ...tagFormData, color: presetColor })}
@@ -2057,7 +2022,7 @@ const Categories: React.FC = () => {
                       {deleteTagDialog.usage.budgets !== 1 ? 's' : ''}:
                     </Typography>
                     <Box sx={{ pl: 2 }}>
-                      {deleteTagDialog.usage.budgetNames.map((name) => (
+                      {deleteTagDialog.usage.budgetNames.map((name: string) => (
                         <Typography
                           key={name}
                           variant="caption"
@@ -2107,8 +2072,8 @@ const Categories: React.FC = () => {
                     Select a tag...
                   </MenuItem>
                   {tags
-                    .filter((t) => t.id !== deleteTagDialog.tag?.id)
-                    .map((tag) => (
+                    .filter((t: Tag) => t.id !== deleteTagDialog.tag?.id)
+                    .map((tag: Tag) => (
                       <MenuItem key={tag.id} value={tag.id}>
                         <Box display="flex" alignItems="center" gap={1}>
                           <Box

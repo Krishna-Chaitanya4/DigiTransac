@@ -45,6 +45,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import { useAuth } from '../context/AuthContext';
+import { ROUTE_PATHS } from '../config/routes.config';
 import { detectCurrency, availableCurrencies } from '../utils/currencyDetection';
 import { detectCountry } from '../utils/countryDetection';
 
@@ -320,7 +321,7 @@ const Register: React.FC = () => {
       }
 
       await register(registerData);
-      navigate('/dashboard');
+      navigate(ROUTE_PATHS.DASHBOARD);
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {

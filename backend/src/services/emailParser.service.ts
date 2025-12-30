@@ -1,10 +1,17 @@
-﻿import { detectTransactionTags } from '../utils/transactionTags';
-import { getLearnedMapping } from './merchantLearning.service';
-import { normalizeMerchantName, matchAccount } from '../utils/accountMatcher';
-import { mongoDBService } from '../config/mongodb';
+/**
+ * Email Parser Service
+ * Parses bank transaction emails using centralized base parser
+ * Extends BaseTransactionParser for email-specific logic
+ */
+
+import { BaseTransactionParser } from './parsers/base/BaseTransactionParser';
 import { logger } from '../utils/logger';
 
-interface ParsedTransaction {
+/**
+ * Email-specific parsed transaction with required fields
+ * Compatible with existing email routes
+ */
+export interface ParsedTransaction {
   amount: number;
   merchant: string;
   date: Date;
@@ -13,443 +20,217 @@ interface ParsedTransaction {
   transactionId?: string;
   rawText: string;
   confidence: number;
-  tags?: string[]; // Auto-detected tags
-  learnedCategoryId?: string; // Auto-filled from learning
-  learnedAccountId?: string; // Auto-filled from learning
-  matchedAccountId?: string; // Auto-matched from email account info
+  tags?: string[];
+  learnedCategoryId?: string;
+  learnedAccountId?: string;
+  matchedAccountId?: string;
 }
 
-// Top 10 Indian Bank SMS Patterns
-const BANK_PATTERNS = [
-  {
-    name: 'HDFC Bank',
-    senders: ['HDFCBK', 'HDFC'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent|paid).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+?)(?:\s+on|\s+at|\s*\.|\s+Avl)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-      {
-        regex:
-          /(?:debited|spent).*?(?:Rs\.?|INR)\s*([\d,]+\.?\d*).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}-[A-Z][a-z]{2}-\d{2,4})/i,
-  },
-  {
-    name: 'ICICI Bank',
-    senders: ['ICICIB', 'ICICI'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:spent|debited).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+?)(?:\s+on|\.|Card)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}\/\d{2}\/\d{4})/,
-  },
-  {
-    name: 'SBI',
-    senders: ['SBIIN', 'SBI'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|withdrawn).*?(?:at|from)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}-\d{2}-\d{4})/,
-  },
-  {
-    name: 'Axis Bank',
-    senders: ['AXISBK', 'AXIS'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:spent|debited).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}\/\d{2}\/\d{2})/,
-  },
-  {
-    name: 'Kotak Bank',
-    senders: ['KOTAKB', 'KOTAK'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}-\d{2}-\d{4})/,
-  },
-  {
-    name: 'PNB',
-    senders: ['PNBSMS', 'PNB'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}\/\d{2}\/\d{4})/,
-  },
-  {
-    name: 'Bank of Baroda',
-    senders: ['BOBIN', 'BOB'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}-\d{2}-\d{4})/,
-  },
-  {
-    name: 'Canara Bank',
-    senders: ['CANBNK', 'CANARA'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}\/\d{2}\/\d{4})/,
-  },
-  {
-    name: 'Union Bank',
-    senders: ['UBOI', 'UNION'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}-\d{2}-\d{4})/,
-  },
-  {
-    name: 'IDBI Bank',
-    senders: ['IDBIBN', 'IDBI'],
-    patterns: [
-      {
-        regex:
-          /(?:Rs|INR)\s*([\d,]+\.?\d*)\s*(?:debited|spent).*?(?:at|on)\s*([A-Z][A-Za-z0-9\s&-]+)/i,
-        amountGroup: 1,
-        merchantGroup: 2,
-      },
-    ],
-    cardPattern: /XX(\d{4})/,
-    datePattern: /(\d{2}\/\d{2}\/\d{4})/,
-  },
-];
-
-export class EmailParserService {
+/**
+ * Email-specific transaction parser
+ * Inherits common parsing logic from BaseTransactionParser
+ */
+export class EmailParserService extends BaseTransactionParser {
   /**
-   * Parse transaction SMS/email text
+   * Parse transaction from email text
+   * @param text - Email body text
+   * @param sender - Email sender (e.g., 'HDFCBK', 'ICICIB') - optional
+   * @param userId - User ID for learning and matching - optional
+   * @returns Parsed transaction or null if parsing fails
    */
-  public async parseTransaction(
+  override async parseTransaction(
     text: string,
     sender?: string,
     userId?: string
   ): Promise<ParsedTransaction | null> {
-    // Try to identify bank from sender or text
-    const bank = this.identifyBank(text, sender);
+    const baseTransaction = await super.parseTransaction(
+      text,
+      sender || '', // Empty string means no sender info, UNKNOWN means explicitly unknown
+      userId || 'unknown-user',
+      {
+        enableLearning: !!userId, // Only enable if userId provided
+        enableTagging: !!userId,
+        enableAccountMatching: !!userId,
+      }
+    );
 
-    if (!bank) {
-      logger.debug({ text: text.substring(0, 100) }, 'Could not identify bank from text');
+    if (!baseTransaction) {
       return null;
     }
 
-    // Try each pattern for this bank
-    for (const pattern of bank.patterns) {
-      const match = text.match(pattern.regex);
-
-      if (match) {
-        try {
-          // Extract amount
-          const amountStr = match[pattern.amountGroup].replace(/,/g, '');
-          const amount = parseFloat(amountStr);
-
-          if (isNaN(amount) || amount <= 0) {
-            continue;
-          }
-
-          // Extract merchant
-          let merchant = match[pattern.merchantGroup].trim();
-          merchant = this.cleanMerchantName(merchant);
-
-          // Normalize merchant name for consistency
-          const normalizedMerchant = normalizeMerchantName(merchant);
-
-          // Extract card last 4 digits
-          const cardMatch = text.match(bank.cardPattern);
-          const cardLast4 = cardMatch ? cardMatch[1] : undefined;
-
-          // Extract date
-          const dateMatch = text.match(bank.datePattern);
-          const date = dateMatch ? this.parseDate(dateMatch[1]) : new Date();
-
-          // Extract transaction ID if present
-          const transactionId = this.extractTransactionId(text);
-
-          // Auto-detect and assign tags (email transactions are typically debits)
-          const tagDetection = detectTransactionTags('debit', text, normalizedMerchant);
-
-          // Check if we have learned category/account for this merchant
-          let learnedCategoryId: string | undefined;
-          let learnedAccountId: string | undefined;
-
-          if (userId && normalizedMerchant) {
-            const learned = await getLearnedMapping(userId, normalizedMerchant);
-            if (learned) {
-              learnedCategoryId = learned.categoryId;
-              learnedAccountId = learned.accountId;
-            }
-          }
-
-          // Match email account info to user's accounts
-          let matchedAccountId: string | undefined;
-
-          if (userId && (bank.name || cardLast4)) {
-            try {
-              const accountsContainer = await mongoDBService.getAccountsContainer();
-              matchedAccountId =
-                (await matchAccount(userId, accountsContainer as any, bank.name, cardLast4)) ||
-                undefined;
-            } catch {
-              // Account matching failed, continue without it
-            }
-          }
-
-          return {
-            amount,
-            merchant: normalizedMerchant,
-            date,
-            bankName: bank.name,
-            cardLast4,
-            transactionId,
-            rawText: text,
-            confidence: this.calculateConfidence(amount, normalizedMerchant, bank.name),
-            tags: tagDetection.tags,
-            learnedCategoryId,
-            learnedAccountId,
-            matchedAccountId,
-          };
-        } catch (error) {
-          logger.error(error, 'Error parsing transaction');
-          continue;
-        }
-      }
+    // Validate required fields for email transactions
+    // Amount, merchant, and bankName are required; date is optional
+    if (!baseTransaction.merchant || !baseTransaction.bankName) {
+      logger.warn('Email transaction missing required fields');
+      return null;
     }
 
-    logger.debug({ bankName: bank.name }, 'No pattern matched for bank');
-    return null;
-  }
-
-  /**
-   * Identify bank from sender or text content
-   */
-  private identifyBank(text: string, sender?: string): (typeof BANK_PATTERNS)[0] | null {
-    const searchText = (sender || '') + ' ' + text;
-
-    for (const bank of BANK_PATTERNS) {
-      for (const senderPattern of bank.senders) {
-        if (searchText.toUpperCase().includes(senderPattern)) {
-          return bank;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Clean merchant name
-   */
-  private cleanMerchantName(merchant: string): string {
-    // Remove common suffixes
-    merchant = merchant
-      .replace(/\s+(PVT\.?|LTD\.?|LIMITED|INC\.?|CORP\.?)$/i, '')
-      .replace(/\s+ON\s+\d{2}.*$/i, '')
-      .replace(/\s+AT\s+\d{2}.*$/i, '')
-      .trim();
-
-    // Capitalize properly
-    merchant = merchant
-      .toLowerCase()
-      .split(' ')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-
-    return merchant;
-  }
-
-  /**
-   * Parse date from various formats
-   */
-  private parseDate(dateStr: string): Date {
-    // Handle DD-MMM-YY or DD-MMM-YYYY
-    const monthMap: { [key: string]: number } = {
-      jan: 0,
-      feb: 1,
-      mar: 2,
-      apr: 3,
-      may: 4,
-      jun: 5,
-      jul: 6,
-      aug: 7,
-      sep: 8,
-      oct: 9,
-      nov: 10,
-      dec: 11,
+    // Convert base transaction to email-specific format
+    const emailTransaction: ParsedTransaction = {
+      amount: baseTransaction.amount,
+      merchant: baseTransaction.merchant,
+      date: baseTransaction.date || new Date(), // Default to current date if not parsed
+      bankName: baseTransaction.bankName,
+      cardLast4: baseTransaction.cardLast4,
+      transactionId: baseTransaction.transactionId,
+      rawText: baseTransaction.rawText,
+      confidence: typeof baseTransaction.confidence === 'number' ? baseTransaction.confidence : 0.8, // Default numeric confidence
+      tags: baseTransaction.tags,
+      learnedCategoryId: baseTransaction.learnedCategoryId,
+      learnedAccountId: baseTransaction.learnedAccountId,
+      matchedAccountId: baseTransaction.matchedAccountId,
     };
 
-    const match = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{2,4})/i);
-    if (match) {
-      const day = parseInt(match[1]);
-      const month = monthMap[match[2].toLowerCase()];
-      let year = parseInt(match[3]);
-
-      // Handle 2-digit year
-      if (year < 100) {
-        year += 2000;
-      }
-
-      return new Date(year, month, day);
-    }
-
-    // Handle DD/MM/YYYY or DD-MM-YYYY
-    const match2 = dateStr.match(/(\d{2})[/-](\d{2})[/-](\d{2,4})/);
-    if (match2) {
-      const day = parseInt(match2[1]);
-      const month = parseInt(match2[2]) - 1;
-      let year = parseInt(match2[3]);
-
-      if (year < 100) {
-        year += 2000;
-      }
-
-      return new Date(year, month, day);
-    }
-
-    // Default to today
-    return new Date();
+    return emailTransaction;
   }
 
   /**
-   * Extract transaction ID if present
-   */
-  private extractTransactionId(text: string): string | undefined {
-    const match = text.match(/(?:TXN|REF|ID|REFERENCE)[\s:]*([A-Z0-9]{8,})/i);
-    return match ? match[1] : undefined;
-  }
-
-  /**
-   * Calculate confidence score
-   */
-  private calculateConfidence(amount: number, merchant: string, bankName: string): number {
-    let confidence = 0.5; // Base confidence
-
-    // Has valid amount
-    if (amount > 0) confidence += 0.2;
-
-    // Has merchant name
-    if (merchant && merchant.length > 2) confidence += 0.2;
-
-    // Identified bank
-    if (bankName) confidence += 0.1;
-
-    return Math.min(confidence, 1.0);
-  }
-
-  /**
-   * Suggest category based on merchant name using generic keyword patterns
-   * This is a fallback when MerchantLearning has no data
-   */
-  public suggestCategory(merchant: string): string | null {
-    const merchantLower = merchant.toLowerCase();
-
-    // Generic category suggestions based on common keywords
-    const categoryKeywords: { [key: string]: string[] } = {
-      'Food & Dining': [
-        'swiggy',
-        'zomato',
-        'restaurant',
-        'cafe',
-        'coffee',
-        'pizza',
-        'burger',
-        'mcdonald',
-        'kfc',
-        'dominos',
-        'subway',
-      ],
-      Groceries: ['bigbasket', 'grofer', 'dmart', 'reliance', 'more', 'supermarket', 'grocery'],
-      Transport: ['uber', 'ola', 'rapido', 'fuel', 'petrol', 'diesel', 'gas', 'parking'],
-      Shopping: ['amazon', 'flipkart', 'myntra', 'ajio', 'nykaa', 'mall', 'shop'],
-      Utilities: ['electricity', 'water', 'gas', 'broadband', 'internet', 'mobile', 'recharge'],
-      Entertainment: ['netflix', 'prime', 'hotstar', 'spotify', 'movie', 'cinema', 'pvr', 'inox'],
-      Healthcare: ['pharmacy', 'hospital', 'clinic', 'doctor', 'medical', 'apollo', 'netmeds'],
-    };
-
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      for (const keyword of keywords) {
-        if (merchantLower.includes(keyword)) {
-          return category;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Test if text looks like a transaction SMS
+   * Check if email text is a transaction message
+   * @param text - Email body text
+   * @returns true if text contains transaction information
    */
   public isTransactionSMS(text: string): boolean {
-    // Check for common transaction keywords
-    const keywords = [
-      'debited',
-      'spent',
-      'withdrawn',
-      'paid',
-      'payment',
-      'rs',
-      'inr',
-      'rupees',
-      'card',
-      'account',
+    return this.isTransactionMessage(text);
+  }
+
+  /**
+   * Suggest category based on merchant name (fallback)
+   * Used when learned category is not available
+   * @param merchant - Merchant name
+   * @returns Suggested category name or null if unknown
+   */
+  public suggestCategory(merchant: string): string | null {
+    if (!merchant) {
+      return 'Uncategorized';
+    }
+
+    const lowerMerchant = merchant.toLowerCase();
+
+    // Category patterns with keywords
+    const categories = [
+      {
+        category: 'Food & Dining',
+        keywords: [
+          'swiggy',
+          'zomato',
+          'restaurant',
+          'cafe',
+          'food',
+          'dining',
+          'pizza',
+          'burger',
+          'mcdonald',
+          'kfc',
+          'dominos',
+          'subway',
+        ],
+      },
+      {
+        category: 'Groceries',
+        keywords: [
+          'bigbasket',
+          'grofers',
+          'blinkit',
+          'zepto',
+          'dunzo',
+          'dmart',
+          'reliance fresh',
+          'more',
+          'supermarket',
+          'grocery',
+        ],
+      },
+      {
+        category: 'Transport',
+        keywords: [
+          'uber',
+          'ola',
+          'rapido',
+          'metro',
+          'bus',
+          'taxi',
+          'petrol',
+          'diesel',
+          'fuel',
+          'parking',
+        ],
+      },
+      {
+        category: 'Shopping',
+        keywords: [
+          'amazon',
+          'flipkart',
+          'myntra',
+          'ajio',
+          'nykaa',
+          'mall',
+          'shop',
+          'meesho',
+          'snapdeal',
+        ],
+      },
+      {
+        category: 'Utilities',
+        keywords: [
+          'electricity',
+          'water',
+          'gas cylinder',
+          'broadband',
+          'internet',
+          'mobile recharge',
+          'recharge',
+          'airtel',
+          'jio',
+          'vodafone',
+          'bsnl',
+        ],
+      },
+      {
+        category: 'Entertainment',
+        keywords: [
+          'netflix',
+          'prime',
+          'hotstar',
+          'spotify',
+          'movie',
+          'cinema',
+          'theatre',
+          'pvr',
+          'inox',
+        ],
+      },
+      {
+        category: 'Healthcare',
+        keywords: [
+          'hospital',
+          'clinic',
+          'doctor',
+          'pharmacy',
+          'medicine',
+          'apollo',
+          '1mg',
+          'pharmeasy',
+          'netmeds',
+          'medplus',
+          'hospital',
+        ],
+      },
+      {
+        category: 'Education',
+        keywords: ['school', 'college', 'university', 'course', 'tuition', 'exam', 'fees'],
+      },
     ];
 
-    const lowerText = text.toLowerCase();
-    return keywords.some((keyword) => lowerText.includes(keyword));
+    // Find matching category
+    for (const { category, keywords } of categories) {
+      if (keywords.some((keyword) => lowerMerchant.includes(keyword))) {
+        return category;
+      }
+    }
+
+    return null; // Return null for unknown merchants
   }
 }
 
+// Export singleton instance for backward compatibility
 export const emailParserService = new EmailParserService();

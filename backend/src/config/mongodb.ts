@@ -30,6 +30,10 @@ class MongoDBService {
       const dbName =
         process.env.MONGODB_DATABASE_NAME || process.env.COSMOS_DATABASE_NAME || 'DigiTransacDB';
 
+      // Azure Document DB optimized settings
+      const isDevelopment =
+        process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
       // Initialize MongoDB client with secure options and connection pooling
       this.client = new MongoClient(connectionString, {
         tls: true,
@@ -37,14 +41,17 @@ class MongoDBService {
         retryWrites: true,
         w: 'majority',
         // Connection pool settings (industry standard)
-        maxPoolSize: 50,
-        minPoolSize: 10,
+        maxPoolSize: isDevelopment ? 20 : 50,
+        minPoolSize: isDevelopment ? 5 : 10,
         maxIdleTimeMS: 30000,
-        connectTimeoutMS: 10000,
-        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: isDevelopment ? 30000 : 10000, // Longer timeout for dev
+        serverSelectionTimeoutMS: isDevelopment ? 30000 : 5000, // Longer timeout for dev
         // Monitoring and reliability
         monitorCommands: false,
         compressors: ['zlib'],
+        // Azure Document DB specific
+        retryReads: true,
+        socketTimeoutMS: 30000,
       });
 
       await this.client.connect();
@@ -67,7 +74,18 @@ class MongoDBService {
         '✅ All MongoDB collections are ready'
       );
     } catch (error) {
+      const isDevelopment =
+        process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
       logger.error({ error }, 'Failed to initialize MongoDB');
+
+      if (isDevelopment) {
+        logger.warn('💡 Troubleshooting tips for Azure Document DB connection:');
+        logger.warn('   1. Check if your IP is whitelisted in Azure Document DB firewall');
+        logger.warn('   2. Verify connection string in Key Vault');
+        logger.warn('   3. Ensure Azure Document DB instance is running');
+        logger.warn('   4. Check VPN/network connectivity to Azure');
+      }
+
       throw error;
     }
   }

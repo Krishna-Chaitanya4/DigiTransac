@@ -8,6 +8,8 @@ import OfflineIndicator from './components/OfflineIndicator';
 import Layout from './components/Layout';
 import Loading from './components/Loading';
 import ErrorBoundary from './components/ErrorBoundary';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
+import { ROUTE_PATHS } from './config/routes.config';
 
 // Lazy load pages for better performance and smaller initial bundle
 const Login = lazy(() => import('./pages/Login'));
@@ -46,12 +48,12 @@ const App: React.FC = () => {
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route
-                path="/login"
-                element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />}
+                path={ROUTE_PATHS.LOGIN}
+                element={isAuthenticated ? <Navigate to={ROUTE_PATHS.DASHBOARD} /> : <Login />}
               />
               <Route
-                path="/register"
-                element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />}
+                path={ROUTE_PATHS.REGISTER}
+                element={isAuthenticated ? <Navigate to={ROUTE_PATHS.DASHBOARD} /> : <Register />}
               />
 
               <Route
@@ -62,17 +64,66 @@ const App: React.FC = () => {
                   </PrivateRoute>
                 }
               >
-                <Route index element={<Navigate to="/dashboard" />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="transactions" element={<Transactions />} />
-                <Route path="categories" element={<Categories />} />
-                <Route path="accounts" element={<Accounts />} />
-                <Route path="budgets" element={<Budgets />} />
-                <Route path="analytics" element={<Analytics />} />
-                <Route path="profile" element={<Profile />} />
+                <Route index element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
+                <Route
+                  path="dashboard"
+                  element={
+                    <RouteErrorBoundary>
+                      <Dashboard />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="transactions"
+                  element={
+                    <RouteErrorBoundary>
+                      <Transactions />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="categories"
+                  element={
+                    <RouteErrorBoundary>
+                      <Categories />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="accounts"
+                  element={
+                    <RouteErrorBoundary>
+                      <Accounts />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="budgets"
+                  element={
+                    <RouteErrorBoundary>
+                      <Budgets />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="analytics"
+                  element={
+                    <RouteErrorBoundary>
+                      <Analytics />
+                    </RouteErrorBoundary>
+                  }
+                />
+                <Route
+                  path="profile"
+                  element={
+                    <RouteErrorBoundary>
+                      <Profile />
+                    </RouteErrorBoundary>
+                  }
+                />
               </Route>
 
-              <Route path="*" element={<Navigate to="/dashboard" />} />
+              <Route path="*" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
             </Routes>
           </Suspense>
         </Box>

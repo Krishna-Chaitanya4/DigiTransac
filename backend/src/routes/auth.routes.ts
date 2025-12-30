@@ -7,6 +7,8 @@ import { User } from '../models/types';
 import { validate, schemas } from '../middleware/validation';
 import { authenticate } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ApiResponse } from '../utils/apiResponse';
 
 const router = Router();
 
@@ -214,8 +216,10 @@ router.post(
 );
 
 // POST /api/auth/refresh - Generate new JWT token
-router.post('/refresh', authenticate, async (req: any, res: Response): Promise<void> => {
-  try {
+router.post(
+  '/refresh',
+  authenticate,
+  asyncHandler(async (req: any, res: Response) => {
     // User is already authenticated via middleware
     const userId = req.userId;
     const email = req.user?.email;
@@ -226,20 +230,9 @@ router.post('/refresh', authenticate, async (req: any, res: Response): Promise<v
       expiresIn: process.env.JWT_EXPIRE || '7d',
     } as jwt.SignOptions);
 
-    logger.info(`Token refreshed for user: ${email}`);
-
-    res.json({
-      success: true,
-      message: 'Token refreshed successfully',
-      token,
-    });
-  } catch (error) {
-    logger.error({ error }, 'Token refresh error');
-    res.status(500).json({
-      success: false,
-      message: 'Error refreshing token',
-    });
-  }
-});
+    logger.info({ userId, email }, 'Token refreshed successfully');
+    ApiResponse.success(res, { token }, 'Token refreshed successfully');
+  })
+);
 
 export default router;

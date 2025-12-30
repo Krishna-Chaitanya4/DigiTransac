@@ -4,6 +4,7 @@ import { emailParserService } from './emailParser.service';
 import { encryptionService } from './encryption.service';
 import { Transaction, TransactionSplit, Category } from '../models/types';
 import { randomUUID } from 'crypto';
+import { logger } from '../utils/logger';
 
 class GmailPollingService {
   /**
@@ -85,11 +86,11 @@ class GmailPollingService {
       };
 
       await categoriesContainer.insertOne(newCategory);
-      console.log(`📂 Auto-created "Uncategorized" category for user ${userId}`);
+      logger.info(`Auto-created "Uncategorized" category for user ${userId}`);
 
       return newCategory.id;
     } catch (error) {
-      console.error('Error getting/creating uncategorized category:', error);
+      logger.error({ err: error }, 'Error getting/creating uncategorized category');
       // Return empty string if failed
       return '';
     }
@@ -116,7 +117,7 @@ class GmailPollingService {
 
       // First-time setup: Get initial historyId
       if (!lastHistoryId) {
-        console.log(`🆕 First-time setup for user ${user.id} - Getting initial historyId`);
+        logger.info(`First-time setup for user ${user.id} - Getting initial historyId`);
         const profile = await gmail.users.getProfile({ userId: 'me' });
         const initialHistoryId = profile.data.historyId;
 
@@ -127,12 +128,12 @@ class GmailPollingService {
           { $set: { 'emailIntegration.lastHistoryId': initialHistoryId } }
         );
 
-        console.log(`✅ Stored initial historyId: ${initialHistoryId}`);
-        console.log(`📭 No emails to process on first setup - will start tracking from now`);
+        logger.info(`Stored initial historyId: ${initialHistoryId}`);
+        logger.info(`No emails to process on first setup - will start tracking from now`);
         return 0;
       }
 
-      console.log(`🔄 Fetching changes since historyId: ${lastHistoryId}`);
+      logger.info(`Fetching changes since historyId: ${lastHistoryId}`);
 
       // Fetch history changes (only new emails added to INBOX)
       let history: any;
@@ -145,7 +146,7 @@ class GmailPollingService {
         });
       } catch (error: any) {
         if (error.code === 404) {
-          console.warn(`⚠️ HistoryId ${lastHistoryId} expired. Getting fresh historyId.`);
+          logger.warn(`HistoryId ${lastHistoryId} expired. Getting fresh historyId.`);
           const profile = await gmail.users.getProfile({ userId: 'me' });
           const freshHistoryId = profile.data.historyId;
 
@@ -155,7 +156,7 @@ class GmailPollingService {
             { $set: { 'emailIntegration.lastHistoryId': freshHistoryId } }
           );
 
-          console.log(`✅ Reset to fresh historyId: ${freshHistoryId}`);
+          logger.info(`Reset to fresh historyId: ${freshHistoryId}`);
           return 0;
         }
         throw error;
@@ -164,11 +165,11 @@ class GmailPollingService {
       const historyRecords = history.data.history || [];
 
       if (historyRecords.length === 0) {
-        console.log(`📭 No new changes since last check`);
+        logger.info(`No new changes since last check`);
         return 0;
       }
 
-      console.log(`📬 Found ${historyRecords.length} history record(s) with changes`);
+      logger.info(`Found ${historyRecords.length} history record(s) with changes`);
 
       // Extract new message IDs from history
       const newMessageIds: string[] = [];
@@ -181,7 +182,7 @@ class GmailPollingService {
         }
       }
 
-      console.log(`📨 Extracted ${newMessageIds.length} new message ID(s)`);
+      logger.info(`Extracted ${newMessageIds.length} new message ID(s)`);
 
       if (newMessageIds.length === 0) {
         // Update historyId even if no messages to process
@@ -240,7 +241,7 @@ class GmailPollingService {
           // Check if email is from a bank sender
           const isFromBank = bankSenders.some((sender) => from.includes(sender));
           if (!isFromBank) {
-            console.log(`⏭️ Skipping non-bank email from: ${from}`);
+            logger.debug(`Skipping non-bank email from: ${from}`);
             continue;
           }
 
@@ -280,32 +281,29 @@ class GmailPollingService {
           }
 
           // Log email details for debugging
-          console.log(`📧 Processing new email:`);
-          console.log('  From:', from);
-          console.log('  Message ID:', messageId);
-          console.log('  Body:', body.substring(0, 200)); // First 200 chars
+          logger.debug(`Processing new email from ${from} (${messageId})`);
+          logger.debug(`Body preview: ${body.substring(0, 200)}`);
 
           // Check if it's a transaction SMS
           if (!emailParserService.isTransactionSMS(body)) {
-            console.log('❌ Not a transaction email, skipping');
+            logger.debug('Not a transaction email, skipping');
             continue;
           }
 
-          console.log('✅ Detected as transaction SMS');
+          logger.debug('Detected as transaction SMS');
 
           // Parse transaction (pass userId for learning)
           const parsedTransaction = await emailParserService.parseTransaction(body, from, user.id);
 
           if (!parsedTransaction) {
-            console.log('❌ Could not parse transaction, skipping');
-            console.log('   Full body was:', body);
+            logger.warn(`Could not parse transaction from ${messageId}`);
+            logger.debug(`Full body: ${body}`);
             continue;
           }
 
-          console.log('✅ Transaction parsed successfully!');
-          console.log('   Amount:', parsedTransaction.amount);
-          console.log('   Merchant:', parsedTransaction.merchant);
-          console.log('   Bank:', parsedTransaction.bankName);
+          logger.info(
+            `Parsed transaction: ${parsedTransaction.amount} at ${parsedTransaction.merchant} (${parsedTransaction.bankName})`
+          );
 
           // Fallback hierarchy for category:
           // 1. MerchantLearning (auto-learned from approvals)
@@ -318,9 +316,9 @@ class GmailPollingService {
           // If no category suggested, use "Uncategorized" as fallback
           if (!categoryId) {
             categoryId = await this.getOrCreateUncategorizedCategory(user.id);
-            console.log('   📂 No category match - using Uncategorized');
+            logger.debug('No category match - using Uncategorized');
           } else {
-            console.log('   📂 Category from MerchantLearning or generic keywords');
+            logger.debug('Category from MerchantLearning or generic keywords');
           }
 
           // Priority for account: matched (email info) > learned (merchant history) > empty (manual)
@@ -379,9 +377,9 @@ class GmailPollingService {
           await transactionsContainer.insertOne(newTransaction);
           await splitsContainer.insertOne(newSplit);
           processedCount++;
-          console.log(`💰 Created transaction ${newTransaction.id} from email ${messageId}`);
+          logger.info(`Created transaction ${newTransaction.id} from email ${messageId}`);
         } catch (error) {
-          console.error(`❌ Error processing message ${messageId}:`, error);
+          logger.error({ err: error, messageId }, `Error processing message ${messageId}`);
           // Continue processing other emails even if one fails
         }
       }
@@ -402,15 +400,15 @@ class GmailPollingService {
         }
       );
 
-      console.log(
-        `✅ Successfully processed ${processedCount} expense(s) from ${newMessageIds.length} new email(s)`
+      logger.info(
+        `Successfully processed ${processedCount} expense(s) from ${newMessageIds.length} new email(s)`
       );
-      console.log(`📌 Updated historyId: ${lastHistoryId} → ${newHistoryId}`);
-      console.log(`🚀 Delta sync complete - only fetched changes, not full inbox!`);
+      logger.info(`Updated historyId: ${lastHistoryId} → ${newHistoryId}`);
+      logger.info(`Delta sync complete - only fetched changes, not full inbox`);
 
       return processedCount;
     } catch (error: any) {
-      console.error(`Error processing emails for user ${user.id}:`, error);
+      logger.error({ err: error, userId: user.id }, `Error processing emails for user ${user.id}`);
       return 0;
     }
   }
@@ -420,7 +418,7 @@ class GmailPollingService {
    */
   async pollAllUsers(): Promise<void> {
     try {
-      console.log('Starting email polling job...');
+      logger.info('Starting email polling job...');
 
       const userContainer = await mongoDBService.getUsersContainer();
 
@@ -431,7 +429,7 @@ class GmailPollingService {
         })
         .toArray();
 
-      console.log(`Found ${users.length} users with email integration enabled`);
+      logger.info(`Found ${users.length} users with email integration enabled`);
 
       let totalProcessed = 0;
 
@@ -441,9 +439,9 @@ class GmailPollingService {
         totalProcessed += count;
       }
 
-      console.log(`Email polling completed. Processed ${totalProcessed} emails total.`);
+      logger.info(`Email polling completed. Processed ${totalProcessed} emails total.`);
     } catch (error) {
-      console.error('Error in email polling job:', error);
+      logger.error({ err: error }, 'Error in email polling job');
     }
   }
 }

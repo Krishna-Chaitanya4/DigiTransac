@@ -2,20 +2,24 @@
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { mongoDBService } from '../config/mongodb';
 import { Account } from '../models/types';
-import { v4 as uuidv4 } from 'uuid';
 import { buildApprovedTransactionsFilter } from '../utils/transactionFilters';
+import { logger } from '../utils/logger';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ApiResponse } from '../utils/apiResponse';
+import { DbHelper } from '../utils/dbHelpers';
 
 const router = Router();
 
 router.use(authenticate);
 
 // GET /api/accounts - Get all accounts for a user
-router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.get(
+  '/',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
 
     const accountsContainer = await mongoDBService.getAccountsContainer();
-    const accounts = (await accountsContainer.find({ userId }).toArray()) as unknown as Account[];
+    const accounts = await DbHelper.findAllByUser<Account>(accountsContainer, userId);
 
     // Sort in memory to avoid composite index requirement
     accounts.sort((a, b) => {
@@ -25,22 +29,15 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
-    res.json({
-      success: true,
-      accounts,
-    });
-  } catch (error) {
-    console.error('Error fetching accounts:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching accounts',
-    });
-  }
-});
+    logger.info({ userId, count: accounts.length }, 'Accounts fetched successfully');
+    ApiResponse.success(res, { accounts });
+  })
+);
 
 // POST /api/accounts - Create a new account
-router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.post(
+  '/',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const {
       name,
@@ -56,11 +53,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     } = req.body;
 
     if (!name || !type || !currency) {
-      res.status(400).json({
-        success: false,
-        message: 'Name, type, and currency are required',
-      });
-      return;
+      return ApiResponse.badRequest(res, 'Name, type, and currency are required');
     }
 
     const accountsContainer = await mongoDBService.getAccountsContainer();
@@ -73,8 +66,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       );
     }
 
-    const newAccount: Account = {
-      id: uuidv4(),
+    const newAccount = await DbHelper.createDocument<Account>(accountsContainer, {
       userId,
       name,
       type,
@@ -88,29 +80,17 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       isDefault: isDefault || false,
       isActive: true,
       notes,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    await accountsContainer.insertOne(newAccount);
-
-    res.status(201).json({
-      success: true,
-      message: 'Account created successfully',
-      account: newAccount,
     });
-  } catch (error) {
-    console.error('Error creating account:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating account',
-    });
-  }
-});
+
+    logger.info({ userId, accountId: newAccount.id }, 'Account created successfully');
+    ApiResponse.created(res, { account: newAccount }, 'Account created successfully');
+  })
+);
 
 // PUT /api/accounts/:id - Update an account
-router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.put(
+  '/:id',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const { id } = req.params;
     const { name, type, bankName, accountNumber, icon, color, isDefault, isActive, notes } =
@@ -118,13 +98,9 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const accountsContainer = await mongoDBService.getAccountsContainer();
 
-    const account = await accountsContainer.findOne({ id, userId });
+    const account = await DbHelper.findByIdAndUser<Account>(accountsContainer, id, userId);
     if (!account) {
-      res.status(404).json({
-        success: false,
-        message: 'Account not found',
-      });
-      return;
+      return ApiResponse.notFound(res, 'Account not found');
     }
 
     // If this is set as default, unset other defaults
@@ -145,86 +121,61 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       ...(isDefault !== undefined && { isDefault }),
       ...(isActive !== undefined && { isActive }),
       ...(notes !== undefined && { notes }),
-      updatedAt: new Date(),
     };
 
-    await accountsContainer.updateOne({ id, userId }, { $set: updateData });
+    await DbHelper.updateByIdAndUser(accountsContainer, id, userId, updateData);
 
-    const updatedAccount = await accountsContainer.findOne({ id, userId });
+    const updatedAccount = await DbHelper.findByIdAndUser<Account>(accountsContainer, id, userId);
 
-    res.json({
-      success: true,
-      message: 'Account updated successfully',
-      account: updatedAccount,
-    });
-  } catch (error) {
-    console.error('Error updating account:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating account',
-    });
-  }
-});
+    logger.info({ userId, accountId: id }, 'Account updated successfully');
+    ApiResponse.success(res, { account: updatedAccount }, 'Account updated successfully');
+  })
+);
 
 // DELETE /api/accounts/:id - Delete an account
-router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.delete(
+  '/:id',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const { id } = req.params;
 
     const accountsContainer = await mongoDBService.getAccountsContainer();
     const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-    const account = await accountsContainer.findOne({ id, userId });
+    const account = await DbHelper.findByIdAndUser<Account>(accountsContainer, id, userId);
     if (!account) {
-      res.status(404).json({
-        success: false,
-        message: 'Account not found',
-      });
-      return;
+      return ApiResponse.notFound(res, 'Account not found');
     }
 
     // Check if account has transactions
     const transactionCount = await transactionsContainer.countDocuments({ accountId: id });
     if (transactionCount > 0) {
-      res.status(400).json({
-        success: false,
-        message: `Cannot delete account with ${transactionCount} transaction(s). Please delete or reassign transactions first.`,
-      });
-      return;
+      return ApiResponse.badRequest(
+        res,
+        `Cannot delete account with ${transactionCount} transaction(s). Please delete or reassign transactions first.`
+      );
     }
 
-    await accountsContainer.deleteOne({ id, userId });
+    await DbHelper.deleteByIdAndUser(accountsContainer, id, userId);
 
-    res.json({
-      success: true,
-      message: 'Account deleted successfully',
-    });
-  } catch (error) {
-    console.error('Error deleting account:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting account',
-    });
-  }
-});
+    logger.info({ userId, accountId: id }, 'Account deleted successfully');
+    ApiResponse.success(res, null, 'Account deleted successfully');
+  })
+);
 
 // GET /api/accounts/:id/balance - Get account balance with transaction summary
-router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.get(
+  '/:id/balance',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const { id } = req.params;
 
     const accountsContainer = await mongoDBService.getAccountsContainer();
     const transactionsContainer = await mongoDBService.getTransactionsContainer();
 
-    const account = (await accountsContainer.findOne({ id, userId })) as unknown as Account;
+    const account = await DbHelper.findByIdAndUser<Account>(accountsContainer, id, userId);
     if (!account) {
-      res.status(404).json({
-        success: false,
-        message: 'Account not found',
-      });
-      return;
+      return ApiResponse.notFound(res, 'Account not found');
     }
 
     // Get approved transactions only for accurate balance calculation
@@ -242,8 +193,11 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
 
     const calculatedBalance = (account.initialBalance || 0) + credits - debits;
 
-    res.json({
-      success: true,
+    logger.info(
+      { userId, accountId: id, transactionCount: transactions.length },
+      'Account balance fetched'
+    );
+    ApiResponse.success(res, {
       balance: {
         currentBalance: account.balance,
         calculatedBalance,
@@ -253,13 +207,7 @@ router.get('/:id/balance', async (req: AuthRequest, res: Response): Promise<void
         transactionCount: transactions.length,
       },
     });
-  } catch (error) {
-    console.error('Error fetching account balance:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching account balance',
-    });
-  }
-});
+  })
+);
 
 export default router;

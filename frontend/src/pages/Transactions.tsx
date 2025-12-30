@@ -23,7 +23,6 @@ import {
   InputAdornment,
   Grid,
   Collapse,
-  Divider,
   Checkbox,
   ToggleButtonGroup,
   ToggleButton,
@@ -40,7 +39,6 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Search as SearchIcon,
   FileDownload as FileDownloadIcon,
   TrendingUp as CreditIcon,
   TrendingDown as DebitIcon,
@@ -56,14 +54,22 @@ import {
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   UnfoldMore as UnfoldMoreIcon,
-  Close as CloseIcon,
   HourglassEmpty as PendingIcon,
   Block as RejectedIcon,
-  Tune as TuneIcon,
   AccountBalanceWallet,
+  Search as SearchIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
 import { useToast } from '../components/Toast';
+import {
+  useAccounts,
+  useCategories,
+  useTags,
+  useCreateTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
+  type Account,
+} from '../hooks/useApi';
+import { api } from '../services/api';
 import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
@@ -73,6 +79,7 @@ import SwipeableTransactionCard from '../components/SwipeableTransactionCard';
 import ResponsiveDialog from '../components/ResponsiveDialog';
 import PullToRefresh from '../components/PullToRefresh';
 import SMSImportModal from '../components/SMSImportModal';
+import FilterPanel, { FilterValues } from '../components/FilterPanel';
 import { useResponsive } from '../hooks/useResponsive';
 import { useIsTouchDevice } from '../hooks/useResponsive';
 import { useAuth } from '../context/AuthContext';
@@ -81,7 +88,22 @@ import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/curre
 import { ModernDatePicker } from '../components/ModernDatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+
+interface Category {
+  id: string;
+  name: string;
+  isFolder: boolean;
+  parentId?: string;
+  icon?: string;
+  color?: string;
+}
+
+interface Tag {
+  id: string;
+  name: string;
+  color?: string;
+}
 
 interface Transaction {
   id: string;
@@ -115,31 +137,6 @@ interface TransactionSplit {
   order: number;
   createdAt?: string;
   updatedAt?: string;
-}
-
-interface Account {
-  id: string;
-  name: string;
-  type: string;
-  currency: string;
-  isDefault?: boolean;
-  isActive: boolean;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  color?: string;
-  isFolder?: boolean;
-  parentId?: string | null;
-  path?: string[];
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  color?: string;
-  usageCount: number;
 }
 
 // Smart tag mapping: category names (lowercase) to suggested tags
@@ -188,11 +185,22 @@ const Transactions: React.FC = () => {
   const userCurrency = user?.currency || 'USD';
   const currencySymbol = CURRENCIES[userCurrency]?.symbol || '$';
   const isTouchDevice = useIsTouchDevice();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+
+  // React Query hooks for data fetching
+  const { data: accountsData } = useAccounts();
+  const { data: categoriesData } = useCategories();
+  const { data: tagsData } = useTags();
+  const createTransaction = useCreateTransaction();
+  const updateTransaction = useUpdateTransaction();
+  const deleteTransaction = useDeleteTransaction();
+
+  const accounts = (accountsData?.data?.accounts || []).filter((a: Account) => a.isActive);
+  const categories = categoriesData?.data?.categories || [];
+  const tags = tagsData?.data?.tags || [];
+
   const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [totalCount, setTotalCount] = useState(0); // Total records from API
   const [openDialog, setOpenDialog] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -203,21 +211,22 @@ const Transactions: React.FC = () => {
     transactionId: null,
   });
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<'all' | 'credit' | 'debit'>('all');
-  const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [includeTags, setIncludeTags] = useState<string[]>([]);
-  const [excludeTags, setExcludeTags] = useState<string[]>([]);
-  const [minAmount, setMinAmount] = useState<string>('');
-  const [maxAmount, setMaxAmount] = useState<string>('');
-  const [amountQuickFilter, setAmountQuickFilter] = useState<string>('any');
-  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
-  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('month'));
-  const [activeDateFilter, setActiveDateFilter] = useState<string>('thisMonth'); // Track active quick filter
+  // Filter states - using centralized FilterPanel
+  const [filterValues, setFilterValues] = useState<FilterValues>({
+    searchQuery: '',
+    transactionType: 'all',
+    selectedAccount: '',
+    selectedCategories: [],
+    includeTags: [],
+    excludeTags: [],
+    minAmount: '',
+    maxAmount: '',
+    amountQuickFilter: 'any',
+    startDate: dayjs().startOf('month'),
+    endDate: dayjs().endOf('month'),
+    activeDateFilter: 'thisMonth',
+  });
   const [reviewStatus, setReviewStatus] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<string>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
@@ -229,7 +238,6 @@ const Transactions: React.FC = () => {
   const [smsImportOpen, setSmsImportOpen] = useState(false);
   const [emailImportOpen, setEmailImportOpen] = useState(false);
   const [importMenuAnchor, setImportMenuAnchor] = useState<null | HTMLElement>(null);
-  const [totalCount, setTotalCount] = useState(0); // Total records from API
   const [pendingCount, setPendingCount] = useState(0); // All-time pending count
   const [merchants, setMerchants] = useState<string[]>([]); // Unique merchant names
   const [recentCategories, setRecentCategories] = useState<string[]>([]); // Recent category IDs
@@ -270,9 +278,11 @@ const Transactions: React.FC = () => {
 
   useEffect(() => {
     const initializeData = async () => {
+      if (!token) return; // Wait for authentication
+
       try {
         setLoading(true);
-        await Promise.all([fetchAccounts(), fetchCategories(), fetchTags()]);
+        // React Query hooks already fetched accounts, categories, tags
         await fetchTransactions();
         await fetchPendingCount();
         await fetchMerchantsAndRecentCategories();
@@ -285,7 +295,7 @@ const Transactions: React.FC = () => {
     };
 
     initializeData();
-  }, []);
+  }, [token]);
 
   // Handle navigation state from other pages (e.g., clicking "View Transactions" from Accounts)
   useEffect(() => {
@@ -294,7 +304,10 @@ const Transactions: React.FC = () => {
 
       // Apply category filter
       if (state.filterCategoryId) {
-        setSelectedCategories([state.filterCategoryId]);
+        setFilterValues((prev) => ({
+          ...prev,
+          selectedCategories: [state.filterCategoryId],
+        }));
         toast.success('Filtered by category');
       }
 
@@ -338,17 +351,18 @@ const Transactions: React.FC = () => {
       setPage(0);
     }
   }, [
-    selectedType,
-    selectedAccount,
-    selectedCategories,
-    includeTags,
-    excludeTags,
-    startDate,
-    endDate,
+    filterValues.transactionType,
+    filterValues.selectedAccount,
+    filterValues.selectedCategories,
+    filterValues.includeTags,
+    filterValues.excludeTags,
+    filterValues.startDate,
+    filterValues.endDate,
     reviewStatus,
     sortBy,
     sortOrder,
-    searchQuery,
+    filterValues.searchQuery,
+    token,
   ]);
 
   // Fetch transactions when page, rowsPerPage, or any filter changes
@@ -360,26 +374,27 @@ const Transactions: React.FC = () => {
       () => {
         fetchTransactions();
       },
-      searchQuery ? 500 : 0
+      filterValues.searchQuery ? 500 : 0
     ); // Debounce search, immediate for other filters
 
     return () => clearTimeout(debounceTimer);
   }, [
     page,
     rowsPerPage,
-    selectedType,
-    selectedAccount,
-    selectedCategories,
-    includeTags,
-    excludeTags,
-    startDate,
-    endDate,
+    filterValues.transactionType,
+    filterValues.selectedAccount,
+    filterValues.selectedCategories,
+    filterValues.includeTags,
+    filterValues.excludeTags,
+    filterValues.startDate,
+    filterValues.endDate,
     reviewStatus,
     sortBy,
     sortOrder,
-    searchQuery,
-    minAmount,
-    maxAmount,
+    filterValues.searchQuery,
+    filterValues.minAmount,
+    filterValues.maxAmount,
+    token,
   ]);
 
   const fetchTransactions = async () => {
@@ -391,20 +406,21 @@ const Transactions: React.FC = () => {
         skip: (page * rowsPerPage).toString(),
       };
 
-      if (searchQuery) params.search = searchQuery;
-      if (selectedType !== 'all') params.type = selectedType;
-      if (selectedAccount) params.accountId = selectedAccount;
-      if (minAmount) params.minAmount = minAmount;
-      if (maxAmount) params.maxAmount = maxAmount;
-      if (selectedCategories.length > 0) {
+      if (filterValues.searchQuery) params.search = filterValues.searchQuery;
+      if (filterValues.transactionType && filterValues.transactionType !== 'all')
+        params.type = filterValues.transactionType;
+      if (filterValues.selectedAccount) params.accountId = filterValues.selectedAccount;
+      if (filterValues.minAmount) params.minAmount = filterValues.minAmount;
+      if (filterValues.maxAmount) params.maxAmount = filterValues.maxAmount;
+      if (filterValues.selectedCategories && filterValues.selectedCategories.length > 0) {
         // Expand folders to category IDs before sending to backend
         const expandedCategoryIds = new Set<string>();
 
         const getAllDescendants = (folderId: string): string[] => {
           const descendants: string[] = [];
-          const children = categories.filter((c) => c.parentId === folderId);
+          const children = categories.filter((c: Category) => c.parentId === folderId);
 
-          children.forEach((child) => {
+          children.forEach((child: Category) => {
             if (child.isFolder) {
               descendants.push(...getAllDescendants(child.id));
             } else {
@@ -415,8 +431,8 @@ const Transactions: React.FC = () => {
           return descendants;
         };
 
-        selectedCategories.forEach((catId) => {
-          const cat = categories.find((c) => c.id === catId);
+        filterValues.selectedCategories.forEach((catId) => {
+          const cat = categories.find((c: Category) => c.id === catId);
           if (cat?.isFolder) {
             getAllDescendants(cat.id).forEach((id) => expandedCategoryIds.add(id));
           } else {
@@ -426,70 +442,31 @@ const Transactions: React.FC = () => {
 
         params.categoryIds = Array.from(expandedCategoryIds).join(',');
       }
-      if (includeTags.length > 0) params.includeTags = includeTags.join(',');
-      if (excludeTags.length > 0) params.excludeTags = excludeTags.join(',');
-      if (startDate) params.startDate = startDate.startOf('day').toISOString();
-      if (endDate) params.endDate = endDate.endOf('day').toISOString();
+      if (filterValues.includeTags && filterValues.includeTags.length > 0)
+        params.includeTags = filterValues.includeTags.join(',');
+      if (filterValues.excludeTags && filterValues.excludeTags.length > 0)
+        params.excludeTags = filterValues.excludeTags.join(',');
+      if (filterValues.startDate)
+        params.startDate = filterValues.startDate.startOf('day').toISOString();
+      if (filterValues.endDate) params.endDate = filterValues.endDate.endOf('day').toISOString();
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
       params.includeSplits = 'true'; // Always fetch splits
 
-      const response = await axios.get(`/api/transactions`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
+      const response = await api.get('/api/transactions', params);
 
-      setTransactions(response.data.transactions || []);
-      setTotalCount(response.data.pagination?.total || 0);
+      setTransactions(response.data?.transactions || []);
+      setTotalCount(response.data?.pagination?.total || 0);
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
-      toast.error(err.response?.data?.message || 'Failed to fetch transactions');
+      toast.error(err.message || 'Failed to fetch transactions');
       setTransactions([]); // Set empty array on error
-    }
-  };
-
-  const fetchAccounts = async () => {
-    try {
-      const response = await axios.get(`/api/accounts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAccounts((response.data.accounts || []).filter((a: Account) => a.isActive));
-    } catch (err: any) {
-      console.error('Failed to fetch accounts:', err);
-      setAccounts([]); // Set empty array on error
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get(`/api/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Include both folders and categories for smart folder selection
-      setCategories(response.data.categories || []);
-    } catch (err: any) {
-      console.error('Failed to fetch categories:', err);
-      setCategories([]); // Set empty array on error
-    }
-  };
-
-  const fetchTags = async () => {
-    try {
-      const response = await axios.get(`/api/tags`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTags(response.data.tags || []);
-    } catch (err: any) {
-      console.error('Failed to fetch tags:', err);
-      setTags([]); // Set empty array on error to prevent white screen
     }
   };
 
   const fetchPendingCount = async () => {
     try {
-      const response = await axios.get(`/api/transactions/pending/count`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setPendingCount(response.data.count || 0);
+      const response = await api.get('/api/transactions/pending/count');
+      setPendingCount(response.count || 0);
     } catch (err: any) {
       console.error('Failed to fetch pending count:', err);
       setPendingCount(0);
@@ -499,12 +476,13 @@ const Transactions: React.FC = () => {
   const fetchMerchantsAndRecentCategories = async () => {
     try {
       // Fetch unique merchants from transactions
-      const txnResponse = await axios.get(`/api/transactions`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { limit: '1000', sortBy: 'date', sortOrder: 'desc' },
+      const txnResponse = await api.get('/api/transactions', {
+        limit: '1000',
+        sortBy: 'date',
+        sortOrder: 'desc',
       });
 
-      const txns = txnResponse.data.transactions || [];
+      const txns = txnResponse.data?.transactions || [];
 
       // Extract unique merchants
       const uniqueMerchants = [
@@ -583,11 +561,7 @@ const Transactions: React.FC = () => {
     reason?: string
   ) => {
     try {
-      await axios.patch(
-        `/api/transactions/${id}/status`,
-        { status, reason },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.patch(`/api/transactions/${id}/status`, { status, reason });
       return true;
     } catch (error: any) {
       console.error('Error changing transaction status:', error);
@@ -617,13 +591,7 @@ const Transactions: React.FC = () => {
       }
 
       // Transaction is complete, proceed with approval
-      await axios.patch(
-        `/api/transactions/${id}/approve`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await api.patch(`/api/transactions/${id}/approve`, {});
       toast.success('Transaction approved');
       await fetchTransactions();
       await fetchPendingCount();
@@ -640,13 +608,7 @@ const Transactions: React.FC = () => {
         clearTimeout(undoRejectInfo.timeoutId);
       }
 
-      await axios.patch(
-        `/api/transactions/${id}/reject`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await api.patch(`/api/transactions/${id}/reject`, {});
 
       await fetchTransactions();
       await fetchPendingCount();
@@ -698,15 +660,9 @@ const Transactions: React.FC = () => {
       }
 
       try {
-        await axios.post(
-          '/api/transactions/bulk-approve',
-          {
-            transactionIds: completeTransactionIds,
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        await api.post('/api/transactions/bulk-approve', {
+          transactionIds: completeTransactionIds,
+        });
         toast.success(
           `${completeTransactionIds.length} transactions approved. ` +
             `${incompleteTransactions.length} skipped (incomplete).`
@@ -724,15 +680,9 @@ const Transactions: React.FC = () => {
 
     // All transactions are complete, proceed normally
     try {
-      await axios.post(
-        '/api/transactions/bulk-approve',
-        {
-          transactionIds: Array.from(selectedTransactions),
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await api.post('/api/transactions/bulk-approve', {
+        transactionIds: Array.from(selectedTransactions),
+      });
       toast.success(`${selectedTransactions.size} transactions approved`);
       setSelectedTransactions(new Set());
       await fetchTransactions();
@@ -814,7 +764,7 @@ const Transactions: React.FC = () => {
       setFormData({
         type: 'debit',
         amount: '',
-        accountId: accounts.find((a) => a.isDefault)?.id || '',
+        accountId: accounts.find((a: Account) => a.isDefault)?.id || '',
         categoryId: '',
         description: '',
         tags: [defaultTag],
@@ -915,33 +865,22 @@ const Transactions: React.FC = () => {
       }
 
       if (editingTransaction) {
-        await axios.put(`/api/transactions/${editingTransaction.id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await updateTransaction.mutateAsync({ id: editingTransaction.id, data: payload });
 
         // If in approve mode, also approve the transaction after saving
         if (approveMode) {
-          await axios.patch(
-            `/api/transactions/${editingTransaction.id}/approve`,
-            {},
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
+          await api.patch(`/api/transactions/${editingTransaction.id}/approve`, {});
           toast.success('Transaction completed and approved');
         } else {
           toast.success('Transaction updated successfully');
         }
       } else {
-        await axios.post(`/api/transactions`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await createTransaction.mutateAsync(payload);
         toast.success('Transaction created successfully');
       }
 
       handleCloseDialog();
       fetchTransactions();
-      fetchAccounts();
       fetchPendingCount(); // Refresh pending count
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save transaction');
@@ -956,13 +895,10 @@ const Transactions: React.FC = () => {
     if (!confirmDelete.transactionId) return;
 
     try {
-      await axios.delete(`/api/transactions/${confirmDelete.transactionId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await deleteTransaction.mutateAsync(confirmDelete.transactionId);
 
       toast.success('Transaction deleted successfully');
       fetchTransactions();
-      fetchAccounts();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete transaction');
     } finally {
@@ -1107,7 +1043,7 @@ const Transactions: React.FC = () => {
 
   // Smart tag suggestion based on category
   const handleCategoryChange = (categoryId: string, splitIndex?: number) => {
-    const category = categories.find((c) => c.id === categoryId);
+    const category = categories.find((c: Category) => c.id === categoryId);
     if (!category) return;
 
     const categoryNameLower = category.name.toLowerCase();
@@ -1214,16 +1150,13 @@ const Transactions: React.FC = () => {
     if (!window.confirm(`Delete ${selectedTransactions.size} selected transactions?`)) return;
 
     try {
-      await axios.delete(`/api/transactions/bulk`, {
-        headers: { Authorization: `Bearer ${token}` },
-        data: { ids: Array.from(selectedTransactions) },
-      });
+      // api.delete doesn't support data parameter, use POST for bulk delete
+      await api.post('/api/transactions/bulk-delete', { ids: Array.from(selectedTransactions) });
 
       toast.success(`${selectedTransactions.size} transactions deleted`);
       setSelectedTransactions(new Set());
       setSelectAll(false);
       fetchTransactions();
-      fetchAccounts();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete transactions');
     }
@@ -1301,39 +1234,41 @@ const Transactions: React.FC = () => {
   );
 
   const clearFilters = () => {
-    setSearchQuery('');
-    setSelectedType('all');
-    setSelectedAccount('');
-    setSelectedCategories([]);
-    setIncludeTags([]);
-    setExcludeTags([]);
-    setMinAmount('');
-    setMaxAmount('');
-    setAmountQuickFilter('any');
-    setStartDate(dayjs().startOf('month'));
-    setEndDate(dayjs().endOf('month'));
-    setActiveDateFilter('thisMonth');
+    setFilterValues({
+      searchQuery: '',
+      transactionType: 'all',
+      selectedAccount: '',
+      selectedCategories: [],
+      includeTags: [],
+      excludeTags: [],
+      minAmount: '',
+      maxAmount: '',
+      amountQuickFilter: 'any',
+      startDate: dayjs().startOf('month'),
+      endDate: dayjs().endOf('month'),
+      activeDateFilter: 'thisMonth',
+    });
     setReviewStatus('all');
     setPage(0); // Reset to first page
   };
 
   const getAccountName = (accountId: string) => {
-    return accounts.find((a) => a.id === accountId)?.name || 'Unknown';
+    return accounts.find((a: Account) => a.id === accountId)?.name || 'Unknown';
   };
 
   const getCategoryName = (categoryId?: string) => {
     if (!categoryId) return 'Uncategorized';
-    return categories.find((c) => c.id === categoryId)?.name || 'Unknown';
+    return categories.find((c: Category) => c.id === categoryId)?.name || 'Unknown';
   };
 
   const getCategoryColor = (categoryId?: string) => {
     if (!categoryId) return '#999999';
-    return categories.find((c) => c.id === categoryId)?.color || '#667eea';
+    return categories.find((c: Category) => c.id === categoryId)?.color || '#667eea';
   };
 
   const formatCurrency = useCallback(
     (amount: number, accountId: string) => {
-      const account = accounts.find((a) => a.id === accountId);
+      const account = accounts.find((a: Account) => a.id === accountId);
       const currency = account?.currency || user?.currency || 'USD';
       return formatCurrencyUtil(amount, currency);
     },
@@ -1722,603 +1657,167 @@ const Transactions: React.FC = () => {
           </Grid>
         </Grid>
 
-        {/* Inline Filter Interface */}
-        <Card sx={{ mb: 3, overflow: 'visible' }}>
+        {/* Review Status Filter and Search/Filters */}
+        <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
-              {/* Search Bar */}
-              <TextField
-                placeholder="Search by description, merchant, amount..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                size="small"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchQuery && (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setSearchQuery('')} edge="end">
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  minWidth: 250,
-                  flexGrow: { xs: 1, sm: 0 },
-                  '& .MuiInputBase-input': {
+            <Box
+              display="flex"
+              gap={1.5}
+              alignItems="center"
+              flexWrap="wrap"
+              justifyContent="space-between"
+            >
+              <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+                <Chip
+                  label="All"
+                  onClick={() => setReviewStatus('all')}
+                  color={reviewStatus === 'all' ? 'primary' : 'default'}
+                  variant={reviewStatus === 'all' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'all' ? 600 : 400,
                     fontSize: '0.875rem',
-                  },
-                }}
-              />
-
-              {/* Transaction Type Chips */}
-              <Chip
-                label="All"
-                onClick={() => setSelectedType('all')}
-                color={selectedType === 'all' ? 'primary' : 'default'}
-                variant={selectedType === 'all' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: selectedType === 'all' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-              <Chip
-                icon={<CreditIcon fontSize="small" />}
-                label="Credits"
-                onClick={() => setSelectedType('credit')}
-                color={selectedType === 'credit' ? 'success' : 'default'}
-                variant={selectedType === 'credit' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: selectedType === 'credit' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-              <Chip
-                icon={<DebitIcon fontSize="small" />}
-                label="Debits"
-                onClick={() => setSelectedType('debit')}
-                color={selectedType === 'debit' ? 'error' : 'default'}
-                variant={selectedType === 'debit' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: selectedType === 'debit' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-
-              {/* Divider */}
-              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-              {/* Status Chips */}
-              <Chip
-                label="All"
-                onClick={() => setReviewStatus('all')}
-                color={reviewStatus === 'all' ? 'primary' : 'default'}
-                variant={reviewStatus === 'all' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'all' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-              <Chip
-                icon={<PendingIcon fontSize="small" />}
-                label={`Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
-                onClick={() => {
-                  setReviewStatus('pending');
-                  setStartDate(null);
-                  setEndDate(null);
-                  setActiveDateFilter('');
-                }}
-                color={reviewStatus === 'pending' ? 'warning' : 'default'}
-                variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'pending' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                  '& .MuiChip-label': {
-                    fontWeight: pendingCount > 0 ? 600 : 400,
-                  },
-                }}
-              />
-              <Chip
-                icon={<ApproveIcon fontSize="small" />}
-                label="Approved"
-                onClick={() => setReviewStatus('approved')}
-                color={reviewStatus === 'approved' ? 'success' : 'default'}
-                variant={reviewStatus === 'approved' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'approved' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-              <Chip
-                icon={<RejectedIcon fontSize="small" />}
-                label="Rejected"
-                onClick={() => setReviewStatus('rejected')}
-                color={reviewStatus === 'rejected' ? 'error' : 'default'}
-                variant={reviewStatus === 'rejected' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'rejected' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-
-              {/* Divider */}
-              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-              {/* More Filters Button */}
-              <Button
-                variant={showFilters ? 'contained' : 'outlined'}
-                startIcon={<TuneIcon />}
-                onClick={() => setShowFilters(!showFilters)}
-                size="small"
-                sx={{ fontSize: '0.875rem', minHeight: 32 }}
-              >
-                Filters
-              </Button>
-
-              {/* Clear Filters */}
-              {(searchQuery ||
-                selectedType !== 'all' ||
-                selectedAccount ||
-                selectedCategories.length > 0 ||
-                includeTags.length > 0 ||
-                excludeTags.length > 0 ||
-                minAmount ||
-                maxAmount ||
-                reviewStatus !== 'all') && (
-                <Chip
-                  label="Clear All"
-                  onDelete={clearFilters}
-                  onClick={clearFilters}
-                  color="primary"
-                  size="small"
-                  variant="outlined"
-                  sx={{ fontWeight: 500, fontSize: '0.8125rem', height: 28 }}
-                />
-              )}
-
-              {/* Active filter indicators */}
-              {selectedAccount && (
-                <Chip
-                  label={`Account: ${accounts.find((a) => a.id === selectedAccount)?.name || ''}`}
-                  onDelete={() => setSelectedAccount('')}
-                  size="small"
-                  color="info"
-                  variant="outlined"
-                  sx={{ fontSize: '0.8125rem', height: 28 }}
-                />
-              )}
-              {selectedCategories.length > 0 && (
-                <Chip
-                  label={`${selectedCategories.length} ${selectedCategories.length === 1 ? 'Category' : 'Categories'}`}
-                  onDelete={() => setSelectedCategories([])}
-                  size="small"
-                  color="info"
-                  variant="outlined"
-                  sx={{ fontSize: '0.8125rem', height: 28 }}
-                />
-              )}
-              {(includeTags.length > 0 || excludeTags.length > 0) && (
-                <Chip
-                  label={`${includeTags.length + excludeTags.length} Tag Filter${includeTags.length + excludeTags.length > 1 ? 's' : ''}`}
-                  onDelete={() => {
-                    setIncludeTags([]);
-                    setExcludeTags([]);
+                    height: 32,
                   }}
-                  size="small"
-                  color="info"
-                  variant="outlined"
-                  sx={{ fontSize: '0.8125rem', height: 28 }}
                 />
-              )}
-              {(minAmount || maxAmount) && (
                 <Chip
-                  label="Amount Range"
-                  onDelete={() => {
-                    setMinAmount('');
-                    setMaxAmount('');
+                  icon={<PendingIcon fontSize="small" />}
+                  label={`Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+                  onClick={() => {
+                    setReviewStatus('pending');
+                    setFilterValues((prev) => ({
+                      ...prev,
+                      startDate: null,
+                      endDate: null,
+                      activeDateFilter: '',
+                    }));
                   }}
-                  size="small"
-                  color="info"
-                  variant="outlined"
-                  sx={{ fontSize: '0.8125rem', height: 28 }}
+                  color={reviewStatus === 'pending' ? 'warning' : 'default'}
+                  variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'pending' ? 600 : 400,
+                    fontSize: '0.875rem',
+                    height: 32,
+                    '& .MuiChip-label': {
+                      fontWeight: pendingCount > 0 ? 600 : 400,
+                    },
+                  }}
                 />
-              )}
+                <Chip
+                  icon={<ApproveIcon fontSize="small" />}
+                  label="Approved"
+                  onClick={() => setReviewStatus('approved')}
+                  color={reviewStatus === 'approved' ? 'success' : 'default'}
+                  variant={reviewStatus === 'approved' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'approved' ? 600 : 400,
+                    fontSize: '0.875rem',
+                    height: 32,
+                  }}
+                />
+                <Chip
+                  icon={<RejectedIcon fontSize="small" />}
+                  label="Rejected"
+                  onClick={() => setReviewStatus('rejected')}
+                  color={reviewStatus === 'rejected' ? 'error' : 'default'}
+                  variant={reviewStatus === 'rejected' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'rejected' ? 600 : 400,
+                    fontSize: '0.875rem',
+                    height: 32,
+                  }}
+                />
+              </Box>
 
-              {/* Bulk Actions */}
-              {selectedTransactions.size > 0 && (
-                <>
-                  <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                  <Chip
-                    label={`${selectedTransactions.size} selected`}
-                    color="primary"
-                    variant="filled"
-                    onDelete={() => {
-                      setSelectedTransactions(new Set());
-                      setSelectAll(false);
-                    }}
-                    size="small"
-                    sx={{ fontWeight: 600, fontSize: '0.8125rem', height: 28 }}
-                  />
-                  {reviewStatus === 'pending' && (
-                    <Button
-                      size="small"
-                      color="success"
-                      variant="contained"
-                      startIcon={<ApproveIcon />}
-                      onClick={handleBulkApprove}
-                      sx={{ fontSize: '0.875rem', minHeight: 32 }}
-                    >
-                      Approve
-                    </Button>
-                  )}
-                  <Button
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                    startIcon={<DeleteIcon />}
-                    onClick={handleBulkDelete}
-                    sx={{ fontSize: '0.875rem', minHeight: 32 }}
-                  >
-                    Delete
-                  </Button>
-                </>
-              )}
+              <Box display="flex" gap={1.5} alignItems="center">
+                <TextField
+                  placeholder="Search transactions..."
+                  value={filterValues.searchQuery || ''}
+                  onChange={(e) =>
+                    setFilterValues((prev) => ({ ...prev, searchQuery: e.target.value }))
+                  }
+                  size="small"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ minWidth: 250 }}
+                />
+                <FilterPanel
+                  config={{
+                    showSearch: false,
+                    showTransactionType: true,
+                    showAccount: true,
+                    showCategories: true,
+                    showDateRange: true,
+                    showQuickDatePresets: true,
+                    showTags: true,
+                    showAmountRange: true,
+                    collapsible: true,
+                    defaultExpanded: false,
+                    inline: true,
+                  }}
+                  values={filterValues}
+                  onChange={setFilterValues}
+                  accounts={accounts}
+                  categories={categories}
+                  tags={tags}
+                  currencySymbol={currencySymbol}
+                  onClearAll={clearFilters}
+                />
+              </Box>
             </Box>
-
-            {/* Collapsible Advanced Filters */}
-            <Collapse in={showFilters}>
-              <Divider sx={{ my: 2 }} />
-              <Grid container spacing={2}>
-                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
-                  <TextField
-                    select
-                    label="Account"
-                    value={selectedAccount}
-                    onChange={(e) => setSelectedAccount(e.target.value)}
-                    fullWidth
-                    size="small"
-                  >
-                    <MenuItem value="">All Accounts</MenuItem>
-                    {accounts.map((account) => (
-                      <MenuItem key={account.id} value={account.id}>
-                        {account.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-
-                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
-                  <Autocomplete
-                    multiple
-                    options={categories}
-                    getOptionLabel={(option) => option.name}
-                    value={categories.filter((c) => selectedCategories.includes(c.id))}
-                    onChange={(_, newValue) => {
-                      // Store folders and categories as-is (no expansion in state)
-                      // Expansion happens only when making API call
-                      setSelectedCategories(newValue.map((cat) => cat.id));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Categories"
-                        size="small"
-                        placeholder="Select categories or folders..."
-                      />
-                    )}
-                    renderOption={(props, option) => (
-                      <li {...props}>
-                        {option.isFolder ? '📁 ' : ''}
-                        {option.name}
-                      </li>
-                    )}
-                    renderTags={(value, getTagProps) => {
-                      // Helper to count descendants for folders
-                      const getDescendantCount = (folderId: string): number => {
-                        let count = 0;
-                        const children = categories.filter((c) => c.parentId === folderId);
-
-                        children.forEach((child) => {
-                          if (child.isFolder) {
-                            count += getDescendantCount(child.id);
-                          } else {
-                            count++;
-                          }
-                        });
-
-                        return count;
-                      };
-
-                      return value.map((option, index) => {
-                        const label = option.isFolder
-                          ? `📁 ${option.name} (${getDescendantCount(option.id)})`
-                          : option.name;
-
-                        return (
-                          <Chip
-                            label={label}
-                            size="small"
-                            style={{ backgroundColor: option.color || '#667eea', color: '#fff' }}
-                            {...getTagProps({ index })}
-                            key={option.id || index}
-                          />
-                        );
-                      });
-                    }}
-                  />
-                </Grid>
-
-                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
-                  <ModernDatePicker
-                    label="Start Date"
-                    value={startDate}
-                    onChange={(date) => {
-                      setStartDate(date);
-                      setActiveDateFilter(''); // Clear active filter on manual change
-                    }}
-                    fullWidth
-                  />
-                </Grid>
-
-                <Grid size={{ sm: 6, xs: 12, md: 3 }}>
-                  <ModernDatePicker
-                    label="End Date"
-                    value={endDate}
-                    onChange={(date) => {
-                      setEndDate(date);
-                      setActiveDateFilter(''); // Clear active filter on manual change
-                    }}
-                    fullWidth
-                  />
-                </Grid>
-
-                <Grid size={{ xs: 12 }}>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Chip
-                      label="All Time"
-                      size="small"
-                      variant={activeDateFilter === 'all' ? 'filled' : 'outlined'}
-                      color={activeDateFilter === 'all' ? 'primary' : 'default'}
-                      onClick={() => {
-                        setStartDate(null);
-                        setEndDate(null);
-                        setActiveDateFilter('all');
-                      }}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                    <Chip
-                      label="Today"
-                      size="small"
-                      variant={activeDateFilter === 'today' ? 'filled' : 'outlined'}
-                      color={activeDateFilter === 'today' ? 'primary' : 'default'}
-                      onClick={() => {
-                        setStartDate(dayjs().startOf('day'));
-                        setEndDate(dayjs().endOf('day'));
-                        setActiveDateFilter('today');
-                      }}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                    <Chip
-                      label="Last 7 Days"
-                      size="small"
-                      variant={activeDateFilter === 'last7' ? 'filled' : 'outlined'}
-                      color={activeDateFilter === 'last7' ? 'primary' : 'default'}
-                      onClick={() => {
-                        setStartDate(dayjs().subtract(7, 'days'));
-                        setEndDate(dayjs());
-                        setActiveDateFilter('last7');
-                      }}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                    <Chip
-                      label="Last 30 Days"
-                      size="small"
-                      variant={activeDateFilter === 'last30' ? 'filled' : 'outlined'}
-                      color={activeDateFilter === 'last30' ? 'primary' : 'default'}
-                      onClick={() => {
-                        setStartDate(dayjs().subtract(30, 'days'));
-                        setEndDate(dayjs());
-                        setActiveDateFilter('last30');
-                      }}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                    <Chip
-                      label="This Month"
-                      size="small"
-                      variant={activeDateFilter === 'thisMonth' ? 'filled' : 'outlined'}
-                      color={activeDateFilter === 'thisMonth' ? 'primary' : 'default'}
-                      onClick={() => {
-                        setStartDate(dayjs().startOf('month'));
-                        setEndDate(dayjs().endOf('month'));
-                        setActiveDateFilter('thisMonth');
-                      }}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                    <Chip
-                      label="Last Month"
-                      size="small"
-                      variant={activeDateFilter === 'lastMonth' ? 'filled' : 'outlined'}
-                      color={activeDateFilter === 'lastMonth' ? 'primary' : 'default'}
-                      onClick={() => {
-                        setStartDate(dayjs().subtract(1, 'month').startOf('month'));
-                        setEndDate(dayjs().subtract(1, 'month').endOf('month'));
-                        setActiveDateFilter('lastMonth');
-                      }}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                  </Box>
-                </Grid>
-
-                <Grid size={{ md: 6, xs: 12 }}>
-                  <Autocomplete
-                    multiple
-                    options={tags.map((t) => t.name)}
-                    value={includeTags}
-                    onChange={(_, value) => setIncludeTags(value)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Include Tags (show WITH these)"
-                        size="small"
-                        placeholder="Select tags to include..."
-                      />
-                    )}
-                    renderTags={(value, getTagProps) =>
-                      value.map((option, index) => (
-                        <Chip
-                          label={option}
-                          size="small"
-                          color="success"
-                          {...getTagProps({ index })}
-                          key={index}
-                        />
-                      ))
-                    }
-                  />
-                </Grid>
-
-                <Grid size={{ md: 6, xs: 12 }}>
-                  <Autocomplete
-                    multiple
-                    options={tags.map((t) => t.name)}
-                    value={excludeTags}
-                    onChange={(_, value) => setExcludeTags(value)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Exclude Tags (hide WITH these)"
-                        size="small"
-                        placeholder="Select tags to exclude..."
-                      />
-                    )}
-                    renderTags={(value, getTagProps) =>
-                      value.map((option, index) => (
-                        <Chip
-                          label={option}
-                          size="small"
-                          color="error"
-                          {...getTagProps({ index })}
-                          key={index}
-                        />
-                      ))
-                    }
-                  />
-                </Grid>
-
-                {/* Amount Range Filter - Compact Design */}
-                <Grid size={{ sm: 6, xs: 12, md: 2 }}>
-                  <TextField
-                    select
-                    label="Amount Range"
-                    value={amountQuickFilter}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setAmountQuickFilter(value);
-                      switch (value) {
-                        case 'small':
-                          setMinAmount('0');
-                          setMaxAmount('50');
-                          break;
-                        case 'medium':
-                          setMinAmount('50');
-                          setMaxAmount('200');
-                          break;
-                        case 'large':
-                          setMinAmount('200');
-                          setMaxAmount('1000');
-                          break;
-                        case 'veryLarge':
-                          setMinAmount('1000');
-                          setMaxAmount('');
-                          break;
-                        case 'any':
-                          setMinAmount('');
-                          setMaxAmount('');
-                          break;
-                        case 'custom':
-                          // Keep current values
-                          break;
-                      }
-                    }}
-                    fullWidth
-                    size="small"
-                  >
-                    <MenuItem value="any">Any Amount</MenuItem>
-                    <MenuItem value="small">
-                      {currencySymbol}0-{currencySymbol}50
-                    </MenuItem>
-                    <MenuItem value="medium">
-                      {currencySymbol}50-{currencySymbol}200
-                    </MenuItem>
-                    <MenuItem value="large">
-                      {currencySymbol}200-{currencySymbol}1K
-                    </MenuItem>
-                    <MenuItem value="veryLarge">&gt;{currencySymbol}1K</MenuItem>
-                    <MenuItem value="custom">Custom Range</MenuItem>
-                  </TextField>
-                </Grid>
-
-                <Grid size={{ sm: 6, xs: 12, md: 2 }}>
-                  <TextField
-                    label="Min Amount"
-                    type="number"
-                    value={minAmount}
-                    onChange={(e) => {
-                      setMinAmount(e.target.value);
-                      if (e.target.value || maxAmount) {
-                        setAmountQuickFilter('custom');
-                      }
-                    }}
-                    placeholder="0"
-                    fullWidth
-                    size="small"
-                    InputProps={{
-                      startAdornment: <span style={{ marginRight: 4 }}>{currencySymbol}</span>,
-                    }}
-                  />
-                </Grid>
-
-                <Grid size={{ sm: 6, xs: 12, md: 2 }}>
-                  <TextField
-                    label="Max Amount"
-                    type="number"
-                    value={maxAmount}
-                    onChange={(e) => {
-                      setMaxAmount(e.target.value);
-                      if (minAmount || e.target.value) {
-                        setAmountQuickFilter('custom');
-                      }
-                    }}
-                    placeholder="No limit"
-                    fullWidth
-                    size="small"
-                    InputProps={{
-                      startAdornment: <span style={{ marginRight: 4 }}>{currencySymbol}</span>,
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            </Collapse>
           </CardContent>
         </Card>
+
+        {/* Bulk Actions */}
+        {selectedTransactions.size > 0 && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+                <Chip
+                  label={`${selectedTransactions.size} selected`}
+                  color="primary"
+                  variant="filled"
+                  onDelete={() => {
+                    setSelectedTransactions(new Set());
+                    setSelectAll(false);
+                  }}
+                  size="small"
+                  sx={{ fontWeight: 600, fontSize: '0.8125rem', height: 28 }}
+                />
+                {reviewStatus === 'pending' && (
+                  <Button
+                    size="small"
+                    color="success"
+                    variant="contained"
+                    startIcon={<ApproveIcon />}
+                    onClick={handleBulkApprove}
+                    sx={{ fontSize: '0.875rem', minHeight: 32 }}
+                  >
+                    Approve
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  color="error"
+                  variant="outlined"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleBulkDelete}
+                  sx={{ fontSize: '0.875rem', minHeight: 32 }}
+                >
+                  Delete
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Transactions - Table for desktop, Cards for mobile */}
         {isMobile ? (
@@ -3156,7 +2655,8 @@ const Transactions: React.FC = () => {
                             ? new Intl.NumberFormat('en-US', {
                                 style: 'currency',
                                 currency:
-                                  accounts.find((a) => a.id === formData.accountId)?.currency ||
+                                  accounts.find((a: Account) => a.id === formData.accountId)
+                                    ?.currency ||
                                   user?.currency ||
                                   'USD',
                               })
@@ -3272,7 +2772,7 @@ const Transactions: React.FC = () => {
                     fullWidth
                     required
                   >
-                    {accounts.map((account) => (
+                    {accounts.map((account: Account) => (
                       <MenuItem key={account.id} value={account.id}>
                         {account.name} ({account.type})
                       </MenuItem>
@@ -3406,11 +2906,13 @@ const Transactions: React.FC = () => {
                     <Grid size={{ sm: 6, xs: 12 }}>
                       <Autocomplete
                         options={[
-                          ...categories.filter((c) => recentCategories.includes(c.id)),
-                          ...categories.filter((c) => !recentCategories.includes(c.id)),
-                        ].filter((c) => !c.isFolder)}
+                          ...categories.filter((c: Category) => recentCategories.includes(c.id)),
+                          ...categories.filter((c: Category) => !recentCategories.includes(c.id)),
+                        ].filter((c: Category) => !c.isFolder)}
                         getOptionLabel={(option) => option.name}
-                        value={categories.find((c) => c.id === formData.categoryId) || null}
+                        value={
+                          categories.find((c: Category) => c.id === formData.categoryId) || null
+                        }
                         onChange={(_, newValue) => {
                           if (newValue) {
                             handleCategoryChange(newValue.id);
@@ -3460,7 +2962,7 @@ const Transactions: React.FC = () => {
                       <Autocomplete
                         multiple
                         freeSolo
-                        options={tags.map((t) => t.name)}
+                        options={tags.map((t: Tag) => t.name)}
                         value={formData.tags}
                         onChange={(_, value) => {
                           setFormData({ ...formData, tags: value });
@@ -3626,8 +3128,8 @@ const Transactions: React.FC = () => {
                                 error={Boolean(!split.categoryId && split.amount > 0)}
                               >
                                 {categories
-                                  .filter((c) => !c.isFolder)
-                                  .map((category) => (
+                                  .filter((c: Category) => !c.isFolder)
+                                  .map((category: Category) => (
                                     <MenuItem key={category.id} value={category.id}>
                                       {category.name}
                                     </MenuItem>
@@ -3655,8 +3157,9 @@ const Transactions: React.FC = () => {
                                           ? new Intl.NumberFormat('en-US', {
                                               style: 'currency',
                                               currency:
-                                                accounts.find((a) => a.id === formData.accountId)
-                                                  ?.currency ||
+                                                accounts.find(
+                                                  (a: Account) => a.id === formData.accountId
+                                                )?.currency ||
                                                 user?.currency ||
                                                 'USD',
                                             })
@@ -3700,7 +3203,7 @@ const Transactions: React.FC = () => {
                               <Autocomplete
                                 multiple
                                 freeSolo
-                                options={tags.map((t) => t.name)}
+                                options={tags.map((t: Tag) => t.name)}
                                 value={split.tags}
                                 onChange={(_, value) => updateSplit(index, 'tags', value)}
                                 renderInput={(params) => (
@@ -3739,7 +3242,8 @@ const Transactions: React.FC = () => {
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',
                             currency:
-                              accounts.find((a) => a.id === formData.accountId)?.currency ||
+                              accounts.find((a: Account) => a.id === formData.accountId)
+                                ?.currency ||
                               user?.currency ||
                               'USD',
                           }).format(parseFloat(formData.amount) || 0)}
@@ -3749,7 +3253,8 @@ const Transactions: React.FC = () => {
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',
                             currency:
-                              accounts.find((a) => a.id === formData.accountId)?.currency ||
+                              accounts.find((a: Account) => a.id === formData.accountId)
+                                ?.currency ||
                               user?.currency ||
                               'USD',
                           }).format(getSplitTotal())}
@@ -3763,7 +3268,8 @@ const Transactions: React.FC = () => {
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',
                             currency:
-                              accounts.find((a) => a.id === formData.accountId)?.currency ||
+                              accounts.find((a: Account) => a.id === formData.accountId)
+                                ?.currency ||
                               user?.currency ||
                               'USD',
                           }).format(getRemainingAmount())}

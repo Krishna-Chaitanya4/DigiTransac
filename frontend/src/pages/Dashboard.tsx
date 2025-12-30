@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   Grid,
   Card,
@@ -6,1334 +6,714 @@ import {
   Typography,
   Box,
   Paper,
-  Avatar,
-  Chip,
-  Alert,
   Button,
-  LinearProgress,
   List,
   ListItem,
   ListItemText,
+  Chip,
+  Avatar,
+  IconButton,
+  Tooltip,
   Fade,
   Zoom,
-  Skeleton,
+  alpha,
+  CircularProgress,
 } from '@mui/material';
 import {
   TrendingUp,
   TrendingDown,
   Receipt,
   AccountBalanceWallet,
-  Warning as WarningIcon,
   Add as AddIcon,
-  AccountBalance,
-  CreditCard,
-  Savings,
-  Assessment,
-  Remove,
+  Refresh as RefreshIcon,
+  ArrowUpward,
+  ArrowDownward,
+  CalendarMonth,
+  Category as CategoryIcon,
+  PieChart,
+  AccountBalance as AccountBalanceIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
+import { ROUTE_PATHS } from '../config/routes.config';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { getTimeBasedGreeting, getTimeEmoji } from '../utils/greetings';
-import PullToRefresh from '../components/PullToRefresh';
+import { useTransactions, useCategories, useBudgets, useAccounts } from '../hooks/useApi';
 
-// Smart tag filtering: exclude these tags from expense/income calculations
-const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
-const INCOME_EXCLUDE_TAGS = ['transfer', 'refund'];
-
-// Helper function to check if transaction should be excluded from calculations
-const shouldExcludeFromExpenses = (transaction: any): boolean => {
-  // Check splits for excluding tags
-  if (transaction.splits && transaction.splits.length > 0) {
-    return transaction.splits.some((split: any) =>
-      split.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase()))
-    );
+// Add keyframe animation for refresh icon
+const styles = `
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
-  // Fallback to transaction-level tags
-  return (
-    transaction.tags?.some((tag: string) => EXPENSE_EXCLUDE_TAGS.includes(tag.toLowerCase())) ||
-    false
-  );
-};
+`;
 
-const shouldExcludeFromIncome = (transaction: any): boolean => {
-  // Check splits for excluding tags
-  if (transaction.splits && transaction.splits.length > 0) {
-    return transaction.splits.some((split: any) =>
-      split.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase()))
-    );
-  }
-  // Fallback to transaction-level tags
-  return (
-    transaction.tags?.some((tag: string) => INCOME_EXCLUDE_TAGS.includes(tag.toLowerCase())) ||
-    false
-  );
-};
-
-interface DashboardStats {
-  totalSpent: number;
-  monthSpent: number;
-  monthIncome: number;
-  netSavings: number;
-  budgetLeft: number;
-  categoryCount: number;
-  expenseCount: number;
-  incomeCount: number;
-  avgDailySpending: number;
-  percentChange: number;
-  incomePercentChange: number;
-}
-
-interface RecentTransaction {
-  id: string;
-  description: string;
-  amount: number;
-  type: 'credit' | 'debit';
-  categoryName: string;
-  categoryColor: string;
-  date: string;
-}
-
-interface BudgetStatus {
-  categoryName: string;
-  categoryId: string;
-  categoryColor: string;
-  spent: number;
-  budget: number;
-  percentage: number;
-  isOver: boolean;
-}
-
-interface UpcomingRecurring {
-  id: string;
-  description: string;
-  amount: number;
-  type: 'credit' | 'debit';
-  nextDate: string;
-  frequency: string;
-}
-
-interface AccountBalance {
-  id: string;
-  name: string;
-  accountType: string;
-  balance: number;
-  currency: string;
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
 }
 
 const Dashboard: React.FC = () => {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
-  const [budgetStatus, setBudgetStatus] = useState<BudgetStatus[]>([]);
-  const [alerts, setAlerts] = useState<string[]>([]);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-  const [upcomingRecurring, setUpcomingRecurring] = useState<UpcomingRecurring[]>([]);
-  const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
-  const [smartInsights, setSmartInsights] = useState<{
-    highestCategory: { name: string; amount: number };
-    unusualSpending: boolean;
-    savingsTrend: 'improving' | 'declining' | 'stable';
-    budgetHealthScore: number;
-  } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Filter states - Dashboard is locked to "This Month"
-  const [categories, setCategories] = useState<any[]>([]);
-  const [tags, setTags] = useState<any[]>([]);
-  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  // Greeting and emoji
+  const greeting = getTimeBasedGreeting();
+  const emoji = getTimeEmoji();
 
-  // Dashboard always shows "This Month" - no user filtering
-  const filters = {
-    dateRange: {
-      start: dayjs().startOf('month'),
-      end: dayjs().endOf('month'),
-      preset: 'thisMonth',
-    },
-    accounts: [] as string[],
-    categories: [] as string[],
-    includeTags: [] as string[],
-    excludeTags: [] as string[],
-    transactionType: 'all' as const,
+  // Fetch data for current month
+  const startDate = dayjs().startOf('month').toISOString();
+  const endDate = dayjs().endOf('month').toISOString();
+
+  const {
+    data: transactionsData,
+    isLoading: loadingTransactions,
+    refetch: refetchTransactions,
+  } = useTransactions({
+    startDate,
+    endDate,
+    reviewStatus: 'approved',
+    sortBy: 'date',
+    sortOrder: 'desc',
+  });
+
+  const { data: categoriesData, refetch: refetchCategories } = useCategories();
+  const { data: budgetsData, refetch: refetchBudgets } = useBudgets();
+  const { data: accountsData, refetch: refetchAccounts } = useAccounts();
+
+  const transactions = transactionsData?.data?.transactions || [];
+  const categories = categoriesData?.data?.categories || [];
+  const budgets = budgetsData?.data?.budgets || [];
+  const accounts = accountsData?.data?.accounts || [];
+
+  // Helper function to check if transaction has a specific tag
+  const hasTag = (transaction: any, tagName: string): boolean => {
+    if (!transaction.tags || !Array.isArray(transaction.tags)) return false;
+    return transaction.tags.some((tag: string) => tag.toLowerCase() === tagName.toLowerCase());
   };
 
-  useEffect(() => {
-    fetchInitialData();
-    // Load dismissed alerts from localStorage
-    const dismissed = localStorage.getItem('dismissedAlerts');
-    if (dismissed) {
-      try {
-        setDismissedAlerts(new Set(JSON.parse(dismissed)));
-      } catch (e) {
-        console.error('Failed to load dismissed alerts:', e);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Calculate statistics
+  const stats = useMemo(() => {
+    // Expenses = Debit transactions with "expense" tag
+    const expenses = transactions.filter((t: any) => t.type === 'debit' && hasTag(t, 'expense'));
+    // Income = Credit transactions with "income" tag
+    const income = transactions.filter((t: any) => t.type === 'credit' && hasTag(t, 'income'));
 
-  useEffect(() => {
-    // Only fetch dashboard data once initial data is loaded
-    // Dashboard is locked to "This Month" - no filter dependencies needed
-    if (initialDataLoaded) {
-      fetchDashboardData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDataLoaded]);
+    const totalExpenses = expenses.reduce((sum: number, t: any) => sum + t.amount, 0);
+    const totalIncome = income.reduce((sum: number, t: any) => sum + t.amount, 0);
 
-  const fetchInitialData = useCallback(async () => {
-    try {
-      const [, categoriesRes, tagsRes] = await Promise.all([
-        axios.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } }), // Still fetch but don't store
-        axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/tags', { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
+    return {
+      monthExpense: totalExpenses,
+      monthIncome: totalIncome,
+      netSavings: totalIncome - totalExpenses,
+      avgDailyExpense: totalExpenses / dayjs().date(),
+      expenseCount: expenses.length,
+      incomeCount: income.length,
+    };
+  }, [transactions]);
 
-      // We don't store accounts in state anymore since we removed filtering
-      setCategories(categoriesRes.data.categories || []);
-      setTags(tagsRes.data.tags || []);
-    } catch (err) {
-      console.error('Failed to fetch initial data:', err);
-      // Set empty arrays on error to unblock dashboard loading
-      setCategories([]);
-      setTags([]);
-    } finally {
-      setInitialDataLoaded(true);
-    }
-  }, [token]);
-
-  const handleDismissAlert = useCallback(
-    (alert: string) => {
-      const newDismissed = new Set(dismissedAlerts);
-      newDismissed.add(alert);
-      setDismissedAlerts(newDismissed);
-      // Save to localStorage
-      localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
-    },
-    [dismissedAlerts]
-  );
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      // Ensure start date includes beginning of day and end date includes end of day
-      const startDate = filters.dateRange.start.startOf('day').toISOString();
-      const endDate = filters.dateRange.end.endOf('day').toISOString();
-
-      // Build query params for transactions API
-      // Only fetch approved transactions for accurate financial calculations
-      const txnParams = new URLSearchParams({
-        startDate,
-        endDate,
-        reviewStatus: 'approved',
-        sortBy: 'date',
-        sortOrder: 'desc',
-      });
-
-      // Add account filters if specified
-      if (filters.accounts.length > 0) {
-        filters.accounts.forEach((accountId) => txnParams.append('accountIds', accountId));
-      }
-
-      const [transactionsRes, budgetsRes, accountsRes] = await Promise.all([
-        axios.get(`/api/transactions?${txnParams}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/budgets`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/accounts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
-
-      let transactions = transactionsRes.data.transactions || [];
-
-      // Apply client-side filtering for categories and tags
-      transactions = transactions.filter((t: any) => {
-        // Filter by transaction type
-        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
-          return false;
-        }
-
-        // Filter by categories (check splits)
-        if (filters.categories.length > 0) {
-          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
-          const hasMatchingCategory = txnCategories.some((catId: string) =>
-            filters.categories.includes(catId)
-          );
-          if (!hasMatchingCategory) return false;
-        }
-
-        // Filter by tags (include/exclude logic)
-        if (filters.includeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
-          if (!hasIncludedTag) return false;
-        }
-
-        if (filters.excludeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
-          if (hasExcludedTag) return false;
-        }
-
-        return true;
-      });
-
-      // Filter debits and credits with smart tag exclusion
-      const debits = transactions.filter(
-        (t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t)
-      );
-      const credits = transactions.filter(
-        (t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t)
-      );
-      const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
-      const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
-      const netSavings = totalIncome - totalSpent;
-
-      // Calculate previous period for comparison (same duration as current period)
-      const currentStart = filters.dateRange.start.toDate();
-      const currentEnd = filters.dateRange.end.toDate();
-      const periodDuration = currentEnd.getTime() - currentStart.getTime();
-      const prevEnd = new Date(currentStart.getTime() - 1);
-      const prevStart = new Date(prevEnd.getTime() - periodDuration);
-
-      const prevParams = new URLSearchParams({
-        startDate: prevStart.toISOString(),
-        endDate: prevEnd.toISOString(),
-        reviewStatus: 'approved',
-      });
-      if (filters.accounts.length > 0) {
-        filters.accounts.forEach((accountId) => prevParams.append('accountIds', accountId));
-      }
-
-      const prevRes = await axios.get(`/api/transactions?${prevParams}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      let prevTransactions = prevRes.data.transactions || [];
-
-      // Apply same client-side filtering to previous period
-      prevTransactions = prevTransactions.filter((t: any) => {
-        if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
-          return false;
-        }
-        if (filters.categories.length > 0) {
-          const txnCategories = t.splits?.map((s: any) => s.categoryId) || [t.categoryId];
-          const hasMatchingCategory = txnCategories.some((catId: string) =>
-            filters.categories.includes(catId)
-          );
-          if (!hasMatchingCategory) return false;
-        }
-        if (filters.includeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasIncludedTag = txnTags.some((tag: string) => filters.includeTags.includes(tag));
-          if (!hasIncludedTag) return false;
-        }
-        if (filters.excludeTags.length > 0) {
-          const txnTags = t.tags || [];
-          const hasExcludedTag = txnTags.some((tag: string) => filters.excludeTags.includes(tag));
-          if (hasExcludedTag) return false;
-        }
-        return true;
-      });
-
-      const prevSpent = prevTransactions
-        .filter((t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t))
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
-      const prevIncome = prevTransactions
-        .filter((t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t))
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-      // Calculate percentage changes
-      let spentChange = 0;
-      if (prevSpent > 0) {
-        spentChange = Math.round(((totalSpent - prevSpent) / prevSpent) * 100);
-      } else if (totalSpent > 0) {
-        spentChange = 100;
-      }
-
-      let incomeChange = 0;
-      if (prevIncome > 0) {
-        incomeChange = Math.round(((totalIncome - prevIncome) / prevIncome) * 100);
-      } else if (totalIncome > 0) {
-        incomeChange = 100;
-      }
-
-      // Calculate days in current period for average daily spending
-      const daysInPeriod = Math.ceil(periodDuration / (1000 * 60 * 60 * 24)) || 1;
-
-      setStats({
-        totalSpent,
-        monthSpent: totalSpent,
-        monthIncome: totalIncome,
-        netSavings,
-        budgetLeft: 0, // Will be calculated from budgets
-        categoryCount: new Set(debits.map((t: any) => t.categoryId)).size,
-        expenseCount: debits.length,
-        incomeCount: credits.length,
-        avgDailySpending: totalSpent / daysInPeriod,
-        percentChange: spentChange,
-        incomePercentChange: incomeChange,
-      });
-
-      // Process recent transactions (both credits and debits)
-      const categoryMap = new Map<string, { name: string; color: string }>(
-        categories.map((c: any) => [c.id, { name: c.name, color: c.color }])
-      );
-
-      setRecentTransactions(
-        transactions.slice(0, 5).map((txn: any) => {
-          const category = categoryMap.get(txn.categoryId);
-          return {
-            id: txn.id,
-            description: txn.description,
-            amount: txn.amount,
-            type: txn.type,
-            categoryName: category?.name || 'Unknown',
-            categoryColor: category?.color || '#667eea',
-            date: txn.date,
-          };
-        })
-      );
-
-      // Process account balances first (needed for budget display)
-      const accounts = accountsRes.data.accounts || [];
-      setAccountBalances(
-        accounts.map((acc: any) => ({
-          id: acc.id,
-          name: acc.name,
-          accountType: acc.accountType,
-          balance: acc.balance,
-          currency: acc.currency || user?.currency || 'USD',
-        }))
-      );
-
-      // Process budget status
-      const budgets = budgetsRes.data.budgets || [];
-      const budgetStatuses: BudgetStatus[] = [];
-      let totalBudget = 0;
-
-      for (const budget of budgets) {
-        // Use effective budget (includes rollover)
-        const effectiveBudget = budget.amount + (budget.rolledOverAmount || 0);
-        totalBudget += effectiveBudget;
-
-        // Use spent amount calculated by backend (handles all budget types correctly)
-        const spent = budget.spent || 0;
-        const percentage = Math.round((spent / effectiveBudget) * 100);
-
-        // Get display name based on budget type
-        let displayName = 'Unknown';
-        let displayColor = '#667eea';
-
-        if (budget.scopeType === 'category' && budget.categoryId) {
-          const category = categoryMap.get(budget.categoryId);
-          displayName = category?.name || 'Unknown Category';
-          displayColor = category?.color || '#667eea';
-        } else if (budget.scopeType === 'tag') {
-          // For tag budgets, show tag names
-          const includeTagNames = (budget.includeTagIds || [])
-            .map((id: string) => {
-              const tag = tags.find((t: any) => t.id === id);
-              return tag?.name || id;
-            })
-            .join(', ');
-          const excludeTagNames = (budget.excludeTagIds || [])
-            .map((id: string) => {
-              const tag = tags.find((t: any) => t.id === id);
-              return tag?.name || id;
-            })
-            .join(', ');
-
-          if (includeTagNames && excludeTagNames) {
-            displayName = `${includeTagNames} (excl: ${excludeTagNames})`;
-          } else if (includeTagNames) {
-            displayName = includeTagNames;
-          } else {
-            displayName = `Excl: ${excludeTagNames}`;
-          }
-          displayColor = '#ff6b6b';
-        } else if (budget.scopeType === 'account' && budget.accountId) {
-          const account = accounts.find((a: any) => a.id === budget.accountId);
-          displayName = account?.name || 'Unknown Account';
-          displayColor = account?.color || '#4caf50';
-        }
-
-        budgetStatuses.push({
-          categoryName: displayName,
-          categoryId: budget.categoryId || budget.accountId || 'tag-budget',
-          categoryColor: displayColor,
-          spent,
-          budget: effectiveBudget,
-          percentage,
-          isOver: spent > effectiveBudget,
-        });
-      }
-
-      // Update budget left in stats
-      // Only calculate budget left if there are budgets configured
-      const budgetLeft = budgets.length > 0 ? totalBudget - totalSpent : 0;
-      setStats((prev) => (prev ? { ...prev, budgetLeft } : null));
-
-      setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
-
-      // Calculate spending trends (last 6 months)
-      const now = new Date();
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-      // Set to start and end of day for inclusive date range
-      sixMonthsAgo.setHours(0, 0, 0, 0);
-      now.setHours(23, 59, 59, 999);
-
-      const trendParams = new URLSearchParams({
-        startDate: sixMonthsAgo.toISOString(),
-        endDate: now.toISOString(),
-      });
-      if (filters.accounts.length > 0) {
-        filters.accounts.forEach((accountId) => trendParams.append('accountIds', accountId));
-      }
-
-      await axios.get(`/api/transactions?${trendParams}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // Get upcoming recurring transactions
-      const recurringRes = await axios.get(`/api/transactions?isRecurring=true`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const recurringTxns = recurringRes.data.transactions || [];
-
-      const upcoming: UpcomingRecurring[] = recurringTxns
-        .map((t: any) => {
-          if (!t.recurrencePattern) return null;
-
-          const lastCreated = t.recurrencePattern.lastCreated
-            ? new Date(t.recurrencePattern.lastCreated)
-            : new Date(t.date);
-          const nextDate = new Date(lastCreated);
-
-          switch (t.recurrencePattern.frequency) {
-            case 'daily':
-              nextDate.setDate(nextDate.getDate() + 1);
-              break;
-            case 'weekly':
-              nextDate.setDate(nextDate.getDate() + 7);
-              break;
-            case 'monthly':
-              nextDate.setMonth(nextDate.getMonth() + 1);
-              if (t.recurrencePattern.day) {
-                nextDate.setDate(t.recurrencePattern.day);
-              }
-              break;
-            case 'yearly':
-              nextDate.setFullYear(nextDate.getFullYear() + 1);
-              break;
-          }
-
-          // Only show next 30 days
-          const thirtyDaysFromNow = new Date();
-          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
-          if (nextDate <= thirtyDaysFromNow && nextDate >= now) {
-            return {
-              id: t.id,
-              description: t.description,
-              amount: t.amount,
-              type: t.type,
-              nextDate: nextDate.toISOString(),
-              frequency: t.recurrencePattern.frequency,
-            };
-          }
-          return null;
-        })
-        .filter((t: any) => t !== null)
-        .sort((a: any, b: any) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
-        .slice(0, 5);
-
-      setUpcomingRecurring(upcoming);
-
-      // Generate alerts
-      const newAlerts: string[] = [];
-      const overBudget = budgetStatuses.filter((b) => b.isOver);
-      if (overBudget.length > 0) {
-        newAlerts.push(`${overBudget.length} categories are over budget`);
-      }
-      if (netSavings < 0) {
-        newAlerts.push(
-          `Spending exceeds income by ${formatCurrency(Math.abs(netSavings))} this month`
-        );
-      }
-      setAlerts(newAlerts);
-
-      // Calculate top category for insights
-      const categorySpending = new Map<string, { name: string; amount: number }>();
-      debits.forEach((t: any) => {
-        const category = categoryMap.get(t.categoryId);
-        if (category) {
-          const existing = categorySpending.get(t.categoryId);
-          categorySpending.set(t.categoryId, {
-            name: category.name,
-            amount: (existing?.amount || 0) + t.amount,
-          });
-        }
-      });
-      const topCategory = Array.from(categorySpending.values()).sort(
-        (a, b) => b.amount - a.amount
-      )[0];
-
-      // Generate Smart Insights
-      const insights = {
-        highestCategory: {
-          name: topCategory?.name || 'N/A',
-          amount: topCategory?.amount || 0,
-        },
-        unusualSpending: Math.abs(spentChange) > 30,
-        savingsTrend:
-          netSavings > 0 && incomeChange > spentChange
-            ? ('improving' as const)
-            : netSavings < 0 || spentChange > incomeChange
-              ? ('declining' as const)
-              : ('stable' as const),
-        budgetHealthScore: Math.max(
-          0,
-          Math.min(100, 100 - (overBudget.length / Math.max(1, budgetStatuses.length)) * 100)
-        ),
+  // Get recent transactions
+  const recentTransactions = useMemo(() => {
+    return transactions.slice(0, 5).map((t: any) => {
+      const category = categories.find((c: any) => c._id === t.categoryId);
+      return {
+        id: t._id,
+        description: t.description,
+        amount: t.amount,
+        type: t.type,
+        categoryName: category?.name || 'Uncategorized',
+        categoryColor: category?.color || '#999',
+        date: t.date,
       };
-      setSmartInsights(insights);
+    });
+  }, [transactions, categories]);
 
-      setError('');
-    } catch (err: any) {
-      console.error('Dashboard fetch error:', err);
-      // Don't show error for empty data (new users)
-      if (err.response?.status !== 404) {
-        setError(err.response?.data?.message || 'Failed to fetch dashboard data');
-      }
-    } finally {
-      setLoading(false);
-    }
+  // Calculate budget status (only for expense transactions)
+  const budgetStatus = useMemo(() => {
+    return budgets
+      .map((budget: any) => {
+        const category = categories.find((c: any) => c._id === budget.categoryId);
+        // Only count debit transactions with "expense" tag for budget tracking
+        const spent = transactions
+          .filter(
+            (t: any) =>
+              t.type === 'debit' && t.categoryId === budget.categoryId && hasTag(t, 'expense')
+          )
+          .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+        return {
+          categoryName: category?.name || 'Unknown',
+          categoryColor: category?.color || '#999',
+          spent,
+          budget: budget.amount,
+          percentage: Math.round((spent / budget.amount) * 100),
+          isOver: spent > budget.amount,
+        };
+      })
+      .filter((b: any) => b.spent > 0 || b.budget > 0); // Only show budgets with activity
+  }, [budgets, categories, transactions]);
+
+  const formatCurrency = (amount: number) => {
+    return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
   };
 
-  const formatCurrency = useCallback(
-    (amount: number) => {
-      return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
-    },
-    [user?.currency]
-  );
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([
+      refetchTransactions(),
+      refetchCategories(),
+      refetchBudgets(),
+      refetchAccounts(),
+    ]);
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
 
-  const formatDate = useCallback((dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+  const handleQuickAddTransaction = (type: 'income' | 'expense') => {
+    navigate(ROUTE_PATHS.TRANSACTIONS, { state: { quickAdd: true, type } });
+  };
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  const handleStatCardClick = (path: string) => {
+    navigate(path);
+  };
 
-    const daysAgo = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysAgo < 7) return `${daysAgo} days ago`;
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }, []);
-
-  if (loading) {
+  if (loadingTransactions) {
     return (
-      <Box>
-        {/* Animated Header Skeleton */}
-        <Box sx={{ mb: 4 }}>
-          <Skeleton variant="text" width="60%" height={60} sx={{ mb: 1 }} />
-          <Skeleton variant="text" width="40%" height={30} />
-        </Box>
-
-        {/* Stats Cards Skeleton */}
-        <Grid container spacing={3} mb={3}>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Grid size={{ sm: 6, xs: 12, md: 4 }} key={i}>
-              <Skeleton
-                variant="rectangular"
-                height={180}
-                sx={{ borderRadius: 3 }}
-                animation="wave"
-              />
-            </Grid>
-          ))}
-        </Grid>
-
-        {/* Content Skeleton */}
-        <Grid container spacing={3}>
-          <Grid size={{ md: 7, xs: 12 }}>
-            <Skeleton
-              variant="rectangular"
-              height={450}
-              sx={{ borderRadius: 3 }}
-              animation="wave"
-            />
-          </Grid>
-          <Grid size={{ md: 5, xs: 12 }}>
-            <Skeleton
-              variant="rectangular"
-              height={450}
-              sx={{ borderRadius: 3 }}
-              animation="wave"
-            />
-          </Grid>
-        </Grid>
+      <Box p={3}>
+        <CircularProgress />
       </Box>
     );
   }
 
-  const statCards = [
-    {
-      title: 'Month Spent',
-      value: formatCurrency(stats?.monthSpent || 0),
-      change: `${(stats?.percentChange ?? 0) <= 0 ? '+' : ''}${Math.abs(stats?.percentChange ?? 0)}% vs last month`,
-      trend: (stats?.percentChange || 0) > 0 ? 'down' : 'up',
-      icon: <Receipt sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
-    },
-    {
-      title: 'Month Income',
-      value: formatCurrency(stats?.monthIncome || 0),
-      change: `${(stats?.incomePercentChange ?? 0) >= 0 ? '+' : ''}${stats?.incomePercentChange ?? 0}% vs last month`,
-      trend: (stats?.incomePercentChange || 0) >= 0 ? 'up' : 'down',
-      icon: <TrendingUp sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-    },
-    {
-      title: 'Net Savings',
-      value: formatCurrency(stats?.netSavings || 0),
-      change: (stats?.netSavings || 0) >= 0 ? 'Positive flow' : 'Negative flow',
-      trend: (stats?.netSavings || 0) >= 0 ? 'up' : 'down',
-      icon: <AccountBalanceWallet sx={{ fontSize: 32 }} />,
-      gradient:
-        (stats?.netSavings || 0) >= 0
-          ? 'linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%)'
-          : 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
-    },
-    {
-      title: 'Budget Left',
-      value: budgetStatus.length === 0 ? 'No budgets' : formatCurrency(stats?.budgetLeft || 0),
-      change: budgetStatus.length === 0 ? 'Create budgets' : `${stats?.expenseCount || 0} expenses`,
-      trend: (stats?.budgetLeft || 0) > 0 ? 'up' : 'down',
-      icon: <Savings sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-    },
-    {
-      title: 'Avg Daily',
-      value: formatCurrency(stats?.avgDailySpending || 0),
-      change: 'This month',
-      trend: 'up',
-      icon: <Assessment sx={{ fontSize: 32 }} />,
-      gradient: 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
-    },
-  ];
-
-  const content = (
-    <>
-      {/* Animated Gradient Header */}
-      <Fade in timeout={600}>
-        <Box
-          sx={{
-            mb: 4,
-            p: 4,
-            borderRadius: 4,
-            position: 'relative',
-            overflow: 'hidden',
-            background: (theme) =>
-              theme.palette.mode === 'light'
-                ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
-                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
-            boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}40`,
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background:
-                'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
-              animation: 'pulse 4s ease-in-out infinite',
-            },
-            '@keyframes pulse': {
-              '0%, 100%': { opacity: 0.6 },
-              '50%': { opacity: 1 },
-            },
-          }}
-        >
-          <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box
+  return (
+    <Box sx={{ p: 3 }}>
+      {/* Header with Actions */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box>
+          <Typography variant="h4" fontWeight={700} gutterBottom>
+            {greeting}, {(user as any)?.name || 'User'}! {emoji}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {dayjs().format('MMMM D, YYYY')}
+          </Typography>
+        </Box>
+        <Box display="flex" gap={1}>
+          <Tooltip title="Refresh">
+            <IconButton
+              onClick={handleRefresh}
+              disabled={isRefreshing}
               sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                flexWrap: 'wrap',
-                gap: 2,
+                bgcolor: 'action.hover',
+                '&:hover': { bgcolor: 'action.selected' },
               }}
             >
-              <Box sx={{ flex: 1, minWidth: 250 }}>
-                <Typography
-                  variant="h3"
-                  fontWeight={800}
-                  gutterBottom
-                  sx={{
-                    letterSpacing: '-0.02em',
-                    color: 'white',
-                    textShadow: '0 2px 10px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  {getTimeBasedGreeting()}, {user?.fullName || user?.username || 'User'}!{' '}
-                  {getTimeEmoji()}
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    color: 'rgba(255,255,255,0.95)',
-                    fontWeight: 500,
-                    mt: 1,
-                    textShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  {budgetStatus.length > 0 && budgetStatus.some((b) => b.percentage >= 90)
-                    ? `⚠️ ${budgetStatus.filter((b) => b.percentage >= 90).length} budget${budgetStatus.filter((b) => b.percentage >= 90).length > 1 ? 's' : ''} approaching limit`
-                    : (stats?.netSavings || 0) >= 0
-                      ? `🎉 You're ${formatCurrency(Math.abs(stats?.netSavings || 0))} in savings this month`
-                      : `Spending ${formatCurrency(Math.abs(stats?.netSavings || 0))} more than income this month`}
-                </Typography>
-              </Box>
-              <Zoom in timeout={800}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={<AddIcon />}
-                  onClick={() => navigate('/transactions')}
-                  sx={{
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    px: 4,
-                    py: 1.5,
-                    bgcolor: 'white',
-                    color: 'primary.main',
-                    fontWeight: 700,
-                    fontSize: '1rem',
-                    boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
-                      bgcolor: 'rgba(255,255,255,0.95)',
-                    },
-                  }}
-                >
-                  <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                    New Transaction
-                  </Box>
-                  <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                    New
-                  </Box>
-                </Button>
-              </Zoom>
+              <RefreshIcon sx={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+            </IconButton>
+          </Tooltip>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleQuickAddTransaction('expense')}
+            sx={{
+              background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              '&:hover': {
+                background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: 4,
+              },
+              transition: 'all 0.2s',
+            }}
+          >
+            Add Expense
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleQuickAddTransaction('income')}
+            sx={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              '&:hover': {
+                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: 4,
+              },
+              transition: 'all 0.2s',
+            }}
+          >
+            Add Income
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Summary Banner */}
+      <Paper
+        sx={{
+          p: 3,
+          mb: 3,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+          color: 'white',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: '200px',
+            height: '200px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '50%',
+            transform: 'translate(50%, -50%)',
+          },
+        }}
+      >
+        <Box position="relative" zIndex={1}>
+          {stats.netSavings < 0 ? (
+            <Box>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
+                💸 Expenses exceed income
+              </Typography>
+              <Typography variant="body1">
+                You&apos;re spending {formatCurrency(Math.abs(stats.netSavings))} more than your
+                income this month
+              </Typography>
             </Box>
-          </Box>
+          ) : stats.netSavings > 0 ? (
+            <Box>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
+                🎉 Great job saving!
+              </Typography>
+              <Typography variant="body1">
+                You&apos;re saving {formatCurrency(stats.netSavings)} this month - Keep it up!
+              </Typography>
+            </Box>
+          ) : (
+            <Box>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
+                💰 Breaking even
+              </Typography>
+              <Typography variant="body1">
+                Your income and expenses are balanced this month
+              </Typography>
+            </Box>
+          )}
         </Box>
-      </Fade>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <Box mb={3}>
-          {alerts
-            .filter((alert) => !dismissedAlerts.has(alert))
-            .map((alert, idx) => (
-              <Alert
-                key={idx}
-                severity="warning"
-                icon={<WarningIcon />}
-                onClose={() => handleDismissAlert(alert)}
-                sx={{ mb: 1, borderRadius: 2 }}
-              >
-                {alert}
-              </Alert>
-            ))}
-        </Box>
-      )}
+      </Paper>
 
       {/* Stats Cards */}
-      <Grid container spacing={3} mb={3}>
-        {statCards.map((stat, index) => (
-          <Grid size={{ sm: 6, xs: 12, md: 4 }} key={index}>
-            <Zoom in timeout={400 + index * 100}>
-              <Card
-                sx={{
-                  height: '100%',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  borderRadius: 3,
-                  background: (theme) =>
-                    theme.palette.mode === 'light'
-                      ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-                      : 'linear-gradient(135deg, rgba(30, 30, 30, 0.9) 0%, rgba(20, 20, 20, 0.9) 100%)',
-                  backdropFilter: 'blur(20px)',
-                  border: (theme) =>
-                    theme.palette.mode === 'light'
-                      ? `1px solid ${theme.palette.primary.main}1A`
-                      : `1px solid ${theme.palette.primary.main}33`,
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    transform: 'translateY(-12px)',
-                    boxShadow: (theme) => `0 20px 40px ${theme.palette.primary.main}33`,
-                    border: (theme) =>
-                      theme.palette.mode === 'light'
-                        ? `1px solid ${theme.palette.primary.main}4D`
-                        : `1px solid ${theme.palette.primary.main}66`,
-                    '& .stat-icon': {
-                      transform: 'scale(1.1) rotate(5deg)',
-                    },
-                    '& .stat-value': {
-                      transform: 'scale(1.02)',
-                    },
-                    '&::before': {
-                      opacity: 1,
-                    },
-                  },
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    background: stat.gradient,
-                    opacity: 0.8,
-                    transition: 'opacity 0.4s ease',
-                  },
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    width: '60px',
-                    height: '60px',
-                    background: stat.gradient,
-                    opacity: 0.05,
-                    borderRadius: '0 0 0 100%',
-                  },
-                }}
-              >
-                <CardContent sx={{ p: 3, position: 'relative', zIndex: 1 }}>
-                  <Box sx={{ mb: 3 }}>
-                    <Avatar
-                      className="stat-icon"
-                      sx={{
-                        background: stat.gradient,
-                        width: 60,
-                        height: 60,
-                        boxShadow: (theme) => `0 8px 16px ${theme.palette.primary.main}4D`,
-                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                      }}
-                    >
-                      {stat.icon}
-                    </Avatar>
-                  </Box>
-                  <Typography
-                    className="stat-value"
-                    variant="h4"
-                    fontWeight={800}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {/* Month Expenses */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Zoom in timeout={300}>
+            <Card
+              onClick={() => handleStatCardClick(ROUTE_PATHS.TRANSACTIONS)}
+              sx={{
+                borderRadius: 3,
+                height: '100%',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                background:
+                  'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: alpha('#f43f5e', 0.1),
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: '0 12px 24px rgba(244, 63, 94, 0.15)',
+                  borderColor: '#f43f5e',
+                },
+              }}
+            >
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                  <Avatar
                     sx={{
-                      mb: 0.5,
-                      letterSpacing: '-0.02em',
-                      background: stat.gradient,
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      transition: 'transform 0.4s ease',
+                      bgcolor: '#f43f5e',
+                      width: 56,
+                      height: 56,
+                      boxShadow: '0 4px 12px rgba(244, 63, 94, 0.3)',
                     }}
                   >
-                    {stat.value}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    fontWeight={600}
+                    <TrendingDown sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Chip
+                    icon={<ArrowUpward sx={{ fontSize: 16 }} />}
+                    label="This month"
+                    size="small"
                     sx={{
-                      mb: 1.5,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      fontSize: '0.7rem',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      bgcolor: alpha('#f43f5e', 0.1),
+                      color: '#f43f5e',
+                      fontWeight: 600,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h4" fontWeight={700} gutterBottom color="#f43f5e">
+                  {formatCurrency(stats.monthExpense)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>
+                  MONTH EXPENSES
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {stats.expenseCount} transactions
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
+        </Grid>
+
+        {/* Month Income */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Zoom in timeout={400}>
+            <Card
+              onClick={() => handleStatCardClick(ROUTE_PATHS.TRANSACTIONS)}
+              sx={{
+                borderRadius: 3,
+                height: '100%',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                background:
+                  'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: alpha('#10b981', 0.1),
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: '0 12px 24px rgba(16, 185, 129, 0.15)',
+                  borderColor: '#10b981',
+                },
+              }}
+            >
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                  <Avatar
+                    sx={{
+                      bgcolor: '#10b981',
+                      width: 56,
+                      height: 56,
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
                     }}
                   >
-                    {stat.title}
-                  </Typography>
-                  <Box
+                    <TrendingUp sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Chip
+                    icon={<ArrowUpward sx={{ fontSize: 16 }} />}
+                    label="This month"
+                    size="small"
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      p: 1,
-                      borderRadius: 1.5,
-                      bgcolor: (theme) =>
-                        theme.palette.mode === 'light'
-                          ? stat.trend === 'up'
-                            ? 'rgba(16, 185, 129, 0.1)'
-                            : 'rgba(239, 68, 68, 0.1)'
-                          : stat.trend === 'up'
-                            ? 'rgba(16, 185, 129, 0.2)'
-                            : 'rgba(239, 68, 68, 0.2)',
+                      bgcolor: alpha('#10b981', 0.1),
+                      color: '#10b981',
+                      fontWeight: 600,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h4" fontWeight={700} gutterBottom color="#10b981">
+                  {formatCurrency(stats.monthIncome)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>
+                  MONTH INCOME
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {stats.incomeCount} transactions
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
+        </Grid>
+
+        {/* Net Savings */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Zoom in timeout={500}>
+            <Card
+              onClick={() => handleStatCardClick(ROUTE_PATHS.ANALYTICS)}
+              sx={{
+                borderRadius: 3,
+                height: '100%',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                background:
+                  stats.netSavings >= 0
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                    : 'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: stats.netSavings >= 0 ? alpha('#10b981', 0.1) : alpha('#f43f5e', 0.1),
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow:
+                    stats.netSavings >= 0
+                      ? '0 12px 24px rgba(16, 185, 129, 0.15)'
+                      : '0 12px 24px rgba(244, 63, 94, 0.15)',
+                  borderColor: stats.netSavings >= 0 ? '#10b981' : '#f43f5e',
+                },
+              }}
+            >
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                  <Avatar
+                    sx={{
+                      bgcolor: stats.netSavings >= 0 ? '#10b981' : '#f43f5e',
+                      width: 56,
+                      height: 56,
+                      boxShadow:
+                        stats.netSavings >= 0
+                          ? '0 4px 12px rgba(16, 185, 129, 0.3)'
+                          : '0 4px 12px rgba(244, 63, 94, 0.3)',
                     }}
                   >
-                    {stat.trend === 'up' ? (
-                      <TrendingUp sx={{ fontSize: 16, color: 'success.main' }} />
-                    ) : (
-                      <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
-                    )}
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: stat.trend === 'up' ? 'success.main' : 'error.main',
-                        fontWeight: 700,
-                        fontSize: '0.7rem',
-                      }}
-                    >
-                      {stat.change}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Zoom>
-          </Grid>
-        ))}
+                    <AccountBalanceWallet sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Chip
+                    icon={
+                      stats.netSavings >= 0 ? (
+                        <ArrowUpward sx={{ fontSize: 16 }} />
+                      ) : (
+                        <ArrowDownward sx={{ fontSize: 16 }} />
+                      )
+                    }
+                    label={stats.netSavings >= 0 ? 'Surplus' : 'Deficit'}
+                    size="small"
+                    sx={{
+                      bgcolor:
+                        stats.netSavings >= 0 ? alpha('#10b981', 0.1) : alpha('#f43f5e', 0.1),
+                      color: stats.netSavings >= 0 ? '#10b981' : '#f43f5e',
+                      fontWeight: 600,
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="h4"
+                  fontWeight={700}
+                  gutterBottom
+                  color={stats.netSavings >= 0 ? '#10b981' : '#f43f5e'}
+                >
+                  {stats.netSavings >= 0 ? '+' : ''}
+                  {formatCurrency(stats.netSavings)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>
+                  NET SAVINGS
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color={stats.netSavings >= 0 ? 'success.main' : 'error.main'}
+                >
+                  {stats.netSavings >= 0 ? '🎯 Great!' : '⚠️ Watch spending'}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
+        </Grid>
+
+        {/* Avg Daily Expense */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Zoom in timeout={600}>
+            <Card
+              onClick={() => handleStatCardClick(ROUTE_PATHS.ANALYTICS)}
+              sx={{
+                borderRadius: 3,
+                height: '100%',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                background:
+                  'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%)',
+                border: '1px solid',
+                borderColor: alpha('#3b82f6', 0.1),
+                '&:hover': {
+                  transform: 'translateY(-8px)',
+                  boxShadow: '0 12px 24px rgba(59, 130, 246, 0.15)',
+                  borderColor: '#3b82f6',
+                },
+              }}
+            >
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                  <Avatar
+                    sx={{
+                      bgcolor: '#3b82f6',
+                      width: 56,
+                      height: 56,
+                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                    }}
+                  >
+                    <CalendarMonth sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Chip
+                    label={`${dayjs().date()} days`}
+                    size="small"
+                    sx={{
+                      bgcolor: alpha('#3b82f6', 0.1),
+                      color: '#3b82f6',
+                      fontWeight: 600,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h4" fontWeight={700} gutterBottom color="#3b82f6">
+                  {formatCurrency(stats.avgDailyExpense)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>
+                  AVG DAILY EXPENSE
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Per day this month
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
+        </Grid>
       </Grid>
 
-      {/* Budget Status & Recent Activity */}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid size={{ md: 5, xs: 12 }}>
+      <Grid container spacing={3}>
+        {/* Recent Transactions */}
+        <Grid size={{ xs: 12, md: 7 }}>
           <Paper
             sx={{
               p: 3,
-              height: 450,
               borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-              },
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
             }}
           >
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <AccountBalanceWallet color="primary" />
-              <Typography variant="h5" fontWeight={700}>
-                Account Balances
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Your accounts overview
-            </Typography>
-            {accountBalances.length > 0 ? (
-              <Box
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+              <Box display="flex" alignItems="center" gap={1.5}>
+                <Avatar sx={{ bgcolor: '#14b8a6', width: 40, height: 40 }}>
+                  <Receipt />
+                </Avatar>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    Recent Transactions
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Latest activity
+                  </Typography>
+                </Box>
+              </Box>
+              <Button
+                size="small"
+                onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
+                endIcon={<ArrowUpward sx={{ transform: 'rotate(45deg)' }} />}
                 sx={{
-                  maxHeight: 280,
-                  overflowY: 'auto',
-                  pr: 1,
-                  '&::-webkit-scrollbar': {
-                    width: '6px',
-                  },
-                  '&::-webkit-scrollbar-track': {
-                    background: (theme) =>
-                      theme.palette.mode === 'light'
-                        ? 'rgba(0,0,0,0.05)'
-                        : 'rgba(255,255,255,0.05)',
-                    borderRadius: '10px',
-                  },
-                  '&::-webkit-scrollbar-thumb': {
-                    background: (theme) =>
-                      theme.palette.mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)',
-                    borderRadius: '10px',
-                    '&:hover': {
-                      background: (theme) =>
-                        theme.palette.mode === 'light'
-                          ? 'rgba(0,0,0,0.3)'
-                          : 'rgba(255,255,255,0.3)',
-                    },
-                  },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  color: '#14b8a6',
+                  '&:hover': { bgcolor: alpha('#14b8a6', 0.08) },
                 }}
               >
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                  {accountBalances.map((account) => {
-                    const accountCurrency = account.currency || user?.currency || 'USD';
-                    const formattedBalance = new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: accountCurrency,
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(account.balance);
-
-                    // Determine icon and color based on account type
-                    const accountType = (account.accountType || 'wallet').toLowerCase();
-
-                    let accountIcon = <AccountBalanceWallet />;
-                    let accountGradient = 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
-
-                    if (accountType.includes('bank')) {
-                      accountIcon = <AccountBalance />;
-                      accountGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                    } else if (accountType.includes('card') || accountType.includes('credit')) {
-                      accountIcon = <CreditCard />;
-                      accountGradient = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-                    } else if (accountType.includes('saving')) {
-                      accountIcon = <Savings />;
-                      accountGradient = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
-                    }
-
-                    return (
-                      <Grid size={{ xs: 12 }} key={account.id}>
-                        <Box
-                          sx={{
-                            p: 2,
-                            borderRadius: 3,
-                            background: (theme) =>
-                              theme.palette.mode === 'light' ? 'white' : 'rgba(255,255,255,0.05)',
-                            border: (theme) =>
-                              theme.palette.mode === 'light'
-                                ? '1px solid rgba(0,0,0,0.08)'
-                                : '1px solid rgba(255,255,255,0.1)',
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            cursor: 'pointer',
-                            '&:hover': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)',
-                            },
-                          }}
-                          onClick={() => navigate('/accounts')}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar
-                              sx={{
-                                width: 44,
-                                height: 44,
-                                background: accountGradient,
-                                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
-                              }}
-                            >
-                              {accountIcon}
-                            </Avatar>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography
-                                variant="body2"
-                                fontWeight={600}
-                                sx={{
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  lineHeight: 1.3,
-                                }}
-                              >
-                                {account.name}
-                              </Typography>
-                            </Box>
+                View All
+              </Button>
+            </Box>
+            {recentTransactions.length > 0 ? (
+              <List sx={{ p: 0 }}>
+                {recentTransactions.map((txn: any, index: number) => (
+                  <Fade in timeout={300 + index * 100} key={txn.id}>
+                    <ListItem
+                      onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
+                      sx={{
+                        borderRadius: 2,
+                        mb: 1.5,
+                        bgcolor: 'action.hover',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: '1px solid transparent',
+                        '&:hover': {
+                          bgcolor: 'background.paper',
+                          borderColor: '#14b8a6',
+                          transform: 'translateX(4px)',
+                          boxShadow: '0 4px 12px rgba(20, 184, 166, 0.15)',
+                        },
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 2,
+                          bgcolor: txn.categoryColor,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          mr: 2,
+                        }}
+                      >
+                        <CategoryIcon sx={{ color: 'white', fontSize: 20 }} />
+                      </Box>
+                      <ListItemText
+                        primary={
+                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Typography variant="body1" fontWeight={600}>
+                              {txn.description}
+                            </Typography>
                             <Typography
                               variant="h6"
                               fontWeight={700}
-                              color={account.balance >= 0 ? 'success.main' : 'error.main'}
-                              sx={{
-                                fontSize: '1.1rem',
-                                whiteSpace: 'nowrap',
-                              }}
+                              color={txn.type === 'credit' ? 'success.main' : 'error.main'}
                             >
-                              {formattedBalance}
+                              {txn.type === 'credit' ? '+' : '-'}
+                              {formatCurrency(txn.amount)}
                             </Typography>
                           </Box>
-                        </Box>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-                <Box
-                  sx={{
-                    p: 3,
-                    borderRadius: 3,
-                    background: (theme) => theme.palette.gradient.primary,
-                    boxShadow: '0 8px 24px rgba(20, 184, 166, 0.4)',
-                  }}
-                >
-                  <Box
-                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                  >
-                    <Box>
-                      <Typography
-                        variant="body2"
-                        color="rgba(255,255,255,0.8)"
-                        sx={{ mb: 0.5, fontWeight: 500 }}
-                      >
-                        Total Balance
-                      </Typography>
-                      <Typography variant="h4" fontWeight={700} color="white">
-                        {formatCurrency(accountBalances.reduce((sum, acc) => sum + acc.balance, 0))}
-                      </Typography>
-                    </Box>
-                    <Avatar
-                      sx={{
-                        width: 56,
-                        height: 56,
-                        background: 'rgba(255,255,255,0.2)',
-                        backdropFilter: 'blur(10px)',
-                      }}
-                    >
-                      <AccountBalanceWallet sx={{ fontSize: 28, color: 'white' }} />
-                    </Avatar>
-                  </Box>
-                </Box>
-              </Box>
-            ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No accounts found</Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => navigate('/accounts')}
-                  sx={{ mt: 2 }}
-                >
-                  Add Account
-                </Button>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-
-        <Grid size={{ md: 7, xs: 12 }}>
-          <Paper
-            sx={{
-              p: 3,
-              height: 450,
-              borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-              },
-            }}
-          >
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              Recent Transactions
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Latest activity
-            </Typography>
-            {recentTransactions.length > 0 ? (
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 2,
-                  maxHeight: 320,
-                  overflowY: 'auto',
-                }}
-              >
-                {recentTransactions.map((transaction) => (
-                  <Box
-                    key={transaction.id}
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      background: (theme) =>
-                        theme.palette.mode === 'light'
-                          ? 'rgba(0,0,0,0.02)'
-                          : 'rgba(255,255,255,0.05)',
-                      transition: 'all 0.2s ease',
-                      cursor: 'pointer',
-                      border: '1px solid transparent',
-                      '&:hover': {
-                        transform: 'translateX(8px)',
-                        background: (theme) =>
-                          theme.palette.mode === 'light'
-                            ? 'rgba(0,0,0,0.04)'
-                            : 'rgba(255,255,255,0.08)',
-                        borderColor: transaction.categoryColor + '40',
-                      },
-                    }}
-                    onClick={() => navigate('/transactions')}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        mb: 0.5,
-                      }}
-                    >
-                      <Typography variant="body1" fontWeight={600} noWrap sx={{ maxWidth: '60%' }}>
-                        {transaction.description}
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        fontWeight={700}
-                        color={transaction.type === 'credit' ? 'success.main' : 'error.main'}
-                      >
-                        {transaction.type === 'credit' ? '+' : '-'}
-                        {formatCurrency(transaction.amount)}
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Chip
-                        label={transaction.categoryName}
-                        size="small"
-                        sx={{
-                          background: `${transaction.categoryColor}20`,
-                          color: transaction.categoryColor,
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                        }}
+                        }
+                        secondary={
+                          <Box
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            mt={0.5}
+                          >
+                            <Chip
+                              label={txn.categoryName}
+                              size="small"
+                              sx={{
+                                bgcolor: alpha(txn.categoryColor, 0.1),
+                                color: txn.categoryColor,
+                                height: 22,
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                              }}
+                            />
+                            <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                              {dayjs(txn.date).format('MMM D, h:mm A')}
+                            </Typography>
+                          </Box>
+                        }
                       />
-                      <Typography variant="caption" color="text.secondary">
-                        {formatDate(transaction.date)}
-                      </Typography>
-                    </Box>
-                  </Box>
+                    </ListItem>
+                  </Fade>
                 ))}
-              </Box>
+              </List>
             ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No recent transactions</Typography>
+              <Box textAlign="center" py={8}>
+                <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'action.hover' }}>
+                  <Receipt sx={{ fontSize: 40, color: 'text.secondary' }} />
+                </Avatar>
+                <Typography color="text.secondary" gutterBottom fontWeight={600}>
+                  No transactions yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                  Start tracking your finances by adding your first transaction
+                </Typography>
                 <Button
                   variant="outlined"
-                  size="small"
+                  size="large"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/transactions')}
-                  sx={{ mt: 2 }}
+                  onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    borderColor: '#14b8a6',
+                    color: '#14b8a6',
+                    '&:hover': {
+                      borderColor: '#0d9488',
+                      bgcolor: alpha('#14b8a6', 0.05),
+                    },
+                  }}
                 >
                   Add Transaction
                 </Button>
@@ -1341,470 +721,315 @@ const Dashboard: React.FC = () => {
             )}
           </Paper>
         </Grid>
-      </Grid>
 
-      {/* Financial Health Score & Quick Actions */}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        {/* Financial Health Score */}
-        <Grid size={{ md: 6, xs: 12 }}>
+        {/* Budget Status */}
+        <Grid size={{ xs: 12, md: 5 }}>
           <Paper
             sx={{
-              p: 4,
-              borderRadius: 4,
-              background: (theme) =>
-                theme.palette.mode === 'light'
-                  ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.dark} 100%)`
-                  : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.dark} 100%)`,
-              color: 'white',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: (theme) => `0 8px 32px ${theme.palette.primary.main}4D`,
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: (theme) => `0 12px 40px ${theme.palette.primary.main}66`,
-              },
+              p: 3,
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
             }}
           >
-            {/* Animated background elements */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: -50,
-                right: -50,
-                width: 200,
-                height: 200,
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
-                animation: 'pulse 4s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': { opacity: 0.5, transform: 'scale(1)' },
-                  '50%': { opacity: 1, transform: 'scale(1.1)' },
-                },
-              }}
-            />
-            <Box
-              sx={{
-                position: 'absolute',
-                bottom: -30,
-                left: -30,
-                width: 150,
-                height: 150,
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-              }}
-            />
-
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Box display="flex" alignItems="center" gap={1.5} mb={3}>
-                <Avatar
-                  sx={{
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    backdropFilter: 'blur(10px)',
-                    width: 48,
-                    height: 48,
-                  }}
-                >
-                  <TrendingUp sx={{ fontSize: 28 }} />
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+              <Box display="flex" alignItems="center" gap={1.5}>
+                <Avatar sx={{ bgcolor: '#f59e0b', width: 40, height: 40 }}>
+                  <PieChart />
                 </Avatar>
-                <Typography
-                  variant="h5"
-                  fontWeight={700}
-                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-                >
-                  Financial Health Score
-                </Typography>
-              </Box>
-              <Box display="flex" alignItems="baseline" gap={2} mb={4}>
-                <Typography
-                  variant="h1"
-                  fontWeight={800}
-                  sx={{
-                    fontSize: { xs: '3.5rem', sm: '4rem' },
-                    textShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                  }}
-                >
-                  {smartInsights?.budgetHealthScore || 0}
-                </Typography>
-                <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 600 }}>
-                  / 100
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <Box>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      opacity: 0.85,
-                      mb: 1,
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      fontSize: '0.7rem',
-                    }}
-                  >
-                    Top Spending
+                  <Typography variant="h6" fontWeight={700}>
+                    Budget Status
                   </Typography>
-                  <Box
-                    display="flex"
-                    alignItems="center"
-                    gap={1.5}
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      bgcolor: 'rgba(255,255,255,0.15)',
-                      backdropFilter: 'blur(10px)',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        bgcolor: 'white',
-                        boxShadow: '0 0 8px rgba(255,255,255,0.8)',
-                      }}
-                    />
-                    <Typography variant="body1" fontWeight={700}>
-                      {smartInsights?.highestCategory.name || 'N/A'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.9, ml: 'auto', fontWeight: 600 }}>
-                      {formatCurrency(smartInsights?.highestCategory.amount || 0)}
-                    </Typography>
-                  </Box>
+                  <Typography variant="caption" color="text.secondary">
+                    This month&apos;s progress
+                  </Typography>
                 </Box>
-                {smartInsights?.savingsTrend && (
-                  <Box>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        opacity: 0.85,
-                        mb: 1,
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        fontSize: '0.7rem',
-                      }}
-                    >
-                      Savings Trend
-                    </Typography>
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      gap={1.5}
-                      sx={{
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: 'rgba(255,255,255,0.15)',
-                        backdropFilter: 'blur(10px)',
-                      }}
-                    >
-                      {smartInsights.savingsTrend === 'improving' ? (
-                        <TrendingUp fontSize="small" sx={{ fontWeight: 'bold' }} />
-                      ) : smartInsights.savingsTrend === 'declining' ? (
-                        <TrendingDown fontSize="small" sx={{ fontWeight: 'bold' }} />
-                      ) : (
-                        <Remove fontSize="small" sx={{ fontWeight: 'bold' }} />
-                      )}
-                      <Typography
-                        variant="body1"
-                        fontWeight={700}
-                        sx={{ textTransform: 'capitalize' }}
-                      >
-                        {smartInsights.savingsTrend}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
               </Box>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Quick Actions */}
-        <Grid size={{ md: 6, xs: 12 }}>
-          <Paper
-            sx={{
-              p: 3,
-              borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
-            }}
-          >
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              Quick Actions
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Common tasks at your fingertips
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Button
-                variant="contained"
-                size="large"
-                startIcon={<AddIcon />}
-                onClick={() => navigate('/transactions')}
+                size="small"
+                onClick={() => navigate(ROUTE_PATHS.BUDGETS)}
+                endIcon={<ArrowUpward sx={{ transform: 'rotate(45deg)' }} />}
                 sx={{
-                  justifyContent: 'flex-start',
-                  py: 1.5,
-                  borderRadius: 2,
                   textTransform: 'none',
-                  bgcolor: 'primary.main',
-                  '&:hover': { bgcolor: 'primary.dark' },
+                  fontWeight: 600,
+                  color: '#f59e0b',
+                  '&:hover': { bgcolor: alpha('#f59e0b', 0.08) },
                 }}
               >
-                Add Transaction
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<Assessment />}
-                onClick={() => navigate('/analytics')}
-                sx={{
-                  justifyContent: 'flex-start',
-                  py: 1.5,
-                  borderRadius: 2,
-                  textTransform: 'none',
-                }}
-              >
-                View Analytics
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<Receipt />}
-                onClick={() => navigate('/budgets')}
-                sx={{
-                  justifyContent: 'flex-start',
-                  py: 1.5,
-                  borderRadius: 2,
-                  textTransform: 'none',
-                }}
-              >
-                Manage Budgets
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<AccountBalance />}
-                onClick={() => navigate('/accounts')}
-                sx={{
-                  justifyContent: 'flex-start',
-                  py: 1.5,
-                  borderRadius: 2,
-                  textTransform: 'none',
-                }}
-              >
-                View Accounts
+                View All
               </Button>
             </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Budget Progress & Upcoming Recurring */}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        {/* Budget Progress Bars */}
-        <Grid size={{ md: 6, xs: 12 }}>
-          <Paper
-            sx={{
-              p: 3,
-              borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
-            }}
-          >
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              Budget Progress
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Current month status
-            </Typography>
             {budgetStatus.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {budgetStatus.map((budget, idx) => (
-                  <Box key={idx}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            bgcolor: budget.categoryColor,
-                          }}
-                        />
-                        <Typography variant="body2" fontWeight={600}>
-                          {budget.categoryName}
-                        </Typography>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatCurrency(budget.spent)} / {formatCurrency(budget.budget)}
-                      </Typography>
-                    </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.min(budget.percentage, 100)}
+              <Box>
+                {budgetStatus.map((budget: any, index: number) => (
+                  <Fade in timeout={300 + index * 100} key={index}>
+                    <Box
+                      onClick={() => navigate(ROUTE_PATHS.BUDGETS)}
                       sx={{
-                        height: 8,
-                        borderRadius: 1,
-                        bgcolor: 'rgba(0,0,0,0.05)',
-                        '& .MuiLinearProgress-bar': {
-                          borderRadius: 1,
-                          bgcolor: budget.isOver
-                            ? '#f44336'
-                            : budget.percentage > 80
-                              ? '#ff9800'
-                              : '#4caf50',
+                        borderRadius: 2,
+                        mb: 2,
+                        p: 2,
+                        bgcolor: 'action.hover',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: '1px solid transparent',
+                        '&:hover': {
+                          bgcolor: 'background.paper',
+                          borderColor: '#f59e0b',
+                          transform: 'scale(1.02)',
+                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)',
                         },
                       }}
-                    />
-                    <Typography
-                      variant="caption"
-                      color={budget.isOver ? 'error' : 'text.secondary'}
                     >
-                      {budget.percentage}% used
-                      {budget.isOver && ' - Over budget!'}
-                    </Typography>
-                  </Box>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        mb={1.5}
+                      >
+                        <Box display="flex" alignItems="center" gap={1.5}>
+                          <Box
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 1.5,
+                              bgcolor: budget.categoryColor || '#6366f1',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <CategoryIcon sx={{ color: 'white', fontSize: 16 }} />
+                          </Box>
+                          <Typography variant="body1" fontWeight={700}>
+                            {budget.categoryName}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={`${Math.min(budget.percentage, 100)}%`}
+                          size="small"
+                          sx={{
+                            bgcolor: budget.isOver
+                              ? alpha('#ef4444', 0.1)
+                              : budget.percentage > 80
+                                ? alpha('#f59e0b', 0.1)
+                                : alpha('#10b981', 0.1),
+                            color: budget.isOver
+                              ? '#ef4444'
+                              : budget.percentage > 80
+                                ? '#f59e0b'
+                                : '#10b981',
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                          }}
+                        />
+                      </Box>
+                      <Box
+                        sx={{
+                          height: 8,
+                          borderRadius: 1,
+                          bgcolor: 'action.selected',
+                          overflow: 'hidden',
+                          mb: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            height: '100%',
+                            width: `${Math.min(budget.percentage, 100)}%`,
+                            bgcolor: budget.isOver
+                              ? '#ef4444'
+                              : budget.percentage > 80
+                                ? '#f59e0b'
+                                : '#10b981',
+                            transition: 'width 0.5s ease-in-out',
+                            borderRadius: 1,
+                          }}
+                        />
+                      </Box>
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          {formatCurrency(budget.spent)} of {formatCurrency(budget.budget)}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          color={budget.isOver ? 'error.main' : 'text.secondary'}
+                        >
+                          {formatCurrency(budget.budget - budget.spent)} left
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Fade>
                 ))}
               </Box>
             ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No budgets set</Typography>
+              <Box textAlign="center" py={8}>
+                <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'action.hover' }}>
+                  <PieChart sx={{ fontSize: 40, color: 'text.secondary' }} />
+                </Avatar>
+                <Typography color="text.secondary" gutterBottom fontWeight={600}>
+                  No budgets set
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                  Create budgets to track your spending across categories
+                </Typography>
                 <Button
                   variant="outlined"
-                  size="small"
-                  onClick={() => navigate('/budgets')}
-                  sx={{ mt: 2 }}
+                  size="large"
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate(ROUTE_PATHS.BUDGETS)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    borderColor: '#f59e0b',
+                    color: '#f59e0b',
+                    '&:hover': {
+                      borderColor: '#d97706',
+                      bgcolor: alpha('#f59e0b', 0.05),
+                    },
+                  }}
                 >
-                  Set Budget
+                  Create Budget
                 </Button>
               </Box>
             )}
           </Paper>
         </Grid>
 
-        {/* Upcoming Recurring Transactions */}
-        <Grid size={{ md: 6, xs: 12 }}>
+        {/* Account Balances */}
+        <Grid size={{ xs: 12 }}>
           <Paper
             sx={{
               p: 3,
               borderRadius: 3,
-              background: (theme) =>
-                theme.palette.mode === 'light' ? 'white' : 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: (theme) =>
-                theme.palette.mode === 'light'
-                  ? '1px solid rgba(0,0,0,0.05)'
-                  : '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
             }}
           >
-            <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <Receipt color="primary" />
-              <Typography variant="h5" fontWeight={700}>
-                Upcoming Recurring
-              </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+              <Box display="flex" alignItems="center" gap={1.5}>
+                <Avatar sx={{ bgcolor: '#8b5cf6', width: 40, height: 40 }}>
+                  <AccountBalanceIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    Account Balances
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    All your accounts
+                  </Typography>
+                </Box>
+              </Box>
+              <Button
+                size="small"
+                onClick={() => navigate(ROUTE_PATHS.ACCOUNTS)}
+                endIcon={<ArrowUpward sx={{ transform: 'rotate(45deg)' }} />}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  color: '#8b5cf6',
+                  '&:hover': { bgcolor: alpha('#8b5cf6', 0.08) },
+                }}
+              >
+                View All
+              </Button>
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Next 30 days
-            </Typography>
-            {upcomingRecurring.length > 0 ? (
-              <List sx={{ maxHeight: 300, overflowY: 'auto' }}>
-                {upcomingRecurring.map((txn) => (
-                  <ListItem
-                    key={txn.id}
-                    sx={{
-                      borderRadius: 2,
-                      mb: 1,
-                      background: (theme) =>
-                        theme.palette.mode === 'light'
-                          ? 'rgba(0,0,0,0.02)'
-                          : 'rgba(255,255,255,0.05)',
-                      '&:hover': {
-                        background: (theme) =>
-                          theme.palette.mode === 'light'
-                            ? 'rgba(0,0,0,0.04)'
-                            : 'rgba(255,255,255,0.08)',
-                      },
-                    }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <Typography variant="body2" fontWeight={600}>
-                            {txn.description}
+            {accounts.length > 0 ? (
+              <Grid container spacing={2}>
+                {accounts.slice(0, 4).map((account: any, index: number) => (
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }} key={account._id}>
+                    <Zoom in timeout={300 + index * 100}>
+                      <Card
+                        onClick={() => navigate(ROUTE_PATHS.ACCOUNTS)}
+                        sx={{
+                          borderRadius: 3,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          background:
+                            'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                          border: '1px solid',
+                          borderColor: alpha('#8b5cf6', 0.1),
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: '0 8px 16px rgba(139, 92, 246, 0.15)',
+                            borderColor: '#8b5cf6',
+                          },
+                        }}
+                      >
+                        <CardContent>
+                          <Box display="flex" alignItems="center" gap={1.5} mb={2}>
+                            <Avatar
+                              sx={{
+                                bgcolor: '#8b5cf6',
+                                width: 36,
+                                height: 36,
+                              }}
+                            >
+                              <AccountBalanceIcon sx={{ fontSize: 20 }} />
+                            </Avatar>
+                            <Typography variant="body1" fontWeight={700} noWrap>
+                              {account.name}
+                            </Typography>
+                          </Box>
+                          <Typography variant="h5" fontWeight={700} color="#8b5cf6" gutterBottom>
+                            {formatCurrency(account.balance)}
                           </Typography>
-                          <Typography
-                            variant="body2"
-                            fontWeight={700}
-                            color={txn.type === 'credit' ? 'success.main' : 'error.main'}
-                          >
-                            {txn.type === 'credit' ? '+' : '-'}
-                            {formatCurrency(txn.amount)}
-                          </Typography>
-                        </Box>
-                      }
-                      secondary={
-                        <Box
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          mt={0.5}
-                        >
                           <Chip
-                            label={txn.frequency}
+                            label={account.accountType}
                             size="small"
                             sx={{
-                              height: 20,
-                              fontSize: '0.7rem',
                               textTransform: 'capitalize',
+                              bgcolor: alpha('#8b5cf6', 0.1),
+                              color: '#8b5cf6',
+                              fontWeight: 600,
                             }}
                           />
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(txn.nextDate).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  </ListItem>
+                        </CardContent>
+                      </Card>
+                    </Zoom>
+                  </Grid>
                 ))}
-              </List>
+              </Grid>
             ) : (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">No upcoming recurring transactions</Typography>
+              <Box textAlign="center" py={8}>
+                <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'action.hover' }}>
+                  <AccountBalanceIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
+                </Avatar>
+                <Typography color="text.secondary" gutterBottom fontWeight={600}>
+                  No accounts added
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                  Add your financial accounts to track all your balances in one place
+                </Typography>
                 <Button
                   variant="outlined"
-                  size="small"
+                  size="large"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/transactions')}
-                  sx={{ mt: 2 }}
+                  onClick={() => navigate(ROUTE_PATHS.ACCOUNTS)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    borderColor: '#8b5cf6',
+                    color: '#8b5cf6',
+                    '&:hover': {
+                      borderColor: '#7c3aed',
+                      bgcolor: alpha('#8b5cf6', 0.05),
+                    },
+                  }}
                 >
-                  Add Recurring
+                  Add Account
                 </Button>
               </Box>
             )}
           </Paper>
         </Grid>
       </Grid>
-    </>
-  );
-
-  return (
-    <Box>
-      <PullToRefresh onRefresh={fetchDashboardData}>{content}</PullToRefresh>
     </Box>
   );
 };

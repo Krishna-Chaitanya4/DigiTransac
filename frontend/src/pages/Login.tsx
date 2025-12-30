@@ -32,6 +32,7 @@ import {
   Insights,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { ROUTE_PATHS } from '../config/routes.config';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -86,7 +87,7 @@ const Login: React.FC = () => {
 
     try {
       await login(identifier, password);
-      navigate('/dashboard');
+      navigate(ROUTE_PATHS.DASHBOARD);
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {

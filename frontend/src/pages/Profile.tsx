@@ -43,9 +43,15 @@ import {
   Brightness7 as LightModeIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
+import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ROUTE_PATHS } from '../config/routes.config';
+import {
+  useUserProfile,
+  useDeleteAccount as useDeleteUserAccount,
+  useDisconnectGmail,
+} from '../hooks/useApi';
 import { useTheme } from '@mui/material/styles';
 import { useThemeContext } from '../context/ThemeContext';
 import { ModernDatePicker } from '../components/ModernDatePicker';
@@ -54,10 +60,15 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
 const Profile: React.FC = () => {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeContext();
+
+  // React Query hooks
+  const { data: profileData, refetch: refetchProfile } = useUserProfile();
+  const deleteUserAccount = useDeleteUserAccount();
+  const disconnectGmail = useDisconnectGmail();
 
   const [emailIntegration, setEmailIntegration] = useState({
     enabled: false,
@@ -83,49 +94,35 @@ const Profile: React.FC = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.data.emailIntegration) {
+    if (profileData) {
+      const response = profileData;
+      if (response.emailIntegration) {
         setEmailIntegration({
-          enabled: response.data.emailIntegration.enabled || false,
-          provider: response.data.emailIntegration.provider || null,
-          email: response.data.emailIntegration.email || '',
-          totalEmailsProcessed: response.data.emailIntegration.totalEmailsProcessed || 0,
-          lastProcessedAt: response.data.emailIntegration.lastProcessedAt || null,
+          enabled: response.emailIntegration.enabled || false,
+          provider: response.emailIntegration.provider || null,
+          email: response.emailIntegration.email || '',
+          totalEmailsProcessed: response.emailIntegration.totalEmailsProcessed || 0,
+          lastProcessedAt: response.emailIntegration.lastProcessedAt || null,
         });
 
         // Set last sync time if available
-        if (response.data.emailIntegration.lastProcessedAt) {
-          setLastSyncTime(new Date(response.data.emailIntegration.lastProcessedAt));
+        if (response.emailIntegration.lastProcessedAt) {
+          setLastSyncTime(new Date(response.emailIntegration.lastProcessedAt));
         }
       }
 
       // TODO: Fetch pending transaction count from review queue API
       // For now, hardcoded as 0
       setPendingCount(0);
-    } catch (err) {
-      console.error('Failed to fetch user profile:', err);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [profileData]);
 
   const handleConnectGmail = async () => {
     try {
       console.log('Connecting to Gmail...');
 
       // Get OAuth URL from backend
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/connect`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/connect`);
 
       console.log('Got auth URL:', response.data);
       const { authUrl } = response.data;
@@ -157,7 +154,7 @@ const Profile: React.FC = () => {
             console.log('Popup returned to our domain, closing...');
             popup.close();
             clearInterval(checkPopup);
-            fetchUserProfile();
+            refetchProfile();
             setSuccess('Gmail account connected successfully!');
           }
         } catch {
@@ -168,7 +165,7 @@ const Profile: React.FC = () => {
         if (popup?.closed) {
           console.log('Popup closed, refreshing profile...');
           clearInterval(checkPopup);
-          fetchUserProfile();
+          refetchProfile();
         }
       }, 500);
     } catch (err: any) {
@@ -180,11 +177,7 @@ const Profile: React.FC = () => {
   const handleDisconnectGmail = async () => {
     try {
       setLoading(true);
-      await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/disconnect`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await disconnectGmail.mutateAsync();
 
       setEmailIntegration({
         enabled: false,
@@ -204,11 +197,8 @@ const Profile: React.FC = () => {
   const handleToggleEmailIntegration = async (enabled: boolean) => {
     try {
       setLoading(true);
-      await axios.patch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/toggle`,
-        { enabled },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // TODO: No React Query hook exists yet for toggle
+      await api.patch(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/toggle`, { enabled });
 
       setEmailIntegration((prev) => ({ ...prev, enabled }));
       setSuccess(`Email polling ${enabled ? 'enabled' : 'disabled'} successfully!`);
@@ -227,12 +217,10 @@ const Profile: React.FC = () => {
 
     try {
       setLoading(true);
-      await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await deleteUserAccount.mutateAsync(undefined);
 
       logout();
-      navigate('/login');
+      navigate(ROUTE_PATHS.LOGIN);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to delete account');
     } finally {
@@ -273,19 +261,16 @@ const Profile: React.FC = () => {
       setSyncing(true);
       setSyncStatus('syncing');
 
+      // TODO: No React Query hook exists yet for manual sync
       // Trigger manual sync
-      await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.post(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`, {});
 
       setSyncStatus('idle');
       setLastSyncTime(new Date());
       setSuccess('Email sync completed successfully!');
 
       // Refresh profile to get updated stats
-      await fetchUserProfile();
+      await refetchProfile();
     } catch (err: any) {
       setSyncStatus('error');
       setError(err.response?.data?.error || 'Failed to sync emails');
@@ -824,7 +809,7 @@ const Profile: React.FC = () => {
           fullWidth
           onClick={() => {
             logout();
-            navigate('/login');
+            navigate(ROUTE_PATHS.LOGIN);
           }}
           startIcon={<LogoutIcon />}
           sx={{

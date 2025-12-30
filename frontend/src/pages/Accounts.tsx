@@ -50,33 +50,26 @@ import {
   SwapHoriz as TransferIcon,
   Download as DownloadIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ROUTE_PATHS } from '../config/routes.config';
+import {
+  useAccounts,
+  useCreateAccount,
+  useUpdateAccount,
+  useDeleteBankAccount,
+  useTransferFunds,
+  useCreateTransaction,
+  useCreateCategory,
+  useCategories,
+  type Account,
+} from '../hooks/useApi';
+import { api } from '../services/api';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
 import { ModernDatePicker } from '../components/ModernDatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-
-interface Account {
-  id: string;
-  userId: string;
-  name: string;
-  type: 'checking' | 'savings' | 'credit_card' | 'investment' | 'cash' | 'loan' | 'other';
-  bankName?: string;
-  accountNumber?: string;
-  currency: string;
-  balance: number;
-  initialBalance: number;
-  icon?: string;
-  color?: string;
-  isDefault: boolean;
-  isActive: boolean;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface AccountBalance {
   accountId: string;
@@ -102,11 +95,22 @@ const accountTypeConfig = {
 };
 
 const Accounts: React.FC = () => {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState<Account[]>([]);
+
+  // React Query hooks
+  const { data: accountsData, isLoading, refetch } = useAccounts();
+  const { data: categoriesData } = useCategories();
+  const createAccount = useCreateAccount();
+  const updateAccount = useUpdateAccount();
+  const deleteAccount = useDeleteBankAccount();
+  const transferFunds = useTransferFunds();
+  const createTransaction = useCreateTransaction();
+  const createCategory = useCreateCategory();
+
+  const accounts = accountsData?.data?.accounts || [];
+  const categories = categoriesData?.data?.categories || [];
   const [accountBalances, setAccountBalances] = useState<Map<string, AccountBalance>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
@@ -152,107 +156,100 @@ const Accounts: React.FC = () => {
     notes: '',
   });
 
+  // Fetch account balances when accounts are loaded
   useEffect(() => {
-    fetchAccounts();
-  }, []);
+    const fetchAccountBalances = async () => {
+      if (!accounts || accounts.length === 0) return;
 
-  const fetchAccounts = async () => {
-    try {
-      setLoading(true);
-      setError('');
+      try {
+        setError('');
 
-      const response = await axios.get(`/api/accounts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        // Fetch balances and transaction data for all accounts
+        const balancePromises = accounts.map(async (account: Account) => {
+          const balanceRes = await api.get(`/api/accounts/${account.id}/balance`);
 
-      const accountsData = response.data.accounts || [];
-      setAccounts(accountsData);
+          // Fetch last transaction and this month stats
+          const now = new Date();
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          const endOfToday = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+            23,
+            59,
+            59,
+            999
+          );
 
-      // Fetch balances and transaction data for all accounts
-      const balancePromises = accountsData.map(async (account: Account) => {
-        const balanceRes = await axios.get(`/api/accounts/${account.id}/balance`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+          // Fetch last transaction (any status for true last activity)
+          const txnRes = await api.get(`/api/transactions`, {
+            params: {
+              accountId: account.id,
+              sortBy: 'date',
+              sortOrder: 'desc',
+              limit: '1',
+            },
+          });
 
-        // Fetch last transaction and this month stats
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); // Start of month 00:00:00
-        const endOfToday = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-          23,
-          59,
-          59,
-          999
-        ); // End of today 23:59:59.999
+          // Fetch total approved transaction count
+          const countRes = await api.get(`/api/transactions`, {
+            params: {
+              accountId: account.id,
+              reviewStatus: 'approved',
+              limit: '1',
+            },
+          });
 
-        // Fetch last transaction (any status for true last activity)
-        const txnRes = await axios.get(`/api/transactions`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
+          // Fetch this month stats
+          const monthTxnRes = await api.get(`/api/transactions`, {
+            params: {
+              accountId: account.id,
+              startDate: startOfMonth.toISOString(),
+              endDate: endOfToday.toISOString(),
+              reviewStatus: 'approved',
+            },
+          });
+
+          const lastTransaction = txnRes.data.transactions?.[0];
+          const monthTransactions = monthTxnRes.data.transactions || [];
+          const totalApprovedCount = countRes.data.pagination?.total || 0;
+
+          const thisMonthCredits = monthTransactions
+            .filter((t: any) => t.type === 'credit')
+            .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+          const thisMonthDebits = monthTransactions
+            .filter((t: any) => t.type === 'debit')
+            .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+          return {
+            ...balanceRes.data,
             accountId: account.id,
-            sortBy: 'date',
-            sortOrder: 'desc',
-            limit: '1',
-          },
+            transactionCount: totalApprovedCount,
+            lastTransactionDate: lastTransaction?.date,
+            thisMonthCredits,
+            thisMonthDebits,
+            thisMonthNet: thisMonthCredits - thisMonthDebits,
+          };
         });
 
-        // Fetch total approved transaction count (industry standard: show approved only)
-        const countRes = await axios.get(`/api/transactions`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
-            accountId: account.id,
-            reviewStatus: 'approved',
-            limit: '1', // Just to get pagination.total
-          },
+        const balanceResults = await Promise.all(balancePromises);
+        const balanceMap = new Map<string, AccountBalance>();
+        balanceResults.forEach((balance) => {
+          balanceMap.set(balance.accountId, balance);
         });
+        setAccountBalances(balanceMap);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Failed to fetch account balances');
+      }
+    };
 
-        // Fetch this month stats
-        const monthTxnRes = await axios.get(`/api/transactions`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
-            accountId: account.id,
-            startDate: startOfMonth.toISOString(),
-            endDate: endOfToday.toISOString(),
-            reviewStatus: 'approved',
-          },
-        });
+    fetchAccountBalances();
+  }, [accounts]);
 
-        const lastTransaction = txnRes.data.transactions?.[0];
-        const monthTransactions = monthTxnRes.data.transactions || [];
-        const totalApprovedCount = countRes.data.pagination?.total || 0;
-
-        const thisMonthCredits = monthTransactions
-          .filter((t: any) => t.type === 'credit')
-          .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-        const thisMonthDebits = monthTransactions
-          .filter((t: any) => t.type === 'debit')
-          .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-        return {
-          ...balanceRes.data,
-          accountId: account.id, // Ensure accountId is set
-          transactionCount: totalApprovedCount, // Override with accurate count
-          lastTransactionDate: lastTransaction?.date,
-          thisMonthCredits,
-          thisMonthDebits,
-          thisMonthNet: thisMonthCredits - thisMonthDebits,
-        };
-      });
-
-      const balanceResults = await Promise.all(balancePromises);
-      const balanceMap = new Map<string, AccountBalance>();
-      balanceResults.forEach((balance) => {
-        balanceMap.set(balance.accountId, balance);
-      });
-      setAccountBalances(balanceMap);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch accounts');
-    } finally {
-      setLoading(false);
-    }
+  const fetchAccounts = () => {
+    // React Query handles this now - just call refetch
+    refetch();
   };
 
   const handleOpenDialog = (account?: Account) => {
@@ -264,8 +261,9 @@ const Accounts: React.FC = () => {
         bankName: account.bankName || '',
         accountNumber: account.accountNumber || '',
         currency: account.currency,
-        initialBalance: account.initialBalance,
-        color: account.color || accountTypeConfig[account.type].color,
+        initialBalance: account.initialBalance || 0,
+        color:
+          account.color || accountTypeConfig[account.type as keyof typeof accountTypeConfig].color,
         isDefault: account.isDefault,
         isActive: account.isActive,
         notes: account.notes || '',
@@ -304,19 +302,15 @@ const Accounts: React.FC = () => {
       };
 
       if (editingAccount) {
-        await axios.put(`/api/accounts/${editingAccount.id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await updateAccount.mutateAsync({ id: editingAccount.id, data: payload });
         setSuccess('Account updated successfully');
       } else {
-        await axios.post(`/api/accounts`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await createAccount.mutateAsync(payload);
         setSuccess('Account created successfully');
       }
 
       handleCloseDialog();
-      fetchAccounts();
+      refetch();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save account');
     }
@@ -329,14 +323,12 @@ const Accounts: React.FC = () => {
       setError('');
       setSuccess('');
 
-      await axios.delete(`/api/accounts/${accountToDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await deleteAccount.mutateAsync(accountToDelete.id);
 
       setSuccess('Account deleted successfully');
       setDeleteConfirmOpen(false);
       setAccountToDelete(null);
-      fetchAccounts();
+      refetch();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete account');
       setDeleteConfirmOpen(false);
@@ -345,17 +337,16 @@ const Accounts: React.FC = () => {
 
   const handleSetDefault = async (accountId: string) => {
     try {
-      const account = accounts.find((a) => a.id === accountId);
+      const account = accounts.find((a: Account) => a.id === accountId);
       if (!account) return;
 
-      await axios.put(
-        `/api/accounts/${accountId}`,
-        { ...account, isDefault: true },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await updateAccount.mutateAsync({
+        id: accountId,
+        data: { ...account, isDefault: true },
+      });
 
       setSuccess('Default account updated');
-      fetchAccounts();
+      refetch();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update default account');
     }
@@ -394,22 +385,24 @@ const Accounts: React.FC = () => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (acc) =>
+        (acc: Account) =>
           acc.name.toLowerCase().includes(query) ||
           acc.bankName?.toLowerCase().includes(query) ||
           acc.accountNumber?.includes(query) ||
-          accountTypeConfig[acc.type].label.toLowerCase().includes(query)
+          accountTypeConfig[acc.type as keyof typeof accountTypeConfig].label
+            .toLowerCase()
+            .includes(query)
       );
     }
 
     // Type filter
     if (filterType !== 'all') {
-      filtered = filtered.filter((acc) => acc.type === filterType);
+      filtered = filtered.filter((acc: Account) => acc.type === filterType);
     }
 
     // Currency filter
     if (filterCurrency !== 'all') {
-      filtered = filtered.filter((acc) => acc.currency === filterCurrency);
+      filtered = filtered.filter((acc: Account) => acc.currency === filterCurrency);
     }
 
     // Status filter
@@ -479,8 +472,8 @@ const Accounts: React.FC = () => {
   };
 
   // Get unique currencies from accounts
-  const getUniqueCurrencies = () => {
-    return Array.from(new Set(accounts.map((acc) => acc.currency)));
+  const getUniqueCurrencies = (): string[] => {
+    return Array.from(new Set(accounts.map((acc: Account) => acc.currency)));
   };
 
   // Export accounts to CSV
@@ -500,11 +493,11 @@ const Accounts: React.FC = () => {
       'Status',
     ];
 
-    const rows = accounts.map((acc) => {
+    const rows = accounts.map((acc: Account) => {
       const balance = accountBalances.get(acc.id);
       return [
         acc.name,
-        accountTypeConfig[acc.type].label,
+        accountTypeConfig[acc.type as keyof typeof accountTypeConfig].label,
         acc.bankName || '',
         acc.accountNumber || '',
         acc.currency,
@@ -521,7 +514,7 @@ const Accounts: React.FC = () => {
     });
 
     const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .map((row) => row.map((cell: any) => `"${cell}"`).join(','))
       .join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -539,7 +532,7 @@ const Accounts: React.FC = () => {
   };
 
   const handleAddTransaction = (account: Account) => {
-    navigate('/transactions', { state: { addTransaction: true, accountId: account.id } });
+    navigate(ROUTE_PATHS.TRANSACTIONS, { state: { addTransaction: true, accountId: account.id } });
   };
 
   const handleTransferMoney = (account: Account | null) => {
@@ -567,17 +560,13 @@ const Accounts: React.FC = () => {
     }
 
     try {
-      await axios.post(
-        '/api/transactions/transfer',
-        {
-          fromAccountId,
-          toAccountId: transferToAccountId,
-          amount,
-          date: transferDate,
-          notes: transferNotes,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await transferFunds.mutateAsync({
+        fromAccountId,
+        toAccountId: transferToAccountId,
+        amount,
+        date: transferDate,
+        description: transferNotes,
+      });
 
       setSuccess('Transfer completed successfully');
       setTransferDialogOpen(false);
@@ -586,7 +575,6 @@ const Accounts: React.FC = () => {
       setTransferToAccountId('');
       setTransferAmount('');
       setTransferNotes('');
-      fetchAccounts(); // Refresh account balances
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create transfer');
     }
@@ -595,7 +583,7 @@ const Accounts: React.FC = () => {
   // Render account card
   const renderAccountCard = (account: Account) => {
     const balance = accountBalances.get(account.id);
-    const config = accountTypeConfig[account.type];
+    const config = accountTypeConfig[account.type as keyof typeof accountTypeConfig];
     const IconComponent = config.icon;
     const isNegative = (balance?.calculatedBalance || account.balance) < 0;
     const lastActivity = balance?.lastTransactionDate
@@ -831,56 +819,40 @@ const Accounts: React.FC = () => {
         return;
       }
 
-      // Get categories to find or create a balance adjustment category
-      const categoriesRes = await axios.get(`/api/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      let adjustmentCategory = categoriesRes.data.categories?.find(
-        (cat: any) => cat.name === 'Balance Adjustment'
-      );
+      // Find or create a balance adjustment category
+      let adjustmentCategory = categories?.find((cat: any) => cat.name === 'Balance Adjustment');
 
       // If category doesn't exist, create it
       if (!adjustmentCategory) {
-        const newCategoryRes = await axios.post(
-          `/api/categories`,
-          {
-            name: 'Balance Adjustment',
-            type: 'both',
-            color: '#9e9e9e',
-            icon: 'adjustment',
-            description: 'Automatic adjustments to reconcile account balances',
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const newCategoryRes = await createCategory.mutateAsync({
+          name: 'Balance Adjustment',
+          color: '#9e9e9e',
+          icon: 'adjustment',
+        });
         adjustmentCategory = newCategoryRes.data.category;
       }
 
       // Create a balance adjustment transaction
-      await axios.post(
-        `/api/transactions`,
-        {
-          type: difference > 0 ? 'credit' : 'debit',
-          amount: Math.abs(difference),
-          accountId: adjustingAccount.id,
-          description: 'Balance Adjustment',
-          date: new Date().toISOString(),
-          isRecurring: false,
-          reviewStatus: 'approved',
-          splits: [
-            {
-              categoryId: adjustmentCategory.id,
-              amount: Math.abs(difference),
-              tags: ['balance-adjustment'],
-              notes:
-                adjustmentNotes ||
-                `Adjusted to match actual balance: ${formatCurrency(newBalance, adjustingAccount.currency)}`,
-              order: 1,
-            },
-          ],
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await createTransaction.mutateAsync({
+        type: difference > 0 ? 'credit' : 'debit',
+        amount: Math.abs(difference),
+        accountId: adjustingAccount.id,
+        description: 'Balance Adjustment',
+        date: new Date().toISOString(),
+        isRecurring: false,
+        reviewStatus: 'approved',
+        splits: [
+          {
+            categoryId: adjustmentCategory.id,
+            amount: Math.abs(difference),
+            tags: ['balance-adjustment'],
+            notes:
+              adjustmentNotes ||
+              `Adjusted to match actual balance: ${formatCurrency(newBalance, adjustingAccount.currency)}`,
+            order: 1,
+          },
+        ],
+      });
 
       setSuccess(
         `Balance adjusted successfully by ${formatCurrency(Math.abs(difference), adjustingAccount.currency)}`
@@ -889,13 +861,12 @@ const Accounts: React.FC = () => {
       setAdjustingAccount(null);
       setActualBalance('');
       setAdjustmentNotes('');
-      fetchAccounts();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to adjust balance');
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
@@ -909,29 +880,29 @@ const Accounts: React.FC = () => {
 
   // Calculate totals in base currency
   const totalAssets = accounts
-    .filter((a) => a.isActive && a.type !== 'loan')
-    .reduce((sum, account) => {
+    .filter((a: Account) => a.isActive && a.type !== 'loan')
+    .reduce((sum: number, account: Account) => {
       const balance = accountBalances.get(account.id)?.calculatedBalance || account.balance;
       return sum + (balance > 0 ? convertToBaseCurrency(balance, account.currency) : 0);
     }, 0);
 
   const totalLiabilities = accounts
-    .filter((a) => a.isActive && a.type === 'loan')
-    .reduce((sum, account) => {
+    .filter((a: Account) => a.isActive && a.type === 'loan')
+    .reduce((sum: number, account: Account) => {
       const balance = accountBalances.get(account.id)?.calculatedBalance || account.balance;
       return sum + convertToBaseCurrency(Math.abs(balance), account.currency);
     }, 0);
 
   const creditCardDebt = accounts
-    .filter((a) => a.isActive && a.type === 'credit_card')
-    .reduce((sum, account) => {
+    .filter((a: Account) => a.isActive && a.type === 'credit_card')
+    .reduce((sum: number, account: Account) => {
       const balance = accountBalances.get(account.id)?.calculatedBalance || account.balance;
       return sum + (balance < 0 ? convertToBaseCurrency(Math.abs(balance), account.currency) : 0);
     }, 0);
 
   const totalLiabilitiesWithCreditCards = totalLiabilities + creditCardDebt;
   const netWorth = totalAssets - totalLiabilitiesWithCreditCards;
-  const activeAccountCount = accounts.filter((a) => a.isActive).length;
+  const activeAccountCount = accounts.filter((a: Account) => a.isActive).length;
 
   return (
     <Box>
@@ -1213,9 +1184,9 @@ const Accounts: React.FC = () => {
                   sx={{ minWidth: 150 }}
                 >
                   <MenuItem value="all">All Currencies</MenuItem>
-                  {getUniqueCurrencies().map((currency) => (
+                  {getUniqueCurrencies().map((currency: string) => (
                     <MenuItem key={currency} value={currency}>
-                      {CURRENCIES[currency]?.symbol || ''} {currency}
+                      {(CURRENCIES as any)[currency]?.symbol || ''} {currency}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -1478,7 +1449,7 @@ const Accounts: React.FC = () => {
       ) : groupByType ? (
         // Grouped view
         Object.entries(groupedAccounts).map(([type, typeAccounts]) => {
-          const config = accountTypeConfig[type as Account['type']];
+          const config = accountTypeConfig[type as keyof typeof accountTypeConfig];
           const IconComponent = config.icon;
 
           return (
@@ -1558,7 +1529,7 @@ const Accounts: React.FC = () => {
                 setFormData({
                   ...formData,
                   type,
-                  color: accountTypeConfig[type].color,
+                  color: accountTypeConfig[type as keyof typeof accountTypeConfig].color,
                 });
               }}
               fullWidth
@@ -1723,7 +1694,10 @@ const Accounts: React.FC = () => {
                   >
                     <input
                       type="color"
-                      value={formData.color || accountTypeConfig[formData.type].color}
+                      value={
+                        formData.color ||
+                        accountTypeConfig[formData.type as keyof typeof accountTypeConfig].color
+                      }
                       onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                       style={{
                         width: '100%',
@@ -1735,7 +1709,10 @@ const Accounts: React.FC = () => {
                   </Box>
                   <TextField
                     size="small"
-                    value={formData.color || accountTypeConfig[formData.type].color}
+                    value={
+                      formData.color ||
+                      accountTypeConfig[formData.type as keyof typeof accountTypeConfig].color
+                    }
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                     placeholder="#1976d2"
                     sx={{
@@ -1753,7 +1730,10 @@ const Accounts: React.FC = () => {
                             width: 16,
                             height: 16,
                             borderRadius: '50%',
-                            bgcolor: formData.color || accountTypeConfig[formData.type].color,
+                            bgcolor:
+                              formData.color ||
+                              accountTypeConfig[formData.type as keyof typeof accountTypeConfig]
+                                .color,
                             mr: 1,
                             border: '2px solid',
                             borderColor: 'divider',
@@ -2274,9 +2254,14 @@ const Accounts: React.FC = () => {
                   startAdornment: (
                     <InputAdornment position="start">
                       {transferFromAccount &&
-                        React.createElement(accountTypeConfig[transferFromAccount.type].icon, {
-                          fontSize: 'small',
-                        })}
+                        React.createElement(
+                          accountTypeConfig[
+                            transferFromAccount.type as keyof typeof accountTypeConfig
+                          ].icon,
+                          {
+                            fontSize: 'small',
+                          }
+                        )}
                     </InputAdornment>
                   ),
                 }}
@@ -2287,16 +2272,17 @@ const Accounts: React.FC = () => {
                 label="From Account"
                 value={transferFromAccount?.id || ''}
                 onChange={(e) => {
-                  const account = accounts.find((acc) => acc.id === e.target.value);
+                  const account = accounts.find((acc: Account) => acc.id === e.target.value);
                   setTransferFromAccount(account || null);
                 }}
                 fullWidth
                 required
               >
                 {accounts
-                  .filter((acc) => acc.isActive)
-                  .map((account) => {
-                    const IconComponent = accountTypeConfig[account.type].icon;
+                  .filter((acc: Account) => acc.isActive)
+                  .map((account: Account) => {
+                    const IconComponent =
+                      accountTypeConfig[account.type as keyof typeof accountTypeConfig].icon;
                     return (
                       <MenuItem key={account.id} value={account.id}>
                         <Box display="flex" alignItems="center" gap={1}>
@@ -2325,9 +2311,10 @@ const Accounts: React.FC = () => {
               required
             >
               {accounts
-                .filter((acc) => acc.id !== transferFromAccount?.id && acc.isActive)
-                .map((account) => {
-                  const IconComponent = accountTypeConfig[account.type].icon;
+                .filter((acc: Account) => acc.id !== transferFromAccount?.id && acc.isActive)
+                .map((account: Account) => {
+                  const IconComponent =
+                    accountTypeConfig[account.type as keyof typeof accountTypeConfig].icon;
                   return (
                     <MenuItem key={account.id} value={account.id}>
                       <Box display="flex" alignItems="center" gap={1}>

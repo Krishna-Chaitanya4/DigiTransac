@@ -4,30 +4,32 @@ import { mongoDBService } from '../config/mongodb';
 import { Budget, Category } from '../models/types';
 import { getExpensesFromTransactions } from '../utils/expenseHelpers';
 import { calculateBudgetSpending } from '../utils/budgetHelpers';
+import { logger } from '../utils/logger';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ApiResponse } from '../utils/apiResponse';
+import { DbHelper } from '../utils/dbHelpers';
 
 const router = Router();
 
 router.use(authenticate);
 
 // GET /api/budgets - Get all budgets with spending info
-router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.get(
+  '/',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
 
     const budgetsContainer = await mongoDBService.getBudgetsContainer();
-    const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
+    const budgets = await DbHelper.findAllByUser<Budget>(budgetsContainer, userId);
 
     if (budgets.length === 0) {
-      res.json({ success: true, budgets: [] });
-      return;
+      logger.info({ userId }, 'No budgets found');
+      return ApiResponse.success(res, { budgets: [] });
     }
 
     // Fetch all categories once
     const categoriesContainer = await mongoDBService.getCategoriesContainer();
-
-    const categories = (await categoriesContainer
-      .find({ userId })
-      .toArray()) as unknown as Category[];
+    const categories = await DbHelper.findAllByUser<Category>(categoriesContainer, userId);
 
     // Build category hierarchy map for efficient lookups
     const categoryToDescendantsMap = new Map<string, string[]>();
@@ -97,22 +99,15 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       })
     );
 
-    res.json({
-      success: true,
-      budgets: budgetsWithSpending,
-    });
-  } catch (error) {
-    console.error('Error fetching budgets:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching budgets',
-    });
-  }
-});
+    logger.info({ userId, count: budgetsWithSpending.length }, 'Budgets fetched successfully');
+    ApiResponse.success(res, { budgets: budgetsWithSpending });
+  })
+);
 
 // POST /api/budgets - Create budget
-router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.post(
+  '/',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const {
       name,
@@ -137,11 +132,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     if (name && typeof name === 'string') {
       sanitizedName = name.trim();
       if (sanitizedName.length > 100) {
-        res.status(400).json({
-          success: false,
-          message: 'Budget name must not exceed 100 characters',
-        });
-        return;
+        return ApiResponse.badRequest(res, 'Budget name must not exceed 100 characters');
       }
       // Convert empty string to undefined
       if (sanitizedName.length === 0) {
@@ -156,49 +147,32 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const hasAccountFilter = accountIds && accountIds.length > 0;
 
     if (!hasCategoryFilter && !hasTagFilter && !hasAccountFilter) {
-      res.status(400).json({
-        success: false,
-        message: 'At least one filter (categories, tags, or accounts) must be specified',
-      });
-      return;
+      return ApiResponse.badRequest(
+        res,
+        'At least one filter (categories, tags, or accounts) must be specified'
+      );
     }
 
     // Validate dates
     if (!startDate) {
-      res.status(400).json({
-        success: false,
-        message: 'Start date is required',
-      });
-      return;
+      return ApiResponse.badRequest(res, 'Start date is required');
     }
 
     const start = new Date(startDate);
     if (isNaN(start.getTime())) {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid start date',
-      });
-      return;
+      return ApiResponse.badRequest(res, 'Invalid start date');
     }
 
     // Validate end date if provided
     if (endDate) {
       const end = new Date(endDate);
       if (isNaN(end.getTime())) {
-        res.status(400).json({
-          success: false,
-          message: 'Invalid end date',
-        });
-        return;
+        return ApiResponse.badRequest(res, 'Invalid end date');
       }
 
       // End date must be after start date
       if (end <= start) {
-        res.status(400).json({
-          success: false,
-          message: 'End date must be after start date',
-        });
-        return;
+        return ApiResponse.badRequest(res, 'End date must be after start date');
       }
     }
 
@@ -248,8 +222,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
-    const newBudget: Budget = {
-      id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    const newBudget = await DbHelper.createDocument<Budget>(budgetsContainer, {
       userId,
       name: sanitizedName,
       categoryIds: hasCategoryFilter ? categoryIds : undefined,
@@ -266,29 +239,17 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       notificationChannels,
       enableRollover: enableRollover || false,
       rolloverLimit: rolloverLimit ? parseFloat(rolloverLimit) : undefined,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    await budgetsContainer.insertOne(newBudget);
-
-    res.status(201).json({
-      success: true,
-      message: 'Budget created successfully',
-      budget: newBudget,
     });
-  } catch (error) {
-    console.error('Error creating budget:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating budget',
-    });
-  }
-});
+
+    logger.info({ userId, budgetId: newBudget.id }, 'Budget created successfully');
+    ApiResponse.created(res, { budget: newBudget }, 'Budget created successfully');
+  })
+);
 
 // POST /api/budgets/:id/duplicate - Duplicate budget with optional date shift
-router.post('/:id/duplicate', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.post(
+  '/:id/duplicate',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const { id } = req.params;
     const { shiftMonths = 1, newName } = req.body; // Optional: shift dates forward by N months
@@ -297,11 +258,7 @@ router.post('/:id/duplicate', async (req: AuthRequest, res: Response): Promise<v
 
     const originalBudget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
     if (!originalBudget) {
-      res.status(404).json({
-        success: false,
-        message: 'Budget not found',
-      });
-      return;
+      return ApiResponse.notFound(res, 'Budget not found');
     }
 
     // Calculate new dates by shifting forward
@@ -342,23 +299,18 @@ router.post('/:id/duplicate', async (req: AuthRequest, res: Response): Promise<v
 
     await budgetsContainer.insertOne(duplicatedBudget);
 
-    res.status(201).json({
-      success: true,
-      message: 'Budget duplicated successfully',
-      budget: duplicatedBudget,
-    });
-  } catch (error) {
-    console.error('Error duplicating budget:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error duplicating budget',
-    });
-  }
-});
+    logger.info(
+      { userId, budgetId: id, newBudgetId: duplicatedBudget.id },
+      'Budget duplicated successfully'
+    );
+    ApiResponse.created(res, { budget: duplicatedBudget }, 'Budget duplicated successfully');
+  })
+);
 
 // PUT /api/budgets/:id - Update budget
-router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.put(
+  '/:id',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const { id } = req.params;
     const {
@@ -385,11 +337,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       if (typeof name === 'string') {
         sanitizedName = name.trim();
         if (sanitizedName.length > 100) {
-          res.status(400).json({
-            success: false,
-            message: 'Budget name must not exceed 100 characters',
-          });
-          return;
+          return ApiResponse.badRequest(res, 'Budget name must not exceed 100 characters');
         }
         // Convert empty string to undefined
         if (sanitizedName.length === 0) {
@@ -402,11 +350,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const budget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
     if (!budget) {
-      res.status(404).json({
-        success: false,
-        message: 'Budget not found',
-      });
-      return;
+      return ApiResponse.notFound(res, 'Budget not found');
     }
 
     // Validate categories if provided
@@ -416,11 +360,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         .find({ id: { $in: categoryIds }, userId })
         .toArray();
       if (categories.length !== categoryIds.length) {
-        res.status(404).json({
-          success: false,
-          message: 'One or more categories not found',
-        });
-        return;
+        return ApiResponse.notFound(res, 'One or more categories not found');
       }
     }
 
@@ -431,11 +371,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       if (allTagIds.length > 0) {
         const tags = await tagsContainer.find({ id: { $in: allTagIds }, userId }).toArray();
         if (tags.length !== allTagIds.length) {
-          res.status(404).json({
-            success: false,
-            message: 'One or more tags not found',
-          });
-          return;
+          return ApiResponse.notFound(res, 'One or more tags not found');
         }
       }
     }
@@ -445,11 +381,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       const accountsContainer = await mongoDBService.getAccountsContainer();
       const accounts = await accountsContainer.find({ id: { $in: accountIds }, userId }).toArray();
       if (accounts.length !== accountIds.length) {
-        res.status(404).json({
-          success: false,
-          message: 'One or more accounts not found',
-        });
-        return;
+        return ApiResponse.notFound(res, 'One or more accounts not found');
       }
     }
 
@@ -457,22 +389,14 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     if (startDate) {
       const start = new Date(startDate);
       if (isNaN(start.getTime())) {
-        res.status(400).json({
-          success: false,
-          message: 'Invalid start date',
-        });
-        return;
+        return ApiResponse.badRequest(res, 'Invalid start date');
       }
     }
 
     if (endDate) {
       const end = new Date(endDate);
       if (isNaN(end.getTime())) {
-        res.status(400).json({
-          success: false,
-          message: 'Invalid end date',
-        });
-        return;
+        return ApiResponse.badRequest(res, 'Invalid end date');
       }
     }
 
@@ -481,11 +405,7 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     const effectiveEndDate = endDate ? new Date(endDate) : budget.endDate;
 
     if (effectiveEndDate && effectiveStartDate >= effectiveEndDate) {
-      res.status(400).json({
-        success: false,
-        message: 'End date must be after start date',
-      });
-      return;
+      return ApiResponse.badRequest(res, 'End date must be after start date');
     }
 
     const updateData: any = {
@@ -514,63 +434,43 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const updatedBudget = await budgetsContainer.findOne({ id, userId });
 
-    res.json({
-      success: true,
-      message: 'Budget updated successfully',
-      budget: updatedBudget,
-    });
-  } catch (error) {
-    console.error('Error updating budget:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating budget',
-    });
-  }
-});
+    logger.info({ userId, budgetId: id }, 'Budget updated successfully');
+    ApiResponse.success(res, { budget: updatedBudget }, 'Budget updated successfully');
+  })
+);
 
 // DELETE /api/budgets/:id - Delete budget
-router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.delete(
+  '/:id',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const { id } = req.params;
 
     const budgetsContainer = await mongoDBService.getBudgetsContainer();
 
-    const budget = (await budgetsContainer.findOne({ id, userId })) as Budget | null;
+    const budget = await DbHelper.findByIdAndUser<Budget>(budgetsContainer, id, userId);
     if (!budget) {
-      res.status(404).json({
-        success: false,
-        message: 'Budget not found',
-      });
-      return;
+      return ApiResponse.notFound(res, 'Budget not found');
     }
 
-    await budgetsContainer.deleteOne({ id, userId });
+    await DbHelper.deleteByIdAndUser(budgetsContainer, id, userId);
 
-    res.json({
-      success: true,
-      message: 'Budget deleted successfully',
-    });
-  } catch (error) {
-    console.error('Error deleting budget:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting budget',
-    });
-  }
-});
+    logger.info({ userId, budgetId: id }, 'Budget deleted successfully');
+    ApiResponse.success(res, null, 'Budget deleted successfully');
+  })
+);
 
 // GET /api/budgets/alerts - Get budget alerts
-router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.get(
+  '/alerts',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
 
     const budgetsContainer = await mongoDBService.getBudgetsContainer();
     const budgets = (await budgetsContainer.find({ userId }).toArray()) as unknown as Budget[];
 
     if (budgets.length === 0) {
-      res.json({ success: true, alerts: [] });
-      return;
+      return ApiResponse.success(res, { alerts: [] });
     }
 
     const categoriesContainer = await mongoDBService.getCategoriesContainer();
@@ -658,17 +558,9 @@ router.get('/alerts', async (req: AuthRequest, res: Response): Promise<void> => 
       }
     }
 
-    res.json({
-      success: true,
-      alerts: budgetAlerts,
-    });
-  } catch (error) {
-    console.error('Error fetching budget alerts:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching budget alerts',
-    });
-  }
-});
+    logger.info({ userId, alertCount: budgetAlerts.length }, 'Budget alerts fetched');
+    ApiResponse.success(res, { alerts: budgetAlerts });
+  })
+);
 
 export default router;
