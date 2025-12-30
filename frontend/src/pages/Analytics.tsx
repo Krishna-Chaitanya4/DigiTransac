@@ -321,7 +321,7 @@ const Analytics: React.FC = () => {
     }
 
     return insights;
-  }, [filteredTransactions, summaryStats, categories]);
+  }, [filteredTransactions, summaryStats, categories, formatCurrency]);
 
   // Monthly trend data
   const monthlyTrendData = useMemo(() => {

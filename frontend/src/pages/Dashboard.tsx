@@ -284,7 +284,7 @@ const Dashboard: React.FC = () => {
                 💸 Expenses exceed income
               </Typography>
               <Typography variant="body1">
-                You're spending {formatCurrency(Math.abs(stats.netSavings))} more than your income
+                You&apos;re spending {formatCurrency(Math.abs(stats.netSavings))} more than your income
                 this month
               </Typography>
             </Box>
@@ -294,7 +294,7 @@ const Dashboard: React.FC = () => {
                 🎉 Great job saving!
               </Typography>
               <Typography variant="body1">
-                You're saving {formatCurrency(stats.netSavings)} this month - Keep it up!
+                You&apos;re saving {formatCurrency(stats.netSavings)} this month - Keep it up!
               </Typography>
             </Box>
           ) : (
@@ -743,7 +743,7 @@ const Dashboard: React.FC = () => {
                     Budget Status
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    This month's progress
+                    This month&apos;s progress
                   </Typography>
                 </Box>
               </Box>

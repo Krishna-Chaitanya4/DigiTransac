@@ -432,7 +432,7 @@ const Categories: React.FC = () => {
 
     try {
       await deleteCategory.mutateAsync(category.id);
-    } catch (err: any) {
+    } catch {
       // Error is handled by React Query mutation hooks
     }
   };
@@ -503,7 +503,7 @@ const Categories: React.FC = () => {
         usage: response.usage,
         loading: false,
       });
-    } catch (err: any) {
+    } catch {
       setDeleteTagDialog({
         open: false,
         tag: null,

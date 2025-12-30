@@ -522,6 +522,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   );
 
   const anchorRef = useRef<HTMLButtonElement>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
 
   // Inline mode: render just the button and collapsible content
   if (config.inline) {
@@ -529,7 +530,10 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       <ClickAwayListener onClickAway={() => showFilters && setShowFilters(false)}>
         <Box>
           <Button
-            ref={anchorRef}
+            ref={(node) => {
+              anchorRef.current = node;
+              setAnchorEl(node);
+            }}
             variant={showFilters ? 'contained' : 'outlined'}
             startIcon={<TuneIcon />}
             onClick={() => setShowFilters(!showFilters)}
@@ -543,7 +547,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           </Button>
           <Popper
             open={showFilters}
-            anchorEl={anchorRef.current}
+            anchorEl={anchorEl}
             placement="bottom-end"
             sx={{ zIndex: 1300 }}
             modifiers={[

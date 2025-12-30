@@ -117,7 +117,7 @@ const ErrorFallback: React.FC<{ error: Error | null; onReset: () => void }> = ({
           </Typography>
 
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            We encountered an unexpected error. Don't worry, your data is safe.
+            We encountered an unexpected error. Don&apos;t worry, your data is safe.
           </Typography>
 
           {error && import.meta.env.DEV && (
