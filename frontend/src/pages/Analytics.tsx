@@ -41,7 +41,7 @@ import {
 } from 'recharts';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
+import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
 import { useTransactions, useCategories, useAccounts, useTags } from '../hooks/useApi';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../config/routes.config';
@@ -112,6 +112,10 @@ const Analytics: React.FC = () => {
   const formatCurrency = (amount: number) => {
     return formatCurrencyUtil(amount, user?.currency || 'USD', true, 0);
   };
+
+  // Get currency symbol
+  const userCurrency = user?.currency || 'USD';
+  const currencySymbol = CURRENCIES[userCurrency]?.symbol || '$';
 
   // Filter config for Analytics
   const filterConfig: FilterConfig = {
@@ -455,6 +459,7 @@ const Analytics: React.FC = () => {
               categories={categories}
               tags={tags}
               onClearAll={handleClearFilters}
+              currencySymbol={currencySymbol}
             />
           </Box>
         </Fade>
