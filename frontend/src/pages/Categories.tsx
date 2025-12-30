@@ -167,9 +167,6 @@ const Categories: React.FC = () => {
     parentId: null as string | null,
   });
 
-  // Remove the old useEffect that called fetchCategories and fetchTags
-  // React Query handles data fetching automatically
-
   // Debounce search query (performance optimization - industry standard)
   useEffect(() => {
     const timer = setTimeout(() => {
