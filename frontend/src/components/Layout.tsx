@@ -22,17 +22,10 @@ import {
   InputAdornment,
 } from '@mui/material';
 import {
-  Dashboard as DashboardIcon,
-  Category as CategoryIcon,
-  AccountBalance as BudgetIcon,
-  Analytics as AnalyticsIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
-  Menu as MenuIcon,
   Logout as LogoutIcon,
   AccountBalance,
-  AccountBalanceWallet as AccountsIcon,
-  SwapHoriz as TransactionsIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Search as SearchIcon,
@@ -41,26 +34,13 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';
 import MobileBottomNav from './MobileBottomNav';
+import { getSidebarRoutes, ROUTE_PATHS } from '../config/routes.config';
 
 const drawerWidth = 240;
 const drawerWidthCollapsed = 70;
 
-interface MenuItem {
-  text: string;
-  icon: React.ReactElement;
-  path: string;
-}
-
-const menuItems: MenuItem[] = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Transactions', icon: <TransactionsIcon />, path: '/transactions' },
-  { text: 'Accounts', icon: <AccountsIcon />, path: '/accounts' },
-  { text: 'Categories', icon: <CategoryIcon />, path: '/categories' },
-  { text: 'Budgets', icon: <BudgetIcon />, path: '/budgets' },
-  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
-];
-
 const Layout: React.FC = () => {
+  const menuItems = getSidebarRoutes();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
@@ -120,12 +100,12 @@ const Layout: React.FC = () => {
   };
 
   const handleProfileClick = () => {
-    navigate('/profile');
+    navigate(ROUTE_PATHS.PROFILE);
   };
 
   // Filter menu items based on search
   const filteredMenuItems = menuItems.filter((item) =>
-    item.text.toLowerCase().includes(searchQuery.toLowerCase())
+    item.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const drawer = (
@@ -143,7 +123,7 @@ const Layout: React.FC = () => {
         }}
       >
         <Box
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(ROUTE_PATHS.DASHBOARD)}
           sx={{
             display: 'flex',
             alignItems: 'center',
@@ -253,18 +233,21 @@ const Layout: React.FC = () => {
 
       {/* Navigation Menu */}
       <List sx={{ flexGrow: 1, px: sidebarCollapsed ? 1 : 2, py: 2 }}>
-        {filteredMenuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+        {filteredMenuItems.map((item) => {
+          const IconComponent = item.icon;
+          return (
+          <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
             <Tooltip
-              title={sidebarCollapsed ? item.text : ''}
+              title={sidebarCollapsed ? item.label : ''}
               placement="right"
               arrow
               TransitionComponent={Fade}
             >
               <ListItemButton
                 selected={location.pathname === item.path}
-                onClick={() => {
-                  navigate(item.path);
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(item.path, { replace: false });
                   if (isMobile) handleDrawerToggle();
                   setSearchQuery('');
                 }}
@@ -301,12 +284,12 @@ const Layout: React.FC = () => {
                     },
                   }}
                 >
-                  {item.icon}
+                  <IconComponent />
                 </ListItemIcon>
                 {!sidebarCollapsed && (
                   <Fade in={!sidebarCollapsed}>
                     <ListItemText
-                      primary={item.text}
+                      primary={item.label}
                       primaryTypographyProps={{
                         fontWeight: location.pathname === item.path ? 600 : 500,
                         fontSize: '0.9rem',
@@ -317,7 +300,8 @@ const Layout: React.FC = () => {
               </ListItemButton>
             </Tooltip>
           </ListItem>
-        ))}
+        );
+        })}
       </List>
 
       {/* Profile Section at Bottom */}

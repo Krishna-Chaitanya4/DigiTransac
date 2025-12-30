@@ -1,25 +1,13 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BottomNavigation, BottomNavigationAction, Paper, Box } from '@mui/material';
-import {
-  Dashboard as DashboardIcon,
-  SwapHoriz as TransactionsIcon,
-  AccountBalance as BudgetIcon,
-  Analytics as AnalyticsIcon,
-  Person as PersonIcon,
-} from '@mui/icons-material';
+import { getMobileNavRoutes } from '../config/routes.config';
 
 const MobileBottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
-  const routes = [
-    { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-    { path: '/transactions', label: 'Transactions', icon: <TransactionsIcon /> },
-    { path: '/budgets', label: 'Budgets', icon: <BudgetIcon /> },
-    { path: '/analytics', label: 'Analytics', icon: <AnalyticsIcon /> },
-    { path: '/profile', label: 'Profile', icon: <PersonIcon /> },
-  ];
+  
+  const routes = getMobileNavRoutes();
 
   const currentRoute = routes.findIndex((route) => location.pathname.startsWith(route.path));
   const value = currentRoute === -1 ? 0 : currentRoute;
@@ -57,18 +45,21 @@ const MobileBottomNav: React.FC = () => {
           },
         }}
       >
-        {routes.map((route) => (
+        {routes.map((route) => {
+          const IconComponent = route.icon;
+          return (
           <BottomNavigationAction
             key={route.path}
             label={route.label}
-            icon={route.icon}
+            icon={<IconComponent />}
             sx={{
               '&.Mui-selected': {
                 color: 'primary.main',
               },
             }}
           />
-        ))}
+        );
+        })}
       </BottomNavigation>
       {/* Safe area for iOS notch */}
       <Box sx={{ height: 'env(safe-area-inset-bottom)', bgcolor: 'background.paper' }} />
