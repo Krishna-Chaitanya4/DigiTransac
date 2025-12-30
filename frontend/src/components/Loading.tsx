@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, CircularProgress, Typography, useMediaQuery, useTheme } from '@mui/material';
 
 interface LoadingProps {
   message?: string;
@@ -7,6 +7,9 @@ interface LoadingProps {
 }
 
 const Loading: React.FC<LoadingProps> = ({ message, fullScreen = true }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
   return (
     <Box
       sx={{
@@ -25,7 +28,7 @@ const Loading: React.FC<LoadingProps> = ({ message, fullScreen = true }) => {
       }}
     >
       <CircularProgress 
-        size={{ xs: 48, sm: 60 }} 
+        size={isMobile ? 48 : 60}
         sx={{ color: fullScreen ? 'white' : 'primary.main' }} 
       />
       {message && (

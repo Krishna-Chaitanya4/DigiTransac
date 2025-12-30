@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Box, Card, CardContent, Skeleton, Grid } from '@mui/material';
+import { Box, Card, CardContent, Skeleton, Grid, useMediaQuery, useTheme } from '@mui/material';
 
 const DashboardCardSkeletonComponent: React.FC = () => {
   return (
@@ -27,27 +27,30 @@ const DashboardCardSkeletonComponent: React.FC = () => {
 export const DashboardCardSkeleton = React.memo(DashboardCardSkeletonComponent);
 
 const TransactionRowSkeletonComponent: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
   return (
     <Box
       sx={{ 
         display: 'flex', 
         alignItems: 'center', 
-        py: { xs: 2.5, sm: 2 }, 
-        px: { xs: 2, sm: 2 }, 
+        py: isMobile ? 2.5 : 2, 
+        px: 2, 
         borderBottom: '1px solid #eee' 
       }}
     >
       <Skeleton 
         variant="circular" 
-        width={{ xs: 48, sm: 40 }} 
-        height={{ xs: 48, sm: 40 }} 
-        sx={{ mr: { xs: 2, sm: 2 } }} 
+        width={isMobile ? 48 : 40} 
+        height={isMobile ? 48 : 40} 
+        sx={{ mr: 2 }} 
       />
       <Box sx={{ flex: 1 }}>
-        <Skeleton variant="text" width="30%" sx={{ fontSize: { xs: '1rem', sm: '0.875rem' } }} />
-        <Skeleton variant="text" width="50%" sx={{ mt: 0.5, fontSize: { xs: '0.875rem', sm: '0.75rem' } }} />
+        <Skeleton variant="text" width="30%" sx={{ fontSize: isMobile ? '1rem' : '0.875rem' }} />
+        <Skeleton variant="text" width="50%" sx={{ mt: 0.5, fontSize: isMobile ? '0.875rem' : '0.75rem' }} />
       </Box>
-      <Skeleton variant="text" width="15%" sx={{ fontSize: { xs: '1rem', sm: '0.875rem' } }} />
+      <Skeleton variant="text" width="15%" sx={{ fontSize: isMobile ? '1rem' : '0.875rem' }} />
     </Box>
   );
 };
