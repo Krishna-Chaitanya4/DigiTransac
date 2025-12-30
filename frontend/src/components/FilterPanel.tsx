@@ -11,15 +11,12 @@ import {
   Divider,
   Autocomplete,
   InputAdornment,
-  ToggleButtonGroup,
-  ToggleButton,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Tune as TuneIcon,
   TrendingUp as CreditIcon,
   TrendingDown as DebitIcon,
-  UnfoldMore as AllIcon,
 } from '@mui/icons-material';
 import { ModernDatePicker } from './ModernDatePicker';
 import dayjs, { Dayjs } from 'dayjs';
@@ -50,6 +47,7 @@ export interface FilterValues {
   excludeTags?: string[];
   minAmount?: string;
   maxAmount?: string;
+  amountQuickFilter?: string;
   reviewStatus?: 'all' | 'pending' | 'approved' | 'rejected';
 }
 
@@ -60,6 +58,7 @@ export interface FilterPanelProps {
   accounts?: any[];
   categories?: any[];
   tags?: any[];
+  currencySymbol?: string;
   onClearAll?: () => void;
 }
 
@@ -70,6 +69,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   accounts = [],
   categories = [],
   tags = [],
+  currencySymbol = '$',
   onClearAll,
 }) => {
   const [showFilters, setShowFilters] = useState(config.defaultExpanded ?? false);
@@ -175,29 +175,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         />
       )}
 
-      {/* Transaction Type Toggle */}
-      {config.showTransactionType && (
-        <ToggleButtonGroup
-          value={values.transactionType || 'all'}
-          exclusive
-          onChange={(_, value) => value && updateValue('transactionType', value)}
-          size="small"
-        >
-          <ToggleButton value="all">
-            <AllIcon sx={{ mr: 0.5, fontSize: 18 }} />
-            All
-          </ToggleButton>
-          <ToggleButton value="credit">
-            <CreditIcon sx={{ mr: 0.5, fontSize: 18 }} />
-            Income
-          </ToggleButton>
-          <ToggleButton value="debit">
-            <DebitIcon sx={{ mr: 0.5, fontSize: 18 }} />
-            Expense
-          </ToggleButton>
-        </ToggleButtonGroup>
-      )}
-
       {/* Review Status */}
       {config.showReviewStatus && (
         <TextField
@@ -292,6 +269,53 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   const renderAdvancedFilters = () => (
     <Collapse in={!config.collapsible || showFilters}>
       <Divider sx={{ my: 2 }} />
+      
+      {/* Transaction Type Chips - Inside collapsible section */}
+      {config.showTransactionType && (
+        <Box sx={{ mb: 2 }}>
+          <Box display="flex" gap={1.5} flexWrap="wrap">
+            <Chip
+              label="All"
+              onClick={() => updateValue('transactionType', 'all')}
+              color={values.transactionType === 'all' ? 'primary' : 'default'}
+              variant={values.transactionType === 'all' ? 'filled' : 'outlined'}
+              size="medium"
+              sx={{
+                fontWeight: values.transactionType === 'all' ? 600 : 400,
+                fontSize: '0.875rem',
+                height: 32,
+              }}
+            />
+            <Chip
+              icon={<CreditIcon fontSize="small" />}
+              label="Credits"
+              onClick={() => updateValue('transactionType', 'credit')}
+              color={values.transactionType === 'credit' ? 'success' : 'default'}
+              variant={values.transactionType === 'credit' ? 'filled' : 'outlined'}
+              size="medium"
+              sx={{
+                fontWeight: values.transactionType === 'credit' ? 600 : 400,
+                fontSize: '0.875rem',
+                height: 32,
+              }}
+            />
+            <Chip
+              icon={<DebitIcon fontSize="small" />}
+              label="Debits"
+              onClick={() => updateValue('transactionType', 'debit')}
+              color={values.transactionType === 'debit' ? 'error' : 'default'}
+              variant={values.transactionType === 'debit' ? 'filled' : 'outlined'}
+              size="medium"
+              sx={{
+                fontWeight: values.transactionType === 'debit' ? 600 : 400,
+                fontSize: '0.875rem',
+                height: 32,
+              }}
+            />
+          </Box>
+        </Box>
+      )}
+
       <Grid container spacing={2}>
         {/* Account Filter */}
         {config.showAccount && (
@@ -455,6 +479,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                 fullWidth
                 size="small"
                 inputProps={{ min: 0, step: 0.01 }}
+                InputProps={{
+                  startAdornment: <span style={{ marginRight: 4 }}>{currencySymbol}</span>,
+                }}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -466,6 +493,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                 fullWidth
                 size="small"
                 inputProps={{ min: 0, step: 0.01 }}
+                InputProps={{
+                  startAdornment: <span style={{ marginRight: 4 }}>{currencySymbol}</span>,
+                }}
               />
             </Grid>
           </>
