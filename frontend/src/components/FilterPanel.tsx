@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -11,6 +11,8 @@ import {
   Divider,
   Autocomplete,
   InputAdornment,
+  Popper,
+  ClickAwayListener,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -33,6 +35,7 @@ export interface FilterConfig {
   showReviewStatus?: boolean;
   collapsible?: boolean;
   defaultExpanded?: boolean;
+  inline?: boolean;
 }
 
 export interface FilterValues {
@@ -157,8 +160,8 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
   const renderMainFilters = () => (
     <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-      {/* Search */}
-      {config.showSearch && (
+      {/* Search - only in non-inline mode */}
+      {config.showSearch && !config.inline && (
         <TextField
           placeholder="Search transactions..."
           value={values.searchQuery || ''}
@@ -191,7 +194,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         </TextField>
       )}
 
-      {config.collapsible && (
+      {config.collapsible && !config.inline && (
         <>
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
           <Button
@@ -316,10 +319,10 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         </Box>
       )}
 
-      <Grid container spacing={2}>
+      <Grid container spacing={1.5}>
         {/* Account Filter */}
         {config.showAccount && (
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               select
               label="Account"
@@ -340,7 +343,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
         {/* Category Filter */}
         {config.showCategories && (
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid size={{ xs: 12 }}>
             <Autocomplete
               multiple
               options={categories}
@@ -375,7 +378,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         {/* Date Range */}
         {config.showDateRange && (
           <>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12 }}>
               <ModernDatePicker
                 label="Start Date"
                 value={values.startDate || null}
@@ -386,7 +389,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                 fullWidth
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12 }}>
               <ModernDatePicker
                 label="End Date"
                 value={values.endDate || null}
@@ -430,7 +433,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         {/* Tag Filters */}
         {config.showTags && (
           <>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12 }}>
               <Autocomplete
                 multiple
                 options={tags.map((t: any) => t.name)}
@@ -447,7 +450,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                 size="small"
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12 }}>
               <Autocomplete
                 multiple
                 options={tags.map((t: any) => t.name)}
@@ -470,7 +473,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         {/* Amount Range */}
         {config.showAmountRange && (
           <>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 label="Min Amount"
                 type="number"
@@ -484,7 +487,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 label="Max Amount"
                 type="number"
@@ -504,6 +507,62 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     </Collapse>
   );
 
+  const anchorRef = useRef<HTMLButtonElement>(null);
+
+  // Inline mode: render just the button and collapsible content
+  if (config.inline) {
+    return (
+      <ClickAwayListener onClickAway={() => showFilters && setShowFilters(false)}>
+        <Box>
+          <Button
+            ref={anchorRef}
+            variant={showFilters ? 'contained' : 'outlined'}
+            startIcon={<TuneIcon />}
+            onClick={() => setShowFilters(!showFilters)}
+            size="medium"
+            sx={{
+              bgcolor: showFilters ? 'primary.main' : 'action.hover',
+              '&:hover': { bgcolor: showFilters ? 'primary.dark' : 'action.selected' },
+            }}
+          >
+            Filters
+          </Button>
+          <Popper
+            open={showFilters}
+            anchorEl={anchorRef.current}
+            placement="bottom-end"
+            sx={{ zIndex: 1300 }}
+            modifiers={[
+              {
+                name: 'offset',
+                options: {
+                  offset: [0, 8],
+                },
+              },
+            ]}
+          >
+            <Paper
+              sx={{
+                p: 1.5,
+                borderRadius: 3,
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: 3,
+                width: 400,
+                maxWidth: '90vw',
+                maxHeight: '80vh',
+                overflow: 'auto',
+              }}
+            >
+              {renderAdvancedFilters()}
+            </Paper>
+          </Popper>
+        </Box>
+      </ClickAwayListener>
+    );
+  }
+
+  // Standard mode: render with Paper wrapper
   return (
     <Paper
       sx={{

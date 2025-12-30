@@ -119,6 +119,7 @@ const Analytics: React.FC = () => {
 
   // Filter config for Analytics
   const filterConfig: FilterConfig = {
+    showSearch: false,
     showDateRange: true,
     showQuickDatePresets: true,
     showTransactionType: true,
@@ -128,6 +129,7 @@ const Analytics: React.FC = () => {
     showAmountRange: true,
     collapsible: true,
     defaultExpanded: false,
+    inline: true,
   };
 
   // Handle clear all filters
@@ -420,7 +422,17 @@ const Analytics: React.FC = () => {
                 </Typography>
               </Box>
             </Box>
-            <Box display="flex" gap={1}>
+            <Box display="flex" gap={1} alignItems="center">
+              <FilterPanel
+                config={filterConfig}
+                values={filterValues}
+                onChange={setFilterValues}
+                accounts={accounts}
+                categories={categories}
+                tags={tags}
+                onClearAll={handleClearFilters}
+                currencySymbol={currencySymbol}
+              />
               <Tooltip title="Refresh">
                 <IconButton
                   onClick={handleRefresh}
@@ -445,22 +457,6 @@ const Analytics: React.FC = () => {
                 </IconButton>
               </Tooltip>
             </Box>
-          </Box>
-        </Fade>
-
-        {/* Filters */}
-        <Fade in timeout={400}>
-          <Box>
-            <FilterPanel
-              config={filterConfig}
-              values={filterValues}
-              onChange={setFilterValues}
-              accounts={accounts}
-              categories={categories}
-              tags={tags}
-              onClearAll={handleClearFilters}
-              currencySymbol={currencySymbol}
-            />
           </Box>
         </Fade>
 

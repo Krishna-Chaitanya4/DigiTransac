@@ -57,6 +57,7 @@ import {
   HourglassEmpty as PendingIcon,
   Block as RejectedIcon,
   AccountBalanceWallet,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { useToast } from '../components/Toast';
 import { useAccounts, useCategories, useTags, useCreateTransaction, useUpdateTransaction, useDeleteTransaction, type Account } from '../hooks/useApi';
@@ -1644,98 +1645,116 @@ const Transactions: React.FC = () => {
           </Grid>
         </Grid>
 
-        {/* Review Status Filter - Keep this outside FilterPanel */}
+        {/* Review Status Filter and Search/Filters */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
-              <Chip
-                label="All"
-                onClick={() => setReviewStatus('all')}
-                color={reviewStatus === 'all' ? 'primary' : 'default'}
-                variant={reviewStatus === 'all' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'all' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-              <Chip
-                icon={<PendingIcon fontSize="small" />}
-                label={`Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
-                onClick={() => {
-                  setReviewStatus('pending');
-                  setFilterValues((prev) => ({
-                    ...prev,
-                    startDate: null,
-                    endDate: null,
-                    activeDateFilter: '',
-                  }));
-                }}
-                color={reviewStatus === 'pending' ? 'warning' : 'default'}
-                variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'pending' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                  '& .MuiChip-label': {
-                    fontWeight: pendingCount > 0 ? 600 : 400,
-                  },
-                }}
-              />
-              <Chip
-                icon={<ApproveIcon fontSize="small" />}
-                label="Approved"
-                onClick={() => setReviewStatus('approved')}
-                color={reviewStatus === 'approved' ? 'success' : 'default'}
-                variant={reviewStatus === 'approved' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'approved' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
-              <Chip
-                icon={<RejectedIcon fontSize="small" />}
-                label="Rejected"
-                onClick={() => setReviewStatus('rejected')}
-                color={reviewStatus === 'rejected' ? 'error' : 'default'}
-                variant={reviewStatus === 'rejected' ? 'filled' : 'outlined'}
-                size="medium"
-                sx={{
-                  fontWeight: reviewStatus === 'rejected' ? 600 : 400,
-                  fontSize: '0.875rem',
-                  height: 32,
-                }}
-              />
+            <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap" justifyContent="space-between">
+              <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+                <Chip
+                  label="All"
+                  onClick={() => setReviewStatus('all')}
+                  color={reviewStatus === 'all' ? 'primary' : 'default'}
+                  variant={reviewStatus === 'all' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'all' ? 600 : 400,
+                    fontSize: '0.875rem',
+                    height: 32,
+                  }}
+                />
+                <Chip
+                  icon={<PendingIcon fontSize="small" />}
+                  label={`Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+                  onClick={() => {
+                    setReviewStatus('pending');
+                    setFilterValues((prev) => ({
+                      ...prev,
+                      startDate: null,
+                      endDate: null,
+                      activeDateFilter: '',
+                    }));
+                  }}
+                  color={reviewStatus === 'pending' ? 'warning' : 'default'}
+                  variant={reviewStatus === 'pending' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'pending' ? 600 : 400,
+                    fontSize: '0.875rem',
+                    height: 32,
+                    '& .MuiChip-label': {
+                      fontWeight: pendingCount > 0 ? 600 : 400,
+                    },
+                  }}
+                />
+                <Chip
+                  icon={<ApproveIcon fontSize="small" />}
+                  label="Approved"
+                  onClick={() => setReviewStatus('approved')}
+                  color={reviewStatus === 'approved' ? 'success' : 'default'}
+                  variant={reviewStatus === 'approved' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'approved' ? 600 : 400,
+                    fontSize: '0.875rem',
+                    height: 32,
+                  }}
+                />
+                <Chip
+                  icon={<RejectedIcon fontSize="small" />}
+                  label="Rejected"
+                  onClick={() => setReviewStatus('rejected')}
+                  color={reviewStatus === 'rejected' ? 'error' : 'default'}
+                  variant={reviewStatus === 'rejected' ? 'filled' : 'outlined'}
+                  size="medium"
+                  sx={{
+                    fontWeight: reviewStatus === 'rejected' ? 600 : 400,
+                    fontSize: '0.875rem',
+                    height: 32,
+                  }}
+                />
+              </Box>
+              
+              <Box display="flex" gap={1.5} alignItems="center">
+                <TextField
+                  placeholder="Search transactions..."
+                  value={filterValues.searchQuery || ''}
+                  onChange={(e) => setFilterValues((prev) => ({ ...prev, searchQuery: e.target.value }))}
+                  size="small"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ minWidth: 250 }}
+                />
+                <FilterPanel
+                  config={{
+                    showSearch: false,
+                    showTransactionType: true,
+                    showAccount: true,
+                    showCategories: true,
+                    showDateRange: true,
+                    showQuickDatePresets: true,
+                    showTags: true,
+                    showAmountRange: true,
+                    collapsible: true,
+                    defaultExpanded: false,
+                    inline: true,
+                  }}
+                  values={filterValues}
+                  onChange={setFilterValues}
+                  accounts={accounts}
+                  categories={categories}
+                  tags={tags}
+                  currencySymbol={currencySymbol}
+                  onClearAll={clearFilters}
+                />
+              </Box>
             </Box>
           </CardContent>
         </Card>
-
-        {/* Centralized Filter Panel */}
-        <FilterPanel
-          config={{
-            showSearch: true,
-            showTransactionType: true,
-            showAccount: true,
-            showCategories: true,
-            showDateRange: true,
-            showQuickDatePresets: true,
-            showTags: true,
-            showAmountRange: true,
-            collapsible: true,
-            defaultExpanded: false,
-          }}
-          values={filterValues}
-          onChange={setFilterValues}
-          accounts={accounts}
-          categories={categories}
-          tags={tags}
-          currencySymbol={currencySymbol}
-          onClearAll={clearFilters}
-        />
 
         {/* Bulk Actions */}
         {selectedTransactions.size > 0 && (
