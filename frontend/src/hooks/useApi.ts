@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { queryKeys } from '../utils/queryClient';
 import { useToast } from '../components/Toast';
@@ -296,6 +296,55 @@ export const useTags = (options?: UseQueryOptions<any>) => {
     queryKey: queryKeys.tags,
     queryFn: () => api.get('/api/tags'),
     ...options,
+  });
+};
+
+export const useCreateTag = () => {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: Partial<Tag>) => api.post('/api/tags', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags });
+      showToast('Tag created successfully', 'success');
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to create tag', 'error');
+    },
+  });
+};
+
+export const useUpdateTag = () => {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Tag> }) => 
+      api.put(`/api/tags/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags });
+      showToast('Tag updated successfully', 'success');
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to update tag', 'error');
+    },
+  });
+};
+
+export const useDeleteTag = () => {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/tags/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags });
+      showToast('Tag deleted successfully', 'success');
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to delete tag', 'error');
+    },
   });
 };
 

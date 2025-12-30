@@ -6,8 +6,6 @@ import {
   Grid,
   TextField,
   MenuItem,
-  CircularProgress,
-  Alert,
   Table,
   TableBody,
   TableCell,
@@ -56,7 +54,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { getCurrentMonthYear } from '../utils/greetings';
-import axios from 'axios';
+import { useTransactions, useCategories, useBudgets } from '../hooks/useApi';
 import ResponsiveChart from '../components/ResponsiveChart';
 
 // Date range presets
@@ -93,18 +91,6 @@ const getChartColors = (theme: any) => ({
   ],
 });
 
-interface Transaction {
-  id: string;
-  description: string;
-  amount: number;
-  type: 'credit' | 'debit';
-  date: string;
-  categoryId: string;
-  category?: { name: string; color: string };
-  merchant?: string;
-  tags?: string[];
-}
-
 interface Category {
   id: string;
   name: string;
@@ -122,18 +108,23 @@ const Analytics: React.FC = () => {
   const { user } = useAuth();
   const theme = useTheme();
   const COLORS = useMemo(() => getChartColors(theme), [theme]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   // Date range state
   const [dateRangeType, setDateRangeType] = useState<string | number>('month');
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('month'));
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('month'));
 
-  // Data state
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [budgets, setBudgets] = useState<any[]>([]);
+  // React Query hooks
+  const { data: transactionsData } = useTransactions({
+    startDate: startDate?.format('YYYY-MM-DD'),
+    endDate: endDate?.format('YYYY-MM-DD'),
+  });
+  const { data: categoriesData } = useCategories();
+  const { data: budgetsData } = useBudgets();
+
+  const transactions = transactionsData?.data?.transactions || [];
+  const categories = Array.isArray(categoriesData) ? categoriesData : categoriesData?.data?.categories || [];
+  const budgets = Array.isArray(budgetsData) ? budgetsData : budgetsData?.data?.budgets || [];
 
   // Calculate date range based on selection
   useEffect(() => {
@@ -169,51 +160,6 @@ const Analytics: React.FC = () => {
     }
   }, [dateRangeType]);
 
-  // Fetch data
-  useEffect(() => {
-    if (startDate && endDate) {
-      fetchAnalyticsData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate]);
-
-  const fetchAnalyticsData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-
-      const [txnRes, catRes, budgetRes] = await Promise.all([
-        axios.get('/api/transactions', {
-          params: {
-            startDate: startDate?.format('YYYY-MM-DD'),
-            endDate: endDate?.format('YYYY-MM-DD'),
-          },
-          headers,
-        }),
-        axios.get('/api/categories', { headers }),
-        axios.get('/api/budgets', { headers }),
-      ]);
-
-      const txnData = txnRes.data.transactions || [];
-      const catData = Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || [];
-      const budgetData = Array.isArray(budgetRes.data)
-        ? budgetRes.data
-        : budgetRes.data?.budgets || [];
-
-      setTransactions(txnData);
-      setCategories(catData);
-      setBudgets(budgetData);
-    } catch {
-      setError('Failed to load analytics data');
-    } finally {
-      setLoading(false);
-    }
-  }, [user, startDate, endDate]);
-
   // Create category map for lookups
   const categoryMap = useMemo(() => {
     const map = new Map<string, Category>();
@@ -225,7 +171,7 @@ const Analytics: React.FC = () => {
 
   // Enrich transactions with category data
   const enrichedTransactions = useMemo(() => {
-    return transactions.map((txn) => ({
+    return transactions.map((txn: any) => ({
       ...txn,
       category: categoryMap.get(txn.categoryId),
     }));
@@ -235,7 +181,7 @@ const Analytics: React.FC = () => {
   const incomeExpenseData = useMemo(() => {
     const monthlyMap = new Map<string, { income: number; expenses: number }>();
 
-    enrichedTransactions.forEach((txn) => {
+    enrichedTransactions.forEach((txn: any) => {
       const monthKey = dayjs(txn.date).format('MMM YY');
       const existing = monthlyMap.get(monthKey) || { income: 0, expenses: 0 };
 
@@ -265,8 +211,8 @@ const Analytics: React.FC = () => {
     const categoryMap = new Map<string, { name: string; value: number; color: string }>();
 
     enrichedTransactions
-      .filter((txn) => txn.type === 'debit')
-      .forEach((txn) => {
+      .filter((txn: any) => txn.type === 'debit')
+      .forEach((txn: any) => {
         if (txn.category) {
           const existing = categoryMap.get(txn.categoryId);
           categoryMap.set(txn.categoryId, {
@@ -293,8 +239,8 @@ const Analytics: React.FC = () => {
     const dailyMap = new Map<string, number>();
 
     enrichedTransactions
-      .filter((txn) => txn.type === 'debit')
-      .forEach((txn) => {
+      .filter((txn: any) => txn.type === 'debit')
+      .forEach((txn: any) => {
         const dayKey = dayjs(txn.date).format('MMM DD');
         dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + txn.amount);
       });
@@ -310,8 +256,8 @@ const Analytics: React.FC = () => {
     const categorySpending = new Map<string, number>();
 
     enrichedTransactions
-      .filter((txn) => txn.type === 'debit')
-      .forEach((txn) => {
+      .filter((txn: any) => txn.type === 'debit')
+      .forEach((txn: any) => {
         categorySpending.set(
           txn.categoryId,
           (categorySpending.get(txn.categoryId) || 0) + txn.amount
@@ -319,7 +265,7 @@ const Analytics: React.FC = () => {
       });
 
     return budgets
-      .map((budget) => {
+      .map((budget: any) => {
         const category = categoryMap.get(budget.categoryId);
         const spent = categorySpending.get(budget.categoryId) || 0;
         return {
@@ -337,8 +283,8 @@ const Analytics: React.FC = () => {
     const merchantMap = new Map<string, { amount: number; count: number }>();
 
     enrichedTransactions
-      .filter((txn) => txn.type === 'debit' && txn.merchant)
-      .forEach((txn) => {
+      .filter((txn: any) => txn.type === 'debit' && txn.merchant)
+      .forEach((txn: any) => {
         const merchant = txn.merchant || 'Unknown';
         const existing = merchantMap.get(merchant);
         merchantMap.set(merchant, {
@@ -357,7 +303,7 @@ const Analytics: React.FC = () => {
   const monthOverMonthData = useMemo(() => {
     const monthlyMap = new Map<string, { income: number; expenses: number }>();
 
-    enrichedTransactions.forEach((txn) => {
+    enrichedTransactions.forEach((txn: any) => {
       const monthKey = dayjs(txn.date).format('MMM YYYY');
       const existing = monthlyMap.get(monthKey) || { income: 0, expenses: 0 };
 
@@ -393,11 +339,11 @@ const Analytics: React.FC = () => {
   // Summary stats
   const summaryStats = useMemo(() => {
     const income = enrichedTransactions
-      .filter((t) => t.type === 'credit')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t: any) => t.type === 'credit')
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
     const expenses = enrichedTransactions
-      .filter((t) => t.type === 'debit')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t: any) => t.type === 'debit')
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
     const net = income - expenses;
     const avgDailySpending = expenses / (endDate?.diff(startDate, 'days') || 1);
 
@@ -414,7 +360,7 @@ const Analytics: React.FC = () => {
   const exportData = useCallback(() => {
     const csvData = [
       ['Date', 'Description', 'Category', 'Amount', 'Type'],
-      ...enrichedTransactions.map((txn) => [
+      ...enrichedTransactions.map((txn: any) => [
         dayjs(txn.date).format('YYYY-MM-DD'),
         txn.description,
         txn.category?.name || 'Uncategorized',
@@ -433,14 +379,6 @@ const Analytics: React.FC = () => {
     a.click();
     window.URL.revokeObjectURL(url);
   }, [enrichedTransactions]);
-
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress size={60} />
-      </Box>
-    );
-  }
 
   return (
     <Box>
@@ -600,12 +538,6 @@ const Analytics: React.FC = () => {
           </Paper>
         </Fade>
       </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

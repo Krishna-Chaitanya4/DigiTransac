@@ -32,12 +32,12 @@ import {
   Remove,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { getTimeBasedGreeting, getTimeEmoji } from '../utils/greetings';
 import PullToRefresh from '../components/PullToRefresh';
+import { useTransactions, useCategories, useTags, useBudgets, useAccounts } from '../hooks/useApi';
 
 // Smart tag filtering: exclude these tags from expense/income calculations
 const EXPENSE_EXCLUDE_TAGS = ['investment', 'transfer', 'savings', 'loan', 'refund'];
@@ -124,9 +124,8 @@ interface AccountBalance {
 }
 
 const Dashboard: React.FC = () => {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
@@ -142,10 +141,14 @@ const Dashboard: React.FC = () => {
     budgetHealthScore: number;
   } | null>(null);
 
-  // Filter states - Dashboard is locked to "This Month"
-  const [categories, setCategories] = useState<any[]>([]);
-  const [tags, setTags] = useState<any[]>([]);
-  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  // React Query hooks for data fetching
+  const { data: categoriesData } = useCategories();
+  const { data: tagsData } = useTags();
+  const { data: budgetsData } = useBudgets();
+  const { data: accountsData } = useAccounts();
+  
+  const categories = categoriesData?.data?.categories || [];
+  const tags = tagsData?.data?.tags || [];
 
   // Dashboard always shows "This Month" - no user filtering
   const filters = {
@@ -161,8 +164,20 @@ const Dashboard: React.FC = () => {
     transactionType: 'all' as const,
   };
 
+  // Fetch transactions with filters
+  const startDate = filters.dateRange.start.startOf('day').toISOString();
+  const endDate = filters.dateRange.end.endOf('day').toISOString();
+  const { data: transactionsData, isLoading: loading } = useTransactions({
+    startDate,
+    endDate,
+    reviewStatus: 'approved',
+    sortBy: 'date',
+    sortOrder: 'desc',
+  });
+
+  const transactions = transactionsData?.data?.transactions || [];
+
   useEffect(() => {
-    fetchInitialData();
     // Load dismissed alerts from localStorage
     const dismissed = localStorage.getItem('dismissedAlerts');
     if (dismissed) {
@@ -172,38 +187,15 @@ const Dashboard: React.FC = () => {
         console.error('Failed to load dismissed alerts:', e);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    // Only fetch dashboard data once initial data is loaded
-    // Dashboard is locked to "This Month" - no filter dependencies needed
-    if (initialDataLoaded) {
-      fetchDashboardData();
+    // Calculate dashboard data when transactions/budgets/accounts change
+    if (transactions.length >= 0 && categories.length >= 0) {
+      calculateDashboardData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDataLoaded]);
-
-  const fetchInitialData = useCallback(async () => {
-    try {
-      const [, categoriesRes, tagsRes] = await Promise.all([
-        axios.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } }), // Still fetch but don't store
-        axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/tags', { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
-
-      // We don't store accounts in state anymore since we removed filtering
-      setCategories(categoriesRes.data.categories || []);
-      setTags(tagsRes.data.tags || []);
-    } catch (err) {
-      console.error('Failed to fetch initial data:', err);
-      // Set empty arrays on error to unblock dashboard loading
-      setCategories([]);
-      setTags([]);
-    } finally {
-      setInitialDataLoaded(true);
-    }
-  }, [token]);
+  }, [transactions, categories, tags, budgetsData, accountsData]);
 
   const handleDismissAlert = useCallback(
     (alert: string) => {
@@ -216,44 +208,25 @@ const Dashboard: React.FC = () => {
     [dismissedAlerts]
   );
 
-  const fetchDashboardData = async () => {
+  // Fetch previous period transactions for comparison
+  const currentStart = filters.dateRange.start.toDate();
+  const currentEnd = filters.dateRange.end.toDate();
+  const periodDuration = currentEnd.getTime() - currentStart.getTime();
+  const prevEnd = new Date(currentStart.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - periodDuration);
+
+  const { data: prevTransactionsData } = useTransactions({
+    startDate: prevStart.toISOString(),
+    endDate: prevEnd.toISOString(),
+    reviewStatus: 'approved',
+  });
+
+  const { data: recurringData } = useTransactions({ isRecurring: 'true' });
+
+  const calculateDashboardData = useCallback(async () => {
     try {
-      setLoading(true);
-      // Ensure start date includes beginning of day and end date includes end of day
-      const startDate = filters.dateRange.start.startOf('day').toISOString();
-      const endDate = filters.dateRange.end.endOf('day').toISOString();
-
-      // Build query params for transactions API
-      // Only fetch approved transactions for accurate financial calculations
-      const txnParams = new URLSearchParams({
-        startDate,
-        endDate,
-        reviewStatus: 'approved',
-        sortBy: 'date',
-        sortOrder: 'desc',
-      });
-
-      // Add account filters if specified
-      if (filters.accounts.length > 0) {
-        filters.accounts.forEach((accountId) => txnParams.append('accountIds', accountId));
-      }
-
-      const [transactionsRes, budgetsRes, accountsRes] = await Promise.all([
-        axios.get(`/api/transactions?${txnParams}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/budgets`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`/api/accounts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
-
-      let transactions = transactionsRes.data.transactions || [];
-
       // Apply client-side filtering for categories and tags
-      transactions = transactions.filter((t: any) => {
+      let filteredTransactions = transactions.filter((t: any) => {
         // Filter by transaction type
         if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
           return false;
@@ -285,37 +258,19 @@ const Dashboard: React.FC = () => {
       });
 
       // Filter debits and credits with smart tag exclusion
-      const debits = transactions.filter(
+      const debits = filteredTransactions.filter(
         (t: any) => t.type === 'debit' && !shouldExcludeFromExpenses(t)
       );
-      const credits = transactions.filter(
+      const credits = filteredTransactions.filter(
         (t: any) => t.type === 'credit' && !shouldExcludeFromIncome(t)
       );
       const totalSpent = debits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const totalIncome = credits.reduce((sum: number, t: any) => sum + t.amount, 0);
       const netSavings = totalIncome - totalSpent;
 
-      // Calculate previous period for comparison (same duration as current period)
-      const currentStart = filters.dateRange.start.toDate();
-      const currentEnd = filters.dateRange.end.toDate();
-      const periodDuration = currentEnd.getTime() - currentStart.getTime();
-      const prevEnd = new Date(currentStart.getTime() - 1);
-      const prevStart = new Date(prevEnd.getTime() - periodDuration);
-
-      const prevParams = new URLSearchParams({
-        startDate: prevStart.toISOString(),
-        endDate: prevEnd.toISOString(),
-        reviewStatus: 'approved',
-      });
-      if (filters.accounts.length > 0) {
-        filters.accounts.forEach((accountId) => prevParams.append('accountIds', accountId));
-      }
-
-      const prevRes = await axios.get(`/api/transactions?${prevParams}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      let prevTransactions = prevRes.data.transactions || [];
-
+      // Calculate percentage changes using previous period data
+      let prevTransactions = prevTransactionsData?.transactions || [];
+      
       // Apply same client-side filtering to previous period
       prevTransactions = prevTransactions.filter((t: any) => {
         if (filters.transactionType !== 'all' && t.type !== filters.transactionType) {
@@ -386,7 +341,7 @@ const Dashboard: React.FC = () => {
       );
 
       setRecentTransactions(
-        transactions.slice(0, 5).map((txn: any) => {
+        filteredTransactions.slice(0, 5).map((txn: any) => {
           const category = categoryMap.get(txn.categoryId);
           return {
             id: txn.id,
@@ -400,8 +355,8 @@ const Dashboard: React.FC = () => {
         })
       );
 
-      // Process account balances first (needed for budget display)
-      const accounts = accountsRes.data.accounts || [];
+      // Process account balances
+      const accounts = accountsData?.data?.accounts || [];
       setAccountBalances(
         accounts.map((acc: any) => ({
           id: acc.id,
@@ -413,7 +368,7 @@ const Dashboard: React.FC = () => {
       );
 
       // Process budget status
-      const budgets = budgetsRes.data.budgets || [];
+      const budgets = budgetsData?.data?.budgets || [];
       const budgetStatuses: BudgetStatus[] = [];
       let totalBudget = 0;
 
@@ -475,39 +430,14 @@ const Dashboard: React.FC = () => {
       }
 
       // Update budget left in stats
-      // Only calculate budget left if there are budgets configured
       const budgetLeft = budgets.length > 0 ? totalBudget - totalSpent : 0;
       setStats((prev) => (prev ? { ...prev, budgetLeft } : null));
 
       setBudgetStatus(budgetStatuses.sort((a, b) => b.percentage - a.percentage).slice(0, 5));
 
-      // Calculate spending trends (last 6 months)
-      const now = new Date();
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-      // Set to start and end of day for inclusive date range
-      sixMonthsAgo.setHours(0, 0, 0, 0);
-      now.setHours(23, 59, 59, 999);
-
-      const trendParams = new URLSearchParams({
-        startDate: sixMonthsAgo.toISOString(),
-        endDate: now.toISOString(),
-      });
-      if (filters.accounts.length > 0) {
-        filters.accounts.forEach((accountId) => trendParams.append('accountIds', accountId));
-      }
-
-      await axios.get(`/api/transactions?${trendParams}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
       // Get upcoming recurring transactions
-      const recurringRes = await axios.get(`/api/transactions?isRecurring=true`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const recurringTxns = recurringRes.data.transactions || [];
-
+      const recurringTxns = recurringData?.data?.transactions || [];
+      const now = new Date();
       const upcoming: UpcomingRecurring[] = recurringTxns
         .map((t: any) => {
           if (!t.recurrencePattern) return null;
@@ -565,7 +495,7 @@ const Dashboard: React.FC = () => {
       }
       if (netSavings < 0) {
         newAlerts.push(
-          `Spending exceeds income by ${formatCurrency(Math.abs(netSavings))} this month`
+          `Spending exceeds income by ${formatCurrencyUtil(Math.abs(netSavings), user?.currency || 'USD', true, 0)} this month`
         );
       }
       setAlerts(newAlerts);
@@ -608,15 +538,10 @@ const Dashboard: React.FC = () => {
 
       setError('');
     } catch (err: any) {
-      console.error('Dashboard fetch error:', err);
-      // Don't show error for empty data (new users)
-      if (err.response?.status !== 404) {
-        setError(err.response?.data?.message || 'Failed to fetch dashboard data');
-      }
-    } finally {
-      setLoading(false);
+      console.error('Dashboard calculation error:', err);
+      setError('Failed to calculate dashboard data');
     }
-  };
+  }, [transactions, categories, tags, budgetsData, accountsData, prevTransactionsData, recurringData, filters, user?.currency, periodDuration]);
 
   const formatCurrency = useCallback(
     (amount: number) => {
@@ -1804,7 +1729,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <Box>
-      <PullToRefresh onRefresh={fetchDashboardData}>{content}</PullToRefresh>
+      <PullToRefresh onRefresh={calculateDashboardData}>{content}</PullToRefresh>
     </Box>
   );
 };

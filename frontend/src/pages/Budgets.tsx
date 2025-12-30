@@ -43,8 +43,9 @@ import {
   ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useBudgets, useCategories, useTags, useAccounts, type Category, type Tag } from '../hooks/useApi';
+import { api } from '../services/api';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { useToast } from '../components/Toast';
 import QuickAddFab from '../components/QuickAddFab';
@@ -55,30 +56,6 @@ import { ModernDatePicker } from '../components/ModernDatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-
-interface Category {
-  id: string;
-  name: string;
-  isFolder: boolean;
-  color?: string;
-  path: string[];
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  color?: string;
-  usageCount: number;
-}
-
-interface Account {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
-  currency: string;
-  color?: string;
-}
 
 interface Budget {
   id: string;
@@ -118,13 +95,19 @@ interface Budget {
 }
 
 const Budgets: React.FC = () => {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
+  // React Query hooks for data fetching
+  const { data: budgetsData, isLoading: budgetsLoading, refetch: refetchBudgets } = useBudgets();
+  const { data: categoriesData } = useCategories();
+  const { data: tagsData } = useTags();
+  const { data: accountsData } = useAccounts();
+
+  const budgets = budgetsData?.data?.budgets || [];
+  const categories = categoriesData?.data?.categories || [];
+  const tags = tagsData?.data?.tags || [];
+  const accounts = accountsData?.data?.accounts || [];
+  const loading = budgetsLoading;
   const [openDialog, setOpenDialog] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; budgetId: string | null }>({
@@ -252,11 +235,6 @@ const Budgets: React.FC = () => {
     rolloverLimit: '',
   });
 
-  useEffect(() => {
-    // Parallelize all API calls for faster initial load
-    Promise.all([fetchBudgets(), fetchCategories(), fetchTags(), fetchAccounts()]);
-  }, []);
-
   // Memoized utility functions for date calculations (performance optimization)
   const getMonthDateRange = useCallback(() => {
     const now = new Date();
@@ -379,71 +357,17 @@ const Budgets: React.FC = () => {
     }));
   }, []);
 
-  const fetchBudgets = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/budgets`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setBudgets(response.data.budgets || []);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to fetch budgets');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get(`/api/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // Normalize data: ensure all categories have required fields
-      const normalizedCategories = (response.data.categories || []).map((cat: any) => ({
-        ...cat,
-        path: cat.path || [], // Ensure path is always an array
-      }));
-
-      setCategories(normalizedCategories);
-    } catch (err: any) {
-      console.error('Failed to fetch categories:', err);
-    }
-  };
-
-  const fetchTags = async () => {
-    try {
-      const response = await axios.get(`/api/tags`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTags(response.data.tags || []);
-    } catch (err: any) {
-      console.error('Failed to fetch tags:', err);
-    }
-  };
-
-  const fetchAccounts = async () => {
-    try {
-      const response = await axios.get(`/api/accounts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAccounts(response.data.accounts || []);
-    } catch (err: any) {
-      console.error('Failed to fetch accounts:', err);
-    }
-  };
-
   // Memoized lookup maps for O(1) performance instead of O(n) array.find()
   const categoryMap = useMemo(() => {
-    return new Map(categories.map((c) => [c.id, c]));
+    return new Map<string, Category>(categories.map((c: Category) => [c.id, c]));
   }, [categories]);
 
   const tagMap = useMemo(() => {
-    return new Map(tags.map((t) => [t.id, t]));
+    return new Map<string, Tag>(tags.map((t: Tag) => [t.id, t]));
   }, [tags]);
 
   const accountMap = useMemo(() => {
-    return new Map(accounts.map((a) => [a.id, a]));
+    return new Map<string, any>(accounts.map((a: any) => [a.id, a]));
   }, [accounts]);
 
   const getCategoryName = useCallback(
@@ -567,24 +491,20 @@ const Budgets: React.FC = () => {
       }
 
       if (editingBudget) {
-        await axios.put(`/api/budgets/${editingBudget.id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await api.put(`/api/budgets/${editingBudget.id}`, payload);
         toast.success('Budget updated successfully');
       } else {
-        await axios.post(`/api/budgets`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await api.post(`/api/budgets`, payload);
         toast.success('Budget created successfully');
       }
-      fetchBudgets();
+      refetchBudgets();
       handleCloseDialog();
     } catch (err: any) {
       console.error('Error saving budget:', err);
       const errorMessage = err.response?.data?.message || err.message || 'Failed to save budget';
       toast.error(errorMessage);
     }
-  }, [formData, editingBudget, token, toast, handleCloseDialog]);
+  }, [formData, editingBudget, refetchBudgets, toast, handleCloseDialog]);
 
   const handleDeleteClick = useCallback((budgetId: string) => {
     setConfirmDelete({ open: true, budgetId });
@@ -593,18 +513,17 @@ const Budgets: React.FC = () => {
   const handleDuplicateBudget = useCallback(
     async (budget: Budget) => {
       try {
-        await axios.post(
+        await api.post(
           `/api/budgets/${budget.id}/duplicate`,
-          { shiftMonths: 1 }, // Shift dates forward by 1 month
-          { headers: { Authorization: `Bearer ${token}` } }
+          { shiftMonths: 1 } // Shift dates forward by 1 month
         );
         toast.success('Budget duplicated successfully');
-        fetchBudgets();
+        refetchBudgets();
       } catch (err: any) {
         toast.error(err.response?.data?.message || 'Failed to duplicate budget');
       }
     },
-    [token, toast]
+    [refetchBudgets, toast]
   );
 
   const handleAmountClick = useCallback((budget: Budget) => {
@@ -631,27 +550,25 @@ const Budgets: React.FC = () => {
       }
 
       try {
-        const budget = budgets.find((b) => b.id === budgetId);
+        const budget = budgets.find((b: Budget) => b.id === budgetId);
         if (!budget) return;
 
-        await axios.put(
-          `/api/budgets/${budgetId}`,
-          {
-            ...budget,
-            amount: newAmount,
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const updatedBudget = {
+          ...budget,
+          amount: newAmount,
+        };
+
+        await api.put(`/api/budgets/${budgetId}`, updatedBudget);
 
         toast.success('Budget amount updated');
-        fetchBudgets();
+        refetchBudgets();
         setEditingAmountId(null);
       } catch (err: any) {
         toast.error(err.response?.data?.message || 'Failed to update amount');
         setEditingAmountId(null);
       }
     },
-    [editingAmountValue, budgets, token, toast]
+    [editingAmountValue, budgets, refetchBudgets, toast]
   );
 
   const handleAmountCancel = useCallback(() => {
@@ -674,17 +591,15 @@ const Budgets: React.FC = () => {
     if (!confirmDelete.budgetId) return;
 
     try {
-      await axios.delete(`/api/budgets/${confirmDelete.budgetId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/api/budgets/${confirmDelete.budgetId}`);
       toast.success('Budget deleted successfully');
-      fetchBudgets();
+      refetchBudgets();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete budget');
     } finally {
       setConfirmDelete({ open: false, budgetId: null });
     }
-  }, [confirmDelete.budgetId, token, toast]);
+  }, [confirmDelete.budgetId, refetchBudgets, toast]);
 
   const formatCurrency = useCallback(
     (amount: number) => formatCurrencyUtil(amount, user?.currency || 'USD'),
@@ -834,24 +749,24 @@ const Budgets: React.FC = () => {
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((budget) => {
+      filtered = filtered.filter((budget: Budget) => {
         // Search in budget name
         if (budget.name && budget.name.toLowerCase().includes(query)) return true;
 
         // Search in category names
         if (
-          budget.categoryIds?.some((catId) => getCategoryName(catId).toLowerCase().includes(query))
+          budget.categoryIds?.some((catId: string) => getCategoryName(catId).toLowerCase().includes(query))
         )
           return true;
 
         // Search in tag names
-        if (budget.includeTagIds?.some((tagId) => getTagName(tagId).toLowerCase().includes(query)))
+        if (budget.includeTagIds?.some((tagId: string) => getTagName(tagId).toLowerCase().includes(query)))
           return true;
-        if (budget.excludeTagIds?.some((tagId) => getTagName(tagId).toLowerCase().includes(query)))
+        if (budget.excludeTagIds?.some((tagId: string) => getTagName(tagId).toLowerCase().includes(query)))
           return true;
 
         // Search in account names
-        if (budget.accountIds?.some((accId) => getAccountName(accId).toLowerCase().includes(query)))
+        if (budget.accountIds?.some((accId: string) => getAccountName(accId).toLowerCase().includes(query)))
           return true;
 
         return false;
@@ -860,7 +775,7 @@ const Budgets: React.FC = () => {
 
     // Apply status filter
     if (filterStatus !== 'all') {
-      filtered = filtered.filter((budget) => {
+      filtered = filtered.filter((budget: Budget) => {
         const percentUsed = budget.percentUsed || 0;
         const status = getBudgetStatusColors(percentUsed).status;
 
@@ -907,16 +822,16 @@ const Budgets: React.FC = () => {
   const budgetSummary = useMemo(() => {
     if (budgets.length === 0) return null;
 
-    const totalBudgeted = budgets.reduce((sum, b) => sum + b.amount + (b.rolledOverAmount || 0), 0);
-    const totalSpent = budgets.reduce((sum, b) => sum + (b.spent || 0), 0);
+    const totalBudgeted = budgets.reduce((sum: number, b: Budget) => sum + b.amount + (b.rolledOverAmount || 0), 0);
+    const totalSpent = budgets.reduce((sum: number, b: Budget) => sum + (b.spent || 0), 0);
     const totalRemaining = totalBudgeted - totalSpent;
     const overallPercent = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;
 
-    const healthyCount = budgets.filter((b) => (b.percentUsed || 0) < 70).length;
+    const healthyCount = budgets.filter((b: Budget) => (b.percentUsed || 0) < 70).length;
     const warningCount = budgets.filter(
-      (b) => (b.percentUsed || 0) >= 70 && (b.percentUsed || 0) < 100
+      (b: Budget) => (b.percentUsed || 0) >= 70 && (b.percentUsed || 0) < 100
     ).length;
-    const exceededCount = budgets.filter((b) => (b.percentUsed || 0) >= 100).length;
+    const exceededCount = budgets.filter((b: Budget) => (b.percentUsed || 0) >= 100).length;
 
     return {
       totalBudgeted,
@@ -1523,11 +1438,11 @@ const Budgets: React.FC = () => {
                         <Box display="flex" alignItems="center" gap={0.5} mb={1} flexWrap="wrap">
                           {/* Categories */}
                           {budget.categoryIds &&
-                            budget.categoryIds.map((catId) => (
+                            budget.categoryIds.map((catId: string) => (
                               <Chip
                                 key={catId}
                                 icon={
-                                  categories?.find((c) => c.id === catId)?.isFolder ? (
+                                  categories?.find((c: Category) => c.id === catId)?.isFolder ? (
                                     <span>📁</span>
                                   ) : (
                                     <span>📄</span>
@@ -1542,10 +1457,9 @@ const Budgets: React.FC = () => {
                               />
                             ))}
 
-                          {/* Include Tags */}
                           {budget.includeTagIds &&
                             budget.includeTagIds.length > 0 &&
-                            budget.includeTagIds.map((tagId) => (
+                            budget.includeTagIds.map((tagId: string) => (
                               <Chip
                                 key={tagId}
                                 icon={<LabelIcon sx={{ fontSize: 14 }} />}
@@ -1561,7 +1475,7 @@ const Budgets: React.FC = () => {
                           {/* Exclude Tags */}
                           {budget.excludeTagIds &&
                             budget.excludeTagIds.length > 0 &&
-                            budget.excludeTagIds.map((tagId) => (
+                            budget.excludeTagIds.map((tagId: string) => (
                               <Chip
                                 key={`exclude-${tagId}`}
                                 icon={<LabelIcon sx={{ fontSize: 14 }} />}
@@ -1576,7 +1490,7 @@ const Budgets: React.FC = () => {
 
                           {/* Accounts */}
                           {budget.accountIds &&
-                            budget.accountIds.map((accId) => (
+                            budget.accountIds.map((accId: string) => (
                               <Chip
                                 key={accId}
                                 icon={<AccountIcon sx={{ fontSize: 14 }} />}
@@ -2101,12 +2015,12 @@ const Budgets: React.FC = () => {
                       </MenuItem>
                     ) : (
                       categories
-                        .sort((a, b) => {
+                        .sort((a: Category, b: Category) => {
                           const depthDiff = a.path.length - b.path.length;
                           if (depthDiff !== 0) return depthDiff;
                           return a.name.localeCompare(b.name);
                         })
-                        .map((category) => (
+                        .map((category: Category) => (
                           <MenuItem key={category.id} value={category.id}>
                             {'  '.repeat(category.path.length)}
                             {category.isFolder ? '📁' : '📄'} {category.name}
@@ -2160,7 +2074,7 @@ const Budgets: React.FC = () => {
                         No accounts available. Create one first.
                       </MenuItem>
                     ) : (
-                      accounts.map((account) => (
+                      accounts.map((account: any) => (
                         <MenuItem key={account.id} value={account.id}>
                           {account.name} ({account.type})
                         </MenuItem>
@@ -2213,7 +2127,7 @@ const Budgets: React.FC = () => {
                         No tags available. Create transactions with tags first.
                       </MenuItem>
                     ) : (
-                      tags.map((tag) => (
+                      tags.map((tag: Tag) => (
                         <MenuItem key={tag.id} value={tag.id}>
                           {tag.name} ({tag.usageCount} uses)
                         </MenuItem>
@@ -2266,13 +2180,15 @@ const Budgets: React.FC = () => {
                         No tags available. Create transactions with tags first.
                       </MenuItem>
                     ) : (
-                      tags.map((tag) => (
+                      tags.map((tag: Tag) => (
                         <MenuItem key={tag.id} value={tag.id}>
                           {tag.name} ({tag.usageCount} uses)
                         </MenuItem>
                       ))
                     )}
                   </TextField>
+
+                  {/* Separator */}
 
                   {/* Validation Alert */}
                   {formData.categoryIds.length === 0 &&

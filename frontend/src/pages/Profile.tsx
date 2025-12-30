@@ -43,7 +43,7 @@ import {
   Brightness7 as LightModeIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
+import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
@@ -54,7 +54,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
 const Profile: React.FC = () => {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeContext();
@@ -89,22 +89,20 @@ const Profile: React.FC = () => {
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`);
 
-      if (response.data.emailIntegration) {
+      if (response.emailIntegration) {
         setEmailIntegration({
-          enabled: response.data.emailIntegration.enabled || false,
-          provider: response.data.emailIntegration.provider || null,
-          email: response.data.emailIntegration.email || '',
-          totalEmailsProcessed: response.data.emailIntegration.totalEmailsProcessed || 0,
-          lastProcessedAt: response.data.emailIntegration.lastProcessedAt || null,
+          enabled: response.emailIntegration.enabled || false,
+          provider: response.emailIntegration.provider || null,
+          email: response.emailIntegration.email || '',
+          totalEmailsProcessed: response.emailIntegration.totalEmailsProcessed || 0,
+          lastProcessedAt: response.emailIntegration.lastProcessedAt || null,
         });
 
         // Set last sync time if available
-        if (response.data.emailIntegration.lastProcessedAt) {
-          setLastSyncTime(new Date(response.data.emailIntegration.lastProcessedAt));
+        if (response.emailIntegration.lastProcessedAt) {
+          setLastSyncTime(new Date(response.emailIntegration.lastProcessedAt));
         }
       }
 
@@ -123,9 +121,7 @@ const Profile: React.FC = () => {
       console.log('Connecting to Gmail...');
 
       // Get OAuth URL from backend
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/connect`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/connect`);
 
       console.log('Got auth URL:', response.data);
       const { authUrl } = response.data;
@@ -180,10 +176,9 @@ const Profile: React.FC = () => {
   const handleDisconnectGmail = async () => {
     try {
       setLoading(true);
-      await axios.post(
+      await api.post(
         `${import.meta.env.VITE_API_BASE_URL}/api/gmail/disconnect`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        {}
       );
 
       setEmailIntegration({
@@ -204,10 +199,9 @@ const Profile: React.FC = () => {
   const handleToggleEmailIntegration = async (enabled: boolean) => {
     try {
       setLoading(true);
-      await axios.patch(
+      await api.patch(
         `${import.meta.env.VITE_API_BASE_URL}/api/gmail/toggle`,
-        { enabled },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { enabled }
       );
 
       setEmailIntegration((prev) => ({ ...prev, enabled }));
@@ -227,9 +221,7 @@ const Profile: React.FC = () => {
 
     try {
       setLoading(true);
-      await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`);
 
       logout();
       navigate('/login');
@@ -274,10 +266,9 @@ const Profile: React.FC = () => {
       setSyncStatus('syncing');
 
       // Trigger manual sync
-      await axios.post(
+      await api.post(
         `${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        {}
       );
 
       setSyncStatus('idle');
