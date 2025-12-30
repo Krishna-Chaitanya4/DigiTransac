@@ -22,7 +22,7 @@ WORKDIR /app
 
 # Copy package files and install production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN HUSKY=0 npm ci --only=production
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
