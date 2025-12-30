@@ -52,7 +52,17 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useAccounts, useCreateAccount, useUpdateAccount, useDeleteAccount, Account, useCategories } from '../hooks/useApi';
+import { 
+  useAccounts, 
+  useCreateAccount, 
+  useUpdateAccount, 
+  useDeleteBankAccount,
+  useTransferFunds,
+  useCreateTransaction,
+  useCreateCategory,
+  useCategories,
+  type Account
+} from '../hooks/useApi';
 import { api } from '../services/api';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
 import { ModernDatePicker } from '../components/ModernDatePicker';
@@ -92,7 +102,10 @@ const Accounts: React.FC = () => {
   const { data: categoriesData } = useCategories();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
-  const deleteAccount = useDeleteAccount();
+  const deleteAccount = useDeleteBankAccount();
+  const transferFunds = useTransferFunds();
+  const createTransaction = useCreateTransaction();
+  const createCategory = useCreateCategory();
   
   const accounts = accountsData?.data?.accounts || [];
   const categories = categoriesData?.data?.categories || [];
@@ -247,7 +260,7 @@ const Accounts: React.FC = () => {
         bankName: account.bankName || '',
         accountNumber: account.accountNumber || '',
         currency: account.currency,
-        initialBalance: account.initialBalance,
+        initialBalance: account.initialBalance || 0,
         color: account.color || accountTypeConfig[account.type as keyof typeof accountTypeConfig].color,
         isDefault: account.isDefault,
         isActive: account.isActive,
@@ -543,12 +556,12 @@ const Accounts: React.FC = () => {
     }
 
     try {
-      await api.post('/api/transactions/transfer', {
+      await transferFunds.mutateAsync({
         fromAccountId,
         toAccountId: transferToAccountId,
         amount,
         date: transferDate,
-        notes: transferNotes,
+        description: transferNotes,
       });
 
       setSuccess('Transfer completed successfully');
@@ -558,7 +571,6 @@ const Accounts: React.FC = () => {
       setTransferToAccountId('');
       setTransferAmount('');
       setTransferNotes('');
-      refetch(); // Refresh account balances
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create transfer');
     }
@@ -810,18 +822,16 @@ const Accounts: React.FC = () => {
 
       // If category doesn't exist, create it
       if (!adjustmentCategory) {
-        const newCategoryRes = await api.post('/api/categories', {
+        const newCategoryRes = await createCategory.mutateAsync({
           name: 'Balance Adjustment',
-          type: 'both',
           color: '#9e9e9e',
           icon: 'adjustment',
-          description: 'Automatic adjustments to reconcile account balances',
         });
         adjustmentCategory = newCategoryRes.data.category;
       }
 
       // Create a balance adjustment transaction
-      await api.post('/api/transactions', {
+      await createTransaction.mutateAsync({
         type: difference > 0 ? 'credit' : 'debit',
         amount: Math.abs(difference),
         accountId: adjustingAccount.id,
@@ -849,7 +859,6 @@ const Accounts: React.FC = () => {
       setAdjustingAccount(null);
       setActualBalance('');
       setAdjustmentNotes('');
-      refetch();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to adjust balance');
     }

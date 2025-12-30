@@ -44,7 +44,17 @@ import {
 } from '@mui/icons-material';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import { useBudgets, useCategories, useTags, useAccounts, type Category, type Tag } from '../hooks/useApi';
+import { 
+  useBudgets, 
+  useCategories, 
+  useTags, 
+  useAccounts,
+  useCreateBudget,
+  useUpdateBudget,
+  useDeleteBudget,
+  type Category, 
+  type Tag 
+} from '../hooks/useApi';
 import { api } from '../services/api';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { useToast } from '../components/Toast';
@@ -97,7 +107,12 @@ interface Budget {
 const Budgets: React.FC = () => {
   const { user } = useAuth();
   const toast = useToast();
-  // React Query hooks for data fetching
+  
+  // React Query hooks for data fetching and mutations
+  const createBudget = useCreateBudget();
+  const updateBudget = useUpdateBudget();
+  const deleteBudget = useDeleteBudget();
+  // const updateThreshold = useUpdateBudgetThreshold(); // TODO: Use for threshold updates
   const { data: budgetsData, isLoading: budgetsLoading, refetch: refetchBudgets } = useBudgets();
   const { data: categoriesData } = useCategories();
   const { data: tagsData } = useTags();
@@ -491,13 +506,10 @@ const Budgets: React.FC = () => {
       }
 
       if (editingBudget) {
-        await api.put(`/api/budgets/${editingBudget.id}`, payload);
-        toast.success('Budget updated successfully');
+        await updateBudget.mutateAsync({ id: editingBudget.id, data: payload });
       } else {
-        await api.post(`/api/budgets`, payload);
-        toast.success('Budget created successfully');
+        await createBudget.mutateAsync(payload);
       }
-      refetchBudgets();
       handleCloseDialog();
     } catch (err: any) {
       console.error('Error saving budget:', err);
@@ -518,7 +530,7 @@ const Budgets: React.FC = () => {
           { shiftMonths: 1 } // Shift dates forward by 1 month
         );
         toast.success('Budget duplicated successfully');
-        refetchBudgets();
+        refetchBudgets(); // Keep manual refetch for duplicate endpoint (no dedicated hook yet)
       } catch (err: any) {
         toast.error(err.response?.data?.message || 'Failed to duplicate budget');
       }
@@ -558,10 +570,7 @@ const Budgets: React.FC = () => {
           amount: newAmount,
         };
 
-        await api.put(`/api/budgets/${budgetId}`, updatedBudget);
-
-        toast.success('Budget amount updated');
-        refetchBudgets();
+        await updateBudget.mutateAsync({ id: budgetId, data: updatedBudget });
         setEditingAmountId(null);
       } catch (err: any) {
         toast.error(err.response?.data?.message || 'Failed to update amount');
@@ -591,9 +600,7 @@ const Budgets: React.FC = () => {
     if (!confirmDelete.budgetId) return;
 
     try {
-      await api.delete(`/api/budgets/${confirmDelete.budgetId}`);
-      toast.success('Budget deleted successfully');
-      refetchBudgets();
+      await deleteBudget.mutateAsync(confirmDelete.budgetId);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete budget');
     } finally {

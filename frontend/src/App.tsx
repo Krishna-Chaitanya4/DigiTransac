@@ -8,6 +8,7 @@ import OfflineIndicator from './components/OfflineIndicator';
 import Layout from './components/Layout';
 import Loading from './components/Loading';
 import ErrorBoundary from './components/ErrorBoundary';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { ROUTE_PATHS } from './config/routes.config';
 
 // Lazy load pages for better performance and smaller initial bundle
@@ -64,13 +65,62 @@ const App: React.FC = () => {
                 }
               >
                 <Route index element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="transactions" element={<Transactions />} />
-                <Route path="categories" element={<Categories />} />
-                <Route path="accounts" element={<Accounts />} />
-                <Route path="budgets" element={<Budgets />} />
-                <Route path="analytics" element={<Analytics />} />
-                <Route path="profile" element={<Profile />} />
+                <Route 
+                  path="dashboard" 
+                  element={
+                    <RouteErrorBoundary>
+                      <Dashboard />
+                    </RouteErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="transactions" 
+                  element={
+                    <RouteErrorBoundary>
+                      <Transactions />
+                    </RouteErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="categories" 
+                  element={
+                    <RouteErrorBoundary>
+                      <Categories />
+                    </RouteErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="accounts" 
+                  element={
+                    <RouteErrorBoundary>
+                      <Accounts />
+                    </RouteErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="budgets" 
+                  element={
+                    <RouteErrorBoundary>
+                      <Budgets />
+                    </RouteErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="analytics" 
+                  element={
+                    <RouteErrorBoundary>
+                      <Analytics />
+                    </RouteErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="profile" 
+                  element={
+                    <RouteErrorBoundary>
+                      <Profile />
+                    </RouteErrorBoundary>
+                  } 
+                />
               </Route>
 
               <Route path="*" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />

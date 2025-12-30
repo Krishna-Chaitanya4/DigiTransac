@@ -30,6 +30,7 @@ import {
   ChevronRight as ChevronRightIcon,
   Search as SearchIcon,
   MoreVert as MoreVertIcon,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useThemeContext } from '../context/ThemeContext';

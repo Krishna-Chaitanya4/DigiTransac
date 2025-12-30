@@ -46,6 +46,11 @@ import {
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { 
+  useUserProfile, 
+  useDeleteAccount as useDeleteUserAccount,
+  useDisconnectGmail 
+} from '../hooks/useApi';
 import { useTheme } from '@mui/material/styles';
 import { useThemeContext } from '../context/ThemeContext';
 import { ModernDatePicker } from '../components/ModernDatePicker';
@@ -58,6 +63,11 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeContext();
+
+  // React Query hooks
+  const { data: profileData, refetch: refetchProfile } = useUserProfile();
+  const deleteUserAccount = useDeleteUserAccount();
+  const disconnectGmail = useDisconnectGmail();
 
   const [emailIntegration, setEmailIntegration] = useState({
     enabled: false,
@@ -83,14 +93,8 @@ const Profile: React.FC = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`);
-
+    if (profileData) {
+      const response = profileData;
       if (response.emailIntegration) {
         setEmailIntegration({
           enabled: response.emailIntegration.enabled || false,
@@ -109,12 +113,8 @@ const Profile: React.FC = () => {
       // TODO: Fetch pending transaction count from review queue API
       // For now, hardcoded as 0
       setPendingCount(0);
-    } catch (err) {
-      console.error('Failed to fetch user profile:', err);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [profileData]);
 
   const handleConnectGmail = async () => {
     try {
@@ -153,7 +153,7 @@ const Profile: React.FC = () => {
             console.log('Popup returned to our domain, closing...');
             popup.close();
             clearInterval(checkPopup);
-            fetchUserProfile();
+            refetchProfile();
             setSuccess('Gmail account connected successfully!');
           }
         } catch {
@@ -164,7 +164,7 @@ const Profile: React.FC = () => {
         if (popup?.closed) {
           console.log('Popup closed, refreshing profile...');
           clearInterval(checkPopup);
-          fetchUserProfile();
+          refetchProfile();
         }
       }, 500);
     } catch (err: any) {
@@ -176,10 +176,7 @@ const Profile: React.FC = () => {
   const handleDisconnectGmail = async () => {
     try {
       setLoading(true);
-      await api.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/disconnect`,
-        {}
-      );
+      await disconnectGmail.mutateAsync();
 
       setEmailIntegration({
         enabled: false,
@@ -199,6 +196,7 @@ const Profile: React.FC = () => {
   const handleToggleEmailIntegration = async (enabled: boolean) => {
     try {
       setLoading(true);
+      // TODO: No React Query hook exists yet for toggle
       await api.patch(
         `${import.meta.env.VITE_API_BASE_URL}/api/gmail/toggle`,
         { enabled }
@@ -221,7 +219,7 @@ const Profile: React.FC = () => {
 
     try {
       setLoading(true);
-      await api.delete(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`);
+      await deleteUserAccount.mutateAsync(undefined);
 
       logout();
       navigate('/login');
@@ -265,6 +263,7 @@ const Profile: React.FC = () => {
       setSyncing(true);
       setSyncStatus('syncing');
 
+      // TODO: No React Query hook exists yet for manual sync
       // Trigger manual sync
       await api.post(
         `${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`,
@@ -276,7 +275,7 @@ const Profile: React.FC = () => {
       setSuccess('Email sync completed successfully!');
 
       // Refresh profile to get updated stats
-      await fetchUserProfile();
+      await refetchProfile();
     } catch (err: any) {
       setSyncStatus('error');
       setError(err.response?.data?.error || 'Failed to sync emails');

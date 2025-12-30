@@ -130,19 +130,22 @@ export interface CategoryStats {
 // Account Types
 // ===========================
 
-export type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash' | 'other';
+export type AccountType = 'checking' | 'savings' | 'credit_card' | 'investment' | 'cash' | 'loan' | 'other';
 
 export interface Account {
   id: string;
   userId: string;
   name: string;
-  accountType: AccountType;
+  type: AccountType; // Using 'type' for consistency with existing code
+  accountType?: AccountType; // Alias for backward compatibility
   balance: number;
   currency: string;
   isDefault: boolean;
   isActive: boolean;
-  institution?: string;
+  bankName?: string; // Using bankName for consistency
+  institution?: string; // Alias for backward compatibility
   accountNumber?: string;
+  initialBalance?: number; // Initial balance when account was created
   color?: string;
   icon?: string;
   notes?: string;

@@ -63,7 +63,7 @@ import {
   AccountBalanceWallet,
 } from '@mui/icons-material';
 import { useToast } from '../components/Toast';
-import { useAccounts, useCategories, useTags, useCreateTransaction, useUpdateTransaction, useDeleteTransaction, Account } from '../hooks/useApi';
+import { useAccounts, useCategories, useTags, useCreateTransaction, useUpdateTransaction, useDeleteTransaction, type Account } from '../hooks/useApi';
 import { api } from '../services/api';
 import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
