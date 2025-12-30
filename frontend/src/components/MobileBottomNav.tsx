@@ -6,7 +6,7 @@ import { getMobileNavRoutes } from '../config/routes.config';
 const MobileBottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const routes = getMobileNavRoutes();
 
   const currentRoute = routes.findIndex((route) => location.pathname.startsWith(route.path));
@@ -48,17 +48,17 @@ const MobileBottomNav: React.FC = () => {
         {routes.map((route) => {
           const IconComponent = route.icon;
           return (
-          <BottomNavigationAction
-            key={route.path}
-            label={route.label}
-            icon={<IconComponent />}
-            sx={{
-              '&.Mui-selected': {
-                color: 'primary.main',
-              },
-            }}
-          />
-        );
+            <BottomNavigationAction
+              key={route.path}
+              label={route.label}
+              icon={<IconComponent />}
+              sx={{
+                '&.Mui-selected': {
+                  color: 'primary.main',
+                },
+              }}
+            />
+          );
         })}
       </BottomNavigation>
       {/* Safe area for iOS notch */}

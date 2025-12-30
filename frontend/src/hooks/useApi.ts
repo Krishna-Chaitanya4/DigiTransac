@@ -2,14 +2,7 @@ import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstac
 import { api } from '../services/api';
 import { queryKeys } from '../utils/queryClient';
 import { useToast } from '../components/Toast';
-import type {
-  Transaction,
-  Category,
-  Account,
-  Budget,
-  Tag,
-  User,
-} from '../types/api.types';
+import type { Transaction, Category, Account, Budget, Tag, User } from '../types/api.types';
 
 // Re-export types for convenience
 export type { Transaction, Category, Account, Budget, Tag, User } from '../types/api.types';
@@ -65,7 +58,7 @@ export const useUpdateTransaction = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Transaction> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<Transaction> }) =>
       api.put(`/api/transactions/${id}`, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transaction(variables.id) });
@@ -138,7 +131,7 @@ export const useUpdateCategory = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Category> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<Category> }) =>
       api.put(`/api/categories/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.categories });
@@ -208,7 +201,7 @@ export const useUpdateAccount = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Account> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<Account> }) =>
       api.put(`/api/accounts/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
@@ -271,7 +264,7 @@ export const useUpdateBudget = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Budget> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<Budget> }) =>
       api.put(`/api/budgets/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.budgets() });
@@ -306,7 +299,7 @@ export const useUpdateBudgetThreshold = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: ({ budgetId, threshold }: { budgetId: string; threshold: number }) => 
+    mutationFn: ({ budgetId, threshold }: { budgetId: string; threshold: number }) =>
       api.post(`/api/budgets/${budgetId}/threshold`, { threshold }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.budgets() });
@@ -350,7 +343,7 @@ export const useUpdateTag = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Tag> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<Tag> }) =>
       api.put(`/api/tags/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tags });
@@ -405,7 +398,7 @@ export const useUpdateProfile = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: (data: Partial<User>) => 
+    mutationFn: (data: Partial<User>) =>
       api.post(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
@@ -421,7 +414,7 @@ export const useUpdatePassword = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: (data: { currentPassword: string; newPassword: string }) => 
+    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
       api.patch(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile/password`, data),
     onSuccess: () => {
       showToast('Password updated successfully', 'success');
@@ -436,8 +429,7 @@ export const useDeleteAccount = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: () => 
-      api.delete(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`),
+    mutationFn: () => api.delete(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`),
     onSuccess: () => {
       showToast('Account deleted successfully', 'success');
       // Redirect handled in component
@@ -464,8 +456,7 @@ export const useTestGmailConnection = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: () => 
-      api.post(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/test`),
+    mutationFn: () => api.post(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/test`),
     onSuccess: () => {
       showToast('Gmail connection test successful', 'success');
     },
@@ -480,8 +471,7 @@ export const useDisconnectGmail = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: () => 
-      api.post(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/disconnect`),
+    mutationFn: () => api.post(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/disconnect`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
       showToast('Gmail disconnected successfully', 'success');
@@ -500,8 +490,13 @@ export const useTransferFunds = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: (data: { fromAccountId: string; toAccountId: string; amount: number; description?: string; date?: string }) => 
-      api.post('/api/transactions/transfer', data),
+    mutationFn: (data: {
+      fromAccountId: string;
+      toAccountId: string;
+      amount: number;
+      description?: string;
+      date?: string;
+    }) => api.post('/api/transactions/transfer', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions() });
@@ -534,7 +529,7 @@ export const useBulkUpdateTransactions = () => {
   const { showToast } = useToast();
 
   return useMutation({
-    mutationFn: ({ transactionIds, updates }: { transactionIds: string[]; updates: any }) => 
+    mutationFn: ({ transactionIds, updates }: { transactionIds: string[]; updates: any }) =>
       api.post('/api/transactions/bulk-update', { transactionIds, updates }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions() });

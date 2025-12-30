@@ -65,61 +65,61 @@ const App: React.FC = () => {
                 }
               >
                 <Route index element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
-                <Route 
-                  path="dashboard" 
+                <Route
+                  path="dashboard"
                   element={
                     <RouteErrorBoundary>
                       <Dashboard />
                     </RouteErrorBoundary>
-                  } 
+                  }
                 />
-                <Route 
-                  path="transactions" 
+                <Route
+                  path="transactions"
                   element={
                     <RouteErrorBoundary>
                       <Transactions />
                     </RouteErrorBoundary>
-                  } 
+                  }
                 />
-                <Route 
-                  path="categories" 
+                <Route
+                  path="categories"
                   element={
                     <RouteErrorBoundary>
                       <Categories />
                     </RouteErrorBoundary>
-                  } 
+                  }
                 />
-                <Route 
-                  path="accounts" 
+                <Route
+                  path="accounts"
                   element={
                     <RouteErrorBoundary>
                       <Accounts />
                     </RouteErrorBoundary>
-                  } 
+                  }
                 />
-                <Route 
-                  path="budgets" 
+                <Route
+                  path="budgets"
                   element={
                     <RouteErrorBoundary>
                       <Budgets />
                     </RouteErrorBoundary>
-                  } 
+                  }
                 />
-                <Route 
-                  path="analytics" 
+                <Route
+                  path="analytics"
                   element={
                     <RouteErrorBoundary>
                       <Analytics />
                     </RouteErrorBoundary>
-                  } 
+                  }
                 />
-                <Route 
-                  path="profile" 
+                <Route
+                  path="profile"
                   element={
                     <RouteErrorBoundary>
                       <Profile />
                     </RouteErrorBoundary>
-                  } 
+                  }
                 />
               </Route>
 

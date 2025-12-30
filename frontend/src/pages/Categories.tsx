@@ -534,10 +534,9 @@ const Categories: React.FC = () => {
     if (!deleteTagDialog.tag || !replaceTagId) return;
 
     try {
-      await api.post(
-        `/api/tags/${deleteTagDialog.tag.id}/replace`,
-        { replacementTagId: replaceTagId }
-      );
+      await api.post(`/api/tags/${deleteTagDialog.tag.id}/replace`, {
+        replacementTagId: replaceTagId,
+      });
 
       setDeleteTagDialog({
         open: false,
@@ -871,10 +870,14 @@ const Categories: React.FC = () => {
                   {categories.length + tags.length}{' '}
                   {categories.length + tags.length === 1 ? 'item' : 'items'} •{' '}
                   {categories.filter((c: Category) => c.isFolder).length}{' '}
-                  {categories.filter((c: Category) => c.isFolder).length === 1 ? 'folder' : 'folders'} •{' '}
-                  {categories.filter((c: Category) => !c.isFolder).length}{' '}
-                  {categories.filter((c: Category) => !c.isFolder).length === 1 ? 'category' : 'categories'} •{' '}
-                  {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
+                  {categories.filter((c: Category) => c.isFolder).length === 1
+                    ? 'folder'
+                    : 'folders'}{' '}
+                  • {categories.filter((c: Category) => !c.isFolder).length}{' '}
+                  {categories.filter((c: Category) => !c.isFolder).length === 1
+                    ? 'category'
+                    : 'categories'}{' '}
+                  • {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>

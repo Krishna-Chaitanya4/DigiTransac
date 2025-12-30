@@ -163,4 +163,4 @@ export const ROUTE_PATHS = {
   PROFILE: ROUTES.PROFILE.path,
 } as const;
 
-export type RoutePath = typeof ROUTE_PATHS[keyof typeof ROUTE_PATHS];
+export type RoutePath = (typeof ROUTE_PATHS)[keyof typeof ROUTE_PATHS];

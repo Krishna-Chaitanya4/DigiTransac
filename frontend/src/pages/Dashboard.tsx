@@ -68,8 +68,12 @@ const Dashboard: React.FC = () => {
   // Fetch data for current month
   const startDate = dayjs().startOf('month').toISOString();
   const endDate = dayjs().endOf('month').toISOString();
-  
-  const { data: transactionsData, isLoading: loadingTransactions, refetch: refetchTransactions } = useTransactions({
+
+  const {
+    data: transactionsData,
+    isLoading: loadingTransactions,
+    refetch: refetchTransactions,
+  } = useTransactions({
     startDate,
     endDate,
     reviewStatus: 'approved',
@@ -130,26 +134,27 @@ const Dashboard: React.FC = () => {
 
   // Calculate budget status (only for expense transactions)
   const budgetStatus = useMemo(() => {
-    return budgets.map((budget: any) => {
-      const category = categories.find((c: any) => c._id === budget.categoryId);
-      // Only count debit transactions with "expense" tag for budget tracking
-      const spent = transactions
-        .filter((t: any) => 
-          t.type === 'debit' && 
-          t.categoryId === budget.categoryId && 
-          hasTag(t, 'expense')
-        )
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
+    return budgets
+      .map((budget: any) => {
+        const category = categories.find((c: any) => c._id === budget.categoryId);
+        // Only count debit transactions with "expense" tag for budget tracking
+        const spent = transactions
+          .filter(
+            (t: any) =>
+              t.type === 'debit' && t.categoryId === budget.categoryId && hasTag(t, 'expense')
+          )
+          .reduce((sum: number, t: any) => sum + t.amount, 0);
 
-      return {
-        categoryName: category?.name || 'Unknown',
-        categoryColor: category?.color || '#999',
-        spent,
-        budget: budget.amount,
-        percentage: Math.round((spent / budget.amount) * 100),
-        isOver: spent > budget.amount,
-      };
-    }).filter((b: any) => b.spent > 0 || b.budget > 0); // Only show budgets with activity
+        return {
+          categoryName: category?.name || 'Unknown',
+          categoryColor: category?.color || '#999',
+          spent,
+          budget: budget.amount,
+          percentage: Math.round((spent / budget.amount) * 100),
+          isOver: spent > budget.amount,
+        };
+      })
+      .filter((b: any) => b.spent > 0 || b.budget > 0); // Only show budgets with activity
   }, [budgets, categories, transactions]);
 
   const formatCurrency = (amount: number) => {
@@ -279,7 +284,8 @@ const Dashboard: React.FC = () => {
                 💸 Expenses exceed income
               </Typography>
               <Typography variant="body1">
-                You're spending {formatCurrency(Math.abs(stats.netSavings))} more than your income this month
+                You're spending {formatCurrency(Math.abs(stats.netSavings))} more than your income
+                this month
               </Typography>
             </Box>
           ) : stats.netSavings > 0 ? (
@@ -316,7 +322,8 @@ const Dashboard: React.FC = () => {
                 height: '100%',
                 cursor: 'pointer',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
+                background:
+                  'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
                 border: '1px solid',
                 borderColor: alpha('#f43f5e', 0.1),
                 '&:hover': {
@@ -373,7 +380,8 @@ const Dashboard: React.FC = () => {
                 height: '100%',
                 cursor: 'pointer',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                background:
+                  'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)',
                 border: '1px solid',
                 borderColor: alpha('#10b981', 0.1),
                 '&:hover': {
@@ -430,16 +438,18 @@ const Dashboard: React.FC = () => {
                 height: '100%',
                 cursor: 'pointer',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                background: stats.netSavings >= 0
-                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)'
-                  : 'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
+                background:
+                  stats.netSavings >= 0
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                    : 'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
                 border: '1px solid',
                 borderColor: stats.netSavings >= 0 ? alpha('#10b981', 0.1) : alpha('#f43f5e', 0.1),
                 '&:hover': {
                   transform: 'translateY(-8px)',
-                  boxShadow: stats.netSavings >= 0
-                    ? '0 12px 24px rgba(16, 185, 129, 0.15)'
-                    : '0 12px 24px rgba(244, 63, 94, 0.15)',
+                  boxShadow:
+                    stats.netSavings >= 0
+                      ? '0 12px 24px rgba(16, 185, 129, 0.15)'
+                      : '0 12px 24px rgba(244, 63, 94, 0.15)',
                   borderColor: stats.netSavings >= 0 ? '#10b981' : '#f43f5e',
                 },
               }}
@@ -451,19 +461,27 @@ const Dashboard: React.FC = () => {
                       bgcolor: stats.netSavings >= 0 ? '#10b981' : '#f43f5e',
                       width: 56,
                       height: 56,
-                      boxShadow: stats.netSavings >= 0
-                        ? '0 4px 12px rgba(16, 185, 129, 0.3)'
-                        : '0 4px 12px rgba(244, 63, 94, 0.3)',
+                      boxShadow:
+                        stats.netSavings >= 0
+                          ? '0 4px 12px rgba(16, 185, 129, 0.3)'
+                          : '0 4px 12px rgba(244, 63, 94, 0.3)',
                     }}
                   >
                     <AccountBalanceWallet sx={{ fontSize: 28 }} />
                   </Avatar>
                   <Chip
-                    icon={stats.netSavings >= 0 ? <ArrowUpward sx={{ fontSize: 16 }} /> : <ArrowDownward sx={{ fontSize: 16 }} />}
+                    icon={
+                      stats.netSavings >= 0 ? (
+                        <ArrowUpward sx={{ fontSize: 16 }} />
+                      ) : (
+                        <ArrowDownward sx={{ fontSize: 16 }} />
+                      )
+                    }
                     label={stats.netSavings >= 0 ? 'Surplus' : 'Deficit'}
                     size="small"
                     sx={{
-                      bgcolor: stats.netSavings >= 0 ? alpha('#10b981', 0.1) : alpha('#f43f5e', 0.1),
+                      bgcolor:
+                        stats.netSavings >= 0 ? alpha('#10b981', 0.1) : alpha('#f43f5e', 0.1),
                       color: stats.netSavings >= 0 ? '#10b981' : '#f43f5e',
                       fontWeight: 600,
                     }}
@@ -481,7 +499,10 @@ const Dashboard: React.FC = () => {
                 <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>
                   NET SAVINGS
                 </Typography>
-                <Typography variant="caption" color={stats.netSavings >= 0 ? 'success.main' : 'error.main'}>
+                <Typography
+                  variant="caption"
+                  color={stats.netSavings >= 0 ? 'success.main' : 'error.main'}
+                >
                   {stats.netSavings >= 0 ? '🎯 Great!' : '⚠️ Watch spending'}
                 </Typography>
               </CardContent>
@@ -499,7 +520,8 @@ const Dashboard: React.FC = () => {
                 height: '100%',
                 cursor: 'pointer',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%)',
+                background:
+                  'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%)',
                 border: '1px solid',
                 borderColor: alpha('#3b82f6', 0.1),
                 '&:hover': {
@@ -638,7 +660,12 @@ const Dashboard: React.FC = () => {
                           </Box>
                         }
                         secondary={
-                          <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5}>
+                          <Box
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            mt={0.5}
+                          >
                             <Chip
                               label={txn.categoryName}
                               size="small"
@@ -756,7 +783,12 @@ const Dashboard: React.FC = () => {
                         },
                       }}
                     >
-                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        mb={1.5}
+                      >
                         <Box display="flex" alignItems="center" gap={1.5}>
                           <Box
                             sx={{
@@ -782,9 +814,13 @@ const Dashboard: React.FC = () => {
                             bgcolor: budget.isOver
                               ? alpha('#ef4444', 0.1)
                               : budget.percentage > 80
-                              ? alpha('#f59e0b', 0.1)
-                              : alpha('#10b981', 0.1),
-                            color: budget.isOver ? '#ef4444' : budget.percentage > 80 ? '#f59e0b' : '#10b981',
+                                ? alpha('#f59e0b', 0.1)
+                                : alpha('#10b981', 0.1),
+                            color: budget.isOver
+                              ? '#ef4444'
+                              : budget.percentage > 80
+                                ? '#f59e0b'
+                                : '#10b981',
                             fontWeight: 700,
                             fontSize: '0.75rem',
                           }}
@@ -806,8 +842,8 @@ const Dashboard: React.FC = () => {
                             bgcolor: budget.isOver
                               ? '#ef4444'
                               : budget.percentage > 80
-                              ? '#f59e0b'
-                              : '#10b981',
+                                ? '#f59e0b'
+                                : '#10b981',
                             transition: 'width 0.5s ease-in-out',
                             borderRadius: 1,
                           }}
@@ -914,7 +950,8 @@ const Dashboard: React.FC = () => {
                           borderRadius: 3,
                           cursor: 'pointer',
                           transition: 'all 0.2s',
-                          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                          background:
+                            'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.1) 100%)',
                           border: '1px solid',
                           borderColor: alpha('#8b5cf6', 0.1),
                           '&:hover': {

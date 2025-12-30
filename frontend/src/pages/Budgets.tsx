@@ -44,16 +44,16 @@ import {
 } from '@mui/icons-material';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import { 
-  useBudgets, 
-  useCategories, 
-  useTags, 
+import {
+  useBudgets,
+  useCategories,
+  useTags,
   useAccounts,
   useCreateBudget,
   useUpdateBudget,
   useDeleteBudget,
-  type Category, 
-  type Tag 
+  type Category,
+  type Tag,
 } from '../hooks/useApi';
 import { api } from '../services/api';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
@@ -107,7 +107,7 @@ interface Budget {
 const Budgets: React.FC = () => {
   const { user } = useAuth();
   const toast = useToast();
-  
+
   // React Query hooks for data fetching and mutations
   const createBudget = useCreateBudget();
   const updateBudget = useUpdateBudget();
@@ -762,18 +762,32 @@ const Budgets: React.FC = () => {
 
         // Search in category names
         if (
-          budget.categoryIds?.some((catId: string) => getCategoryName(catId).toLowerCase().includes(query))
+          budget.categoryIds?.some((catId: string) =>
+            getCategoryName(catId).toLowerCase().includes(query)
+          )
         )
           return true;
 
         // Search in tag names
-        if (budget.includeTagIds?.some((tagId: string) => getTagName(tagId).toLowerCase().includes(query)))
+        if (
+          budget.includeTagIds?.some((tagId: string) =>
+            getTagName(tagId).toLowerCase().includes(query)
+          )
+        )
           return true;
-        if (budget.excludeTagIds?.some((tagId: string) => getTagName(tagId).toLowerCase().includes(query)))
+        if (
+          budget.excludeTagIds?.some((tagId: string) =>
+            getTagName(tagId).toLowerCase().includes(query)
+          )
+        )
           return true;
 
         // Search in account names
-        if (budget.accountIds?.some((accId: string) => getAccountName(accId).toLowerCase().includes(query)))
+        if (
+          budget.accountIds?.some((accId: string) =>
+            getAccountName(accId).toLowerCase().includes(query)
+          )
+        )
           return true;
 
         return false;
@@ -829,7 +843,10 @@ const Budgets: React.FC = () => {
   const budgetSummary = useMemo(() => {
     if (budgets.length === 0) return null;
 
-    const totalBudgeted = budgets.reduce((sum: number, b: Budget) => sum + b.amount + (b.rolledOverAmount || 0), 0);
+    const totalBudgeted = budgets.reduce(
+      (sum: number, b: Budget) => sum + b.amount + (b.rolledOverAmount || 0),
+      0
+    );
     const totalSpent = budgets.reduce((sum: number, b: Budget) => sum + (b.spent || 0), 0);
     const totalRemaining = totalBudgeted - totalSpent;
     const overallPercent = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;

@@ -87,7 +87,8 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       (config.showTransactionType && values.transactionType !== 'all') ||
       (config.showAccount && values.selectedAccount) ||
       (config.showCategories && (values.selectedCategories?.length ?? 0) > 0) ||
-      (config.showTags && ((values.includeTags?.length ?? 0) > 0 || (values.excludeTags?.length ?? 0) > 0)) ||
+      (config.showTags &&
+        ((values.includeTags?.length ?? 0) > 0 || (values.excludeTags?.length ?? 0) > 0)) ||
       (config.showAmountRange && (values.minAmount || values.maxAmount)) ||
       (config.showReviewStatus && values.reviewStatus !== 'all')
     );
@@ -240,20 +241,21 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           variant="outlined"
         />
       )}
-      {config.showTags && ((values.includeTags?.length ?? 0) > 0 || (values.excludeTags?.length ?? 0) > 0) && (
-        <Chip
-          label={`${(values.includeTags?.length ?? 0) + (values.excludeTags?.length ?? 0)} Tag Filter${
-            (values.includeTags?.length ?? 0) + (values.excludeTags?.length ?? 0) > 1 ? 's' : ''
-          }`}
-          onDelete={() => {
-            updateValue('includeTags', []);
-            updateValue('excludeTags', []);
-          }}
-          size="small"
-          color="info"
-          variant="outlined"
-        />
-      )}
+      {config.showTags &&
+        ((values.includeTags?.length ?? 0) > 0 || (values.excludeTags?.length ?? 0) > 0) && (
+          <Chip
+            label={`${(values.includeTags?.length ?? 0) + (values.excludeTags?.length ?? 0)} Tag Filter${
+              (values.includeTags?.length ?? 0) + (values.excludeTags?.length ?? 0) > 1 ? 's' : ''
+            }`}
+            onDelete={() => {
+              updateValue('includeTags', []);
+              updateValue('excludeTags', []);
+            }}
+            size="small"
+            color="info"
+            variant="outlined"
+          />
+        )}
       {config.showAmountRange && (values.minAmount || values.maxAmount) && (
         <Chip
           label="Amount Range"
@@ -272,7 +274,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   const renderAdvancedFilters = () => (
     <Collapse in={!config.collapsible || showFilters}>
       <Divider sx={{ my: 2 }} />
-      
+
       {/* Transaction Type Chips - Inside collapsible section */}
       {config.showTransactionType && (
         <Box sx={{ mb: 2 }}>
@@ -348,10 +350,22 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               multiple
               options={categories}
               getOptionLabel={(option) => option.name}
-              value={categories.filter((c: any) => (values.selectedCategories || []).includes(c._id))}
-              onChange={(_, newValue) => updateValue('selectedCategories', newValue.map((c: any) => c._id))}
+              value={categories.filter((c: any) =>
+                (values.selectedCategories || []).includes(c._id)
+              )}
+              onChange={(_, newValue) =>
+                updateValue(
+                  'selectedCategories',
+                  newValue.map((c: any) => c._id)
+                )
+              }
               renderInput={(params) => (
-                <TextField {...params} label="Categories" size="small" placeholder="Select categories..." />
+                <TextField
+                  {...params}
+                  label="Categories"
+                  size="small"
+                  placeholder="Select categories..."
+                />
               )}
               renderOption={(props, option) => (
                 <li {...props}>

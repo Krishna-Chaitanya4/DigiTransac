@@ -42,10 +42,10 @@ class RouteErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log to console for development
     console.error('Route Error Boundary caught an error:', error, errorInfo);
-    
+
     // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
     // logErrorToService(error, errorInfo);
-    
+
     this.setState({
       error,
       errorInfo,
@@ -76,7 +76,10 @@ class RouteErrorBoundary extends Component<Props, State> {
 /**
  * Default Error Fallback UI
  */
-const ErrorFallback: React.FC<{ error: Error | null; onReset: () => void }> = ({ error, onReset }) => {
+const ErrorFallback: React.FC<{ error: Error | null; onReset: () => void }> = ({
+  error,
+  onReset,
+}) => {
   const navigate = useNavigate();
 
   return (
@@ -108,11 +111,11 @@ const ErrorFallback: React.FC<{ error: Error | null; onReset: () => void }> = ({
               mb: 2,
             }}
           />
-          
+
           <Typography variant="h4" gutterBottom fontWeight="bold">
             Oops! Something went wrong
           </Typography>
-          
+
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             We encountered an unexpected error. Don't worry, your data is safe.
           </Typography>
@@ -129,7 +132,11 @@ const ErrorFallback: React.FC<{ error: Error | null; onReset: () => void }> = ({
                 overflow: 'auto',
               }}
             >
-              <Typography variant="caption" component="pre" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+              <Typography
+                variant="caption"
+                component="pre"
+                sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+              >
                 {error.message}
                 {error.stack && `\n\n${error.stack}`}
               </Typography>
@@ -137,15 +144,10 @@ const ErrorFallback: React.FC<{ error: Error | null; onReset: () => void }> = ({
           )}
 
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Button
-              variant="contained"
-              startIcon={<RefreshIcon />}
-              onClick={onReset}
-              size="large"
-            >
+            <Button variant="contained" startIcon={<RefreshIcon />} onClick={onReset} size="large">
               Try Again
             </Button>
-            
+
             <Button
               variant="outlined"
               startIcon={<HomeIcon />}

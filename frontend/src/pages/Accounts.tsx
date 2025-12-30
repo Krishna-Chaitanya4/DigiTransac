@@ -53,16 +53,16 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../config/routes.config';
-import { 
-  useAccounts, 
-  useCreateAccount, 
-  useUpdateAccount, 
+import {
+  useAccounts,
+  useCreateAccount,
+  useUpdateAccount,
   useDeleteBankAccount,
   useTransferFunds,
   useCreateTransaction,
   useCreateCategory,
   useCategories,
-  type Account
+  type Account,
 } from '../hooks/useApi';
 import { api } from '../services/api';
 import { formatCurrency as formatCurrencyUtil, CURRENCIES } from '../utils/currency';
@@ -97,7 +97,7 @@ const accountTypeConfig = {
 const Accounts: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   // React Query hooks
   const { data: accountsData, isLoading, refetch } = useAccounts();
   const { data: categoriesData } = useCategories();
@@ -107,7 +107,7 @@ const Accounts: React.FC = () => {
   const transferFunds = useTransferFunds();
   const createTransaction = useCreateTransaction();
   const createCategory = useCreateCategory();
-  
+
   const accounts = accountsData?.data?.accounts || [];
   const categories = categoriesData?.data?.categories || [];
   const [accountBalances, setAccountBalances] = useState<Map<string, AccountBalance>>(new Map());
@@ -262,7 +262,8 @@ const Accounts: React.FC = () => {
         accountNumber: account.accountNumber || '',
         currency: account.currency,
         initialBalance: account.initialBalance || 0,
-        color: account.color || accountTypeConfig[account.type as keyof typeof accountTypeConfig].color,
+        color:
+          account.color || accountTypeConfig[account.type as keyof typeof accountTypeConfig].color,
         isDefault: account.isDefault,
         isActive: account.isActive,
         notes: account.notes || '',
@@ -341,7 +342,7 @@ const Accounts: React.FC = () => {
 
       await updateAccount.mutateAsync({
         id: accountId,
-        data: { ...account, isDefault: true }
+        data: { ...account, isDefault: true },
       });
 
       setSuccess('Default account updated');
@@ -388,7 +389,9 @@ const Accounts: React.FC = () => {
           acc.name.toLowerCase().includes(query) ||
           acc.bankName?.toLowerCase().includes(query) ||
           acc.accountNumber?.includes(query) ||
-          accountTypeConfig[acc.type as keyof typeof accountTypeConfig].label.toLowerCase().includes(query)
+          accountTypeConfig[acc.type as keyof typeof accountTypeConfig].label
+            .toLowerCase()
+            .includes(query)
       );
     }
 
@@ -817,9 +820,7 @@ const Accounts: React.FC = () => {
       }
 
       // Find or create a balance adjustment category
-      let adjustmentCategory = categories?.find(
-        (cat: any) => cat.name === 'Balance Adjustment'
-      );
+      let adjustmentCategory = categories?.find((cat: any) => cat.name === 'Balance Adjustment');
 
       // If category doesn't exist, create it
       if (!adjustmentCategory) {
@@ -1693,7 +1694,10 @@ const Accounts: React.FC = () => {
                   >
                     <input
                       type="color"
-                      value={formData.color || accountTypeConfig[formData.type as keyof typeof accountTypeConfig].color}
+                      value={
+                        formData.color ||
+                        accountTypeConfig[formData.type as keyof typeof accountTypeConfig].color
+                      }
                       onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                       style={{
                         width: '100%',
@@ -1705,7 +1709,10 @@ const Accounts: React.FC = () => {
                   </Box>
                   <TextField
                     size="small"
-                    value={formData.color || accountTypeConfig[formData.type as keyof typeof accountTypeConfig].color}
+                    value={
+                      formData.color ||
+                      accountTypeConfig[formData.type as keyof typeof accountTypeConfig].color
+                    }
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                     placeholder="#1976d2"
                     sx={{
@@ -1723,7 +1730,10 @@ const Accounts: React.FC = () => {
                             width: 16,
                             height: 16,
                             borderRadius: '50%',
-                            bgcolor: formData.color || accountTypeConfig[formData.type as keyof typeof accountTypeConfig].color,
+                            bgcolor:
+                              formData.color ||
+                              accountTypeConfig[formData.type as keyof typeof accountTypeConfig]
+                                .color,
                             mr: 1,
                             border: '2px solid',
                             borderColor: 'divider',
@@ -2244,9 +2254,14 @@ const Accounts: React.FC = () => {
                   startAdornment: (
                     <InputAdornment position="start">
                       {transferFromAccount &&
-                        React.createElement(accountTypeConfig[transferFromAccount.type as keyof typeof accountTypeConfig].icon, {
-                          fontSize: 'small',
-                        })}
+                        React.createElement(
+                          accountTypeConfig[
+                            transferFromAccount.type as keyof typeof accountTypeConfig
+                          ].icon,
+                          {
+                            fontSize: 'small',
+                          }
+                        )}
                     </InputAdornment>
                   ),
                 }}
@@ -2266,7 +2281,8 @@ const Accounts: React.FC = () => {
                 {accounts
                   .filter((acc: Account) => acc.isActive)
                   .map((account: Account) => {
-                    const IconComponent = accountTypeConfig[account.type as keyof typeof accountTypeConfig].icon;
+                    const IconComponent =
+                      accountTypeConfig[account.type as keyof typeof accountTypeConfig].icon;
                     return (
                       <MenuItem key={account.id} value={account.id}>
                         <Box display="flex" alignItems="center" gap={1}>
@@ -2297,7 +2313,8 @@ const Accounts: React.FC = () => {
               {accounts
                 .filter((acc: Account) => acc.id !== transferFromAccount?.id && acc.isActive)
                 .map((account: Account) => {
-                  const IconComponent = accountTypeConfig[account.type as keyof typeof accountTypeConfig].icon;
+                  const IconComponent =
+                    accountTypeConfig[account.type as keyof typeof accountTypeConfig].icon;
                   return (
                     <MenuItem key={account.id} value={account.id}>
                       <Box display="flex" alignItems="center" gap={1}>

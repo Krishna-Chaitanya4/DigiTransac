@@ -237,71 +237,71 @@ const Layout: React.FC = () => {
         {filteredMenuItems.map((item) => {
           const IconComponent = item.icon;
           return (
-          <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
-            <Tooltip
-              title={sidebarCollapsed ? item.label : ''}
-              placement="right"
-              arrow
-              TransitionComponent={Fade}
-            >
-              <ListItemButton
-                selected={location.pathname === item.path}
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(item.path, { replace: false });
-                  if (isMobile) handleDrawerToggle();
-                  setSearchQuery('');
-                }}
-                sx={{
-                  borderRadius: 2,
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  minHeight: sidebarCollapsed ? 48 : 44,
-                  py: 1.25,
-                  px: sidebarCollapsed ? 1.5 : 2,
-                  '&.Mui-selected': {
-                    bgcolor: '#14b8a6',
-                    color: 'white',
-                    '&:hover': {
-                      bgcolor: '#0d9488',
-                    },
-                    '& .MuiListItemIcon-root': {
-                      color: 'white',
-                    },
-                  },
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                  },
-                }}
+            <ListItem key={item.name} disablePadding sx={{ mb: 0.5 }}>
+              <Tooltip
+                title={sidebarCollapsed ? item.label : ''}
+                placement="right"
+                arrow
+                TransitionComponent={Fade}
               >
-                <ListItemIcon
+                <ListItemButton
+                  selected={location.pathname === item.path}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate(item.path, { replace: false });
+                    if (isMobile) handleDrawerToggle();
+                    setSearchQuery('');
+                  }}
                   sx={{
-                    color: location.pathname === item.path ? 'white' : 'text.secondary',
-                    minWidth: sidebarCollapsed ? 0 : 40,
-                    justifyContent: 'center',
-                    '& .MuiSvgIcon-root': {
-                      fontSize: '1.35rem',
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    minHeight: sidebarCollapsed ? 48 : 44,
+                    py: 1.25,
+                    px: sidebarCollapsed ? 1.5 : 2,
+                    '&.Mui-selected': {
+                      bgcolor: '#14b8a6',
+                      color: 'white',
+                      '&:hover': {
+                        bgcolor: '#0d9488',
+                      },
+                      '& .MuiListItemIcon-root': {
+                        color: 'white',
+                      },
+                    },
+                    '&:hover': {
+                      bgcolor: 'action.hover',
                     },
                   }}
                 >
-                  <IconComponent />
-                </ListItemIcon>
-                {!sidebarCollapsed && (
-                  <Fade in={!sidebarCollapsed}>
-                    <ListItemText
-                      primary={item.label}
-                      primaryTypographyProps={{
-                        fontWeight: location.pathname === item.path ? 600 : 500,
-                        fontSize: '0.9rem',
-                      }}
-                    />
-                  </Fade>
-                )}
-              </ListItemButton>
-            </Tooltip>
-          </ListItem>
-        );
+                  <ListItemIcon
+                    sx={{
+                      color: location.pathname === item.path ? 'white' : 'text.secondary',
+                      minWidth: sidebarCollapsed ? 0 : 40,
+                      justifyContent: 'center',
+                      '& .MuiSvgIcon-root': {
+                        fontSize: '1.35rem',
+                      },
+                    }}
+                  >
+                    <IconComponent />
+                  </ListItemIcon>
+                  {!sidebarCollapsed && (
+                    <Fade in={!sidebarCollapsed}>
+                      <ListItemText
+                        primary={item.label}
+                        primaryTypographyProps={{
+                          fontWeight: location.pathname === item.path ? 600 : 500,
+                          fontSize: '0.9rem',
+                        }}
+                      />
+                    </Fade>
+                  )}
+                </ListItemButton>
+              </Tooltip>
+            </ListItem>
+          );
         })}
       </List>
 

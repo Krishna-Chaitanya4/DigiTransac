@@ -130,7 +130,14 @@ export interface CategoryStats {
 // Account Types
 // ===========================
 
-export type AccountType = 'checking' | 'savings' | 'credit_card' | 'investment' | 'cash' | 'loan' | 'other';
+export type AccountType =
+  | 'checking'
+  | 'savings'
+  | 'credit_card'
+  | 'investment'
+  | 'cash'
+  | 'loan'
+  | 'other';
 
 export interface Account {
   id: string;

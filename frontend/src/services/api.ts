@@ -39,7 +39,7 @@ apiClient.interceptors.response.use(
 
     // Extract error message
     const message = error.response?.data?.error || error.response?.data?.message || error.message;
-    
+
     return Promise.reject(new Error(message));
   }
 );
@@ -50,18 +50,13 @@ export { apiClient };
  * Generic API methods
  */
 export const api = {
-  get: <T = any>(url: string, params?: any) => 
-    apiClient.get<any, T>(url, { params }),
-  
-  post: <T = any>(url: string, data?: any) => 
-    apiClient.post<any, T>(url, data),
-  
-  put: <T = any>(url: string, data?: any) => 
-    apiClient.put<any, T>(url, data),
-  
-  patch: <T = any>(url: string, data?: any) => 
-    apiClient.patch<any, T>(url, data),
-  
-  delete: <T = any>(url: string) => 
-    apiClient.delete<any, T>(url),
+  get: <T = any>(url: string, params?: any) => apiClient.get<any, T>(url, { params }),
+
+  post: <T = any>(url: string, data?: any) => apiClient.post<any, T>(url, data),
+
+  put: <T = any>(url: string, data?: any) => apiClient.put<any, T>(url, data),
+
+  patch: <T = any>(url: string, data?: any) => apiClient.patch<any, T>(url, data),
+
+  delete: <T = any>(url: string) => apiClient.delete<any, T>(url),
 };

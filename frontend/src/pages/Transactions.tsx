@@ -60,7 +60,15 @@ import {
   Search as SearchIcon,
 } from '@mui/icons-material';
 import { useToast } from '../components/Toast';
-import { useAccounts, useCategories, useTags, useCreateTransaction, useUpdateTransaction, useDeleteTransaction, type Account } from '../hooks/useApi';
+import {
+  useAccounts,
+  useCategories,
+  useTags,
+  useCreateTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
+  type Account,
+} from '../hooks/useApi';
 import { api } from '../services/api';
 import QuickAddFab from '../components/QuickAddFab';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -177,7 +185,7 @@ const Transactions: React.FC = () => {
   const userCurrency = user?.currency || 'USD';
   const currencySymbol = CURRENCIES[userCurrency]?.symbol || '$';
   const isTouchDevice = useIsTouchDevice();
-  
+
   // React Query hooks for data fetching
   const { data: accountsData } = useAccounts();
   const { data: categoriesData } = useCategories();
@@ -185,11 +193,11 @@ const Transactions: React.FC = () => {
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
   const deleteTransaction = useDeleteTransaction();
-  
+
   const accounts = (accountsData?.data?.accounts || []).filter((a: Account) => a.isActive);
   const categories = categoriesData?.data?.categories || [];
   const tags = tagsData?.data?.tags || [];
-  
+
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0); // Total records from API
@@ -271,7 +279,7 @@ const Transactions: React.FC = () => {
   useEffect(() => {
     const initializeData = async () => {
       if (!token) return; // Wait for authentication
-      
+
       try {
         setLoading(true);
         // React Query hooks already fetched accounts, categories, tags
@@ -399,7 +407,8 @@ const Transactions: React.FC = () => {
       };
 
       if (filterValues.searchQuery) params.search = filterValues.searchQuery;
-      if (filterValues.transactionType && filterValues.transactionType !== 'all') params.type = filterValues.transactionType;
+      if (filterValues.transactionType && filterValues.transactionType !== 'all')
+        params.type = filterValues.transactionType;
       if (filterValues.selectedAccount) params.accountId = filterValues.selectedAccount;
       if (filterValues.minAmount) params.minAmount = filterValues.minAmount;
       if (filterValues.maxAmount) params.maxAmount = filterValues.maxAmount;
@@ -433,9 +442,12 @@ const Transactions: React.FC = () => {
 
         params.categoryIds = Array.from(expandedCategoryIds).join(',');
       }
-      if (filterValues.includeTags && filterValues.includeTags.length > 0) params.includeTags = filterValues.includeTags.join(',');
-      if (filterValues.excludeTags && filterValues.excludeTags.length > 0) params.excludeTags = filterValues.excludeTags.join(',');
-      if (filterValues.startDate) params.startDate = filterValues.startDate.startOf('day').toISOString();
+      if (filterValues.includeTags && filterValues.includeTags.length > 0)
+        params.includeTags = filterValues.includeTags.join(',');
+      if (filterValues.excludeTags && filterValues.excludeTags.length > 0)
+        params.excludeTags = filterValues.excludeTags.join(',');
+      if (filterValues.startDate)
+        params.startDate = filterValues.startDate.startOf('day').toISOString();
       if (filterValues.endDate) params.endDate = filterValues.endDate.endOf('day').toISOString();
       if (reviewStatus !== 'all') params.reviewStatus = reviewStatus;
       params.includeSplits = 'true'; // Always fetch splits
@@ -1648,7 +1660,13 @@ const Transactions: React.FC = () => {
         {/* Review Status Filter and Search/Filters */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap" justifyContent="space-between">
+            <Box
+              display="flex"
+              gap={1.5}
+              alignItems="center"
+              flexWrap="wrap"
+              justifyContent="space-between"
+            >
               <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
                 <Chip
                   label="All"
@@ -1713,12 +1731,14 @@ const Transactions: React.FC = () => {
                   }}
                 />
               </Box>
-              
+
               <Box display="flex" gap={1.5} alignItems="center">
                 <TextField
                   placeholder="Search transactions..."
                   value={filterValues.searchQuery || ''}
-                  onChange={(e) => setFilterValues((prev) => ({ ...prev, searchQuery: e.target.value }))}
+                  onChange={(e) =>
+                    setFilterValues((prev) => ({ ...prev, searchQuery: e.target.value }))
+                  }
                   size="small"
                   InputProps={{
                     startAdornment: (
@@ -2635,7 +2655,8 @@ const Transactions: React.FC = () => {
                             ? new Intl.NumberFormat('en-US', {
                                 style: 'currency',
                                 currency:
-                                  accounts.find((a: Account) => a.id === formData.accountId)?.currency ||
+                                  accounts.find((a: Account) => a.id === formData.accountId)
+                                    ?.currency ||
                                   user?.currency ||
                                   'USD',
                               })
@@ -2889,7 +2910,9 @@ const Transactions: React.FC = () => {
                           ...categories.filter((c: Category) => !recentCategories.includes(c.id)),
                         ].filter((c: Category) => !c.isFolder)}
                         getOptionLabel={(option) => option.name}
-                        value={categories.find((c: Category) => c.id === formData.categoryId) || null}
+                        value={
+                          categories.find((c: Category) => c.id === formData.categoryId) || null
+                        }
                         onChange={(_, newValue) => {
                           if (newValue) {
                             handleCategoryChange(newValue.id);
@@ -3134,8 +3157,9 @@ const Transactions: React.FC = () => {
                                           ? new Intl.NumberFormat('en-US', {
                                               style: 'currency',
                                               currency:
-                                                accounts.find((a: Account) => a.id === formData.accountId)
-                                                  ?.currency ||
+                                                accounts.find(
+                                                  (a: Account) => a.id === formData.accountId
+                                                )?.currency ||
                                                 user?.currency ||
                                                 'USD',
                                             })
@@ -3218,7 +3242,8 @@ const Transactions: React.FC = () => {
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',
                             currency:
-                              accounts.find((a: Account) => a.id === formData.accountId)?.currency ||
+                              accounts.find((a: Account) => a.id === formData.accountId)
+                                ?.currency ||
                               user?.currency ||
                               'USD',
                           }).format(parseFloat(formData.amount) || 0)}
@@ -3228,7 +3253,8 @@ const Transactions: React.FC = () => {
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',
                             currency:
-                              accounts.find((a: Account) => a.id === formData.accountId)?.currency ||
+                              accounts.find((a: Account) => a.id === formData.accountId)
+                                ?.currency ||
                               user?.currency ||
                               'USD',
                           }).format(getSplitTotal())}
@@ -3242,7 +3268,8 @@ const Transactions: React.FC = () => {
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',
                             currency:
-                              accounts.find((a: Account) => a.id === formData.accountId)?.currency ||
+                              accounts.find((a: Account) => a.id === formData.accountId)
+                                ?.currency ||
                               user?.currency ||
                               'USD',
                           }).format(getRemainingAmount())}

@@ -67,7 +67,7 @@ const Analytics: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // Filter state
   const [filterValues, setFilterValues] = useState<FilterValues>({
     startDate: dayjs().startOf('month'),
@@ -83,7 +83,11 @@ const Analytics: React.FC = () => {
   });
 
   // Fetch data
-  const { data: transactionsData, isLoading, refetch: refetchTransactions } = useTransactions({
+  const {
+    data: transactionsData,
+    isLoading,
+    refetch: refetchTransactions,
+  } = useTransactions({
     startDate: filterValues.startDate?.toISOString() || dayjs().startOf('month').toISOString(),
     endDate: filterValues.endDate?.toISOString() || dayjs().endOf('month').toISOString(),
     reviewStatus: 'approved',
@@ -163,8 +167,9 @@ const Analytics: React.FC = () => {
       if (filterValues.transactionType === 'debit' && txn.type !== 'debit') return false;
 
       // Account filter
-      if (filterValues.selectedAccount && txn.accountId !== filterValues.selectedAccount) return false;
-      
+      if (filterValues.selectedAccount && txn.accountId !== filterValues.selectedAccount)
+        return false;
+
       // Category filter
       if (filterValues.selectedCategories && filterValues.selectedCategories.length > 0) {
         if (!filterValues.selectedCategories.includes(txn.categoryId)) return false;
@@ -172,13 +177,13 @@ const Analytics: React.FC = () => {
 
       // Include tags filter
       if (filterValues.includeTags && filterValues.includeTags.length > 0) {
-        const hasAnyIncludeTag = filterValues.includeTags.some(tag => hasTag(txn, tag));
+        const hasAnyIncludeTag = filterValues.includeTags.some((tag) => hasTag(txn, tag));
         if (!hasAnyIncludeTag) return false;
       }
 
       // Exclude tags filter
       if (filterValues.excludeTags && filterValues.excludeTags.length > 0) {
-        const hasAnyExcludeTag = filterValues.excludeTags.some(tag => hasTag(txn, tag));
+        const hasAnyExcludeTag = filterValues.excludeTags.some((tag) => hasTag(txn, tag));
         if (hasAnyExcludeTag) return false;
       }
 
@@ -207,7 +212,7 @@ const Analytics: React.FC = () => {
       .reduce((sum: number, txn: any) => sum + txn.amount, 0);
 
     const net = income - expenses;
-    const savingsRate = income > 0 ? ((net / income) * 100) : 0;
+    const savingsRate = income > 0 ? (net / income) * 100 : 0;
 
     // Previous period comparison
     const daysDiff = filterValues.endDate?.diff(filterValues.startDate, 'day') || 30;
@@ -217,16 +222,24 @@ const Analytics: React.FC = () => {
     const prevExpenses = transactions
       .filter((txn: any) => {
         const txnDate = dayjs(txn.date);
-        return txnDate.isAfter(prevStart) && txnDate.isBefore(prevEnd) && 
-               txn.type === 'debit' && hasTag(txn, 'expense');
+        return (
+          txnDate.isAfter(prevStart) &&
+          txnDate.isBefore(prevEnd) &&
+          txn.type === 'debit' &&
+          hasTag(txn, 'expense')
+        );
       })
       .reduce((sum: number, txn: any) => sum + txn.amount, 0);
 
     const prevIncome = transactions
       .filter((txn: any) => {
         const txnDate = dayjs(txn.date);
-        return txnDate.isAfter(prevStart) && txnDate.isBefore(prevEnd) && 
-               txn.type === 'credit' && hasTag(txn, 'income');
+        return (
+          txnDate.isAfter(prevStart) &&
+          txnDate.isBefore(prevEnd) &&
+          txn.type === 'credit' &&
+          hasTag(txn, 'income')
+        );
       })
       .reduce((sum: number, txn: any) => sum + txn.amount, 0);
 
@@ -251,20 +264,30 @@ const Analytics: React.FC = () => {
 
     // Savings rate insight
     if (summaryStats.savingsRate > 20) {
-      insights.push(`🎉 Excellent! You're saving ${summaryStats.savingsRate.toFixed(1)}% of your income`);
+      insights.push(
+        `🎉 Excellent! You're saving ${summaryStats.savingsRate.toFixed(1)}% of your income`
+      );
     } else if (summaryStats.savingsRate > 10) {
-      insights.push(`💰 Good job! Saving ${summaryStats.savingsRate.toFixed(1)}% - try to reach 20%`);
+      insights.push(
+        `💰 Good job! Saving ${summaryStats.savingsRate.toFixed(1)}% - try to reach 20%`
+      );
     } else if (summaryStats.savingsRate > 0) {
-      insights.push(`⚠️ Low savings rate (${summaryStats.savingsRate.toFixed(1)}%) - consider reducing expenses`);
+      insights.push(
+        `⚠️ Low savings rate (${summaryStats.savingsRate.toFixed(1)}%) - consider reducing expenses`
+      );
     } else {
       insights.push(`🚨 Spending exceeds income - review your budget immediately`);
     }
 
     // Expense trend insight
     if (summaryStats.expenseChange > 10) {
-      insights.push(`📈 Expenses increased ${summaryStats.expenseChange.toFixed(1)}% from previous period`);
+      insights.push(
+        `📈 Expenses increased ${summaryStats.expenseChange.toFixed(1)}% from previous period`
+      );
     } else if (summaryStats.expenseChange < -10) {
-      insights.push(`📉 Great! Expenses decreased ${Math.abs(summaryStats.expenseChange).toFixed(1)}%`);
+      insights.push(
+        `📉 Great! Expenses decreased ${Math.abs(summaryStats.expenseChange).toFixed(1)}%`
+      );
     }
 
     // Top spending day
@@ -275,7 +298,7 @@ const Analytics: React.FC = () => {
         const day = dayjs(txn.date).format('dddd');
         dayMap.set(day, (dayMap.get(day) || 0) + txn.amount);
       });
-    
+
     if (dayMap.size > 0) {
       const topDay = Array.from(dayMap.entries()).sort((a, b) => b[1] - a[1])[0];
       insights.push(`📅 ${topDay[0]} is your highest spending day (${formatCurrency(topDay[1])})`);
@@ -307,13 +330,13 @@ const Analytics: React.FC = () => {
     filteredTransactions.forEach((txn: any) => {
       const month = dayjs(txn.date).format('MMM YY');
       const existing = monthMap.get(month) || { income: 0, expenses: 0 };
-      
+
       if (txn.type === 'credit' && hasTag(txn, 'income')) {
         existing.income += txn.amount;
       } else if (txn.type === 'debit' && hasTag(txn, 'expense')) {
         existing.expenses += txn.amount;
       }
-      
+
       monthMap.set(month, existing);
     });
 
@@ -442,7 +465,9 @@ const Analytics: React.FC = () => {
                     '&:hover': { bgcolor: 'action.selected' },
                   }}
                 >
-                  <RefreshIcon sx={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+                  <RefreshIcon
+                    sx={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }}
+                  />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Export CSV">
@@ -503,7 +528,8 @@ const Analytics: React.FC = () => {
                   borderRadius: 3,
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                  background:
+                    'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 100%)',
                   border: '1px solid',
                   borderColor: alpha('#10b981', 0.1),
                   '&:hover': {
@@ -519,11 +545,20 @@ const Analytics: React.FC = () => {
                       <TrendingUp />
                     </Avatar>
                     <Chip
-                      icon={summaryStats.incomeChange >= 0 ? <ArrowUpward sx={{ fontSize: 16 }} /> : <ArrowDownward sx={{ fontSize: 16 }} />}
+                      icon={
+                        summaryStats.incomeChange >= 0 ? (
+                          <ArrowUpward sx={{ fontSize: 16 }} />
+                        ) : (
+                          <ArrowDownward sx={{ fontSize: 16 }} />
+                        )
+                      }
                       label={`${Math.abs(summaryStats.incomeChange).toFixed(1)}%`}
                       size="small"
                       sx={{
-                        bgcolor: summaryStats.incomeChange >= 0 ? alpha('#10b981', 0.1) : alpha('#ef4444', 0.1),
+                        bgcolor:
+                          summaryStats.incomeChange >= 0
+                            ? alpha('#10b981', 0.1)
+                            : alpha('#ef4444', 0.1),
                         color: summaryStats.incomeChange >= 0 ? '#10b981' : '#ef4444',
                         fontWeight: 600,
                       }}
@@ -548,7 +583,8 @@ const Analytics: React.FC = () => {
                   borderRadius: 3,
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
+                  background:
+                    'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(244, 63, 94, 0.1) 100%)',
                   border: '1px solid',
                   borderColor: alpha('#f43f5e', 0.1),
                   '&:hover': {
@@ -564,11 +600,20 @@ const Analytics: React.FC = () => {
                       <TrendingDown />
                     </Avatar>
                     <Chip
-                      icon={summaryStats.expenseChange >= 0 ? <ArrowUpward sx={{ fontSize: 16 }} /> : <ArrowDownward sx={{ fontSize: 16 }} />}
+                      icon={
+                        summaryStats.expenseChange >= 0 ? (
+                          <ArrowUpward sx={{ fontSize: 16 }} />
+                        ) : (
+                          <ArrowDownward sx={{ fontSize: 16 }} />
+                        )
+                      }
                       label={`${Math.abs(summaryStats.expenseChange).toFixed(1)}%`}
                       size="small"
                       sx={{
-                        bgcolor: summaryStats.expenseChange >= 0 ? alpha('#ef4444', 0.1) : alpha('#10b981', 0.1),
+                        bgcolor:
+                          summaryStats.expenseChange >= 0
+                            ? alpha('#ef4444', 0.1)
+                            : alpha('#10b981', 0.1),
                         color: summaryStats.expenseChange >= 0 ? '#ef4444' : '#10b981',
                         fontWeight: 600,
                       }}
@@ -591,16 +636,19 @@ const Analytics: React.FC = () => {
                 sx={{
                   borderRadius: 3,
                   transition: 'all 0.3s',
-                  background: summaryStats.net >= 0
-                    ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%)'
-                    : 'linear-gradient(135deg, rgba(249, 115, 22, 0.05) 0%, rgba(249, 115, 22, 0.1) 100%)',
+                  background:
+                    summaryStats.net >= 0
+                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%)'
+                      : 'linear-gradient(135deg, rgba(249, 115, 22, 0.05) 0%, rgba(249, 115, 22, 0.1) 100%)',
                   border: '1px solid',
-                  borderColor: summaryStats.net >= 0 ? alpha('#3b82f6', 0.1) : alpha('#f97316', 0.1),
+                  borderColor:
+                    summaryStats.net >= 0 ? alpha('#3b82f6', 0.1) : alpha('#f97316', 0.1),
                   '&:hover': {
                     transform: 'translateY(-8px)',
-                    boxShadow: summaryStats.net >= 0
-                      ? '0 12px 24px rgba(59, 130, 246, 0.15)'
-                      : '0 12px 24px rgba(249, 115, 22, 0.15)',
+                    boxShadow:
+                      summaryStats.net >= 0
+                        ? '0 12px 24px rgba(59, 130, 246, 0.15)'
+                        : '0 12px 24px rgba(249, 115, 22, 0.15)',
                   },
                 }}
               >
@@ -638,7 +686,8 @@ const Analytics: React.FC = () => {
                 sx={{
                   borderRadius: 3,
                   transition: 'all 0.3s',
-                  background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                  background:
+                    'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.1) 100%)',
                   border: '1px solid',
                   borderColor: alpha('#8b5cf6', 0.1),
                   '&:hover': {
@@ -761,7 +810,9 @@ const Analytics: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }: any) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        label={({ name, percent }: any) =>
+                          `${name} (${(percent * 100).toFixed(0)}%)`
+                        }
                         outerRadius={100}
                         fill="#8884d8"
                         dataKey="value"

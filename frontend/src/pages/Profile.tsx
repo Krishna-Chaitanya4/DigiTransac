@@ -47,10 +47,10 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../config/routes.config';
-import { 
-  useUserProfile, 
+import {
+  useUserProfile,
   useDeleteAccount as useDeleteUserAccount,
-  useDisconnectGmail 
+  useDisconnectGmail,
 } from '../hooks/useApi';
 import { useTheme } from '@mui/material/styles';
 import { useThemeContext } from '../context/ThemeContext';
@@ -198,10 +198,7 @@ const Profile: React.FC = () => {
     try {
       setLoading(true);
       // TODO: No React Query hook exists yet for toggle
-      await api.patch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/toggle`,
-        { enabled }
-      );
+      await api.patch(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/toggle`, { enabled });
 
       setEmailIntegration((prev) => ({ ...prev, enabled }));
       setSuccess(`Email polling ${enabled ? 'enabled' : 'disabled'} successfully!`);
@@ -266,10 +263,7 @@ const Profile: React.FC = () => {
 
       // TODO: No React Query hook exists yet for manual sync
       // Trigger manual sync
-      await api.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`,
-        {}
-      );
+      await api.post(`${import.meta.env.VITE_API_BASE_URL}/api/gmail/sync`, {});
 
       setSyncStatus('idle');
       setLastSyncTime(new Date());
