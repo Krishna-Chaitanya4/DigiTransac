@@ -32,9 +32,16 @@ export const BANK_PATTERNS: Readonly<BankPattern[]> = [
         merchantGroup: 3,
       },
       {
-        // Pattern 3: SBI withdrawn - from email patterns
+        // Pattern 3: SBI withdrawn/debited - from email patterns
         regex:
-          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:withdrawn|debited)\s+from\s+([A-Z][A-Za-z0-9\s&-]+?)(?=\.|Card|$)/i,
+          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:withdrawn|debited).*?(?:at|on)\s+([A-Z][A-Za-z0-9\s&-]+?)(?=\s+on\s+\d{2}|\.|$)/i,
+        amountGroup: 1,
+        merchantGroup: 2,
+      },
+      {
+        // Pattern 4: SBI generic debit without merchant location
+        regex:
+          /(?:Rs\.?|INR)\s*([\d,]+\.?\d*)\s*(?:withdrawn|debited)\s+from\s+([A-Z][A-Za-z0-9\s&-]+?)(?=\.| Card|$)/i,
         amountGroup: 1,
         merchantGroup: 2,
       },
@@ -71,8 +78,8 @@ export const BANK_PATTERNS: Readonly<BankPattern[]> = [
         merchantGroup: 2,
       },
     ],
-    cardPattern: /(?:Credit Card|Card)\s+([X\d]+)|XX(\d{4})/i,
-    datePattern: /on\s+([\d-A-Za-z]+)|(\d{2}\/\d{2}\/\d{4})/i,
+    cardPattern: /(?:Credit Card|Card)\s+(?:XX)?(\d{4})|XX(\d{4})/i,
+    datePattern: /on\s+([\d-A-Za-z/]+)|(\d{2}-\d{2}-\d{4})/i,
   },
   // HDFC Bank - Email parser support
   {

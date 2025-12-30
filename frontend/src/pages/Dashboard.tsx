@@ -284,8 +284,8 @@ const Dashboard: React.FC = () => {
                 💸 Expenses exceed income
               </Typography>
               <Typography variant="body1">
-                You&apos;re spending {formatCurrency(Math.abs(stats.netSavings))} more than your income
-                this month
+                You&apos;re spending {formatCurrency(Math.abs(stats.netSavings))} more than your
+                income this month
               </Typography>
             </Box>
           ) : stats.netSavings > 0 ? (

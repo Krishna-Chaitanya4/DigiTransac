@@ -192,8 +192,9 @@ export abstract class BaseTransactionParser {
     // Extract card number
     if (bankPattern.cardPattern) {
       const cardMatch = text.match(bankPattern.cardPattern);
-      if (cardMatch && cardMatch[1]) {
-        extracted.cardLast4 = cardMatch[1];
+      if (cardMatch) {
+        // Check both group 1 and group 2 (some patterns use group 2 for digits only)
+        extracted.cardLast4 = cardMatch[1] || cardMatch[2];
       }
     }
 
@@ -208,8 +209,12 @@ export abstract class BaseTransactionParser {
     // Extract date
     if (bankPattern.datePattern) {
       const dateMatch = text.match(bankPattern.datePattern);
-      if (dateMatch && dateMatch[1]) {
-        extracted.date = parseDate(dateMatch[1]);
+      if (dateMatch) {
+        // Check both group 1 and group 2 (patterns can match in different groups)
+        const dateStr = dateMatch[1] || dateMatch[2];
+        if (dateStr) {
+          extracted.date = parseDate(dateStr);
+        }
       }
     }
 
