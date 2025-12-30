@@ -7,6 +7,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2025-12-30
+
+### Added - Mobile & PWA Optimization
+- **Progressive Web App (PWA) enhancements**
+  - Installable on iOS, Android, and Desktop with improved manifest
+  - App shortcuts for quick actions (Add Transaction, Dashboard, Budgets)
+  - Share target API integration for receiving shared content
+  - Advanced service worker with smart caching strategies
+  - Background sync support for offline transactions
+  - Standalone display mode with theme color adaptation
+  
+- **Mobile-first design improvements**
+  - Responsive typography that scales appropriately on mobile devices
+  - Touch-friendly targets with 44-48px minimum sizes
+  - Bottom navigation bar optimized for thumb access
+  - Safe area insets support for notched devices (iPhone X+)
+  - Mobile-optimized spacing and padding throughout the app
+  - Larger border radius on mobile for better visual appeal
+  
+- **Touch interactions and haptic feedback**
+  - Comprehensive haptic feedback system with vibration patterns
+  - `haptics.ts` utility with light, medium, heavy, success, warning, error patterns
+  - Haptic feedback on button clicks and important actions
+  - Support for device vibration API
+  
+- **Mobile input optimization utilities**
+  - `mobileHelpers.ts` with comprehensive mobile helper functions
+  - Input helpers preventing iOS zoom (16px minimum font size)
+  - Appropriate input modes (decimal, tel, email, url, search)
+  - Device detection utilities (iOS, Android, PWA mode)
+  - Safe area insets helpers for notched devices
+  - Fullscreen API helpers for immersive experiences
+  
+- **Enhanced components for mobile**
+  - Responsive Loading component with optional messages
+  - Mobile-optimized Skeletons with appropriate sizing
+  - Enhanced QuickAddFab with haptic feedback
+  - ResponsiveDialog that becomes fullscreen on mobile (already existed, verified)
+  - PullToRefresh component (already existed, verified)
+  - SwipeableTransactionCard (already existed, verified)
+
+### Changed
+- **Service worker improvements**
+  - Implemented cache-first strategy for static assets and images
+  - Network-first strategy for API calls with cache fallback
+  - Navigation requests use network-first with 3s timeout
+  - Automatic cache cleanup of old versions
+  - Background sync event listeners
+  
+- **Theme enhancements**
+  - Responsive typography with mobile breakpoints
+  - Touch target minimum sizes enforced in theme
+  - Mobile-specific component overrides (buttons, icons, lists)
+  - TextField font size set to 16px on mobile to prevent zoom
+  
+- **Layout optimizations**
+  - Mobile padding reduced appropriately (2rem → 1.5rem on mobile)
+  - Bottom padding accounts for mobile navigation bar
+  - Touch action optimization for smooth scrolling and pinch-zoom
+
+### Improved
+- **CSS optimizations**
+  - Mobile-first CSS with safe area insets
+  - Smooth scrolling with `-webkit-overflow-scrolling: touch`
+  - Disabled tap highlight for cleaner mobile UI
+  - Hidden scrollbars on mobile for better UX
+  - Support for `prefers-reduced-motion` accessibility setting
+  
+- **Performance**
+  - Gzip and Brotli compression enabled
+  - Code splitting and lazy loading
+  - Optimized bundle sizes (~346kb gzipped initial load)
+  - Loading skeletons for better perceived performance
+  
+- **Documentation**
+  - Added comprehensive `MOBILE-PWA-GUIDE.md` (572 lines)
+  - Created `MOBILE-QUICK-REF.md` for developer quick reference
+  - Added `MOBILE-PWA-SUMMARY.md` with implementation details
+  - Documented all mobile features, patterns, and best practices
+  - Included testing checklist and troubleshooting guide
+
+### Technical
+- **Build & Test**
+  - All TypeScript compilation successful
+  - Frontend build passing (24s)
+  - Backend build passing
+  - All 154 tests passing (9 test suites)
+  - No TypeScript errors or build warnings
+
+### Browser Support
+- iOS Safari 12.2+
+- Chrome Android 80+
+- Chrome Desktop 80+
+- Firefox 75+
+- Edge 80+
+- Samsung Internet 12+
+
 ## [1.4.2] - 2025-12-30
 
 ### Added

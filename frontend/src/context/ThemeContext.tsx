@@ -117,26 +117,44 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       h1: {
         fontSize: '2.5rem',
         fontWeight: 500,
+        '@media (max-width:600px)': {
+          fontSize: '1.75rem',
+        },
       },
       h2: {
         fontSize: '2rem',
         fontWeight: 500,
+        '@media (max-width:600px)': {
+          fontSize: '1.5rem',
+        },
       },
       h3: {
         fontSize: '1.75rem',
         fontWeight: 500,
+        '@media (max-width:600px)': {
+          fontSize: '1.35rem',
+        },
       },
       h4: {
         fontSize: '1.5rem',
         fontWeight: 500,
+        '@media (max-width:600px)': {
+          fontSize: '1.25rem',
+        },
       },
       h5: {
         fontSize: '1.25rem',
         fontWeight: 500,
+        '@media (max-width:600px)': {
+          fontSize: '1.1rem',
+        },
       },
       h6: {
         fontSize: '1rem',
         fontWeight: 500,
+        '@media (max-width:600px)': {
+          fontSize: '0.95rem',
+        },
       },
     },
     shape: {
@@ -150,6 +168,20 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
             borderRadius: 8,
             padding: '8px 16px',
             fontWeight: 500,
+            minHeight: 44, // Ensure touch-friendly size
+            '@media (max-width:600px)': {
+              minHeight: 48, // Slightly larger on mobile
+              fontSize: '0.9rem',
+            },
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            '@media (max-width:600px)': {
+              padding: 12, // More padding for easier tapping
+            },
           },
         },
       },
@@ -158,6 +190,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           root: {
             borderRadius: 12,
             boxShadow: mode === 'light' ? '0 2px 8px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.3)',
+            '@media (max-width:600px)': {
+              borderRadius: 16, // Rounder on mobile
+            },
           },
         },
       },
@@ -165,6 +200,31 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         styleOverrides: {
           root: {
             borderRadius: 12,
+            '@media (max-width:600px)': {
+              borderRadius: 16,
+            },
+          },
+        },
+      },
+      MuiTextField: {
+        styleOverrides: {
+          root: {
+            '@media (max-width:600px)': {
+              '& .MuiInputBase-input': {
+                fontSize: '16px', // Prevent zoom on iOS
+              },
+            },
+          },
+        },
+      },
+      MuiListItemButton: {
+        styleOverrides: {
+          root: {
+            '@media (max-width:600px)': {
+              minHeight: 56, // Larger touch targets on mobile
+              paddingTop: 12,
+              paddingBottom: 12,
+            },
           },
         },
       },

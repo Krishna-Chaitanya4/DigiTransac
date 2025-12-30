@@ -1,6 +1,6 @@
 {
   "name": "digitransac-backend",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "DigiTransac Backend API",
   "main": "dist/server.js",
   "scripts": {
