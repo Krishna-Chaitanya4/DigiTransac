@@ -52,6 +52,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ROUTE_PATHS } from '../config/routes.config';
 import { 
   useAccounts, 
   useCreateAccount, 
@@ -528,7 +529,7 @@ const Accounts: React.FC = () => {
   };
 
   const handleAddTransaction = (account: Account) => {
-    navigate('/transactions', { state: { addTransaction: true, accountId: account.id } });
+    navigate(ROUTE_PATHS.TRANSACTIONS, { state: { addTransaction: true, accountId: account.id } });
   };
 
   const handleTransferMoney = (account: Account | null) => {

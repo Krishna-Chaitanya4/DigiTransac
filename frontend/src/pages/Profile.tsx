@@ -46,6 +46,7 @@ import {
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ROUTE_PATHS } from '../config/routes.config';
 import { 
   useUserProfile, 
   useDeleteAccount as useDeleteUserAccount,
@@ -222,7 +223,7 @@ const Profile: React.FC = () => {
       await deleteUserAccount.mutateAsync(undefined);
 
       logout();
-      navigate('/login');
+      navigate(ROUTE_PATHS.LOGIN);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to delete account');
     } finally {
@@ -814,7 +815,7 @@ const Profile: React.FC = () => {
           fullWidth
           onClick={() => {
             logout();
-            navigate('/login');
+            navigate(ROUTE_PATHS.LOGIN);
           }}
           startIcon={<LogoutIcon />}
           sx={{

@@ -34,6 +34,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
+import { ROUTE_PATHS } from '../config/routes.config';
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency';
 import { getTimeBasedGreeting, getTimeEmoji } from '../utils/greetings';
 import PullToRefresh from '../components/PullToRefresh';
@@ -734,7 +735,7 @@ const Dashboard: React.FC = () => {
                   variant="contained"
                   size="large"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/transactions')}
+                  onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
                   sx={{
                     borderRadius: 2,
                     textTransform: 'none',
@@ -1050,7 +1051,7 @@ const Dashboard: React.FC = () => {
                               boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)',
                             },
                           }}
-                          onClick={() => navigate('/accounts')}
+                          onClick={() => navigate(ROUTE_PATHS.ACCOUNTS)}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Avatar
@@ -1136,7 +1137,7 @@ const Dashboard: React.FC = () => {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => navigate('/accounts')}
+                  onClick={() => navigate(ROUTE_PATHS.ACCOUNTS)}
                   sx={{ mt: 2 }}
                 >
                   Add Account
@@ -1203,7 +1204,7 @@ const Dashboard: React.FC = () => {
                         borderColor: transaction.categoryColor + '40',
                       },
                     }}
-                    onClick={() => navigate('/transactions')}
+                    onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
                   >
                     <Box
                       sx={{
@@ -1256,7 +1257,7 @@ const Dashboard: React.FC = () => {
                   variant="outlined"
                   size="small"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/transactions')}
+                  onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
                   sx={{ mt: 2 }}
                 >
                   Add Transaction
@@ -1471,7 +1472,7 @@ const Dashboard: React.FC = () => {
                 variant="contained"
                 size="large"
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/transactions')}
+                onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
                 sx={{
                   justifyContent: 'flex-start',
                   py: 1.5,
@@ -1487,7 +1488,7 @@ const Dashboard: React.FC = () => {
                 variant="outlined"
                 size="large"
                 startIcon={<Assessment />}
-                onClick={() => navigate('/analytics')}
+                onClick={() => navigate(ROUTE_PATHS.ANALYTICS)}
                 sx={{
                   justifyContent: 'flex-start',
                   py: 1.5,
@@ -1501,7 +1502,7 @@ const Dashboard: React.FC = () => {
                 variant="outlined"
                 size="large"
                 startIcon={<Receipt />}
-                onClick={() => navigate('/budgets')}
+                onClick={() => navigate(ROUTE_PATHS.BUDGETS)}
                 sx={{
                   justifyContent: 'flex-start',
                   py: 1.5,
@@ -1515,7 +1516,7 @@ const Dashboard: React.FC = () => {
                 variant="outlined"
                 size="large"
                 startIcon={<AccountBalance />}
-                onClick={() => navigate('/accounts')}
+                onClick={() => navigate(ROUTE_PATHS.ACCOUNTS)}
                 sx={{
                   justifyContent: 'flex-start',
                   py: 1.5,
@@ -1608,7 +1609,7 @@ const Dashboard: React.FC = () => {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => navigate('/budgets')}
+                  onClick={() => navigate(ROUTE_PATHS.BUDGETS)}
                   sx={{ mt: 2 }}
                 >
                   Set Budget
@@ -1713,7 +1714,7 @@ const Dashboard: React.FC = () => {
                   variant="outlined"
                   size="small"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/transactions')}
+                  onClick={() => navigate(ROUTE_PATHS.TRANSACTIONS)}
                   sx={{ mt: 2 }}
                 >
                   Add Recurring
