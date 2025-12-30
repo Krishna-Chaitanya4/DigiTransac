@@ -438,8 +438,8 @@ const Transactions: React.FC = () => {
 
       const response = await api.get('/api/transactions', params);
 
-      setTransactions(response.transactions || []);
-      setTotalCount(response.pagination?.total || 0);
+      setTransactions(response.data?.transactions || []);
+      setTotalCount(response.data?.pagination?.total || 0);
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
       toast.error(err.message || 'Failed to fetch transactions');
@@ -466,7 +466,7 @@ const Transactions: React.FC = () => {
         sortOrder: 'desc',
       });
 
-      const txns = txnResponse.transactions || [];
+      const txns = txnResponse.data?.transactions || [];
 
       // Extract unique merchants
       const uniqueMerchants = [

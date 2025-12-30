@@ -177,37 +177,6 @@ const Dashboard: React.FC = () => {
 
   const transactions = transactionsData?.data?.transactions || [];
 
-  useEffect(() => {
-    // Load dismissed alerts from localStorage
-    const dismissed = localStorage.getItem('dismissedAlerts');
-    if (dismissed) {
-      try {
-        setDismissedAlerts(new Set(JSON.parse(dismissed)));
-      } catch (e) {
-        console.error('Failed to load dismissed alerts:', e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    // Calculate dashboard data when transactions/budgets/accounts change
-    if (transactions.length >= 0 && categories.length >= 0) {
-      calculateDashboardData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, categories, tags, budgetsData, accountsData]);
-
-  const handleDismissAlert = useCallback(
-    (alert: string) => {
-      const newDismissed = new Set(dismissedAlerts);
-      newDismissed.add(alert);
-      setDismissedAlerts(newDismissed);
-      // Save to localStorage
-      localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
-    },
-    [dismissedAlerts]
-  );
-
   // Fetch previous period transactions for comparison
   const currentStart = filters.dateRange.start.toDate();
   const currentEnd = filters.dateRange.end.toDate();
@@ -222,6 +191,29 @@ const Dashboard: React.FC = () => {
   });
 
   const { data: recurringData } = useTransactions({ isRecurring: 'true' });
+
+  useEffect(() => {
+    // Load dismissed alerts from localStorage
+    const dismissed = localStorage.getItem('dismissedAlerts');
+    if (dismissed) {
+      try {
+        setDismissedAlerts(new Set(JSON.parse(dismissed)));
+      } catch (e) {
+        console.error('Failed to load dismissed alerts:', e);
+      }
+    }
+  }, []);
+
+  const handleDismissAlert = useCallback(
+    (alert: string) => {
+      const newDismissed = new Set(dismissedAlerts);
+      newDismissed.add(alert);
+      setDismissedAlerts(newDismissed);
+      // Save to localStorage
+      localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
+    },
+    [dismissedAlerts]
+  );
 
   const calculateDashboardData = useCallback(async () => {
     try {
@@ -269,7 +261,7 @@ const Dashboard: React.FC = () => {
       const netSavings = totalIncome - totalSpent;
 
       // Calculate percentage changes using previous period data
-      let prevTransactions = prevTransactionsData?.transactions || [];
+      let prevTransactions = prevTransactionsData?.data?.transactions || [];
       
       // Apply same client-side filtering to previous period
       prevTransactions = prevTransactions.filter((t: any) => {
@@ -542,6 +534,13 @@ const Dashboard: React.FC = () => {
       setError('Failed to calculate dashboard data');
     }
   }, [transactions, categories, tags, budgetsData, accountsData, prevTransactionsData, recurringData, filters, user?.currency, periodDuration]);
+
+  // Trigger calculation when data changes
+  useEffect(() => {
+    if (transactionsData && categoriesData && accountsData) {
+      calculateDashboardData();
+    }
+  }, [transactionsData, categoriesData, tagsData, budgetsData, accountsData, prevTransactionsData, recurringData, calculateDashboardData]);
 
   const formatCurrency = useCallback(
     (amount: number) => {

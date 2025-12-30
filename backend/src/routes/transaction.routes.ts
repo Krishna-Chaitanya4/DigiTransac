@@ -237,8 +237,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
       const totalSearchResults = decryptedTransactions.length;
       decryptedTransactions = decryptedTransactions.slice(skipNum, skipNum + limitNum);
 
-      res.json({
-        success: true,
+      ApiResponse.success(res, {
         transactions: decryptedTransactions,
         pagination: {
           total: totalSearchResults,
@@ -253,8 +252,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
     // For non-search queries, use DB count
     const total = await transactionsContainer.countDocuments(filter);
 
-    res.json({
-      success: true,
+    ApiResponse.success(res, {
       transactions: decryptedTransactions,
       pagination: {
         total,
