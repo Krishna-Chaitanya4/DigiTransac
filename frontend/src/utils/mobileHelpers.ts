@@ -115,16 +115,22 @@ export const isAndroid = (): boolean => {
  * Detect if running on a mobile device
  */
 export const isMobileDevice = (): boolean => {
-  return isIOS() || isAndroid() || /Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return (
+    isIOS() ||
+    isAndroid() ||
+    /Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  );
 };
 
 /**
  * Detect if running as a PWA
  */
 export const isPWA = (): boolean => {
-  return window.matchMedia('(display-mode: standalone)').matches ||
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
     (window.navigator as any).standalone === true ||
-    document.referrer.includes('android-app://');
+    document.referrer.includes('android-app://')
+  );
 };
 
 /**
@@ -132,7 +138,7 @@ export const isPWA = (): boolean => {
  */
 export const getSafeAreaInsets = () => {
   const style = getComputedStyle(document.documentElement);
-  
+
   return {
     top: parseInt(style.getPropertyValue('--sai-top') || '0'),
     right: parseInt(style.getPropertyValue('--sai-right') || '0'),

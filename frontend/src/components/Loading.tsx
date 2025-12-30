@@ -9,7 +9,7 @@ interface LoadingProps {
 const Loading: React.FC<LoadingProps> = ({ message, fullScreen = true }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
+
   return (
     <Box
       sx={{
@@ -27,14 +27,14 @@ const Loading: React.FC<LoadingProps> = ({ message, fullScreen = true }) => {
             : 'transparent',
       }}
     >
-      <CircularProgress 
+      <CircularProgress
         size={isMobile ? 48 : 60}
-        sx={{ color: fullScreen ? 'white' : 'primary.main' }} 
+        sx={{ color: fullScreen ? 'white' : 'primary.main' }}
       />
       {message && (
-        <Typography 
-          variant="body2" 
-          sx={{ 
+        <Typography
+          variant="body2"
+          sx={{
             color: fullScreen ? 'white' : 'text.secondary',
             fontSize: { xs: '0.875rem', sm: '1rem' },
             textAlign: 'center',
