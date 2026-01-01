@@ -401,13 +401,13 @@ jobs:
       uses: actions/checkout@v4
     
     - name: Download backend image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: backend-image
         path: /tmp
     
     - name: Download frontend image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: frontend-image
         path: /tmp
@@ -520,7 +520,7 @@ jobs:
       run: az acr login --name herdswebsiteacr
     
     - name: Download backend image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: backend-image
         path: /tmp
@@ -585,7 +585,7 @@ jobs:
       run: az acr login --name herdswebsiteacr
     
     - name: Download frontend image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: frontend-image
         path: /tmp
