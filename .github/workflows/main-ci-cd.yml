@@ -298,7 +298,7 @@ jobs:
         echo "✅ Coverage meets baseline thresholds"
     
     - name: Upload coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       if: always()
       with:
         files: ./backend/coverage/lcov.info
