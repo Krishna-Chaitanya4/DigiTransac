@@ -7,14 +7,9 @@ import { isDevelopmentEnvironment } from '../utils/environment';
 
 interface User {
   id: string;
-  email?: string;
-  phone?: string;
+  email: string;
   username: string;
   fullName: string;
-  dateOfBirth?: string;
-  currency: string;
-  emailVerified?: boolean;
-  phoneVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -28,13 +23,10 @@ interface AuthContextType {
 }
 
 interface RegisterData {
-  email?: string;
-  phone?: string;
+  email: string;
   username: string;
   fullName: string;
-  dateOfBirth?: string;
   password: string;
-  currency: string;
 }
 
 interface AuthResponse {
@@ -151,7 +143,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (identifier: string, password: string) => {
     try {
       // Use relative URL to let Vite proxy handle it
-      const loginUrl = '/api/auth/login';
+      const loginUrl = '/api/v1/auth/login';
 
       // Try fetch with relative path (uses Vite proxy)
       const fetchResponse = await fetch(loginUrl, {
@@ -188,7 +180,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(data.message || 'Login failed. Please try again.');
       }
 
-      const { token: newToken, user: userData } = data;
+      // Handle both .NET format (with data wrapper) and Node.js format
+      const responseData = data.data || data;
+      const { token: newToken, user: userData } = responseData;
 
       setToken(newToken);
       setUser(userData);
@@ -203,13 +197,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (data: RegisterData) => {
     try {
-      const response = await axios.post<AuthResponse>('/api/auth/register', data);
+      const response = await axios.post<AuthResponse>('/api/v1/auth/register', data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Registration failed');
       }
 
-      const { token: newToken, user: userData } = response.data;
+      // Handle both .NET format (with data wrapper) and Node.js format
+      const responseData = response.data.data || response.data;
+      const { token: newToken, user: userData } = responseData;
 
       setToken(newToken);
       setUser(userData);

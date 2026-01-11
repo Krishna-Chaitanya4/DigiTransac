@@ -39,13 +39,13 @@ export const getBackendUrl = (): string => {
     const envUrl = import.meta.env.VITE_API_URL;
     if (envUrl) return envUrl;
 
-    // For localhost, use localhost:5000
+    // For localhost, use localhost:5253 (.NET API)
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
+      return 'http://localhost:5253';
     }
 
     // For local network IPs, use same hostname with backend port
-    return `http://${hostname}:5000`;
+    return `http://${hostname}:5253`;
   }
 
   // Production URL
