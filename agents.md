@@ -1779,9 +1779,10 @@ public class TransactionController
 
 ### **Phase 1: Authentication** ✅ COMPLETE
 
-**Integration Tests (Endpoints):**
+**Integration Tests (PowerShell - Endpoints):**
 - File: `test-auth-complete.ps1`
 - Status: ✅ 8/8 PASSING
+- Purpose: Test API endpoints with full request/response cycle
 - Coverage:
   1. ✅ User Registration
   2. ✅ Get Profile (Protected)
@@ -1792,12 +1793,43 @@ public class TransactionController
   7. ✅ Invalid Credentials (Security)
   8. ✅ Duplicate Registration (Prevention)
 
-**Unit Tests:**
-- Status: ⏳ NOT YET (will add incrementally if needed)
-- Potential tests:
-  - Password hashing (BCrypt verification)
-  - Token generation (JWT claims)
-  - Token rotation (revocation logic)
+**Unit Tests (C# - xUnit):**
+- Status: ✅ 29/29 PASSING  
+- Project: `DigiTransac.Tests`
+- Framework: xUnit + Moq + FluentAssertions
+- Test Files:
+  1. **PasswordValidationTests.cs** (9 tests)
+     - ✅ Password strength validation (weak/strong)
+     - ✅ Empty/null password handling
+     - ✅ Minimum length enforcement
+     - ✅ Consistent requirement checking
+  2. **TokenGenerationTests.cs** (7 tests)
+     - ✅ JWT format validation (3 components)
+     - ✅ Refresh token randomness
+     - ✅ SHA256 hashing consistency
+     - ✅ Token expiration times (access: 15min, refresh: 14days)
+     - ✅ Token rotation pattern
+  3. **AuthServiceTests.cs** (13 tests)
+     - ✅ User retrieval (by email, username, ID)
+     - ✅ User creation/updates
+     - ✅ Null handling for nonexistent users
+     - ✅ Repository mock interactions
+     - ✅ User model validation
+
+**Commands to Run Tests:**
+```bash
+# Run all tests
+dotnet test
+
+# Run specific test class
+dotnet test --filter "ClassName=PasswordValidationTests"
+
+# Run with verbose output
+dotnet test --verbosity detailed
+
+# Run specific test method
+dotnet test --filter "MethodName=ValidatePasswordStrength_WithStrongPassword_ShouldSucceed"
+```
 
 ---
 
@@ -1872,31 +1904,26 @@ public class TransactionController
 
 ## 📊 TEST TRACKING
 
-| Phase | Feature | Tests | Status | File |
-|-------|---------|-------|--------|------|
-| 1 | Auth Backend | 8 | ✅ Complete | test-auth-complete.ps1 |
-| 1.B | React Frontend | 0 | ⏳ Pending | (to be created) |
-| 2 | Categories | 0 | ⏳ Pending | (to be created) |
-| 2 | Accounts | 0 | ⏳ Pending | (to be created) |
-| 3 | Transactions | 0 | ⏳ Pending | (to be created) |
-| 3 | Budgets | 0 | ⏳ Pending | (to be created) |
+| Phase | Feature | PowerShell Tests | C# Unit Tests | Total | Status | Files |
+|-------|---------|-----------------|--------------|-------|--------|-------|
+| 1 | Auth Backend | 8 ✅ | 29 ✅ | 37 | ✅ Complete | test-auth-complete.ps1, DigiTransac.Tests/*.cs |
+| 1.B | React Frontend | - | - | 0 | ⏳ Pending | (to be created) |
+| 2 | Categories | - | - | 0 | ⏳ Pending | (to be created) |
+| 2 | Accounts | - | - | 0 | ⏳ Pending | (to be created) |
+| 3 | Transactions | - | - | 0 | ⏳ Pending | (to be created) |
+| 3 | Budgets | - | - | 0 | ⏳ Pending | (to be created) |
 
 ---
 
 ## 🔄 CURRENT TEST SUITE (Phase 1 - Authentication) ✅ ALL PASSING
 
-**Test File:** `test-auth-complete.ps1`
-**Total Tests:** 8 | **Passed:** 8 | **Failed:** 0
+**Integration Tests:** `test-auth-complete.ps1`
+- **Total:** 8 | **Passed:** 8 | **Failed:** 0
 
-**Test Cases:**
-1. ✅ User Registration
-2. ✅ Get Profile (Protected)
-3. ✅ Token Refresh (with Rotation)
-4. ✅ Login with Email
-5. ✅ Login with Username
-6. ✅ Logout (Revoke All Tokens)
-7. ✅ Invalid Credentials (Security Test)
-8. ✅ Duplicate Registration (Prevention)
+**Unit Tests:** `DigiTransac.Tests` (xUnit)
+- **Total:** 29 | **Passed:** 29 | **Failed:** 0
+
+**Combined:** 37/37 PASSING ✅
 
 **Security Validations:**
 - ✅ BCrypt password hashing
