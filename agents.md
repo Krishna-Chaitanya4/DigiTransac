@@ -1750,28 +1750,42 @@ public class TransactionController
 
 ---
 
-## 🧪 PART 11: ITERATIVE TESTING STRATEGY
+## 🧪 PART 11: INCREMENTAL DEVELOPMENT & TESTING STRATEGY
 
-### **Core Principle: agents.md is Source of Truth**
-- **Single source of truth** for everything: features, tests, status, progress
-- **Tests added incrementally** as features are completed
-- **No separate tracking** - everything documented in agents.md
-- **Updated after each task** - reflects current state always
+### **Core Principle: Build → Test → Integrate (Repeat)**
 
-### **How It Works**
+**For EACH feature, follow this pattern:**
 
-**For Each Task/Feature:**
-1. ✅ **Complete the feature** (code, build, deploy)
-2. ✅ **Create test cases** for that feature
-3. ✅ **Run tests** to verify it works
-4. ✅ **Update agents.md** with test results
-5. ✅ **Commit** feature + tests + updated docs
-6. ✅ **Move to next task**
+1. **Backend (1-2 days)**
+   - ✅ Create model/repository/controller
+   - ✅ Write unit tests (20-30 tests)
+   - ✅ Verify all tests pass
+   - ✅ Commit & document
 
-### **Testing Pyramid**
-- **80% Unit Tests** - Test individual functions (fast)
-- **15% Integration Tests** - Test endpoints with real DB (moderate)
-- **5% E2E Tests** - Test complete workflows (slow)
+2. **Frontend (1-2 days)**
+   - ✅ Create React components
+   - ✅ Write component tests (10-20 tests)
+   - ✅ Integrate with backend API
+   - ✅ Commit & document
+
+3. **Integration & E2E (0.5-1 day)**
+   - ✅ Create E2E tests (5-10 scenarios)
+   - ✅ Test complete workflows
+   - ✅ Verify no regressions
+   - ✅ Commit & document
+
+4. **Move to Next Feature**
+
+### **Testing Strategy**
+- **80% Unit Tests** - Backend models, services, business logic
+- **15% Component Tests** - Frontend components, state management
+- **5% E2E Tests** - Complete user workflows (end-to-end)
+
+### **agents.md is Source of Truth**
+- Single source for: features, tests, status, progress
+- Updated after each phase completion
+- Tests documented with results/status
+- No separate test tracking needed
 
 ---
 
@@ -1833,108 +1847,210 @@ dotnet test --filter "MethodName=ValidatePasswordStrength_WithStrongPassword_Sho
 
 ---
 
-### **Phase 1.B: React Frontend Integration** ✅ COMPLETE
+### **Phase 1.B: Clean React Frontend** 🔄 IN PROGRESS
 
-**Frontend Status:** ✅ FULLY INTEGRATED WITH .NET API
-- ✅ App.tsx - Complete routing (lazy loading, PrivateRoute, error boundaries)
-- ✅ AuthContext.tsx - Complete auth logic (login, register, logout) - **UPDATED FOR .NET**
-- ✅ Login.tsx - Beautiful 766-line implementation (email/username/phone support)
-- ✅ Register.tsx - Simplified for v1 MVP (removed phone/dateOfBirth/currency)
-- ✅ API client - Axios with interceptors
-- ✅ Configuration service - Runtime config loading (updated to port 5253)
-- ✅ Vite proxy - Configured for .NET backend (`/api` → `http://localhost:5253`)
+**Approach:** Create minimal, clean React frontend (v2) to replace legacy code
 
-**Changes Made:** ✅ ALL COMPLETE
-- ✅ AuthContext.tsx: Updated login endpoint `/api/auth/login` → `/api/v1/auth/login`
-- ✅ AuthContext.tsx: Updated register endpoint `/api/auth/register` → `/api/v1/auth/register`
-- ✅ AuthContext.tsx: Fixed response parsing (handles .NET `data` wrapper)
-- ✅ AuthContext.tsx: Simplified User interface (removed phone/dateOfBirth/currency)
-- ✅ AuthContext.tsx: Simplified RegisterData interface (v1 MVP)
-- ✅ environment.ts: Updated backend URL from localhost:5000 → localhost:5253
-- ✅ Error handling verified for .NET error format
+**What we're building:**
+- ✅ Login page (100-120 lines, clean & minimal)
+- ✅ Register page (100-120 lines, clean & minimal)
+- ✅ AuthContext (150-200 lines, focused on auth only)
+- ✅ Protected routes (PrivateRoute component)
+- ✅ Material Design 3 UI (clean theme)
+- ✅ Zero technical debt (fresh start)
 
-**Integration Status:**
-- ✅ MongoDB running: `mongodb://localhost:27017`
-- ✅ .NET API running: `http://localhost:5253`
-- ✅ React frontend running: `http://localhost:3000`
-- ✅ Vite proxy working: `/api` → `.NET API`
-- ✅ All endpoints connected and responsive
-- ✅ Token parsing working correctly
+**What we're SKIPPING (v1 MVP):**
+- ❌ Phone registration
+- ❌ Currency selector
+- ❌ Country detection
+- ❌ Offline support (PWA)
+- ❌ Advanced features
 
-**Testing (Ready for Manual Verification):**
-- [ ] Register new user flow
-- [ ] Login with credentials
-- [ ] Token persistence check
-- [ ] Protected route access
-- [ ] Logout flow
-- [ ] Error scenario handling
-- [ ] Duplicate registration prevention
+**Test Cases (To Create):**
+- [ ] Login component renders correctly
+- [ ] Register component renders correctly
+- [ ] Form validation works
+- [ ] Error messages display
+- [ ] AuthContext login() function works
+- [ ] AuthContext register() function works
+- [ ] Token stored in localStorage
+- [ ] Protected routes redirect unauthenticated users
+- [ ] Logout clears token
+- [ ] E2E: Complete registration → login → dashboard flow
 
-**Commit:** eece14d - feat: Update React frontend to integrate with .NET API
+**Estimated Effort:** 3-4 hours (code + tests)
+
+**Status:** Starting now
 
 ---
 
-### **Phase 2: Categories** ⏳ PENDING
+### **Phase 2: Categories (Backend + Frontend + Tests)** ⏳ QUEUED
 
-**Tests (Add After Feature Complete):**
-- [ ] Create category with hierarchy
-- [ ] Get category by ID
-- [ ] Update category
-- [ ] Delete category (soft)
-- [ ] Search categories
-- [ ] Filter by type (folder/category)
-- [ ] Calculate statistics
-- [ ] Move to parent
+**Phase 2.A: Backend (2-3 days)**
+- [ ] Category model (name, parentId, path, isFolder, icon, color)
+- [ ] ICategoryRepository interface
+- [ ] CategoryRepository implementation
+- [ ] CategoriesController with endpoints:
+  - [ ] GET /api/v1/categories (with hierarchy)
+  - [ ] POST /api/v1/categories (create)
+  - [ ] PUT /api/v1/categories/{id} (update)
+  - [ ] DELETE /api/v1/categories/{id} (soft delete)
+  - [ ] GET /api/v1/categories/search (search)
+
+**Phase 2.A Tests (20-30 unit tests):**
+- [ ] Category creation with parent/child relationships
+- [ ] Category search and filtering
+- [ ] Category hierarchy validation
+- [ ] Soft delete functionality
+- [ ] Move category to different parent
+- [ ] Calculate statistics (transaction count, total amount)
+- [ ] Error cases (duplicate name, invalid parent, circular reference)
+
+**Phase 2.B: Frontend (1-2 days)**
+- [ ] Categories.tsx page (tree view with expand/collapse)
+- [ ] Create category dialog
+- [ ] Edit category dialog
+- [ ] Delete category confirmation
+- [ ] Search/filter functionality
+- [ ] Material Design 3 styling
+
+**Phase 2.B Tests (10-15 component tests):**
+- [ ] Page renders correctly
+- [ ] Tree view expands/collapses
+- [ ] Create category works
+- [ ] Edit category works
+- [ ] Delete category works
+- [ ] Search filters categories
+- [ ] Error messages display
+
+**Phase 2.C: Integration (0.5-1 day)**
+- [ ] E2E: Create → Read → Update → Delete categories
+- [ ] Verify hierarchy works end-to-end
+- [ ] Verify search works
+- [ ] No regressions in auth flows
+
+**Estimated Total:** 3-5 days
 
 ---
 
-### **Phase 2: Accounts** ⏳ PENDING
+### **Phase 3: Accounts (Backend + Frontend + Tests)** ⏳ QUEUED
 
-**Tests (Add After Feature Complete):**
-- [ ] Create account (bank/credit/cash/wallet/upi)
-- [ ] Get account
+**Phase 3.A: Backend (2-3 days)**
+- [ ] Account model (name, type: bank/credit/cash/wallet/upi, balance, currency, bankName, lastFour)
+- [ ] IAccountRepository interface
+- [ ] AccountRepository implementation
+- [ ] AccountsController with endpoints:
+  - [ ] GET /api/v1/accounts (list all)
+  - [ ] GET /api/v1/accounts/{id} (get single)
+  - [ ] POST /api/v1/accounts (create)
+  - [ ] PUT /api/v1/accounts/{id} (update)
+  - [ ] DELETE /api/v1/accounts/{id} (soft delete)
+  - [ ] GET /api/v1/accounts/{id}/balance (get current balance)
+
+**Phase 3.A Tests (20-30 unit tests):**
+- [ ] Create account with different types
+- [ ] Get account by ID
 - [ ] Update account
-- [ ] Get balance
+- [ ] Delete account (soft delete)
+- [ ] Calculate balance from transactions
 - [ ] Multi-currency support
-- [ ] Account reconciliation
+- [ ] Error cases
+
+**Phase 3.B: Frontend (1-2 days)**
+- [ ] Accounts.tsx page (card layout)
+- [ ] Account cards with balance display
+- [ ] Create account dialog
+- [ ] Edit account dialog
+- [ ] Delete account confirmation
+- [ ] Filter by account type
+
+**Phase 3.B Tests (10-15 component tests):**
+- [ ] Page renders correctly
+- [ ] Accounts display as cards
+- [ ] Create account works
+- [ ] Edit account works
+- [ ] Delete account works
+- [ ] Balance displays correctly
+
+**Phase 3.C: Integration (0.5-1 day)**
+- [ ] E2E: Create → Read → Update → Delete accounts
+- [ ] Verify balance calculation
+- [ ] No regressions
+
+**Estimated Total:** 3-5 days
 
 ---
 
-### **Phase 3: Transactions** ⏳ PENDING
+### **Phase 4: Transactions (Backend + Frontend + Tests)** ⏳ QUEUED
 
-**Tests (Add After Feature Complete):**
-- [ ] Create transaction
-- [ ] Split transaction
-- [ ] Get transactions (paginated)
-- [ ] Search transactions
-- [ ] Filter by date/category/account
-- [ ] Create recurring transaction
-- [ ] Calculate totals by category
+**Phase 4.A: Backend (3-4 days)**
+- [ ] Transaction model (amount, date, type, description, category, account, tags, splits, recurring)
+- [ ] ITransactionRepository interface
+- [ ] TransactionRepository with advanced queries
+- [ ] TransactionsController with endpoints:
+  - [ ] GET /api/v1/transactions (paginated, filterable)
+  - [ ] GET /api/v1/transactions/{id}
+  - [ ] POST /api/v1/transactions (create)
+  - [ ] PUT /api/v1/transactions/{id} (update)
+  - [ ] DELETE /api/v1/transactions/{id}
+  - [ ] POST /api/v1/transactions/{id}/split (create split)
+
+**Phase 4.A Tests (30-40 unit tests):**
+- [ ] Create transaction with all types
+- [ ] Transaction search and filtering
+- [ ] Pagination works correctly
+- [ ] Split transaction functionality
+- [ ] Recurring transaction setup
+- [ ] Date range filtering
+- [ ] Category/account filtering
+- [ ] Error cases
+
+**Phase 4.B: Frontend (2-3 days)**
+- [ ] Transactions.tsx page (table with infinite scroll)
+- [ ] Transaction detail modal
+- [ ] Create transaction form
+- [ ] Edit transaction form
+- [ ] Transaction search
+- [ ] Date range picker
+- [ ] Filter by category/account/tags
+
+**Phase 4.B Tests (15-20 component tests):**
+- [ ] Page renders correctly
+- [ ] Transactions display in table
+- [ ] Create transaction works
+- [ ] Edit transaction works
+- [ ] Delete transaction works
+- [ ] Search works
+- [ ] Filters work
+- [ ] Infinite scroll works
+
+**Phase 4.C: Integration (1 day)**
+- [ ] E2E: Create transaction → verify in dashboard → edit → delete
+- [ ] Search and filter work end-to-end
+- [ ] No regressions
+
+**Estimated Total:** 4-6 days
 
 ---
 
-### **Phase 3: Budgets** ⏳ PENDING
+### **Phase 5+: Budgets, Analytics, Tags, Email/SMS, etc.** ⏳ FUTURE
 
-**Tests (Add After Feature Complete):**
-- [ ] Create category budget
-- [ ] Create tag budget
-- [ ] Get budget progress
-- [ ] Trigger alert thresholds
-- [ ] Rollover to next month
-- [ ] Period-based budgets
+Each phase follows the same incremental pattern: Backend → Tests → Frontend → Tests → Integration
 
 ---
 
-## 📊 TEST TRACKING
+## 📊 TEST TRACKING BY PHASE
 
-| Phase | Feature | PowerShell Tests | C# Unit Tests | Total | Status | Files |
-|-------|---------|-----------------|--------------|-------|--------|-------|
-| 1 | Auth Backend | 8 ✅ | 29 ✅ | 37 | ✅ Complete | test-auth-complete.ps1, DigiTransac.Tests/*.cs |
-| 1.B | React Frontend | - | - | 0 | ⏳ Pending | (to be created) |
-| 2 | Categories | - | - | 0 | ⏳ Pending | (to be created) |
-| 2 | Accounts | - | - | 0 | ⏳ Pending | (to be created) |
-| 3 | Transactions | - | - | 0 | ⏳ Pending | (to be created) |
-| 3 | Budgets | - | - | 0 | ⏳ Pending | (to be created) |
+| Phase | Component | Backend Tests | Frontend Tests | Integration | Status | Timeline |
+|-------|-----------|--------------|----------------|-------------|--------|----------|
+| **1** | Auth | 29 unit + 8 integration ✅ | - | - | ✅ Complete | Done |
+| **1.B** | React Frontend | - | Pending | Pending | ⏳ In Progress | 3-4 hrs |
+| **2** | Categories Backend | 20-30 planned | - | - | ⏳ Queued | 2-3 days |
+| **2.B** | Categories Frontend | - | 10-15 planned | 5-10 E2E | ⏳ Queued | 1-2 days |
+| **3** | Accounts Backend | 20-30 planned | - | - | ⏳ Queued | 2-3 days |
+| **3.B** | Accounts Frontend | - | 10-15 planned | 5-10 E2E | ⏳ Queued | 1-2 days |
+| **4** | Transactions Backend | 30-40 planned | - | - | ⏳ Queued | 3-4 days |
+| **4.B** | Transactions Frontend | - | 15-20 planned | 5-10 E2E | ⏳ Queued | 2-3 days |
 
 ---
 
@@ -2076,6 +2192,307 @@ git commit -m "feat: Categories feature complete with 8 tests passing"
 **Phase 1 Status:** Backend ✅ COMPLETE | Frontend ⏳ PENDING
 **Next:** Phase 1.B - React Frontend (Est. 1-2 days)
 **Build:** ✅ Successful | Tests: ✅ 8/8 Passing
+
+---
+
+## 📋 PART 12: COMPREHENSIVE TASK INVENTORY & TRACKING (117 Total Tasks)
+
+### **Overall Progress**
+| Phase | Total Tasks | Completed | In Progress | Not Started | Status |
+|-------|------------|-----------|-------------|-------------|--------|
+| **Phase 1: Infrastructure & Auth** | 16 | 16 | 0 | 0 | ✅ 100% |
+| **Phase 2: Core Features** | 16 | 0 | 0 | 16 | ⏳ 0% |
+| **Phase 3: Transactions & Budgets** | 33 | 0 | 0 | 33 | ⏳ 0% |
+| **Phase 4: Dashboard & Analytics** | 11 | 0 | 0 | 11 | ⏳ 0% |
+| **Phase 5: Tags** | 9 | 0 | 0 | 9 | ⏳ 0% |
+| **Phase 6: Email/SMS Integration** | 10 | 0 | 0 | 10 | ⏳ 0% |
+| **Phase 7: User Profile & Settings** | 9 | 0 | 0 | 9 | ⏳ 0% |
+| **Phase 8: Testing & QA** | 8 | 0 | 0 | 8 | ⏳ 0% |
+| **Phase 9: Documentation & Deployment** | 8 | 0 | 0 | 8 | ⏳ 0% |
+| **TOTAL** | **117** | **16** | **0** | **101** | **14% Complete** |
+
+---
+
+### **Phase 1: Infrastructure & Authentication (16 tasks)** ✅ 100% COMPLETE
+
+**Subtask Group 1A: Azure Infrastructure (4 tasks)**
+- [x] **1A-001:** Set up Azure Container Apps for backend deployment
+- [x] **1A-002:** Configure Azure Static Web Apps for React frontend
+- [x] **1A-003:** Set up Azure Cosmos DB for MongoDB (DigiTransacDB)
+- [x] **1A-004:** Configure Azure Key Vault with secrets (JWT_KEY, DB_PASSWORD, API_KEYS)
+
+**Subtask Group 1B: CI/CD Pipeline (4 tasks)**
+- [x] **1B-001:** Create GitHub Actions workflow for backend build
+- [x] **1B-002:** Create GitHub Actions workflow for frontend build
+- [x] **1B-003:** Configure automated deployment to Azure on main branch
+- [x] **1B-004:** Set up health checks and monitoring alerts
+
+**Subtask Group 1C: Authentication Backend (5 tasks)**
+- [x] **1C-001:** Create User model with BCrypt password hashing (work factor 12)
+- [x] **1C-002:** Implement JWT token generation (15min access, 14day refresh)
+- [x] **1C-003:** Create auth controller (register, login, refresh, logout, me endpoints)
+- [x] **1C-004:** Implement token rotation pattern with revoked tokens tracking
+- [x] **1C-005:** Write 29 C# unit tests for auth system (all passing)
+
+**Subtask Group 1D: Authentication Frontend (3 tasks)**
+- [ ] **1D-001:** Create clean React Login page (100-120 lines, Material Design 3)
+- [ ] **1D-002:** Create clean React Register page (100-120 lines, Material Design 3)
+- [ ] **1D-003:** Create Auth context with token management and axios interceptor
+
+---
+
+### **Phase 2: Core Features - Categories & Accounts (16 tasks)** ⏳ 0% STARTED
+
+**Subtask Group 2A: Categories Backend (6 tasks)**
+- [ ] **2A-001:** Create Category model (name, parentId, isFolder, path, icon, color)
+- [ ] **2A-002:** Create ICategoryRepository interface with full CRUD
+- [ ] **2A-003:** Implement CategoryRepository with MongoDB integration
+- [ ] **2A-004:** Create CategoriesController (5 endpoints: GET all, GET one, POST, PUT, DELETE)
+- [ ] **2A-005:** Implement hierarchy validation and statistics calculation
+- [ ] **2A-006:** Write 20-30 C# unit tests for categories backend
+- **Estimated Effort:** 2-3 days
+- **Test Count:** 20-30 unit tests
+
+**Subtask Group 2B: Categories Frontend (5 tasks)**
+- [ ] **2B-001:** Create Categories.tsx page with tree view (expand/collapse)
+- [ ] **2B-002:** Create/Edit/Delete category dialogs
+- [ ] **2B-003:** Implement search and filtering functionality
+- [ ] **2B-004:** Add Material Design 3 styling and animations
+- [ ] **2B-005:** Write 10-15 React component tests for categories frontend
+- **Estimated Effort:** 1-2 days
+- **Test Count:** 10-15 component tests
+
+**Subtask Group 2C: Accounts Backend (3 tasks)**
+- [ ] **2C-001:** Create Account model (name, type, balance, currency, bankName, lastFour)
+- [ ] **2C-002:** Implement AccountRepository with balance calculation logic
+- [ ] **2C-003:** Create AccountsController and write 20-30 unit tests
+- **Estimated Effort:** 2-3 days
+- **Test Count:** 20-30 unit tests
+
+**Subtask Group 2D: Accounts Frontend (2 tasks)**
+- [ ] **2D-001:** Create Accounts.tsx page with card-based UI
+- [ ] **2D-002:** Add account CRUD dialogs and write 10-15 component tests
+- **Estimated Effort:** 1-2 days
+- **Test Count:** 10-15 component tests
+
+**Integration & E2E (1 task)**
+- [ ] **2E-001:** Write 10-15 E2E tests for categories + accounts workflows
+- **Estimated Effort:** 0.5-1 day
+
+---
+
+### **Phase 3: Transactions & Budgets (33 tasks)** ⏳ 0% STARTED
+
+**Subtask Group 3A: Transactions Backend (9 tasks)**
+- [ ] **3A-001:** Create Transaction model (amount, date, type, description, tags, splits)
+- [ ] **3A-002:** Implement TransactionRepository with advanced search queries
+- [ ] **3A-003:** Add pagination (default 50, max 1000) and filtering logic
+- [ ] **3A-004:** Implement transaction split functionality across categories
+- [ ] **3A-005:** Create recurring transaction pattern with cron job support
+- [ ] **3A-006:** Add transaction encryption for sensitive data at rest
+- [ ] **3A-007:** Implement transaction review workflow (pending/approved/rejected)
+- [ ] **3A-008:** Create TransactionsController with full CRUD endpoints
+- [ ] **3A-009:** Write 30-40 C# unit tests for transactions backend
+- **Estimated Effort:** 3-4 days
+- **Test Count:** 30-40 unit tests
+
+**Subtask Group 3B: Transactions Frontend (6 tasks)**
+- [ ] **3B-001:** Create Transactions.tsx page with table view + infinite scroll
+- [ ] **3B-002:** Implement advanced search (date range, amount, category, account, tags)
+- [ ] **3B-003:** Add transaction detail modal and edit form
+- [ ] **3B-004:** Implement split transaction UI
+- [ ] **3B-005:** Add recurring transaction setup form
+- [ ] **3B-006:** Write 15-20 React component tests for transactions
+- **Estimated Effort:** 2-3 days
+- **Test Count:** 15-20 component tests
+
+**Subtask Group 3C: Budgets Backend (6 tasks)**
+- [ ] **3C-001:** Create Budget model (name, categoryIds, amount, period, rollover)
+- [ ] **3C-002:** Implement BudgetRepository with spending calculation logic
+- [ ] **3C-003:** Add tag-based budgets with complex AND/OR logic
+- [ ] **3C-004:** Implement alert threshold logic (10%, 50%, 90%, 100%)
+- [ ] **3C-005:** Create BudgetsController with full CRUD endpoints
+- [ ] **3C-006:** Write 20-30 C# unit tests for budgets backend
+- **Estimated Effort:** 2-3 days
+- **Test Count:** 20-30 unit tests
+
+**Subtask Group 3D: Budgets Frontend (6 tasks)**
+- [ ] **3D-001:** Create Budgets.tsx page with progress bars and charts
+- [ ] **3D-002:** Implement category-based budget UI
+- [ ] **3D-003:** Implement tag-based budget UI with complex logic UI
+- [ ] **3D-004:** Add budget alerts and warning indicators
+- [ ] **3D-005:** Implement period selection (monthly/yearly/custom)
+- [ ] **3D-006:** Write 10-15 React component tests for budgets
+- **Estimated Effort:** 2-3 days
+- **Test Count:** 10-15 component tests
+
+**Integration & E2E (2 tasks)**
+- [ ] **3E-001:** Write E2E tests for transaction workflows (create/edit/delete/split)
+- [ ] **3E-002:** Write E2E tests for budget workflows (create/edit/spending tracking)
+- **Estimated Effort:** 1 day
+
+**Subtask Group 3F: Recurring & Background Jobs (2 tasks)**
+- [ ] **3F-001:** Implement recurring transaction background job (runs daily)
+- [ ] **3F-002:** Implement budget rollover job (runs at period boundaries)
+- **Estimated Effort:** 1 day
+
+---
+
+### **Phase 4: Dashboard & Analytics (11 tasks)** ⏳ 0% STARTED
+
+**Subtask Group 4A: Dashboard Backend (3 tasks)**
+- [ ] **4A-001:** Create aggregation queries for dashboard metrics (income, expense, net, balance)
+- [ ] **4A-002:** Implement recent transactions endpoint (last 10 transactions)
+- [ ] **4A-003:** Implement budget status endpoint (budgets near/at/exceeded limits)
+
+**Subtask Group 4B: Dashboard Frontend (3 tasks)**
+- [ ] **4B-001:** Create Dashboard.tsx page with metrics cards
+- [ ] **4B-002:** Add recent transactions widget with expandable list
+- [ ] **4B-003:** Add budget status widget with warnings
+- **Estimated Effort:** 1-2 days
+
+**Subtask Group 4C: Analytics Backend (3 tasks)**
+- [ ] **4C-001:** Implement spending by category aggregation (pie chart data)
+- [ ] **4C-002:** Implement monthly trends endpoint (line chart data)
+- [ ] **4C-003:** Implement top merchants/categories endpoint
+
+**Subtask Group 4D: Analytics Frontend (2 tasks)**
+- [ ] **4D-001:** Create Analytics.tsx page with Recharts visualizations
+- [ ] **4D-002:** Add date range selector and export to PDF/CSV
+- **Estimated Effort:** 1-2 days
+
+**Test Count:** 5-10 E2E tests for dashboard + analytics flows
+
+---
+
+### **Phase 5: Tags (9 tasks)** ⏳ 0% STARTED
+
+**Subtask Group 5A: Tags Backend (3 tasks)**
+- [ ] **5A-001:** Create Tag model with userId and usage statistics
+- [ ] **5A-002:** Implement TagRepository with full CRUD
+- [ ] **5A-003:** Create TagsController and write 15-20 unit tests
+
+**Subtask Group 5B: Tags Frontend (3 tasks)**
+- [ ] **5B-001:** Add tag management to Categories page
+- [ ] **5B-002:** Implement multi-tag assignment in transaction forms
+- [ ] **5B-003:** Add tag filtering to Transactions page
+
+**Subtask Group 5C: Tag-Based Features (2 tasks)**
+- [ ] **5C-001:** Implement tag-based search
+- [ ] **5C-002:** Implement tag-based budget support (already designed, now connect)
+
+**Subtask Group 5D: Testing (1 task)**
+- [ ] **5D-001:** Write 10-15 E2E tests for tag workflows
+
+**Estimated Effort:** 1-2 days total
+**Test Count:** 15-20 unit + component tests + 10-15 E2E tests
+
+---
+
+### **Phase 6: Email/SMS Integration (10 tasks)** ⏳ 0% STARTED
+
+**Subtask Group 6A: Gmail Integration Backend (4 tasks)**
+- [ ] **6A-001:** Implement Gmail OAuth flow with CSRF protection
+- [ ] **6A-002:** Implement incremental delta sync using Gmail History API
+- [ ] **6A-003:** Create email parsing service (extract merchant, amount, date)
+- [ ] **6A-004:** Implement email receipt pattern matching (bank-specific patterns)
+
+**Subtask Group 6B: Gmail Integration Frontend (2 tasks)**
+- [ ] **6B-001:** Create Gmail connection page (OAuth redirect, token management)
+- [ ] **6B-002:** Add email parsing results preview page
+
+**Subtask Group 6C: SMS Integration Backend (2 tasks)**
+- [ ] **6C-001:** Create SMS parsing service (extract bank SMS patterns)
+- [ ] **6C-002:** Implement SMS route for manual SMS text input
+
+**Subtask Group 6D: SMS Integration Frontend (1 task)**
+- [ ] **6D-001:** Create SMS manual parse form page
+
+**Subtask Group 6E: Background Jobs (1 task)**
+- [ ] **6E-001:** Implement Gmail polling background job (hourly delta sync)
+
+**Estimated Effort:** 3-4 days total
+**Test Count:** 20-30 tests (parsing accuracy, pattern matching, sync logic)
+
+---
+
+### **Phase 7: User Profile & Settings (9 tasks)** ⏳ 0% STARTED
+
+**Subtask Group 7A: User Profile Backend (3 tasks)**
+- [ ] **7A-001:** Implement user profile GET endpoint (email, username, fullName, currency, preferences)
+- [ ] **7A-002:** Implement user profile UPDATE endpoint (fullName, currency, preferences)
+- [ ] **7A-003:** Implement password change endpoint with validation
+
+**Subtask Group 7B: User Profile Frontend (3 tasks)**
+- [ ] **7B-001:** Create Profile.tsx page with profile information display
+- [ ] **7B-002:** Add profile edit modal and password change modal
+- [ ] **7B-003:** Add preference settings (dark mode, notification preferences, currency)
+
+**Subtask Group 7C: Data Management (2 tasks)**
+- [ ] **7C-001:** Implement data export endpoint (download all user data as JSON)
+- [ ] **7C-002:** Implement account deletion endpoint with confirmation flow
+
+**Subtask Group 7D: Testing (1 task)**
+- [ ] **7D-001:** Write 10-15 E2E tests for user profile workflows
+
+**Estimated Effort:** 1-2 days total
+**Test Count:** 15-20 tests
+
+---
+
+### **Phase 8: Testing & QA (8 tasks)** ⏳ 0% STARTED
+
+- [ ] **8-001:** Achieve 80%+ code coverage on backend services (add missing unit tests)
+- [ ] **8-002:** Achieve 70%+ code coverage on React components (add missing component tests)
+- [ ] **8-003:** Write comprehensive E2E test suite (50+ E2E tests covering critical workflows)
+- [ ] **8-004:** Performance load testing (100 concurrent users, 1000 transactions/sec target)
+- [ ] **8-005:** Security audit: OWASP Top 10 validation
+- [ ] **8-006:** Cross-browser testing (Chrome, Firefox, Edge, Safari)
+- [ ] **8-007:** Mobile responsiveness testing (iPhone, Android, tablet)
+- [ ] **8-008:** User acceptance testing (UAT) with 5-10 beta users
+
+**Estimated Effort:** 2-3 days total
+**Test Count:** 80+ E2E tests + security audit
+
+---
+
+### **Phase 9: Documentation & Deployment (8 tasks)** ⏳ 0% STARTED
+
+**Subtask Group 9A: Documentation (4 tasks)**
+- [ ] **9A-001:** Create comprehensive API documentation (Swagger/OpenAPI - auto-generated)
+- [ ] **9A-002:** Create React component documentation (Storybook or similar)
+- [ ] **9A-003:** Create user guide / help documentation (Markdown or wiki)
+- [ ] **9A-004:** Create architecture documentation and decision records (ADRs)
+
+**Subtask Group 9B: Deployment & Monitoring (4 tasks)**
+- [ ] **9B-001:** Deploy backend to Azure Container Apps (production)
+- [ ] **9B-002:** Deploy frontend to Azure Static Web Apps (production)
+- [ ] **9B-003:** Set up Application Insights monitoring and alerting
+- [ ] **9B-004:** Configure backup strategy and disaster recovery plan
+
+**Estimated Effort:** 2-3 days total
+
+---
+
+### **Task Tracking Legend**
+- ✅ **Completed:** Fully implemented, tested, and committed
+- 🔄 **In Progress:** Currently being worked on
+- ⏳ **Not Started:** Queued for implementation
+- ⚠️ **Blocked:** Waiting on dependencies or clarification
+- 📋 **On Hold:** Intentionally postponed
+
+---
+
+### **How to Update Task Status**
+1. Find the task by ID (e.g., 2A-001)
+2. Update checkbox: `[ ]` → `[x]` or add status emoji
+3. Update the phase progress table at the top
+4. Commit changes with message: `tracking: Update task status [TASK-ID]`
+
+**Last Updated:** January 12, 2026
+**Overall Progress:** 16/117 tasks (14%) complete
+**Current Focus:** Phase 1.B React Frontend (clean version)
+**Next Phase:** Phase 2 - Categories (after Phase 1.B complete)
 
 ---
 
