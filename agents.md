@@ -1752,8 +1752,11 @@ public class TransactionController
 
 ## 🧪 PART 11: ITERATIVE TESTING STRATEGY
 
-### **Core Principle**
-**Add test cases incrementally with each feature completion.** Don't write all tests upfront - test each feature as it's built and ready.
+### **Core Principle: agents.md is Source of Truth**
+- **Single source of truth** for everything: features, tests, status, progress
+- **Tests added incrementally** as features are completed
+- **No separate tracking** - everything documented in agents.md
+- **Updated after each task** - reflects current state always
 
 ### **How It Works**
 
@@ -1761,8 +1764,8 @@ public class TransactionController
 1. ✅ **Complete the feature** (code, build, deploy)
 2. ✅ **Create test cases** for that feature
 3. ✅ **Run tests** to verify it works
-4. ✅ **Document test results** in agents.md
-5. ✅ **Commit** feature + tests together
+4. ✅ **Update agents.md** with test results
+5. ✅ **Commit** feature + tests + updated docs
 6. ✅ **Move to next task**
 
 ### **Testing Pyramid**
@@ -1770,7 +1773,117 @@ public class TransactionController
 - **15% Integration Tests** - Test endpoints with real DB (moderate)
 - **5% E2E Tests** - Test complete workflows (slow)
 
-### **Current Test Suite (Phase 1 - Authentication) ✅ ALL PASSING**
+---
+
+## 📋 TEST SUITE INVENTORY (agents.md Source of Truth)
+
+### **Phase 1: Authentication** ✅ COMPLETE
+
+**Integration Tests (Endpoints):**
+- File: `test-auth-complete.ps1`
+- Status: ✅ 8/8 PASSING
+- Coverage:
+  1. ✅ User Registration
+  2. ✅ Get Profile (Protected)
+  3. ✅ Token Refresh (Rotation)
+  4. ✅ Login with Email
+  5. ✅ Login with Username
+  6. ✅ Logout (Revoke Tokens)
+  7. ✅ Invalid Credentials (Security)
+  8. ✅ Duplicate Registration (Prevention)
+
+**Unit Tests:**
+- Status: ⏳ NOT YET (will add incrementally if needed)
+- Potential tests:
+  - Password hashing (BCrypt verification)
+  - Token generation (JWT claims)
+  - Token rotation (revocation logic)
+
+---
+
+### **Phase 1.B: React Frontend** ⏳ PENDING
+
+**Component Tests (When Phase 1.B Complete):**
+- [ ] Login page rendering
+- [ ] Register page rendering
+- [ ] Form validation
+- [ ] Token storage/retrieval
+- [ ] Auth context state management
+- [ ] Protected route redirection
+
+**Integration Tests (When Phase 1.B Complete):**
+- [ ] Complete login flow (frontend → backend)
+- [ ] Complete registration flow
+- [ ] Token refresh on expiry
+- [ ] Auto-logout on 401
+
+---
+
+### **Phase 2: Categories** ⏳ PENDING
+
+**Tests (Add After Feature Complete):**
+- [ ] Create category with hierarchy
+- [ ] Get category by ID
+- [ ] Update category
+- [ ] Delete category (soft)
+- [ ] Search categories
+- [ ] Filter by type (folder/category)
+- [ ] Calculate statistics
+- [ ] Move to parent
+
+---
+
+### **Phase 2: Accounts** ⏳ PENDING
+
+**Tests (Add After Feature Complete):**
+- [ ] Create account (bank/credit/cash/wallet/upi)
+- [ ] Get account
+- [ ] Update account
+- [ ] Get balance
+- [ ] Multi-currency support
+- [ ] Account reconciliation
+
+---
+
+### **Phase 3: Transactions** ⏳ PENDING
+
+**Tests (Add After Feature Complete):**
+- [ ] Create transaction
+- [ ] Split transaction
+- [ ] Get transactions (paginated)
+- [ ] Search transactions
+- [ ] Filter by date/category/account
+- [ ] Create recurring transaction
+- [ ] Calculate totals by category
+
+---
+
+### **Phase 3: Budgets** ⏳ PENDING
+
+**Tests (Add After Feature Complete):**
+- [ ] Create category budget
+- [ ] Create tag budget
+- [ ] Get budget progress
+- [ ] Trigger alert thresholds
+- [ ] Rollover to next month
+- [ ] Period-based budgets
+
+---
+
+## 📊 TEST TRACKING
+
+| Phase | Feature | Tests | Status | File |
+|-------|---------|-------|--------|------|
+| 1 | Auth Backend | 8 | ✅ Complete | test-auth-complete.ps1 |
+| 1.B | React Frontend | 0 | ⏳ Pending | (to be created) |
+| 2 | Categories | 0 | ⏳ Pending | (to be created) |
+| 2 | Accounts | 0 | ⏳ Pending | (to be created) |
+| 3 | Transactions | 0 | ⏳ Pending | (to be created) |
+| 3 | Budgets | 0 | ⏳ Pending | (to be created) |
+
+---
+
+## 🔄 CURRENT TEST SUITE (Phase 1 - Authentication) ✅ ALL PASSING
 
 **Test File:** `test-auth-complete.ps1`
 **Total Tests:** 8 | **Passed:** 8 | **Failed:** 0
