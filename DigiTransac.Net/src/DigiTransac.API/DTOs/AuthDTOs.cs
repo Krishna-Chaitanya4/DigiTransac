@@ -15,6 +15,11 @@ public class RegisterRequest
     public string? Phone { get; set; }
 }
 
+public class RefreshTokenRequest
+{
+    public string RefreshToken { get; set; } = string.Empty;
+}
+
 public class LoginResponse
 {
     public string Id { get; set; } = string.Empty;
@@ -37,6 +42,16 @@ public class AuthResponse
 {
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
-    public string Token { get; set; } = string.Empty;
-    public AuthUserDto User { get; set; } = new();
+    public string AccessToken { get; set; } = string.Empty;
+    public string? RefreshToken { get; set; }
+    public int ExpiresIn { get; set; } = 900; // 15 minutes in seconds
+    public AuthUserDto? User { get; set; }
 }
+
+public class TokenResponse
+{
+    public string AccessToken { get; set; } = string.Empty;
+    public string? RefreshToken { get; set; }
+    public int ExpiresIn { get; set; } = 900;
+}
+

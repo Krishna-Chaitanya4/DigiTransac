@@ -1,7 +1,9 @@
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
+using DigiTransac.Core.Configuration;
 using DigiTransac.Infrastructure.Interfaces;
 using DigiTransac.Infrastructure.Repositories;
+using DigiTransac.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
@@ -102,6 +104,10 @@ builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoSettings)
 // Repositories  
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+
+// Services
+builder.Services.AddScoped<ITokenService>(sp => new TokenService(sp.GetRequiredService<JwtSettings>()));
 
 Console.WriteLine($"📚 Database \"{mongoDatabaseName}\" will be used by repositories");
 
@@ -163,8 +169,6 @@ app.MapControllers();
 
 Console.WriteLine("🚀 DigiTransac.NET API is running!");
 Console.WriteLine("   Swagger UI: http://localhost:5253/swagger");
-Console.WriteLine("   Health check: http://localhost:5253/api/categories");
+Console.WriteLine("   Health check: http://localhost:5253/api/v1/auth/me");
 
 app.Run();
-
-public sealed record JwtSettings(string Issuer, string Audience, string SigningKey);
