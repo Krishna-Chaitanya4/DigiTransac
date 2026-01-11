@@ -159,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({ emailOrUsername: identifier, password }),
       }).catch((fetchError) => {
         throw new Error(`Network request failed: ${fetchError.message}`);
       });

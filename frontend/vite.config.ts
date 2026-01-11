@@ -30,7 +30,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5253',
         changeOrigin: true,
         configure: (proxy, _options) => {
           proxy.on('proxyReq', (proxyReq, req, _res) => {
@@ -39,7 +39,7 @@ export default defineConfig({
             if (originalHost && !originalHost.includes('localhost')) {
               proxyReq.setHeader('X-Forwarded-Host', originalHost);
               // Replace localhost with actual IP
-              proxyReq.setHeader('Host', originalHost.replace(':3000', ':5000'));
+              proxyReq.setHeader('Host', originalHost.replace(':3000', ':5253'));
             }
           });
         },

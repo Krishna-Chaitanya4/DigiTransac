@@ -1,13 +1,16 @@
 # Root .gitignore
 
+# ==================== Node.js ====================
 # Dependencies
 node_modules/
 yarn.lock
+package-lock.json
 
 # Environment variables
 .env
 .env.local
 .env.production
+.env.*.local
 
 # Google OAuth credentials
 client_secret_*.json
@@ -22,25 +25,136 @@ logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
+yarn-error.log*
 
 # Testing
 coverage/
 .nyc_output/
 
-# Docker
+# ==================== .NET Core / ASP.NET ====================
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio cache/options directory
+.vs/
+.vscode/
+
+# Visual Studio Code
+.vscode/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+*.code-workspace
+
+# Rider IDE
+.idea/
+*.sln.iml
+.idea/
+
+# Visual Studio 2015/2017 cache/options directory
+.vs/
+
+# Rider
+.idea/
+*.sln.iml
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Local History for Visual Studio
+.localhistory/
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+.nuget/
+
+# The packages folder can be ignored because of Package Restore
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Test Results
+TestResults/
+
+# Build Folders (you can also keep bin if you'd like, to store dlls and pdbs)
+[Bb]in/
+[Oo]bj/
+
+# Publish folders
+PublishProfiles/
+*.PublishSettings
+
+# ReSharper is a .NET coding add-in
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# dotCover report files
+*.coverage
+*.coveragexml
+
+# Coverage Results
+coverage/
+opencover/
+
+# dotnet user secrets
+**/secrets.json
+user_secrets.json
+
+# Application Insights
+ApplicationInsights.config
+.ApplicationInsights/
+
+# ==================== IDE & Editors ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ==================== OS ====================
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+._*
+
+# ==================== Docker ====================
 .docker/
 
-# Misc
-.DS_Store
+# ==================== Misc ====================
 *.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Azure Emulator
+AzureStorageEmulator/

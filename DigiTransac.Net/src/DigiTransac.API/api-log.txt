@@ -1,0 +1,22 @@
+Using launch settings from E:\personal\DigiTransac\DigiTransac.Net\src\DigiTransac.API\Properties\launchSettings.json...
+Building...
+≡ƒöÉ Key Vault client initialized: https://digitransac-kv-3895.vault.azure.net/
+   Auth method: Azure CLI (az login)
+≡ƒöÉ Fetching MongoDB connection string from Key Vault...
+Γ£à MongoDB connection string retrieved from Key Vault
+≡ƒôÜ Database "DigiTransacDB" will be used by repositories
+≡ƒÜÇ DigiTransac.NET API is running!
+   Swagger UI: http://localhost:5253/swagger
+   Health check: http://localhost:5253/api/categories
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5253
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: E:\personal\DigiTransac\DigiTransac.Net\src\DigiTransac.API
+Γ¥î Error in Login: Invalid salt (Parameter 'salt')
+Γ¥î Error in Login: Invalid salt (Parameter 'salt')
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
