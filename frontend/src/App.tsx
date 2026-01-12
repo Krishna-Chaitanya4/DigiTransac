@@ -1,135 +1,35 @@
-import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Box } from '@mui/material';
-import { useAuth } from './context/AuthContext';
-import { ToastProvider } from './components/Toast';
-import { InstallPrompt } from './components/InstallPrompt';
-import OfflineIndicator from './components/OfflineIndicator';
-import Layout from './components/Layout';
-import Loading from './components/Loading';
-import ErrorBoundary from './components/ErrorBoundary';
-import RouteErrorBoundary from './components/RouteErrorBoundary';
-import { ROUTE_PATHS } from './config/routes.config';
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
 
-// Lazy load pages for better performance and smaller initial bundle
-const Login = lazy(() => import('./pages/Login'));
-const Register = lazy(() => import('./pages/Register'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Categories = lazy(() => import('./pages/Categories'));
-const Budgets = lazy(() => import('./pages/Budgets'));
-const Analytics = lazy(() => import('./pages/Analytics'));
-const Profile = lazy(() => import('./pages/Profile'));
-const Accounts = lazy(() => import('./pages/Accounts'));
-const Transactions = lazy(() => import('./pages/Transactions'));
-
-const PrivateRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <Loading />;
-  }
-
-  return isAuthenticated ? children : <Navigate to="/login" />;
-};
-
-const App: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <Loading />;
-  }
+function App() {
+  const [count, setCount] = useState(0)
 
   return (
-    <ErrorBoundary>
-      <ToastProvider>
-        <InstallPrompt />
-        <OfflineIndicator />
-        <Box sx={{ minHeight: '100vh' }}>
-          <Suspense fallback={<Loading />}>
-            <Routes>
-              <Route
-                path={ROUTE_PATHS.LOGIN}
-                element={isAuthenticated ? <Navigate to={ROUTE_PATHS.DASHBOARD} /> : <Login />}
-              />
-              <Route
-                path={ROUTE_PATHS.REGISTER}
-                element={isAuthenticated ? <Navigate to={ROUTE_PATHS.DASHBOARD} /> : <Register />}
-              />
+    <>
+      <div>
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
+      </div>
+      <h1>Vite + React</h1>
+      <div className="card">
+        <button onClick={() => setCount((count) => count + 1)}>
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.tsx</code> and save to test HMR
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
+  )
+}
 
-              <Route
-                path="/"
-                element={
-                  <PrivateRoute>
-                    <Layout />
-                  </PrivateRoute>
-                }
-              >
-                <Route index element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
-                <Route
-                  path="dashboard"
-                  element={
-                    <RouteErrorBoundary>
-                      <Dashboard />
-                    </RouteErrorBoundary>
-                  }
-                />
-                <Route
-                  path="transactions"
-                  element={
-                    <RouteErrorBoundary>
-                      <Transactions />
-                    </RouteErrorBoundary>
-                  }
-                />
-                <Route
-                  path="categories"
-                  element={
-                    <RouteErrorBoundary>
-                      <Categories />
-                    </RouteErrorBoundary>
-                  }
-                />
-                <Route
-                  path="accounts"
-                  element={
-                    <RouteErrorBoundary>
-                      <Accounts />
-                    </RouteErrorBoundary>
-                  }
-                />
-                <Route
-                  path="budgets"
-                  element={
-                    <RouteErrorBoundary>
-                      <Budgets />
-                    </RouteErrorBoundary>
-                  }
-                />
-                <Route
-                  path="analytics"
-                  element={
-                    <RouteErrorBoundary>
-                      <Analytics />
-                    </RouteErrorBoundary>
-                  }
-                />
-                <Route
-                  path="profile"
-                  element={
-                    <RouteErrorBoundary>
-                      <Profile />
-                    </RouteErrorBoundary>
-                  }
-                />
-              </Route>
-
-              <Route path="*" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
-            </Routes>
-          </Suspense>
-        </Box>
-      </ToastProvider>
-    </ErrorBoundary>
-  );
-};
-
-export default App;
+export default App
