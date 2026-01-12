@@ -37,20 +37,33 @@ For Each Feature Phase:
 ├── Step 1: Backend (2-3 days)
 │   ├── Models, Repositories, Controllers
 │   ├── Unit tests (20-30 tests)
+│   ├── ✅ RUN: dotnet test (verify all pass)
+│   ├── Manual testing (happy path + edge cases)
 │   ├── Commit: "feat: [Phase] backend complete"
 │   └── ✅ Mark tasks complete in agents.md Part 12
 │
 ├── Step 2: Frontend (1-2 days)
 │   ├── Pages, Components, Hooks
 │   ├── Component tests (10-20 tests)
+│   ├── ✅ RUN: npm test (verify all pass)
+│   ├── Manual testing (form validation, navigation, API calls)
 │   ├── Commit: "feat: [Phase] frontend complete"
 │   └── ✅ Mark tasks complete in agents.md Part 12
 │
 └── Step 3: Integration (0.5-1 day)
     ├── E2E tests (5-10 tests)
-    ├── Manual testing verification
+    ├── ✅ RUN: npm run test:e2e (verify all pass)
+    ├── Manual testing verification (end-to-end workflows)
+    ├── Test on multiple devices (mobile/tablet/desktop)
     ├── Commit: "feat: [Phase] integration complete"
     └── ✅ Update Phase status in agents.md
+
+**CRITICAL: NO COMMITS WITHOUT PASSING TESTS!**
+- All tests must pass (0 failures)
+- All functionality manually verified
+- Fix any failing tests before proceeding
+- Then commit with confidence
+- If tests fail, fix code/tests, don't commit broken code
 ```
 
 **4. Task Tracking (Single Source of Truth)**
@@ -63,8 +76,10 @@ For Each Feature Phase:
 - ❌ No backup files (use git for history)
 - ❌ No v2 suffixes (clean files only)
 - ❌ No testing with mixed old/new code
+- ❌ No commits without passing tests!
 - ✅ One codebase, incremental commits
 - ✅ agents.md tracks everything
+- ✅ Tests always pass before commit
 
 ### **Next Immediate Steps:**
 1. Move `frontend/` → `frontend.backup/`
