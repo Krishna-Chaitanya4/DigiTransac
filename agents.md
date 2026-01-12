@@ -4,6 +4,77 @@
 
 ## 🔍 CURRENT STATE: .NET 10 + React Implementation (MIGRATION IN PROGRESS)
 
+---
+
+## ⚠️ DEVELOPMENT STRATEGY (UPDATED January 12, 2026)
+
+### **Current Situation:**
+- ✅ Phase 1 Backend: 100% complete (37 tests passing)
+- ✅ Node.js Backend: Feature-complete but being replaced
+- ⚠️ React Frontend: Over-engineered (Login 766 lines, Register 1019 lines)
+- ❌ Phase 1.B attempt: Created confusion with backup files and v2 suffixes
+
+### **DECISION: Clean Slate Approach**
+
+**1. Move Current Frontend to Backup**
+```bash
+# Preserve existing complex frontend
+mv frontend/ frontend.backup/
+```
+
+**2. Create NEW Clean Frontend from Scratch**
+```bash
+# Create fresh React project
+npm create vite@latest frontend -- --template react-ts
+cd frontend
+npm install @mui/material @emotion/react @emotion/styled react-router-dom axios
+```
+
+**3. Incremental Development Pattern (agents.md = source of truth)**
+
+```
+For Each Feature Phase:
+├── Step 1: Backend (2-3 days)
+│   ├── Models, Repositories, Controllers
+│   ├── Unit tests (20-30 tests)
+│   ├── Commit: "feat: [Phase] backend complete"
+│   └── ✅ Mark tasks complete in agents.md Part 12
+│
+├── Step 2: Frontend (1-2 days)
+│   ├── Pages, Components, Hooks
+│   ├── Component tests (10-20 tests)
+│   ├── Commit: "feat: [Phase] frontend complete"
+│   └── ✅ Mark tasks complete in agents.md Part 12
+│
+└── Step 3: Integration (0.5-1 day)
+    ├── E2E tests (5-10 tests)
+    ├── Manual testing verification
+    ├── Commit: "feat: [Phase] integration complete"
+    └── ✅ Update Phase status in agents.md
+```
+
+**4. Task Tracking (Single Source of Truth)**
+- All planning in **agents.md Part 12** (117 tasks)
+- Update task checkboxes: `[ ]` → `[x]`
+- Update progress table after each phase
+- Commit message: `tracking: Complete task [TASK-ID]`
+
+**5. No More Confusion**
+- ❌ No backup files (use git for history)
+- ❌ No v2 suffixes (clean files only)
+- ❌ No testing with mixed old/new code
+- ✅ One codebase, incremental commits
+- ✅ agents.md tracks everything
+
+### **Next Immediate Steps:**
+1. Move `frontend/` → `frontend.backup/`
+2. Create clean React project in `frontend/`
+3. Start Phase 1.B: Auth frontend (Login, Register, Dashboard)
+4. Write tests, verify with .NET API
+5. Commit and move to Phase 2
+
+---
+
 ### **Backend Features Already Built** ✅
 - ✅ **Authentication:** JWT tokens (7-day expiry), BCrypt password hashing, role-based access
 - ✅ **Categories:** Full hierarchy support (folders + categories), search, stats, soft delete
@@ -1847,40 +1918,77 @@ dotnet test --filter "MethodName=ValidatePasswordStrength_WithStrongPassword_Sho
 
 ---
 
-### **Phase 1.B: Clean React Frontend** 🔄 IN PROGRESS
+### **Phase 1.B: Clean React Frontend** ⏳ READY TO START
 
-**Approach:** Create minimal, clean React frontend (v2) to replace legacy code
+**Strategy: Clean Slate (No Backups, No v2 Suffixes)**
 
-**What we're building:**
-- ✅ Login page (100-120 lines, clean & minimal)
-- ✅ Register page (100-120 lines, clean & minimal)
-- ✅ AuthContext (150-200 lines, focused on auth only)
-- ✅ Protected routes (PrivateRoute component)
-- ✅ Material Design 3 UI (clean theme)
-- ✅ Zero technical debt (fresh start)
+**Step 1: Backup & Reset**
+```bash
+# Move current complex frontend to backup
+mv frontend/ frontend.backup/
 
-**What we're SKIPPING (v1 MVP):**
+# Create fresh React + TypeScript project
+npm create vite@latest frontend -- --template react-ts
+cd frontend
+npm install
+npm install @mui/material @emotion/react @emotion/styled
+npm install react-router-dom axios
+```
+
+**Step 2: Build Clean Components (3-4 hours)**
+- [ ] **1D-001:** AuthContext.tsx (150 lines - login, register, logout, token management)
+- [ ] **1D-002:** Login.tsx (100-120 lines - email/username + password form)
+- [ ] **1D-003:** Register.tsx (100-120 lines - email, username, fullName, password, confirm)
+- [ ] **1D-004:** PrivateRoute.tsx (30 lines - redirect if not authenticated)
+- [ ] **1D-005:** Dashboard.tsx (80 lines - welcome message, placeholder cards)
+- [ ] **1D-006:** App.tsx (60 lines - routing setup, theme provider)
+
+**Step 3: Write Tests (1-2 hours)**
+- [ ] AuthContext.test.tsx (10 tests - login, register, logout, token persist)
+- [ ] Login.test.tsx (10 tests - form validation, submission, navigation)
+- [ ] Register.test.tsx (15 tests - validation, password match, email format)
+- [ ] Integration.test.tsx (5 tests - register → login → dashboard flow)
+
+**Step 4: Manual Testing (30 min)**
+- [ ] Register new user → token saved → dashboard shows
+- [ ] Logout → redirected to login
+- [ ] Login with registered user → dashboard shows
+- [ ] Protected routes redirect when not authenticated
+- [ ] API calls work with .NET backend (localhost:5253)
+
+**Step 5: Commit & Update Tracking**
+```bash
+git add frontend/
+git commit -m "feat: Phase 1.B - Clean React frontend complete
+
+- AuthContext with JWT token management
+- Login/Register pages (Material Design 3)
+- Protected routes
+- Dashboard placeholder
+- 35 tests (10 auth + 10 login + 15 register)
+- Integration tested with .NET API"
+
+# Update agents.md Part 12 task tracking
+# Mark 1D-001 through 1D-006 as [x] complete
+```
+
+**What We're Building (MVP Only):**
+- ✅ Login with email/username + password
+- ✅ Register with email, username, fullName, password
+- ✅ JWT token storage in localStorage
+- ✅ Protected routes (redirect to /login if not authenticated)
+- ✅ Material Design 3 theme
+- ✅ Clean, minimal code (no over-engineering)
+
+**What We're Skipping (v1 MVP):**
 - ❌ Phone registration
-- ❌ Currency selector
+- ❌ Currency selector  
 - ❌ Country detection
 - ❌ Offline support (PWA)
-- ❌ Advanced features
+- ❌ Advanced features (only basics)
 
-**Test Cases (To Create):**
-- [ ] Login component renders correctly
-- [ ] Register component renders correctly
-- [ ] Form validation works
-- [ ] Error messages display
-- [ ] AuthContext login() function works
-- [ ] AuthContext register() function works
-- [ ] Token stored in localStorage
-- [ ] Protected routes redirect unauthenticated users
-- [ ] Logout clears token
-- [ ] E2E: Complete registration → login → dashboard flow
-
-**Estimated Effort:** 3-4 hours (code + tests)
-
-**Status:** Starting now
+**Estimated Effort:** 4-6 hours total
+**Status:** Ready to start (after frontend moved to backup)
 
 ---
 
