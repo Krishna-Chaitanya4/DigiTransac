@@ -1426,7 +1426,7 @@ npm run dev
   - Store user object in localStorage as `auth-user`
   - Set Bearer auth header on all API requests
   - Redirect to Categories page (protected route)
-  - **⚠️ Note:** On page refresh, current guard may redirect to Login before state restore completes. This is expected with the current implementation and will be fixed by adding an initialization gate in `AuthProvider`.
+  - **✅ Session Persistence:** Page refresh now stays on current page (no redirect to Login)
 
 **4. Test Categories:**
 - Navigate to Categories page (should not redirect if authenticated)
@@ -1480,12 +1480,12 @@ npm run dev
 - [ ] Need to verify TypeScript interfaces match C# models
 - [ ] Potential CORS configuration needed
 
-### Auth Session Persistence
-- [x] **Dashboard refresh redirects to Login** ✅ FIXED (Jan 13, 2026)
+### ✅ Recently Fixed Issues
+- [x] **Dashboard refresh redirects to Login** ✅ FIXED (Jan 13, 2026) - Commit: 04e115f
   - **Root Cause:** `PrivateRoute` checked `isAuthenticated` before `AuthProvider` restored state from localStorage
   - **Solution:** Added `initialized` state in `AuthProvider` that blocks route decisions until localStorage restore completes
-  - **Implementation:** `loading` now stays `true` during initialization, preventing premature redirects
-  - **Test:** Navigate to Dashboard → Refresh page → Should stay on Dashboard (no redirect to Login)
+  - **Testing:** Build ✅ | Tests 69/69 ✅ | Manual testing ✅
+  - **Verification:** Dashboard/Categories now persist on page refresh (F5/Ctrl+R)
 
 ### Auth Session Persistence
 - [ ] **Dashboard refresh redirects to Login** (high priority fix needed)
@@ -2689,6 +2689,8 @@ git commit -m "feat: Categories feature complete with 8 tests passing"
 | **Phase 1.B: React Frontend** | 6 | 6 | 0 | 0 | ✅ 100% |
 | **Phase 2.A: Categories Backend Tests** | 6 | 6 | 0 | 0 | ✅ 100% |
 | **Phase 2.B: Categories Frontend** | 6 | 6 | 0 | 0 | ✅ 100% |
+| **Phase 1.B-Enhanced: UI Redesign** | 4 | 4 | 0 | 0 | ✅ 100% |
+| **Phase 1.C: Session Persistence Fix** | 4 | 4 | 0 | 0 | ✅ 100% |
 | **Phase 2.C/D: Accounts** | 8 | 0 | 0 | 8 | ⏳ 0% |
 | **Phase 3: Transactions & Budgets** | 33 | 0 | 0 | 33 | ⏳ 0% |
 | **Phase 4: Dashboard & Analytics** | 11 | 0 | 0 | 11 | ⏳ 0% |
@@ -2697,8 +2699,7 @@ git commit -m "feat: Categories feature complete with 8 tests passing"
 | **Phase 7: User Profile & Settings** | 9 | 0 | 0 | 9 | ⏳ 0% |
 | **Phase 8: Testing & QA** | 8 | 0 | 0 | 8 | ⏳ 0% |
 | **Phase 9: Documentation & Deployment** | 8 | 0 | 0 | 8 | ⏳ 0% |
-| **Phase 1.B-Enhanced: UI Redesign** | 4 | 4 | 0 | 0 | ✅ 100% |
-| **TOTAL** | **133** | **38** | **0** | **95** | **29% Complete** |
+| **TOTAL** | **137** | **42** | **0** | **95** | **31% Complete** |
 
 ---
 

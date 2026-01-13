@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5253/api/v1';
+const API_BASE_URL = 'http://192.168.29.16:5253/api/v1';
 
 // ============================================================================
 // TYPES
