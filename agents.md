@@ -1444,6 +1444,19 @@ npm run dev
 - ✅ User info should persist after refresh
 - Navigate to Categories page and refresh → Should stay on Categories
 
+**6. Test on Mobile Device (Optional):**
+```bash
+# Start frontend with network access
+cd frontend
+npm run dev -- --host
+
+# Backend already configured for network access (0.0.0.0:5253)
+```
+- **Frontend:** Open http://192.168.29.16:5173/ on mobile browser
+- **CORS:** Backend whitelist includes all network IPs
+- **Test:** Register, Login, Dashboard, Categories, Session persistence
+- ✅ All features should work on mobile (responsive design verified)
+
 ---
 
 ## 📊 Progress Tracking
@@ -1486,6 +1499,12 @@ npm run dev
   - **Solution:** Added `initialized` state in `AuthProvider` that blocks route decisions until localStorage restore completes
   - **Testing:** Build ✅ | Tests 69/69 ✅ | Manual testing ✅
   - **Verification:** Dashboard/Categories now persist on page refresh (F5/Ctrl+R)
+
+- [x] **Mobile network access** ✅ FIXED (Jan 13, 2026) - Commit: f580b41
+  - **Issue:** Frontend/backend only accessible via localhost (mobile testing blocked)
+  - **Solution:** Backend listens on 0.0.0.0:5253, CORS whitelist updated with all network IPs, frontend uses network IP
+  - **Testing:** Build ✅ | Tests 69/69 ✅ | Mobile verified on WiFi ✅
+  - **Mobile Access:** http://192.168.29.16:5173/ (all features functional)
 
 ### Auth Session Persistence
 - [ ] **Dashboard refresh redirects to Login** (high priority fix needed)
@@ -2691,6 +2710,7 @@ git commit -m "feat: Categories feature complete with 8 tests passing"
 | **Phase 2.B: Categories Frontend** | 6 | 6 | 0 | 0 | ✅ 100% |
 | **Phase 1.B-Enhanced: UI Redesign** | 4 | 4 | 0 | 0 | ✅ 100% |
 | **Phase 1.C: Session Persistence Fix** | 4 | 4 | 0 | 0 | ✅ 100% |
+| **Phase 1.D: Mobile Network Access** | 3 | 3 | 0 | 0 | ✅ 100% |
 | **Phase 2.C/D: Accounts** | 8 | 0 | 0 | 8 | ⏳ 0% |
 | **Phase 3: Transactions & Budgets** | 33 | 0 | 0 | 33 | ⏳ 0% |
 | **Phase 4: Dashboard & Analytics** | 11 | 0 | 0 | 11 | ⏳ 0% |
@@ -2699,7 +2719,7 @@ git commit -m "feat: Categories feature complete with 8 tests passing"
 | **Phase 7: User Profile & Settings** | 9 | 0 | 0 | 9 | ⏳ 0% |
 | **Phase 8: Testing & QA** | 8 | 0 | 0 | 8 | ⏳ 0% |
 | **Phase 9: Documentation & Deployment** | 8 | 0 | 0 | 8 | ⏳ 0% |
-| **TOTAL** | **137** | **42** | **0** | **95** | **31% Complete** |
+| **TOTAL** | **140** | **45** | **0** | **95** | **32% Complete** |
 
 ---
 
@@ -2747,6 +2767,13 @@ git commit -m "feat: Categories feature complete with 8 tests passing"
 - [x] Login.test.tsx (10 tests - form rendering, validation, error handling)
 - [x] Register.test.tsx (15 tests - email/password validation, confirmation match)
 - [x] Integration.test.tsx (5 tests - complete auth workflows)
+
+**Subtask Group 1E: Mobile Network Access** ✅ 100% COMPLETE (Jan 13, 2026)
+- [x] **1E-001:** Update backend to listen on 0.0.0.0:5253 (all network interfaces)
+- [x] **1E-002:** Add CORS origins for network IPs (192.168.29.16, 172.22.48.1, 172.29.64.1)
+- [x] **1E-003:** Update frontend API base URL to use network IP
+- **Mobile Testing:** ✅ Verified on phone via WiFi - all features functional
+- **Responsive Design:** ✅ Material Design 3 looks great on mobile
 
 ---
 
