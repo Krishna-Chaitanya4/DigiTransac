@@ -6,6 +6,7 @@ import { PrivateRoute } from './components/PrivateRoute';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
+import Categories from './pages/Categories';
 
 // Material Design 3 Theme
 const theme = createTheme({
@@ -42,6 +43,15 @@ const App: React.FC = () => {
               element={
                 <PrivateRoute>
                   <Dashboard />
+                </PrivateRoute>
+              }
+            />
+
+            <Route
+              path="/categories"
+              element={
+                <PrivateRoute>
+                  <Categories />
                 </PrivateRoute>
               }
             />
