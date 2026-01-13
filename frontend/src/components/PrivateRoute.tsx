@@ -8,9 +8,10 @@ interface PrivateRouteProps {
 }
 
 export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, initialized } = useAuth();
 
-  if (loading) {
+  // Show loading spinner while auth is initializing or during API calls
+  if (!initialized || loading) {
     return (
       <Box
         sx={{
@@ -25,6 +26,7 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
     );
   }
 
+  // Only redirect to login after initialization is complete
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

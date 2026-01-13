@@ -1321,8 +1321,10 @@ POST   /api/auth/logout         - Logout user (TODO)
 - [x] JWT stored in localStorage as `auth-token`
 - [x] Protected routes via `PrivateRoute` component
 - [x] Auth context/provider set up
+- [x] **Session persistence on refresh** ✅ COMPLETE: Added initialization state in `AuthProvider` to restore token/user before route guards run
 - [ ] Logout functionality (clear token, API call optional)
 - [ ] Handle 401 responses and redirect to login
+- [ ] Optional: Implement silent refresh on app init if adopting refresh-token httpOnly cookie strategy
 
 **Database:**
 - [x] User collection created
@@ -1424,10 +1426,23 @@ npm run dev
   - Store user object in localStorage as `auth-user`
   - Set Bearer auth header on all API requests
   - Redirect to Categories page (protected route)
+  - **⚠️ Note:** On page refresh, current guard may redirect to Login before state restore completes. This is expected with the current implementation and will be fixed by adding an initialization gate in `AuthProvider`.
 
 **4. Test Categories:**
 - Navigate to Categories page (should not redirect if authenticated)
 - Test CRUD operations
+
+**5. Test Session Persistence Fix:**
+```bash
+# Frontend should already be running on http://localhost:5173
+# If not, start it with: npm run dev
+```
+- Navigate to http://localhost:5173/login
+- Register/Login to reach Dashboard
+- Press F5 or Ctrl+R to refresh the page
+- ✅ Should stay on Dashboard (no redirect to Login)
+- ✅ User info should persist after refresh
+- Navigate to Categories page and refresh → Should stay on Categories
 
 ---
 
@@ -1464,6 +1479,20 @@ npm run dev
 - [ ] React API calls still pointing to Node.js (http://localhost:3000)
 - [ ] Need to verify TypeScript interfaces match C# models
 - [ ] Potential CORS configuration needed
+
+### Auth Session Persistence
+- [x] **Dashboard refresh redirects to Login** ✅ FIXED (Jan 13, 2026)
+  - **Root Cause:** `PrivateRoute` checked `isAuthenticated` before `AuthProvider` restored state from localStorage
+  - **Solution:** Added `initialized` state in `AuthProvider` that blocks route decisions until localStorage restore completes
+  - **Implementation:** `loading` now stays `true` during initialization, preventing premature redirects
+  - **Test:** Navigate to Dashboard → Refresh page → Should stay on Dashboard (no redirect to Login)
+
+### Auth Session Persistence
+- [ ] **Dashboard refresh redirects to Login** (high priority fix needed)
+  - **Root Cause:** `PrivateRoute` checks `isAuthenticated` before `AuthProvider` restores state from localStorage
+  - **Issue Details:** On page refresh, `loading` is false during initial mount, so the guard redirects before localStorage restore completes
+  - **Planned Fix:** Add initialization gate in `AuthProvider` (e.g., `initialized` flag or set `loading=true` until restore completes) and update `PrivateRoute` to wait for initialization
+  - **Impact:** Users lose session on refresh and must re-login (poor UX)
 
 ---
 

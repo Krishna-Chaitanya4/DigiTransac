@@ -18,6 +18,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
+  initialized: boolean;
   login: (emailOrUsername: string, password: string) => Promise<void>;
   register: (email: string, username: string, fullName: string, password: string) => Promise<void>;
   logout: () => void;
@@ -63,6 +64,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   // Restore token and user from localStorage on mount
   useEffect(() => {
@@ -70,9 +72,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const savedUser = localStorage.getItem('auth-user');
 
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        // If localStorage data is corrupted, clear it
+        localStorage.removeItem('auth-token');
+        localStorage.removeItem('auth-user');
+      }
     }
+    
+    // Mark initialization as complete
+    setInitialized(true);
   }, []);
 
   // ========================================================================
@@ -179,6 +190,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     token,
     loading,
+    initialized,
     login,
     register,
     logout,
