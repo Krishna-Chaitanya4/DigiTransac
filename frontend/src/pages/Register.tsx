@@ -80,6 +80,7 @@ export const Register: React.FC = () => {
     <Box
       sx={{
         minHeight: '100vh',
+        width: '100vw',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -87,7 +88,7 @@ export const Register: React.FC = () => {
         py: 3,
       }}
     >
-      <Container maxWidth="sm">
+      <Container maxWidth="sm" sx={{ px: { xs: 2, sm: 3 } }}>
         <Card
           sx={{
             p: { xs: 3, sm: 4 },

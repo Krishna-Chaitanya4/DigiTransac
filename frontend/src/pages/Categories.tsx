@@ -1,29 +1,31 @@
 ﻿import React, { useState, useEffect, useContext } from 'react';
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
-  TextField,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Stack,
-  CircularProgress,
-  Alert,
-  IconButton,
-  Menu,
-  MenuItem,
   Chip,
-  Paper,
-  Typography,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
   Collapse,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -318,13 +320,24 @@ const Categories: React.FC = () => {
     );
   };
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'), {
+    noSsr: true,
+    defaultMatches: false,
+  });
+
   if (loading) return <CircularProgress />;
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Stack spacing={3}>
         {/* Header */}
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+          spacing={{ xs: 1.5, sm: 0 }}
+        >
           <Typography variant="h4" sx={{ fontWeight: 600 }}>
             Categories
           </Typography>
@@ -333,6 +346,7 @@ const Categories: React.FC = () => {
             startIcon={<AddIcon />}
             onClick={() => handleOpenDialog('create')}
             data-testid="create-category-btn"
+            sx={{ alignSelf: { xs: 'stretch', sm: 'auto' } }}
           >
             New Category
           </Button>
@@ -356,8 +370,16 @@ const Categories: React.FC = () => {
                 data-testid="search-input"
               />
 
-              <Stack direction="row" spacing={1}>
-                <Stack direction="row" spacing={1}>
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={{ xs: 1.5, md: 1 }}
+                alignItems={{ xs: 'flex-start', md: 'center' }}
+              >
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ flexWrap: 'wrap', rowGap: 1 }}
+                >
                   {['All', 'Category', 'Folder'].map((type) => (
                     <Chip
                       key={type}
@@ -373,7 +395,11 @@ const Categories: React.FC = () => {
                   ))}
                 </Stack>
 
-                <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ ml: { xs: 0, md: 'auto' }, flexWrap: 'wrap', rowGap: 1 }}
+                >
                   {['name', 'usage', 'recent'].map((sort) => (
                     <Chip
                       key={sort}
@@ -412,6 +438,7 @@ const Categories: React.FC = () => {
         onClose={handleCloseDialog}
         maxWidth="sm"
         fullWidth
+        fullScreen={isMobile}
         data-testid="category-dialog"
       >
         <DialogTitle>
