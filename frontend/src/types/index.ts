@@ -34,10 +34,7 @@ export interface User {
 }
 
 // Category
-export enum CategoryType {
-  Category = 'Category',
-  Folder = 'Folder',
-}
+export type CategoryType = 'Category' | 'Folder';
 
 export interface Category {
   id: string;
@@ -56,14 +53,7 @@ export interface Category {
 }
 
 // Account
-export enum AccountType {
-  BankAccount = 'bank_account',
-  CreditCard = 'credit_card',
-  DebitCard = 'debit_card',
-  Cash = 'cash',
-  UPI = 'upi',
-  Wallet = 'wallet',
-}
+export type AccountType = 'bank_account' | 'credit_card' | 'debit_card' | 'cash' | 'upi' | 'wallet';
 
 export interface Account {
   id: string;

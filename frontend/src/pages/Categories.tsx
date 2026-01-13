@@ -36,7 +36,7 @@ import {
   Folder as FolderIcon,
   SearchOff as SearchOffIcon,
 } from '@mui/icons-material';
-import { Category, CategoryType, CreateCategoryRequest, UpdateCategoryRequest } from '../types';
+import type { Category } from '../types';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 
@@ -200,7 +200,7 @@ const Categories: React.FC = () => {
     setDialog({
       open: true,
       mode,
-      category: mode === 'edit' && category ? { ...category } : { type: CategoryType.Category },
+      category: mode === 'edit' && category ? { ...category } : { type: 'Category' },
       parentId,
     });
   };
@@ -213,7 +213,7 @@ const Categories: React.FC = () => {
     try {
       const payload = {
         name: dialog.category.name,
-        type: dialog.category.type || CategoryType.Category,
+        type: dialog.category.type || 'Category',
         icon: dialog.category.icon,
         color: dialog.category.color,
         parentId: dialog.parentId || dialog.category.parentId,
@@ -276,7 +276,7 @@ const Categories: React.FC = () => {
                 </IconButton>
               }
               sx={{
-                bgcolor: node.type === CategoryType.Folder ? 'action.hover' : 'background.paper',
+                bgcolor: node.type === 'Folder' ? 'action.hover' : 'background.paper',
                 borderRadius: 1,
                 mb: 0.5,
                 '&:hover': { bgcolor: 'action.hover' },
@@ -294,7 +294,7 @@ const Categories: React.FC = () => {
                   <ListItemIcon sx={{ minWidth: 24 }} />
                 )}
                 <ListItemIcon sx={{ minWidth: 32 }}>
-                  {node.type === CategoryType.Folder ? <FolderOpenIcon /> : <FolderIcon />}
+                  {node.type === 'Folder' ? <FolderOpenIcon /> : <FolderIcon />}
                 </ListItemIcon>
                 <ListItemText
                   primary={node.name}

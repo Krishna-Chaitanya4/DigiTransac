@@ -28,7 +28,7 @@ describe('Login Page', () => {
   it('renders login form', () => {
     renderLogin();
     // Use getByRole to avoid multiple matches
-    expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
   });
 
   it('renders email or username input', () => {
@@ -43,14 +43,14 @@ describe('Login Page', () => {
 
   it('renders login button', () => {
     renderLogin();
-    const button = screen.getByRole('button', { name: /login/i });
+    const button = screen.getByRole('button', { name: /sign in/i });
     expect(button).toBeInTheDocument();
   });
 
   it('renders register link', () => {
     renderLogin();
     // Text is split across multiple elements, use more specific query
-    const link = screen.getByRole('link', { name: /register here/i });
+    const link = screen.getByRole('link', { name: /create account/i });
     expect(link).toBeInTheDocument();
   });
 
@@ -82,7 +82,7 @@ describe('Login Page', () => {
 
   it('submit button is initially enabled', () => {
     renderLogin();
-    const button = screen.getByRole('button', { name: /login/i }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: /sign in/i }) as HTMLButtonElement;
     expect(button.disabled).toBe(false);
   });
 

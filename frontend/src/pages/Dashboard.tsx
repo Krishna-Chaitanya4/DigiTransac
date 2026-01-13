@@ -8,7 +8,7 @@ import {
   Button,
   Card,
   CardContent,
-  Grid,
+  Stack,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../context/AuthContext';
@@ -72,44 +72,42 @@ export const Dashboard: React.FC = () => {
         </Paper>
 
         {/* User Info */}
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Email
-                </Typography>
-                <Typography variant="h6">{user?.email}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Username
-                </Typography>
-                <Typography variant="h6">{user?.username}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Card sx={{ flex: 1 }}>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom>
+                Email
+              </Typography>
+              <Typography variant="h6">{user?.email}</Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ flex: 1 }}>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom>
+                Username
+              </Typography>
+              <Typography variant="h6">{user?.username}</Typography>
+            </CardContent>
+          </Card>
+        </Stack>
 
         {/* Placeholder Cards */}
-        <Grid container spacing={2} sx={{ marginTop: 2 }}>
+        <Stack direction="row" spacing={2} sx={{ marginTop: 2, flexWrap: 'wrap' }}>
           {['Transactions', 'Categories', 'Budgets', 'Analytics'].map(
             (title) => (
-              <Grid item xs={12} sm={6} md={3} key={title}>
-                <Card
-                  sx={{
-                    cursor: 'pointer',
-                    transition: 'transform 0.3s, box-shadow 0.3s',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: 3,
-                    },
-                  }}
-                >
+              <Card
+                key={title}
+                sx={{
+                  flex: '1 1 calc(25% - 16px)',
+                  minWidth: 200,
+                  cursor: 'pointer',
+                  transition: 'transform 0.3s, box-shadow 0.3s',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    boxShadow: 3,
+                  },
+                }}
+              >
                   <CardContent>
                     <Typography
                       color="text.secondary"
@@ -127,10 +125,9 @@ export const Dashboard: React.FC = () => {
                     </Typography>
                   </CardContent>
                 </Card>
-              </Grid>
             )
           )}
-        </Grid>
+        </Stack>
       </Container>
     </Box>
   );

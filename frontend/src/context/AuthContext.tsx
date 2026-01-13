@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios, { AxiosInstance } from 'axios';
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5253/api/v1';
 
@@ -42,7 +42,7 @@ export const useAuth = () => {
 // API CLIENT
 // ============================================================================
 
-const createApiClient = (token: string | null): AxiosInstance => {
+const createApiClient = (token: string | null) => {
   const client = axios.create({
     baseURL: API_BASE_URL,
     timeout: 10000,
@@ -88,18 +88,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         password,
       });
 
-      // Handle .NET response format: { success: true, data: { token, user } }
-      const responseData = response.data.data || response.data;
-      const { token: newToken, user: newUser } = responseData;
+      // Handle .NET API response format: { success: true, accessToken, refreshToken, user, ... }
+      const { accessToken, user: apiUser } = response.data;
 
-      if (newToken && newUser) {
-        setToken(newToken);
-        setUser(newUser);
-        localStorage.setItem('auth-token', newToken);
-        localStorage.setItem('auth-user', JSON.stringify(newUser));
-      } else {
+      if (!accessToken || !apiUser) {
         throw new Error('Invalid response format from server');
       }
+
+      // Map API user to frontend User interface
+      const newUser: User = {
+        id: apiUser.id || '',
+        email: apiUser.email || '',
+        username: apiUser.username || '',
+        fullName: apiUser.fullName || apiUser.fullname || '',
+      };
+
+      setToken(accessToken);
+      setUser(newUser);
+      localStorage.setItem('auth-token', accessToken);
+      localStorage.setItem('auth-user', JSON.stringify(newUser));
     } catch (error: any) {
       const message = error.response?.data?.message || error.message || 'Login failed';
       throw new Error(message);
@@ -128,18 +135,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         password,
       });
 
-      // Handle .NET response format: { success: true, data: { token, user } }
-      const responseData = response.data.data || response.data;
-      const { token: newToken, user: newUser } = responseData;
+      // Handle .NET API response format: { success: true, accessToken, refreshToken, user, ... }
+      const { accessToken, user: apiUser } = response.data;
 
-      if (newToken && newUser) {
-        setToken(newToken);
-        setUser(newUser);
-        localStorage.setItem('auth-token', newToken);
-        localStorage.setItem('auth-user', JSON.stringify(newUser));
-      } else {
+      if (!accessToken || !apiUser) {
         throw new Error('Invalid response format from server');
       }
+
+      // Map API user to frontend User interface
+      const newUser: User = {
+        id: apiUser.id || '',
+        email: apiUser.email || '',
+        username: apiUser.username || '',
+        fullName: apiUser.fullName || apiUser.fullname || '',
+      };
+
+      setToken(accessToken);
+      setUser(newUser);
+      localStorage.setItem('auth-token', accessToken);
+      localStorage.setItem('auth-user', JSON.stringify(newUser));
     } catch (error: any) {
       const message = error.response?.data?.message || error.message || 'Registration failed';
       throw new Error(message);

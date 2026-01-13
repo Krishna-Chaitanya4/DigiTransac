@@ -5,12 +5,12 @@ import App from './App';
 describe('E2E: Complete Auth Flow', () => {
   it('renders login page on initial load', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
   });
 
   it('renders register link on login page', () => {
     render(<App />);
-    const link = screen.getByRole('link', { name: /register here/i });
+    const link = screen.getByRole('link', { name: /create account/i });
     expect(link).toBeInTheDocument();
   });
 
@@ -28,7 +28,7 @@ describe('E2E: Complete Auth Flow', () => {
 
   it('login page has submit button', () => {
     render(<App />);
-    const button = screen.getByRole('button', { name: /login/i });
+    const button = screen.getByRole('button', { name: /sign in/i });
     expect(button).toBeInTheDocument();
   });
 });

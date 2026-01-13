@@ -28,7 +28,7 @@ describe('Register Page', () => {
   it('renders register form', () => {
     renderRegister();
     // Use getByRole to avoid multiple matches
-    expect(screen.getByRole('heading', { name: /create account/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /get started today/i })).toBeInTheDocument();
   });
 
   it('renders email input', () => {
@@ -64,7 +64,7 @@ describe('Register Page', () => {
 
   it('renders login link', () => {
     renderRegister();
-    const link = screen.getByText(/login here/i);
+    const link = screen.getByRole('link', { name: /sign in instead/i });
     expect(link).toBeInTheDocument();
   });
 
@@ -120,7 +120,7 @@ describe('Register Page', () => {
 
   it('displays tagline', () => {
     renderRegister();
-    expect(screen.getByText(/Smart Personal Finance Management/i)).toBeInTheDocument();
+     expect(screen.getByText(/Create Your Account/i)).toBeInTheDocument();
   });
 
   it('form has proper structure', () => {
