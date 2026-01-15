@@ -26,6 +26,7 @@ import {
   Collapse,
   useMediaQuery,
   useTheme,
+  Container,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -40,6 +41,7 @@ import {
 } from '@mui/icons-material';
 import type { Category } from '../types';
 import { AuthContext } from '../context/AuthContext';
+import { Layout } from '../components/Layout';
 import axios from 'axios';
 
 interface CategoryNode extends Category {
@@ -329,25 +331,27 @@ const Categories: React.FC = () => {
   if (loading) return <CircularProgress />;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack spacing={3}>
-        {/* Header */}
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          justifyContent="space-between"
-          alignItems={{ xs: 'flex-start', sm: 'center' }}
-          spacing={{ xs: 1.5, sm: 0 }}
-        >
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>
-            Categories
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog('create')}
-            data-testid="create-category-btn"
-            sx={{ alignSelf: { xs: 'stretch', sm: 'auto' } }}
-          >
+    <Layout>
+      <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Container maxWidth="xl">
+          <Stack spacing={3}>
+            {/* Header */}
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              justifyContent="space-between"
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              spacing={{ xs: 1.5, sm: 0 }}
+            >
+              <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a1a2e' }}>
+                Categories
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => handleOpenDialog('create')}
+                data-testid="create-category-btn"
+                sx={{ alignSelf: { xs: 'stretch', sm: 'auto' } }}
+              >
             New Category
           </Button>
         </Stack>
@@ -536,8 +540,10 @@ const Categories: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      </Container>
     </Box>
-  );
+  </Layout>
+);
 };
 
 // Helper function to find category by ID
