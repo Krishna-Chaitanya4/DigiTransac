@@ -13,6 +13,7 @@ public interface IEmailVerificationRepository
     Task<EmailVerification> CreateAsync(EmailVerification verification);
     Task UpdateAsync(EmailVerification verification);
     Task DeleteByEmailAsync(string email, VerificationPurpose purpose);
+    Task DeleteAllByEmailAsync(string email);
 }
 
 public class EmailVerificationRepository : IEmailVerificationRepository
@@ -72,5 +73,10 @@ public class EmailVerificationRepository : IEmailVerificationRepository
     public async Task DeleteByEmailAsync(string email, VerificationPurpose purpose)
     {
         await _verifications.DeleteManyAsync(v => v.Email == email.ToLowerInvariant() && v.Purpose == purpose);
+    }
+
+    public async Task DeleteAllByEmailAsync(string email)
+    {
+        await _verifications.DeleteManyAsync(v => v.Email == email.ToLowerInvariant());
     }
 }

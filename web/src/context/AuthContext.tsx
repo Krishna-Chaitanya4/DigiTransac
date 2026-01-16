@@ -75,18 +75,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Get a valid access token, refreshing if necessary
+  // Read from localStorage to avoid stale closure issues
   const getValidAccessToken = useCallback(async (): Promise<string | null> => {
-    if (!accessToken || !refreshToken) {
+    const currentAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const currentRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+    if (!currentAccessToken || !currentRefreshToken) {
       return null;
     }
 
-    if (!isTokenExpired(accessToken)) {
-      return accessToken;
+    if (!isTokenExpired(currentAccessToken)) {
+      return currentAccessToken;
     }
 
     // Token is expired, try to refresh
     try {
-      const response = await authService.refreshToken(refreshToken);
+      const response = await authService.refreshToken(currentRefreshToken);
       handleAuthSuccess(response);
       return response.accessToken;
     } catch {
@@ -94,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearAuth();
       return null;
     }
-  }, [accessToken, refreshToken, handleAuthSuccess, clearAuth]);
+  }, [handleAuthSuccess, clearAuth]);
 
   const login = async (email: string, password: string) => {
     const response = await authService.login(email, password);

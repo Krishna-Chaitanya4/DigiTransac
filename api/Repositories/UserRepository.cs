@@ -1,6 +1,7 @@
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Settings;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace DigiTransac.Api.Repositories;
@@ -54,7 +55,9 @@ public class UserRepository : IUserRepository
 
     public async Task<bool> DeleteAsync(string id)
     {
-        var result = await _users.DeleteOneAsync(u => u.Id == id);
+        // Use ObjectId filter for more reliable deletion
+        var filter = Builders<User>.Filter.Eq("_id", new ObjectId(id));
+        var result = await _users.DeleteOneAsync(filter);
         return result.DeletedCount > 0;
     }
 }

@@ -345,8 +345,14 @@ public class AuthServiceTests
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password)
         };
 
-        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
-            .ReturnsAsync(user);
+        // First call returns user, second call (verification) returns null
+        _userRepositoryMock.SetupSequence(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user)
+            .ReturnsAsync((User?)null);
+        _refreshTokenRepositoryMock.Setup(x => x.DeleteByUserIdAsync(userId))
+            .Returns(Task.CompletedTask);
+        _emailVerificationRepositoryMock.Setup(x => x.DeleteAllByEmailAsync(user.Email))
+            .Returns(Task.CompletedTask);
         _userRepositoryMock.Setup(x => x.DeleteAsync(userId))
             .ReturnsAsync(true);
 
@@ -356,7 +362,10 @@ public class AuthServiceTests
         // Assert
         result.Success.Should().BeTrue();
         result.Message.Should().Contain("deleted successfully");
+        _refreshTokenRepositoryMock.Verify(x => x.DeleteByUserIdAsync(userId), Times.Once);
+        _emailVerificationRepositoryMock.Verify(x => x.DeleteAllByEmailAsync(user.Email), Times.Once);
         _userRepositoryMock.Verify(x => x.DeleteAsync(userId), Times.Once);
+        _userRepositoryMock.Verify(x => x.GetByIdAsync(userId), Times.Exactly(2)); // Initial + verification
     }
 
     [Fact]

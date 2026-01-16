@@ -216,6 +216,8 @@ public class AuthService : IAuthService
             return (false, "User not found");
         }
 
+        var userEmail = user.Email;
+
         // Verify password
         if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
         {
@@ -223,7 +225,16 @@ public class AuthService : IAuthService
             return (false, "Invalid password");
         }
 
-        // Delete the user
+        // Delete all associated data
+        _logger.LogInformation("Deleting all data for user: {Email}", userEmail);
+
+        // 1. Delete all refresh tokens for the user
+        await _refreshTokenRepository.DeleteByUserIdAsync(userId);
+
+        // 2. Delete all email verifications for the user
+        await _emailVerificationRepository.DeleteAllByEmailAsync(userEmail);
+
+        // 3. Delete the user record
         var deleted = await _userRepository.DeleteAsync(userId);
         if (!deleted)
         {
@@ -231,7 +242,15 @@ public class AuthService : IAuthService
             return (false, "Failed to delete account");
         }
 
-        _logger.LogInformation("Account deleted successfully: {Email}, UserId: {UserId}", user.Email, userId);
+        // Verify deletion
+        var verifyUser = await _userRepository.GetByIdAsync(userId);
+        if (verifyUser != null)
+        {
+            _logger.LogError("Delete account verification failed - user still exists: {UserId}", userId);
+            return (false, "Failed to delete account");
+        }
+
+        _logger.LogInformation("Account deleted successfully: {Email}", userEmail);
         return (true, "Account deleted successfully");
     }
 

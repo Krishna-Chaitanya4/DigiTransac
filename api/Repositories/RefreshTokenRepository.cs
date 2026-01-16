@@ -12,6 +12,7 @@ public interface IRefreshTokenRepository
     Task<RefreshToken> CreateAsync(RefreshToken refreshToken);
     Task UpdateAsync(RefreshToken refreshToken);
     Task RevokeAllByUserIdAsync(string userId);
+    Task DeleteByUserIdAsync(string userId);
     Task DeleteExpiredAsync();
 }
 
@@ -76,6 +77,11 @@ public class RefreshTokenRepository : IRefreshTokenRepository
             t => t.UserId == userId && t.RevokedAt == null,
             update
         );
+    }
+
+    public async Task DeleteByUserIdAsync(string userId)
+    {
+        await _refreshTokens.DeleteManyAsync(t => t.UserId == userId);
     }
 
     public async Task DeleteExpiredAsync()
