@@ -11,6 +11,9 @@ interface AuthContextType {
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
+  updateName: (fullName: string) => Promise<void>;
+  sendEmailChangeCode: (newEmail: string) => Promise<void>;
+  verifyEmailChange: (newEmail: string, code: string) => Promise<void>;
   getValidAccessToken: () => Promise<string | null>;
 }
 
@@ -141,6 +144,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuth();
   };
 
+  const updateName = async (fullName: string) => {
+    const validToken = await getValidAccessToken();
+    if (!validToken) {
+      throw new Error('Not authenticated');
+    }
+    await authService.updateName(validToken, fullName);
+    // Update local user state
+    if (user) {
+      const updatedUser = { ...user, fullName };
+      setUser(updatedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+    }
+  };
+
+  const sendEmailChangeCode = async (newEmail: string) => {
+    const validToken = await getValidAccessToken();
+    if (!validToken) {
+      throw new Error('Not authenticated');
+    }
+    await authService.sendEmailChangeCode(validToken, newEmail);
+  };
+
+  const verifyEmailChange = async (newEmail: string, code: string) => {
+    const validToken = await getValidAccessToken();
+    if (!validToken) {
+      throw new Error('Not authenticated');
+    }
+    await authService.verifyEmailChange(validToken, newEmail, code);
+    // Update local user state
+    if (user) {
+      const updatedUser = { ...user, email: newEmail };
+      setUser(updatedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -151,6 +190,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout, 
       logoutAll, 
       deleteAccount,
+      updateName,
+      sendEmailChangeCode,
+      verifyEmailChange,
       getValidAccessToken 
     }}>
       {children}

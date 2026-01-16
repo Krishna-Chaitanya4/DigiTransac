@@ -27,6 +27,9 @@ public class EmailVerification
     [BsonElement("purpose")]
     public VerificationPurpose Purpose { get; set; } = VerificationPurpose.Registration;
 
+    [BsonElement("userId")]
+    public string? UserId { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
@@ -34,5 +37,6 @@ public class EmailVerification
 public enum VerificationPurpose
 {
     Registration,
-    PasswordReset
+    PasswordReset,
+    EmailChange
 }

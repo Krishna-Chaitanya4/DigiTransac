@@ -22,6 +22,11 @@ public record VerificationResponse(string Message, string? VerificationToken = n
 
 public record DeleteAccountRequest(string Password);
 
+// Profile update
+public record UpdateNameRequest(string FullName);
+public record UpdateEmailRequest(string NewEmail);
+public record VerifyEmailChangeRequest(string NewEmail, string Code);
+
 // Forgot Password flow
 public record ForgotPasswordRequest(string Email);
 public record ResetPasswordRequest(string Email, string VerificationToken, string NewPassword);

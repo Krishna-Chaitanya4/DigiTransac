@@ -2,13 +2,136 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function SettingsPage() {
-  const { user, logout, logoutAll, deleteAccount } = useAuth();
+  const { user, logout, logoutAll, deleteAccount, updateName, sendEmailChangeCode, verifyEmailChange } = useAuth();
+  
+  // Name editing state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(user?.fullName || '');
+  const [nameError, setNameError] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  
+  // Email change modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailStep, setEmailStep] = useState<'enter' | 'verify'>('enter');
+  const [newEmail, setNewEmail] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [isEmailLoading, setIsEmailLoading] = useState(false);
+  
+  // Delete account state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  // Name editing handlers
+  const handleEditName = () => {
+    setEditedName(user?.fullName || '');
+    setNameError('');
+    setIsEditingName(true);
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false);
+    setEditedName(user?.fullName || '');
+    setNameError('');
+  };
+
+  const handleSaveName = async () => {
+    const trimmedName = editedName.trim();
+    if (!trimmedName) {
+      setNameError('Name is required');
+      return;
+    }
+    if (trimmedName.length < 2) {
+      setNameError('Name must be at least 2 characters');
+      return;
+    }
+    if (trimmedName === user?.fullName) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setNameError('');
+    setIsSavingName(true);
+    try {
+      await updateName(trimmedName);
+      setIsEditingName(false);
+    } catch (err) {
+      setNameError(err instanceof Error ? err.message : 'Failed to update name');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  // Email change handlers
+  const handleOpenEmailModal = () => {
+    setNewEmail('');
+    setEmailCode('');
+    setEmailError('');
+    setEmailStep('enter');
+    setShowEmailModal(true);
+  };
+
+  const handleCloseEmailModal = () => {
+    setShowEmailModal(false);
+    setNewEmail('');
+    setEmailCode('');
+    setEmailError('');
+    setEmailStep('enter');
+  };
+
+  const handleSendEmailCode = async () => {
+    const trimmedEmail = newEmail.trim().toLowerCase();
+    if (!trimmedEmail) {
+      setEmailError('Email is required');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    if (trimmedEmail === user?.email) {
+      setEmailError('New email must be different from current email');
+      return;
+    }
+
+    setEmailError('');
+    setIsEmailLoading(true);
+    try {
+      await sendEmailChangeCode(trimmedEmail);
+      setEmailStep('verify');
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'Failed to send verification code');
+    } finally {
+      setIsEmailLoading(false);
+    }
+  };
+
+  const handleVerifyEmailChange = async () => {
+    const trimmedCode = emailCode.trim();
+    if (!trimmedCode) {
+      setEmailError('Verification code is required');
+      return;
+    }
+    if (trimmedCode.length !== 6) {
+      setEmailError('Code must be 6 digits');
+      return;
+    }
+
+    setEmailError('');
+    setIsEmailLoading(true);
+    try {
+      await verifyEmailChange(newEmail.trim().toLowerCase(), trimmedCode);
+      handleCloseEmailModal();
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'Failed to verify code');
+    } finally {
+      setIsEmailLoading(false);
+    }
+  };
 
   const handleLogoutAll = async () => {
     setIsLoggingOutAll(true);
@@ -41,13 +164,64 @@ export default function SettingsPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Profile</h2>
           <div className="space-y-4">
+            {/* Name Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-500">Full Name</label>
-              <p className="mt-1 text-sm text-gray-900">{user?.fullName}</p>
+              <label className="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
+              {isEditingName ? (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Your full name"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveName}
+                      disabled={isSavingName}
+                      className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isSavingName ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleCancelEditName}
+                      disabled={isSavingName}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-900">{user?.fullName}</p>
+                  <button
+                    onClick={handleEditName}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+              {nameError && (
+                <p className="mt-1 text-sm text-red-600">{nameError}</p>
+              )}
             </div>
+            
+            {/* Email Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-500">Email</label>
-              <p className="mt-1 text-sm text-gray-900">{user?.email}</p>
+              <label className="block text-sm font-medium text-gray-500 mb-1">Email</label>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-900">{user?.email}</p>
+                <button
+                  onClick={handleOpenEmailModal}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Change
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -175,6 +349,111 @@ export default function SettingsPage() {
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {isDeleting ? 'Deleting...' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Email Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50"
+            onClick={handleCloseEmailModal}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {emailStep === 'enter' ? 'Change Email' : 'Verify Email'}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {emailStep === 'enter' 
+                      ? 'Enter your new email address. We will send a verification code to confirm.'
+                      : `We sent a 6-digit code to ${newEmail}. Enter it below to complete the change.`
+                    }
+                  </p>
+                </div>
+              </div>
+              
+              <div className="mt-5">
+                {emailStep === 'enter' ? (
+                  <>
+                    <label htmlFor="new-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      New Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="new-email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="new@example.com"
+                      autoFocus
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label htmlFor="email-code" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      id="email-code"
+                      value={emailCode}
+                      onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center tracking-widest font-mono text-lg"
+                      placeholder="000000"
+                      maxLength={6}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailStep('enter');
+                        setEmailCode('');
+                        setEmailError('');
+                      }}
+                      className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      ← Use a different email
+                    </button>
+                  </>
+                )}
+                {emailError && (
+                  <p className="mt-2 text-sm text-red-600">{emailError}</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleCloseEmailModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={emailStep === 'enter' ? handleSendEmailCode : handleVerifyEmailChange}
+                disabled={isEmailLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isEmailLoading 
+                  ? (emailStep === 'enter' ? 'Sending...' : 'Verifying...') 
+                  : (emailStep === 'enter' ? 'Send Code' : 'Verify & Update')
+                }
               </button>
             </div>
           </div>

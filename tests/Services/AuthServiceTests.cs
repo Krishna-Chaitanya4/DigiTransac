@@ -412,6 +412,245 @@ public class AuthServiceTests
 
     #endregion
 
+    #region UpdateNameAsync Tests
+
+    [Fact]
+    public async Task UpdateNameAsync_WithValidName_ShouldReturnSuccess()
+    {
+        // Arrange
+        var userId = "user-123";
+        var newName = "Updated Name";
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            FullName = "Original Name"
+        };
+
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user);
+        _userRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<User>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.UpdateNameAsync(userId, newName);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Message.Should().Contain("updated successfully");
+        _userRepositoryMock.Verify(x => x.UpdateAsync(It.Is<User>(u => u.FullName == newName)), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateNameAsync_WithEmptyName_ShouldReturnFailure()
+    {
+        // Act
+        var result = await _authService.UpdateNameAsync("user-123", "");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("empty");
+    }
+
+    [Fact]
+    public async Task UpdateNameAsync_WithNonExistentUser_ShouldReturnFailure()
+    {
+        // Arrange
+        var userId = "nonexistent";
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.UpdateNameAsync(userId, "New Name");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("not found");
+    }
+
+    #endregion
+
+    #region SendEmailChangeCodeAsync Tests
+
+    [Fact]
+    public async Task SendEmailChangeCodeAsync_WithValidEmail_ShouldReturnSuccess()
+    {
+        // Arrange
+        var userId = "user-123";
+        var newEmail = "newemail@example.com";
+        var user = new User
+        {
+            Id = userId,
+            Email = "oldemail@example.com",
+            FullName = "Test User"
+        };
+
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user);
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync(newEmail))
+            .ReturnsAsync((User?)null);
+        _emailVerificationRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<EmailVerification>()))
+            .ReturnsAsync((EmailVerification v) => v);
+        _emailServiceMock.Setup(x => x.SendVerificationCodeAsync(newEmail, It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.SendEmailChangeCodeAsync(userId, newEmail);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Message.Should().Contain("Verification code sent");
+        _emailServiceMock.Verify(x => x.SendVerificationCodeAsync(newEmail, It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendEmailChangeCodeAsync_WithSameEmail_ShouldReturnFailure()
+    {
+        // Arrange
+        var userId = "user-123";
+        var email = "same@example.com";
+        var user = new User
+        {
+            Id = userId,
+            Email = email,
+            FullName = "Test User"
+        };
+
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.SendEmailChangeCodeAsync(userId, email);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("same as current");
+    }
+
+    [Fact]
+    public async Task SendEmailChangeCodeAsync_WithEmailInUse_ShouldReturnFailure()
+    {
+        // Arrange
+        var userId = "user-123";
+        var newEmail = "taken@example.com";
+        var user = new User
+        {
+            Id = userId,
+            Email = "current@example.com",
+            FullName = "Test User"
+        };
+        var existingUser = new User
+        {
+            Id = "other-user",
+            Email = newEmail
+        };
+
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user);
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync(newEmail))
+            .ReturnsAsync(existingUser);
+
+        // Act
+        var result = await _authService.SendEmailChangeCodeAsync(userId, newEmail);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("already in use");
+    }
+
+    #endregion
+
+    #region VerifyAndUpdateEmailAsync Tests
+
+    [Fact]
+    public async Task VerifyAndUpdateEmailAsync_WithValidCode_ShouldReturnSuccess()
+    {
+        // Arrange
+        var userId = "user-123";
+        var newEmail = "newemail@example.com";
+        var code = "123456";
+        var user = new User
+        {
+            Id = userId,
+            Email = "oldemail@example.com",
+            FullName = "Test User"
+        };
+        var verification = new EmailVerification
+        {
+            Email = newEmail,
+            Code = code,
+            Purpose = VerificationPurpose.EmailChange,
+            UserId = userId,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        };
+
+        _emailVerificationRepositoryMock.Setup(x => x.GetByEmailAndCodeAsync(newEmail, code, VerificationPurpose.EmailChange))
+            .ReturnsAsync(verification);
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync(newEmail))
+            .ReturnsAsync((User?)null);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user);
+        _userRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<User>()))
+            .Returns(Task.CompletedTask);
+        _emailVerificationRepositoryMock.Setup(x => x.DeleteByEmailAsync(newEmail, VerificationPurpose.EmailChange))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.VerifyAndUpdateEmailAsync(userId, newEmail, code);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Message.Should().Contain("updated successfully");
+        _userRepositoryMock.Verify(x => x.UpdateAsync(It.Is<User>(u => u.Email == newEmail)), Times.Once);
+    }
+
+    [Fact]
+    public async Task VerifyAndUpdateEmailAsync_WithInvalidCode_ShouldReturnFailure()
+    {
+        // Arrange
+        var userId = "user-123";
+        var newEmail = "newemail@example.com";
+
+        _emailVerificationRepositoryMock.Setup(x => x.GetByEmailAndCodeAsync(newEmail, "wrongcode", VerificationPurpose.EmailChange))
+            .ReturnsAsync((EmailVerification?)null);
+
+        // Act
+        var result = await _authService.VerifyAndUpdateEmailAsync(userId, newEmail, "wrongcode");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("Invalid or expired");
+    }
+
+    [Fact]
+    public async Task VerifyAndUpdateEmailAsync_WithDifferentUserId_ShouldReturnFailure()
+    {
+        // Arrange
+        var userId = "user-123";
+        var newEmail = "newemail@example.com";
+        var code = "123456";
+        var verification = new EmailVerification
+        {
+            Email = newEmail,
+            Code = code,
+            Purpose = VerificationPurpose.EmailChange,
+            UserId = "different-user", // Different user
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        };
+
+        _emailVerificationRepositoryMock.Setup(x => x.GetByEmailAndCodeAsync(newEmail, code, VerificationPurpose.EmailChange))
+            .ReturnsAsync(verification);
+
+        // Act
+        var result = await _authService.VerifyAndUpdateEmailAsync(userId, newEmail, code);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("Invalid or expired");
+    }
+
+    #endregion
+
     #region Password Reset Tests
 
     [Fact]

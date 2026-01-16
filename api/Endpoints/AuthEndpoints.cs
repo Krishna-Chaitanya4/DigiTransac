@@ -210,6 +210,90 @@ public static class AuthEndpoints
         .Produces<ErrorResponse>(400)
         .Produces(401);
 
+        // Update name
+        group.MapPut("/profile/name", [Authorize] async ([FromBody] UpdateNameRequest request, ClaimsPrincipal user, IAuthService authService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.FullName))
+            {
+                return Results.BadRequest(new ErrorResponse("Name is required"));
+            }
+
+            var (success, message) = await authService.UpdateNameAsync(userId, request.FullName);
+            
+            if (!success)
+            {
+                return Results.BadRequest(new ErrorResponse(message));
+            }
+
+            return Results.Ok(new { message });
+        })
+        .WithName("UpdateName")
+        .Produces(200)
+        .Produces<ErrorResponse>(400)
+        .Produces(401);
+
+        // Send email change verification code
+        group.MapPost("/profile/email/send-code", [Authorize] async ([FromBody] UpdateEmailRequest request, ClaimsPrincipal user, IAuthService authService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.NewEmail))
+            {
+                return Results.BadRequest(new ErrorResponse("New email is required"));
+            }
+
+            var (success, message) = await authService.SendEmailChangeCodeAsync(userId, request.NewEmail);
+            
+            if (!success)
+            {
+                return Results.BadRequest(new ErrorResponse(message));
+            }
+
+            return Results.Ok(new { message });
+        })
+        .WithName("SendEmailChangeCode")
+        .Produces(200)
+        .Produces<ErrorResponse>(400)
+        .Produces(401);
+
+        // Verify and update email
+        group.MapPost("/profile/email/verify", [Authorize] async ([FromBody] VerifyEmailChangeRequest request, ClaimsPrincipal user, IAuthService authService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.NewEmail) || string.IsNullOrWhiteSpace(request.Code))
+            {
+                return Results.BadRequest(new ErrorResponse("New email and verification code are required"));
+            }
+
+            var (success, message) = await authService.VerifyAndUpdateEmailAsync(userId, request.NewEmail, request.Code);
+            
+            if (!success)
+            {
+                return Results.BadRequest(new ErrorResponse(message));
+            }
+
+            return Results.Ok(new { message });
+        })
+        .WithName("VerifyEmailChange")
+        .Produces(200)
+        .Produces<ErrorResponse>(400)
+        .Produces(401);
+
         // Forgot password - Step 1: Send reset code
         group.MapPost("/forgot-password", async (ForgotPasswordRequest request, IAuthService authService) =>
         {

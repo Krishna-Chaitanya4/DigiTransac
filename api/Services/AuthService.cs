@@ -30,6 +30,9 @@ public interface IAuthService
     
     // Account management
     Task<(bool Success, string Message)> DeleteAccountAsync(string userId, string password);
+    Task<(bool Success, string Message)> UpdateNameAsync(string userId, string newName);
+    Task<(bool Success, string Message)> SendEmailChangeCodeAsync(string userId, string newEmail);
+    Task<(bool Success, string Message)> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code);
     
     // Forgot password flow
     Task<(bool Success, string Message)> SendPasswordResetCodeAsync(string email);
@@ -252,6 +255,127 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("Account deleted successfully: {Email}", userEmail);
         return (true, "Account deleted successfully");
+    }
+
+    public async Task<(bool Success, string Message)> UpdateNameAsync(string userId, string newName)
+    {
+        _logger.LogInformation("Update name request for UserId: {UserId}", userId);
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return (false, "Name cannot be empty");
+        }
+
+        if (newName.Length < 2 || newName.Length > 100)
+        {
+            return (false, "Name must be between 2 and 100 characters");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            _logger.LogWarning("Update name failed - user not found: {UserId}", userId);
+            return (false, "User not found");
+        }
+
+        user.FullName = newName.Trim();
+        await _userRepository.UpdateAsync(user);
+
+        _logger.LogInformation("Name updated successfully for UserId: {UserId}", userId);
+        return (true, "Name updated successfully");
+    }
+
+    public async Task<(bool Success, string Message)> SendEmailChangeCodeAsync(string userId, string newEmail)
+    {
+        _logger.LogInformation("Email change request for UserId: {UserId} to {NewEmail}", userId, newEmail);
+
+        if (!IsValidEmail(newEmail))
+        {
+            return (false, "Invalid email format");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            _logger.LogWarning("Email change failed - user not found: {UserId}", userId);
+            return (false, "User not found");
+        }
+
+        var normalizedNewEmail = newEmail.ToLowerInvariant();
+
+        // Check if new email is same as current
+        if (user.Email == normalizedNewEmail)
+        {
+            return (false, "New email is the same as current email");
+        }
+
+        // Check if email is already taken by another user
+        var existingUser = await _userRepository.GetByEmailAsync(normalizedNewEmail);
+        if (existingUser != null)
+        {
+            _logger.LogWarning("Email change failed - email already in use: {NewEmail}", normalizedNewEmail);
+            return (false, "Email is already in use");
+        }
+
+        // Generate and send verification code
+        var code = GenerateVerificationCode();
+        
+        // Store verification with EmailChange purpose
+        var verification = new EmailVerification
+        {
+            Email = normalizedNewEmail,
+            Code = code,
+            Purpose = VerificationPurpose.EmailChange,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            UserId = userId // Store the user ID for verification
+        };
+
+        await _emailVerificationRepository.CreateAsync(verification);
+
+        // Send verification email to the NEW email
+        await _emailService.SendVerificationCodeAsync(normalizedNewEmail, code);
+
+        _logger.LogInformation("Email change verification code sent to {NewEmail}", normalizedNewEmail);
+        return (true, "Verification code sent to your new email address");
+    }
+
+    public async Task<(bool Success, string Message)> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code)
+    {
+        _logger.LogInformation("Verifying email change for UserId: {UserId}", userId);
+
+        var normalizedNewEmail = newEmail.ToLowerInvariant();
+
+        // Find the verification record
+        var verification = await _emailVerificationRepository.GetByEmailAndCodeAsync(normalizedNewEmail, code, VerificationPurpose.EmailChange);
+        
+        if (verification == null || verification.ExpiresAt < DateTime.UtcNow || verification.UserId != userId)
+        {
+            _logger.LogWarning("Invalid or expired email change code for {NewEmail}", normalizedNewEmail);
+            return (false, "Invalid or expired verification code");
+        }
+
+        // Verify email isn't taken (double-check)
+        var existingUser = await _userRepository.GetByEmailAsync(normalizedNewEmail);
+        if (existingUser != null)
+        {
+            return (false, "Email is already in use");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        var oldEmail = user.Email;
+        user.Email = normalizedNewEmail;
+        await _userRepository.UpdateAsync(user);
+
+        // Clean up verification record
+        await _emailVerificationRepository.DeleteByEmailAsync(normalizedNewEmail, VerificationPurpose.EmailChange);
+
+        _logger.LogInformation("Email changed successfully from {OldEmail} to {NewEmail}", oldEmail, normalizedNewEmail);
+        return (true, "Email updated successfully");
     }
 
     public async Task<(bool Success, string Message)> SendPasswordResetCodeAsync(string email)

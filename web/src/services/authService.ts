@@ -120,6 +120,43 @@ export async function deleteAccount(token: string, password: string): Promise<{ 
   return handleResponse<{ message: string }>(response);
 }
 
+// Profile update
+export async function updateName(token: string, fullName: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/profile/name`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ fullName }),
+  });
+  return handleResponse<{ message: string }>(response);
+}
+
+export async function sendEmailChangeCode(token: string, newEmail: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/profile/email/send-code`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ newEmail }),
+  });
+  return handleResponse<{ message: string }>(response);
+}
+
+export async function verifyEmailChange(token: string, newEmail: string, code: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/profile/email/verify`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ newEmail, code }),
+  });
+  return handleResponse<{ message: string }>(response);
+}
+
 // Forgot password flow
 export async function sendPasswordResetCode(email: string): Promise<VerificationResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/forgot-password`, {
