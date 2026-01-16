@@ -361,4 +361,181 @@ describe('AuthContext', () => {
       expect(returnedToken).toBeNull();
     });
   });
+
+  // Profile Update Tests
+  describe('Profile Update', () => {
+    const setupAuthenticatedUser = () => {
+      const validPayload = { sub: 'user-123', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
+      const validToken = `header.${btoa(JSON.stringify(validPayload))}.signature`;
+      const storedUser = { email: 'test@example.com', fullName: 'Test User', isEmailVerified: true };
+      
+      localStorage.setItem('digitransac_access_token', validToken);
+      localStorage.setItem('digitransac_refresh_token', 'valid-refresh-token');
+      localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
+    };
+
+    it('should update name and update local state', async () => {
+      setupAuthenticatedUser();
+      vi.mocked(authService.updateName).mockResolvedValue({ message: 'Name updated' });
+
+      function TestConsumerWithUpdateName() {
+        const { user, updateName } = useAuth();
+        return (
+          <div>
+            <span data-testid="fullName">{user?.fullName || 'no-name'}</span>
+            <button onClick={() => updateName('New Name')}>Update Name</button>
+          </div>
+        );
+      }
+
+      render(
+        <AuthProvider>
+          <TestConsumerWithUpdateName />
+        </AuthProvider>
+      );
+
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('fullName')).toHaveTextContent('Test User');
+      });
+
+      await user.click(screen.getByText('Update Name'));
+
+      await waitFor(() => {
+        expect(authService.updateName).toHaveBeenCalled();
+        expect(screen.getByTestId('fullName')).toHaveTextContent('New Name');
+      });
+
+      // Verify localStorage was updated
+      const storedUser = JSON.parse(localStorage.getItem('digitransac_user') || '{}');
+      expect(storedUser.fullName).toBe('New Name');
+    });
+
+    it('should throw error when updating name without authentication', async () => {
+      let thrownError: Error | null = null;
+
+      function TestConsumerWithUpdateName() {
+        const { updateName } = useAuth();
+        return (
+          <button onClick={async () => {
+            try {
+              await updateName('New Name');
+            } catch (err) {
+              thrownError = err as Error;
+            }
+          }}>Update Name</button>
+        );
+      }
+
+      render(
+        <AuthProvider>
+          <TestConsumerWithUpdateName />
+        </AuthProvider>
+      );
+
+      const user = userEvent.setup();
+      await user.click(screen.getByText('Update Name'));
+
+      await waitFor(() => {
+        expect(thrownError?.message).toBe('Not authenticated');
+      });
+    });
+
+    it('should send email change code', async () => {
+      setupAuthenticatedUser();
+      vi.mocked(authService.sendEmailChangeCode).mockResolvedValue({ message: 'Code sent' });
+
+      function TestConsumerWithEmailChange() {
+        const { sendEmailChangeCode } = useAuth();
+        return (
+          <button onClick={() => sendEmailChangeCode('new@example.com')}>Send Code</button>
+        );
+      }
+
+      render(
+        <AuthProvider>
+          <TestConsumerWithEmailChange />
+        </AuthProvider>
+      );
+
+      const user = userEvent.setup();
+      await user.click(screen.getByText('Send Code'));
+
+      await waitFor(() => {
+        expect(authService.sendEmailChangeCode).toHaveBeenCalled();
+        expect(vi.mocked(authService.sendEmailChangeCode).mock.calls[0][1]).toBe('new@example.com');
+      });
+    });
+
+    it('should verify email change and update local state', async () => {
+      setupAuthenticatedUser();
+      vi.mocked(authService.verifyEmailChange).mockResolvedValue({ message: 'Email updated' });
+
+      function TestConsumerWithEmailVerify() {
+        const { user, verifyEmailChange } = useAuth();
+        return (
+          <div>
+            <span data-testid="email">{user?.email || 'no-email'}</span>
+            <button onClick={() => verifyEmailChange('new@example.com', '123456')}>Verify</button>
+          </div>
+        );
+      }
+
+      render(
+        <AuthProvider>
+          <TestConsumerWithEmailVerify />
+        </AuthProvider>
+      );
+
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('email')).toHaveTextContent('test@example.com');
+      });
+
+      await user.click(screen.getByText('Verify'));
+
+      await waitFor(() => {
+        expect(authService.verifyEmailChange).toHaveBeenCalled();
+        expect(vi.mocked(authService.verifyEmailChange).mock.calls[0][1]).toBe('new@example.com');
+        expect(vi.mocked(authService.verifyEmailChange).mock.calls[0][2]).toBe('123456');
+        expect(screen.getByTestId('email')).toHaveTextContent('new@example.com');
+      });
+
+      // Verify localStorage was updated
+      const storedUser = JSON.parse(localStorage.getItem('digitransac_user') || '{}');
+      expect(storedUser.email).toBe('new@example.com');
+    });
+
+    it('should throw error when verifying email without authentication', async () => {
+      let thrownError: Error | null = null;
+
+      function TestConsumerWithEmailVerify() {
+        const { verifyEmailChange } = useAuth();
+        return (
+          <button onClick={async () => {
+            try {
+              await verifyEmailChange('new@example.com', '123456');
+            } catch (err) {
+              thrownError = err as Error;
+            }
+          }}>Verify</button>
+        );
+      }
+
+      render(
+        <AuthProvider>
+          <TestConsumerWithEmailVerify />
+        </AuthProvider>
+      );
+
+      const user = userEvent.setup();
+      await user.click(screen.getByText('Verify'));
+
+      await waitFor(() => {
+        expect(thrownError?.message).toBe('Not authenticated');
+      });
+    });
+  });
 });
