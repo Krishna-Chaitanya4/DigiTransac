@@ -6,7 +6,6 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import TransactionsPage from './pages/TransactionsPage';
 import AccountsPage from './pages/AccountsPage';
-import AssetsPage from './pages/AssetsPage';
 import LabelsPage from './pages/LabelsPage';
 import InsightsPage from './pages/InsightsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -35,7 +34,6 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
-        <Route path="/assets" element={<AssetsPage />} />
         <Route path="/labels" element={<LabelsPage />} />
         <Route path="/insights" element={<InsightsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
