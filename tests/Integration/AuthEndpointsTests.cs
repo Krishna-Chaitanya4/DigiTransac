@@ -107,7 +107,8 @@ public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory
         var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
         result.Should().NotBeNull();
         result!.Email.Should().Be(user.Email);
-        result.Token.Should().NotBeNullOrEmpty();
+        result.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -188,7 +189,7 @@ public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory
 
         // Act - Use the token to access protected endpoint
         _client.DefaultRequestHeaders.Authorization = 
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.Token);
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
         var response = await _client.GetAsync("/api/auth/me");
 
         // Assert

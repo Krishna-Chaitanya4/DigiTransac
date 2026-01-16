@@ -9,12 +9,12 @@ vi.mock('../services/authService');
 
 // Test component to access auth context
 function TestConsumer() {
-  const { user, token, isLoading, login, logout } = useAuth();
+  const { user, accessToken, isLoading, login, logout } = useAuth();
   return (
     <div>
       <span data-testid="loading">{isLoading ? 'loading' : 'ready'}</span>
       <span data-testid="user">{user ? user.email : 'no-user'}</span>
-      <span data-testid="token">{token || 'no-token'}</span>
+      <span data-testid="token">{accessToken || 'no-token'}</span>
       <button onClick={() => login('test@example.com', 'password123')}>Login</button>
       <button onClick={logout}>Logout</button>
     </div>
@@ -69,7 +69,8 @@ describe('AuthContext', () => {
 
   it('should restore user from localStorage on mount', async () => {
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
-    localStorage.setItem('digitransac_token', 'stored-token');
+    localStorage.setItem('digitransac_access_token', 'stored-token');
+    localStorage.setItem('digitransac_refresh_token', 'stored-refresh-token');
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     render(
@@ -87,7 +88,8 @@ describe('AuthContext', () => {
   it('should login successfully and store credentials', async () => {
     const user = userEvent.setup();
     const mockResponse = {
-      token: 'new-jwt-token',
+      accessToken: 'new-jwt-token',
+      refreshToken: 'new-refresh-token',
       email: 'test@example.com',
       fullName: 'Test User',
       isEmailVerified: true,
@@ -112,15 +114,20 @@ describe('AuthContext', () => {
     });
 
     // Verify localStorage was updated
-    expect(localStorage.getItem('digitransac_token')).toBe('new-jwt-token');
+    expect(localStorage.getItem('digitransac_access_token')).toBe('new-jwt-token');
+    expect(localStorage.getItem('digitransac_refresh_token')).toBe('new-refresh-token');
     expect(JSON.parse(localStorage.getItem('digitransac_user')!).email).toBe('test@example.com');
   });
 
   it('should logout and clear credentials', async () => {
     const user = userEvent.setup();
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
-    localStorage.setItem('digitransac_token', 'stored-token');
+    localStorage.setItem('digitransac_access_token', 'stored-token');
+    localStorage.setItem('digitransac_refresh_token', 'stored-refresh-token');
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
+
+    // Mock the revokeToken call
+    vi.mocked(authService.revokeToken).mockResolvedValue({ message: 'Token revoked' });
 
     render(
       <AuthProvider>
@@ -140,7 +147,8 @@ describe('AuthContext', () => {
     });
 
     // Verify localStorage was cleared
-    expect(localStorage.getItem('digitransac_token')).toBeNull();
+    expect(localStorage.getItem('digitransac_access_token')).toBeNull();
+    expect(localStorage.getItem('digitransac_refresh_token')).toBeNull();
     expect(localStorage.getItem('digitransac_user')).toBeNull();
   });
 });

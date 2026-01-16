@@ -103,6 +103,64 @@ public static class AuthEndpoints
         .Produces<ErrorResponse>(400)
         .Produces(401);
 
+        // Refresh access token
+        group.MapPost("/refresh-token", async (RefreshTokenRequest request, IAuthService authService) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return Results.BadRequest(new ErrorResponse("Refresh token is required"));
+            }
+
+            var result = await authService.RefreshTokenAsync(request.RefreshToken);
+            if (result == null)
+            {
+                return Results.Unauthorized();
+            }
+
+            return Results.Ok(result);
+        })
+        .WithName("RefreshToken")
+        .Produces<AuthResponse>(200)
+        .Produces<ErrorResponse>(400)
+        .Produces(401);
+
+        // Revoke refresh token (logout from specific device)
+        group.MapPost("/revoke-token", [Authorize] async (RefreshTokenRequest request, IAuthService authService) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return Results.BadRequest(new ErrorResponse("Refresh token is required"));
+            }
+
+            var revoked = await authService.RevokeTokenAsync(request.RefreshToken);
+            if (!revoked)
+            {
+                return Results.BadRequest(new ErrorResponse("Token not found or already revoked"));
+            }
+
+            return Results.Ok(new { message = "Token revoked successfully" });
+        })
+        .WithName("RevokeToken")
+        .Produces(200)
+        .Produces<ErrorResponse>(400)
+        .Produces(401);
+
+        // Revoke all refresh tokens (logout from all devices)
+        group.MapPost("/revoke-all-tokens", [Authorize] async (ClaimsPrincipal user, IAuthService authService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
+            {
+                return Results.Unauthorized();
+            }
+
+            await authService.RevokeAllUserTokensAsync(userId);
+            return Results.Ok(new { message = "All tokens revoked successfully" });
+        })
+        .WithName("RevokeAllTokens")
+        .Produces(200)
+        .Produces(401);
+
         // Get current user
         group.MapGet("/me", [Authorize] async (ClaimsPrincipal user, IAuthService authService) =>
         {

@@ -2,12 +2,18 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function DashboardPage() {
-  const { user, logout, deleteAccount } = useAuth();
+  const { user, logout, logoutAll, deleteAccount } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  const handleLogoutAll = async () => {
+    setIsLoggingOutAll(true);
+    await logoutAll();
+  };
 
   const handleDeleteAccount = async () => {
     if (!deletePassword) {
@@ -67,7 +73,20 @@ export default function DashboardPage() {
           {/* Account Settings Section */}
           <div className="mt-8 bg-white shadow-sm rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Account Settings</h3>
-            <div className="border-t border-gray-200 pt-4">
+            <div className="border-t border-gray-200 pt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Sign out from all devices</p>
+                  <p className="text-sm text-gray-500">This will sign you out everywhere</p>
+                </div>
+                <button
+                  onClick={handleLogoutAll}
+                  disabled={isLoggingOutAll}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  {isLoggingOutAll ? 'Signing out...' : 'Sign out everywhere'}
+                </button>
+              </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-red-600">Delete Account</p>

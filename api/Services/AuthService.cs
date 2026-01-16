@@ -23,6 +23,11 @@ public interface IAuthService
     Task<AuthResponse?> LoginAsync(LoginRequest request);
     Task<User?> GetCurrentUserAsync(string userId);
     
+    // Token refresh
+    Task<AuthResponse?> RefreshTokenAsync(string refreshToken);
+    Task<bool> RevokeTokenAsync(string refreshToken);
+    Task RevokeAllUserTokensAsync(string userId);
+    
     // Account management
     Task<(bool Success, string Message)> DeleteAccountAsync(string userId, string password);
     
@@ -36,6 +41,7 @@ public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IEmailVerificationRepository _emailVerificationRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IEmailService _emailService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
@@ -43,12 +49,14 @@ public class AuthService : IAuthService
     public AuthService(
         IUserRepository userRepository,
         IEmailVerificationRepository emailVerificationRepository,
+        IRefreshTokenRepository refreshTokenRepository,
         IEmailService emailService,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _emailVerificationRepository = emailVerificationRepository;
+        _refreshTokenRepository = refreshTokenRepository;
         _emailService = emailService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
@@ -167,8 +175,10 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User registered successfully: {Email}, UserId: {UserId}", user.Email, user.Id);
 
-        var token = GenerateJwtToken(user);
-        return new AuthResponse(token, user.Email, user.FullName, user.IsEmailVerified);
+        var accessToken = GenerateJwtToken(user);
+        var refreshToken = await GenerateRefreshTokenAsync(user.Id);
+        
+        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
     }
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request)
@@ -184,8 +194,10 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in successfully: {Email}, UserId: {UserId}", user.Email, user.Id);
 
-        var token = GenerateJwtToken(user);
-        return new AuthResponse(token, user.Email, user.FullName, user.IsEmailVerified);
+        var accessToken = GenerateJwtToken(user);
+        var refreshToken = await GenerateRefreshTokenAsync(user.Id);
+        
+        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
     }
 
     public async Task<User?> GetCurrentUserAsync(string userId)
@@ -331,6 +343,87 @@ public class AuthService : IAuthService
         return (true, "Password reset successfully");
     }
 
+    public async Task<AuthResponse?> RefreshTokenAsync(string refreshToken)
+    {
+        _logger.LogInformation("Token refresh attempt");
+
+        var storedToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
+        
+        if (storedToken == null)
+        {
+            _logger.LogWarning("Refresh token not found");
+            return null;
+        }
+
+        if (!storedToken.IsActive)
+        {
+            _logger.LogWarning("Refresh token is no longer active for UserId: {UserId}", storedToken.UserId);
+            
+            // If token was revoked, revoke all tokens for this user (potential token theft)
+            if (storedToken.IsRevoked)
+            {
+                await _refreshTokenRepository.RevokeAllByUserIdAsync(storedToken.UserId);
+                _logger.LogWarning("Potential token theft detected. All tokens revoked for UserId: {UserId}", storedToken.UserId);
+            }
+            
+            return null;
+        }
+
+        var user = await _userRepository.GetByIdAsync(storedToken.UserId);
+        if (user == null)
+        {
+            _logger.LogWarning("User not found for refresh token: {UserId}", storedToken.UserId);
+            return null;
+        }
+
+        // Rotate refresh token (revoke old, create new)
+        storedToken.RevokedAt = DateTime.UtcNow;
+        var newRefreshToken = await GenerateRefreshTokenAsync(user.Id);
+        storedToken.ReplacedByToken = newRefreshToken.Token;
+        await _refreshTokenRepository.UpdateAsync(storedToken);
+
+        var accessToken = GenerateJwtToken(user);
+
+        _logger.LogInformation("Token refreshed successfully for UserId: {UserId}", user.Id);
+        return new AuthResponse(accessToken, newRefreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+    }
+
+    public async Task<bool> RevokeTokenAsync(string refreshToken)
+    {
+        var storedToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
+        
+        if (storedToken == null || !storedToken.IsActive)
+        {
+            return false;
+        }
+
+        storedToken.RevokedAt = DateTime.UtcNow;
+        await _refreshTokenRepository.UpdateAsync(storedToken);
+        
+        _logger.LogInformation("Refresh token revoked for UserId: {UserId}", storedToken.UserId);
+        return true;
+    }
+
+    public async Task RevokeAllUserTokensAsync(string userId)
+    {
+        await _refreshTokenRepository.RevokeAllByUserIdAsync(userId);
+        _logger.LogInformation("All refresh tokens revoked for UserId: {UserId}", userId);
+    }
+
+    private async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, string? deviceInfo = null)
+    {
+        var refreshToken = new RefreshToken
+        {
+            UserId = userId,
+            Token = GenerateSecureToken(),
+            ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpireDays),
+            DeviceInfo = deviceInfo
+        };
+
+        await _refreshTokenRepository.CreateAsync(refreshToken);
+        return refreshToken;
+    }
+
     private string GenerateJwtToken(User user)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
@@ -348,7 +441,7 @@ public class AuthService : IAuthService
             issuer: _jwtSettings.Issuer,
             audience: _jwtSettings.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpireMinutes),
+            expires: DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpireMinutes),
             signingCredentials: credentials
         );
 

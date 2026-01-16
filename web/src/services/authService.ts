@@ -153,3 +153,39 @@ export async function resetPassword(email: string, verificationToken: string, ne
   });
   return handleResponse<{ message: string }>(response);
 }
+
+// Refresh access token
+export async function refreshToken(refreshTokenValue: string): Promise<AuthResponse> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/refresh-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refreshToken: refreshTokenValue }),
+  });
+  return handleResponse<AuthResponse>(response);
+}
+
+// Revoke refresh token (logout from current device)
+export async function revokeToken(accessToken: string, refreshTokenValue: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/revoke-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ refreshToken: refreshTokenValue }),
+  });
+  return handleResponse<{ message: string }>(response);
+}
+
+// Revoke all refresh tokens (logout from all devices)
+export async function revokeAllTokens(accessToken: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/revoke-all-tokens`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+  return handleResponse<{ message: string }>(response);
+}

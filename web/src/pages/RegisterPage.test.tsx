@@ -222,7 +222,8 @@ describe('RegisterPage', () => {
     it('should complete registration successfully', async () => {
       const user = await goToCompleteStep();
       vi.mocked(authService.completeRegistration).mockResolvedValue({
-        token: 'jwt-token',
+        accessToken: 'jwt-token',
+        refreshToken: 'refresh-token',
         email: 'test@example.com',
         fullName: 'Test User',
         isEmailVerified: true,

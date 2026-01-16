@@ -63,7 +63,8 @@ describe('LoginPage', () => {
   it('should submit form and navigate on successful login', async () => {
     const user = userEvent.setup();
     const mockResponse = {
-      token: 'jwt-token',
+      accessToken: 'jwt-token',
+      refreshToken: 'refresh-token',
       email: 'test@example.com',
       fullName: 'Test User',
       isEmailVerified: true,
@@ -124,7 +125,8 @@ describe('LoginPage', () => {
 
     // Resolve the login
     resolveLogin!({
-      token: 'jwt-token',
+      accessToken: 'jwt-token',
+      refreshToken: 'refresh-token',
       email: 'test@example.com',
       fullName: 'Test User',
       isEmailVerified: true,

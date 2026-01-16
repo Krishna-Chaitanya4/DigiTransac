@@ -19,6 +19,7 @@ builder.Services.AddSingleton(emailSettings);
 // Add repositories
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<IEmailVerificationRepository, EmailVerificationRepository>();
+builder.Services.AddSingleton<IRefreshTokenRepository, RefreshTokenRepository>();
 
 // Add services
 builder.Services.AddSingleton<IEmailService, GmailEmailService>();

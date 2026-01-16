@@ -14,6 +14,7 @@ public class AuthServiceTests
 {
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IEmailVerificationRepository> _emailVerificationRepositoryMock;
+    private readonly Mock<IRefreshTokenRepository> _refreshTokenRepositoryMock;
     private readonly Mock<IEmailService> _emailServiceMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
@@ -23,6 +24,7 @@ public class AuthServiceTests
     {
         _userRepositoryMock = new Mock<IUserRepository>();
         _emailVerificationRepositoryMock = new Mock<IEmailVerificationRepository>();
+        _refreshTokenRepositoryMock = new Mock<IRefreshTokenRepository>();
         _emailServiceMock = new Mock<IEmailService>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
@@ -30,12 +32,18 @@ public class AuthServiceTests
             Key = "super-secret-key-for-testing-at-least-32-characters-long",
             Issuer = "DigiTransac-Test",
             Audience = "DigiTransac-Test-Users",
-            ExpireMinutes = 60
+            AccessTokenExpireMinutes = 15,
+            RefreshTokenExpireDays = 7
         });
+
+        // Setup refresh token repository to return the token passed to it
+        _refreshTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<RefreshToken>()))
+            .ReturnsAsync((RefreshToken t) => t);
 
         _authService = new AuthService(
             _userRepositoryMock.Object,
             _emailVerificationRepositoryMock.Object,
+            _refreshTokenRepositoryMock.Object,
             _emailServiceMock.Object,
             _jwtSettings,
             _loggerMock.Object
@@ -186,7 +194,8 @@ public class AuthServiceTests
         result.Should().NotBeNull();
         result!.Email.Should().Be(request.Email);
         result.FullName.Should().Be(request.FullName);
-        result.Token.Should().NotBeNullOrEmpty();
+        result.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
         result.IsEmailVerified.Should().BeTrue();
     }
 
@@ -274,7 +283,8 @@ public class AuthServiceTests
         result.Should().NotBeNull();
         result!.Email.Should().Be(user.Email);
         result.FullName.Should().Be(user.FullName);
-        result.Token.Should().NotBeNullOrEmpty();
+        result.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
