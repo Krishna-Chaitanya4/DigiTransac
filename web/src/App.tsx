@@ -5,7 +5,10 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import TransactionsPage from './pages/TransactionsPage';
-import CategoriesPage from './pages/CategoriesPage';
+import AccountsPage from './pages/AccountsPage';
+import AssetsPage from './pages/AssetsPage';
+import LabelsPage from './pages/LabelsPage';
+import InsightsPage from './pages/InsightsPage';
 import SettingsPage from './pages/SettingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -31,7 +34,10 @@ function App() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
-        <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/accounts" element={<AccountsPage />} />
+        <Route path="/assets" element={<AssetsPage />} />
+        <Route path="/labels" element={<LabelsPage />} />
+        <Route path="/insights" element={<InsightsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

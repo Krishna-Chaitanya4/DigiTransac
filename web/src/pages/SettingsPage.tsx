@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function SettingsPage() {
-  const { user, logout, logoutAll, deleteAccount, updateName, sendEmailChangeCode, verifyEmailChange } = useAuth();
+  const { user, logoutAll, deleteAccount, updateName, sendEmailChangeCode, verifyEmailChange } = useAuth();
   
   // Name editing state
   const [isEditingName, setIsEditingName] = useState(false);
