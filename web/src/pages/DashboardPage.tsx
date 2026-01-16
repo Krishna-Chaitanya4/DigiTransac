@@ -9,6 +9,7 @@ export default function DashboardPage() {
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const handleLogoutAll = async () => {
     setIsLoggingOutAll(true);
@@ -39,10 +40,14 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-indigo-600">DigiTransac</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-indigo-600">DigiTransac</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700">Welcome, {user?.fullName}</span>
+            
+            {/* Desktop navigation */}
+            <div className="hidden sm:flex items-center space-x-4">
+              <span className="text-gray-700 text-sm lg:text-base truncate max-w-[200px]">
+                Welcome, {user?.fullName}
+              </span>
               <button
                 onClick={logout}
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -50,51 +55,91 @@ export default function DashboardPage() {
                 Sign out
               </button>
             </div>
+
+            {/* Mobile menu button */}
+            <div className="flex items-center sm:hidden">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                aria-expanded="false"
+              >
+                <span className="sr-only">Open main menu</span>
+                {showMobileMenu ? (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile menu */}
+        {showMobileMenu && (
+          <div className="sm:hidden border-t border-gray-200">
+            <div className="px-4 py-3 space-y-3">
+              <div className="text-gray-700 text-sm">
+                Welcome, <span className="font-medium">{user?.fullName}</span>
+              </div>
+              <button
+                onClick={logout}
+                className="w-full text-left px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="border-4 border-dashed border-gray-200 rounded-lg h-96 flex items-center justify-center">
+      <main className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
+        <div className="py-4 sm:py-6">
+          <div className="border-4 border-dashed border-gray-200 rounded-lg min-h-[200px] sm:h-96 flex items-center justify-center p-4">
             <div className="text-center">
-              <h2 className="text-2xl font-semibold text-gray-700 mb-2">
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-2">
                 Welcome to DigiTransac!
               </h2>
-              <p className="text-gray-500">
+              <p className="text-sm sm:text-base text-gray-500">
                 Your digital transaction tracker dashboard.
               </p>
-              <p className="text-gray-400 mt-4">
+              <p className="text-sm text-gray-400 mt-4">
                 Transaction tracking features coming soon...
               </p>
             </div>
           </div>
 
           {/* Account Settings Section */}
-          <div className="mt-8 bg-white shadow-sm rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Account Settings</h3>
+          <div className="mt-6 sm:mt-8 bg-white shadow-sm rounded-lg p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">Account Settings</h3>
             <div className="border-t border-gray-200 pt-4 space-y-4">
-              <div className="flex items-center justify-between">
+              {/* Sign out everywhere */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-gray-900">Sign out from all devices</p>
-                  <p className="text-sm text-gray-500">This will sign you out everywhere</p>
+                  <p className="text-xs sm:text-sm text-gray-500">This will sign you out everywhere</p>
                 </div>
                 <button
                   onClick={handleLogoutAll}
                   disabled={isLoggingOutAll}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
                   {isLoggingOutAll ? 'Signing out...' : 'Sign out everywhere'}
                 </button>
               </div>
-              <div className="flex items-center justify-between">
+              
+              {/* Delete account */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-red-600">Delete Account</p>
-                  <p className="text-sm text-gray-500">Permanently delete your account and all data</p>
+                  <p className="text-xs sm:text-sm text-gray-500">Permanently delete your account and all data</p>
                 </div>
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="inline-flex items-center px-3 py-2 border border-red-300 text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-3 py-2 border border-red-300 text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                 >
                   Delete Account
                 </button>
@@ -106,16 +151,16 @@ export default function DashboardPage() {
 
       {/* Delete Account Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Delete Account</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="fixed inset-0 bg-gray-500/75 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-xl sm:rounded-lg w-full sm:max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Delete Account</h3>
+            <p className="text-xs sm:text-sm text-gray-500 mb-4">
               This action cannot be undone. All your data will be permanently deleted.
               Please enter your password to confirm.
             </p>
 
             {deleteError && (
-              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-sm text-sm">
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-sm text-xs sm:text-sm">
                 {deleteError}
               </div>
             )}
@@ -126,7 +171,7 @@ export default function DashboardPage() {
                 placeholder="Enter your password"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
-                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-hidden focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 sm:py-2.5 pr-10 border border-gray-300 rounded-md focus:outline-hidden focus:ring-red-500 focus:border-red-500 text-sm sm:text-base"
               />
               <button
                 type="button"
@@ -146,7 +191,7 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="flex justify-end space-x-3">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
               <button
                 onClick={() => {
                   setShowDeleteModal(false);
@@ -154,14 +199,14 @@ export default function DashboardPage() {
                   setShowDeletePassword(false);
                   setDeleteError('');
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={isDeleting}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
               >
                 {isDeleting ? 'Deleting...' : 'Delete Account'}
               </button>
