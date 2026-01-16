@@ -507,4 +507,241 @@ public class AuthServiceTests
     }
 
     #endregion
+
+    #region RefreshTokenAsync Tests
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithValidToken_ShouldReturnNewTokens()
+    {
+        // Arrange
+        var userId = "user-123";
+        var oldRefreshToken = "valid-refresh-token";
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            FullName = "Test User",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password@123"),
+            IsEmailVerified = true
+        };
+
+        var storedToken = new RefreshToken
+        {
+            Id = "token-id",
+            UserId = userId,
+            Token = oldRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(oldRefreshToken))
+            .ReturnsAsync(storedToken);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user);
+        _refreshTokenRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<RefreshToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(oldRefreshToken);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBe(oldRefreshToken); // Token rotation
+        result.Email.Should().Be(user.Email);
+        _refreshTokenRepositoryMock.Verify(x => x.CreateAsync(It.IsAny<RefreshToken>()), Times.Once);
+        _refreshTokenRepositoryMock.Verify(x => x.UpdateAsync(It.Is<RefreshToken>(t => t.RevokedAt != null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithExpiredToken_ShouldReturnNull()
+    {
+        // Arrange
+        var oldRefreshToken = "expired-refresh-token";
+        var storedToken = new RefreshToken
+        {
+            Id = "token-id",
+            UserId = "user-123",
+            Token = oldRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(-1), // Expired
+            CreatedAt = DateTime.UtcNow.AddDays(-8)
+        };
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(oldRefreshToken))
+            .ReturnsAsync(storedToken);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(oldRefreshToken);
+
+        // Assert
+        result.Should().BeNull();
+        _userRepositoryMock.Verify(x => x.GetByIdAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithRevokedToken_ShouldRevokeAllUserTokens()
+    {
+        // Arrange - Token theft detection scenario
+        var userId = "user-123";
+        var revokedRefreshToken = "revoked-refresh-token";
+        var storedToken = new RefreshToken
+        {
+            Id = "token-id",
+            UserId = userId,
+            Token = revokedRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow,
+            RevokedAt = DateTime.UtcNow.AddMinutes(-5) // Already revoked
+        };
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(revokedRefreshToken))
+            .ReturnsAsync(storedToken);
+        _refreshTokenRepositoryMock.Setup(x => x.RevokeAllByUserIdAsync(userId))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(revokedRefreshToken);
+
+        // Assert
+        result.Should().BeNull();
+        // Verify that all user tokens were revoked due to potential theft
+        _refreshTokenRepositoryMock.Verify(x => x.RevokeAllByUserIdAsync(userId), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithNonExistentToken_ShouldReturnNull()
+    {
+        // Arrange
+        var nonExistentToken = "non-existent-token";
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(nonExistentToken))
+            .ReturnsAsync((RefreshToken?)null);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(nonExistentToken);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithValidToken_ButUserNotFound_ShouldReturnNull()
+    {
+        // Arrange
+        var refreshToken = "valid-refresh-token";
+        var storedToken = new RefreshToken
+        {
+            Id = "token-id",
+            UserId = "deleted-user-123",
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(refreshToken))
+            .ReturnsAsync(storedToken);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(storedToken.UserId))
+            .ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(refreshToken);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    #endregion
+
+    #region RevokeTokenAsync Tests
+
+    [Fact]
+    public async Task RevokeTokenAsync_WithValidActiveToken_ShouldReturnTrue()
+    {
+        // Arrange
+        var refreshToken = "valid-refresh-token";
+        var storedToken = new RefreshToken
+        {
+            Id = "token-id",
+            UserId = "user-123",
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(refreshToken))
+            .ReturnsAsync(storedToken);
+        _refreshTokenRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<RefreshToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RevokeTokenAsync(refreshToken);
+
+        // Assert
+        result.Should().BeTrue();
+        _refreshTokenRepositoryMock.Verify(x => x.UpdateAsync(It.Is<RefreshToken>(t => t.RevokedAt != null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task RevokeTokenAsync_WithNonExistentToken_ShouldReturnFalse()
+    {
+        // Arrange
+        var nonExistentToken = "non-existent-token";
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(nonExistentToken))
+            .ReturnsAsync((RefreshToken?)null);
+
+        // Act
+        var result = await _authService.RevokeTokenAsync(nonExistentToken);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RevokeTokenAsync_WithAlreadyRevokedToken_ShouldReturnFalse()
+    {
+        // Arrange
+        var alreadyRevokedToken = "revoked-token";
+        var storedToken = new RefreshToken
+        {
+            Id = "token-id",
+            UserId = "user-123",
+            Token = alreadyRevokedToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow,
+            RevokedAt = DateTime.UtcNow.AddMinutes(-10)
+        };
+
+        _refreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(alreadyRevokedToken))
+            .ReturnsAsync(storedToken);
+
+        // Act
+        var result = await _authService.RevokeTokenAsync(alreadyRevokedToken);
+
+        // Assert
+        result.Should().BeFalse();
+        _refreshTokenRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<RefreshToken>()), Times.Never);
+    }
+
+    #endregion
+
+    #region RevokeAllUserTokensAsync Tests
+
+    [Fact]
+    public async Task RevokeAllUserTokensAsync_ShouldCallRepository()
+    {
+        // Arrange
+        var userId = "user-123";
+        _refreshTokenRepositoryMock.Setup(x => x.RevokeAllByUserIdAsync(userId))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _authService.RevokeAllUserTokensAsync(userId);
+
+        // Assert
+        _refreshTokenRepositoryMock.Verify(x => x.RevokeAllByUserIdAsync(userId), Times.Once);
+    }
+
+    #endregion
 }

@@ -151,4 +151,214 @@ describe('AuthContext', () => {
     expect(localStorage.getItem('digitransac_refresh_token')).toBeNull();
     expect(localStorage.getItem('digitransac_user')).toBeNull();
   });
+
+  it('should logout all sessions and clear credentials', async () => {
+    const user = userEvent.setup();
+    const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
+    localStorage.setItem('digitransac_access_token', 'stored-token');
+    localStorage.setItem('digitransac_refresh_token', 'stored-refresh-token');
+    localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
+
+    // Mock the revokeAllTokens call
+    vi.mocked(authService.revokeAllTokens).mockResolvedValue({ message: 'All tokens revoked' });
+
+    // Test component with logoutAll
+    function TestConsumerWithLogoutAll() {
+      const { user: authUser, logoutAll } = useAuth();
+      return (
+        <div>
+          <span data-testid="user">{authUser ? authUser.email : 'no-user'}</span>
+          <button onClick={logoutAll}>Logout All</button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <TestConsumerWithLogoutAll />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user')).toHaveTextContent('stored@example.com');
+    });
+
+    await user.click(screen.getByText('Logout All'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user')).toHaveTextContent('no-user');
+    });
+
+    // Verify revokeAllTokens was called
+    expect(authService.revokeAllTokens).toHaveBeenCalledWith('stored-token');
+
+    // Verify localStorage was cleared
+    expect(localStorage.getItem('digitransac_access_token')).toBeNull();
+    expect(localStorage.getItem('digitransac_refresh_token')).toBeNull();
+  });
+
+  it('should refresh access token when expired', async () => {
+    // Create an expired JWT token (exp in the past)
+    const expiredPayload = { sub: 'user-123', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) - 60 };
+    const expiredToken = `header.${btoa(JSON.stringify(expiredPayload))}.signature`;
+
+    const storedUser = { email: 'test@example.com', fullName: 'Test User', isEmailVerified: true };
+    localStorage.setItem('digitransac_access_token', expiredToken);
+    localStorage.setItem('digitransac_refresh_token', 'valid-refresh-token');
+    localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
+
+    const newTokenPayload = { sub: 'user-123', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
+    const newAccessToken = `header.${btoa(JSON.stringify(newTokenPayload))}.signature`;
+
+    vi.mocked(authService.refreshToken).mockResolvedValue({
+      accessToken: newAccessToken,
+      refreshToken: 'new-refresh-token',
+      email: 'test@example.com',
+      fullName: 'Test User',
+      isEmailVerified: true,
+    });
+
+    let validToken: string | null = null;
+
+    function TestConsumerWithGetValidToken() {
+      const { getValidAccessToken, accessToken: currentToken } = useAuth();
+      return (
+        <div>
+          <span data-testid="current-token">{currentToken || 'no-token'}</span>
+          <button onClick={async () => { validToken = await getValidAccessToken(); }}>Get Valid Token</button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <TestConsumerWithGetValidToken />
+      </AuthProvider>
+    );
+
+    const user = userEvent.setup();
+    
+    await waitFor(() => {
+      expect(screen.getByTestId('current-token')).toHaveTextContent(expiredToken);
+    });
+
+    await user.click(screen.getByText('Get Valid Token'));
+
+    await waitFor(() => {
+      expect(authService.refreshToken).toHaveBeenCalledWith('valid-refresh-token');
+    });
+
+    // Token should be refreshed
+    await waitFor(() => {
+      expect(screen.getByTestId('current-token')).toHaveTextContent(newAccessToken);
+    });
+
+    expect(validToken).toBe(newAccessToken);
+  });
+
+  it('should clear auth when refresh token fails', async () => {
+    // Create an expired JWT token
+    const expiredPayload = { sub: 'user-123', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) - 60 };
+    const expiredToken = `header.${btoa(JSON.stringify(expiredPayload))}.signature`;
+
+    const storedUser = { email: 'test@example.com', fullName: 'Test User', isEmailVerified: true };
+    localStorage.setItem('digitransac_access_token', expiredToken);
+    localStorage.setItem('digitransac_refresh_token', 'invalid-refresh-token');
+    localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
+
+    vi.mocked(authService.refreshToken).mockRejectedValue(new Error('Invalid refresh token'));
+
+    let validToken: string | null = 'should-be-null';
+
+    function TestConsumerWithGetValidToken() {
+      const { getValidAccessToken, user: authUser } = useAuth();
+      return (
+        <div>
+          <span data-testid="user">{authUser ? authUser.email : 'no-user'}</span>
+          <button onClick={async () => { validToken = await getValidAccessToken(); }}>Get Valid Token</button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <TestConsumerWithGetValidToken />
+      </AuthProvider>
+    );
+
+    const user = userEvent.setup();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user')).toHaveTextContent('test@example.com');
+    });
+
+    await user.click(screen.getByText('Get Valid Token'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user')).toHaveTextContent('no-user');
+    });
+
+    expect(validToken).toBeNull();
+    expect(localStorage.getItem('digitransac_access_token')).toBeNull();
+  });
+
+  it('should return valid token without refresh when not expired', async () => {
+    // Create a valid (non-expired) JWT token
+    const validPayload = { sub: 'user-123', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
+    const validAccessToken = `header.${btoa(JSON.stringify(validPayload))}.signature`;
+
+    const storedUser = { email: 'test@example.com', fullName: 'Test User', isEmailVerified: true };
+    localStorage.setItem('digitransac_access_token', validAccessToken);
+    localStorage.setItem('digitransac_refresh_token', 'valid-refresh-token');
+    localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
+
+    let returnedToken: string | null = null;
+
+    function TestConsumerWithGetValidToken() {
+      const { getValidAccessToken } = useAuth();
+      return (
+        <button onClick={async () => { returnedToken = await getValidAccessToken(); }}>Get Valid Token</button>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <TestConsumerWithGetValidToken />
+      </AuthProvider>
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('Get Valid Token'));
+
+    await waitFor(() => {
+      expect(returnedToken).toBe(validAccessToken);
+    });
+
+    // Refresh should NOT have been called
+    expect(authService.refreshToken).not.toHaveBeenCalled();
+  });
+
+  it('should return null when no tokens exist', async () => {
+    let returnedToken: string | null = 'should-be-null';
+
+    function TestConsumerWithGetValidToken() {
+      const { getValidAccessToken } = useAuth();
+      return (
+        <button onClick={async () => { returnedToken = await getValidAccessToken(); }}>Get Valid Token</button>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <TestConsumerWithGetValidToken />
+      </AuthProvider>
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('Get Valid Token'));
+
+    await waitFor(() => {
+      expect(returnedToken).toBeNull();
+    });
+  });
 });
