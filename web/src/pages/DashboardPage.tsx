@@ -29,7 +29,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
+      <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -39,7 +39,7 @@ export default function DashboardPage() {
               <span className="text-gray-700">Welcome, {user?.fullName}</span>
               <button
                 onClick={logout}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Sign out
               </button>
@@ -65,7 +65,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Account Settings Section */}
-          <div className="mt-8 bg-white shadow rounded-lg p-6">
+          <div className="mt-8 bg-white shadow-sm rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Account Settings</h3>
             <div className="border-t border-gray-200 pt-4">
               <div className="flex items-center justify-between">
@@ -75,7 +75,7 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="inline-flex items-center px-3 py-2 border border-red-300 text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="inline-flex items-center px-3 py-2 border border-red-300 text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                 >
                   Delete Account
                 </button>
@@ -96,7 +96,7 @@ export default function DashboardPage() {
             </p>
 
             {deleteError && (
-              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-sm text-sm">
                 {deleteError}
               </div>
             )}
@@ -107,7 +107,7 @@ export default function DashboardPage() {
                 placeholder="Enter your password"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
-                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-hidden focus:ring-red-500 focus:border-red-500"
               />
               <button
                 type="button"
