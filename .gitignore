@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+bin/
+obj/
+
+# Build outputs
+dist/
+build/
+
+# IDE
+.idea/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Environment files
+.env
+.env.local
+.env.*.local
+appsettings.Production.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Misc
+*.swp
+*.swo
