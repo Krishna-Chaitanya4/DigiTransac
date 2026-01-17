@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
-import { getLabelsTree, createLabel, updateLabel, deleteLabel } from '../services/labelService';
+import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
+import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel } from '../services/labelService';
 
 interface LabelTreeItemProps {
   label: LabelTree;
@@ -135,24 +135,53 @@ interface LabelModalProps {
   parentId: string | null;
   labelType: 'Folder' | 'Category';
   isLoading: boolean;
+  allLabels: Label[];  // For parent dropdown
 }
 
-function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelType, isLoading }: LabelModalProps) {
+function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelType, isLoading, allLabels }: LabelModalProps) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingLabel) {
       setName(editingLabel.name);
       setIcon(editingLabel.icon || '');
       setColor(editingLabel.color || '');
+      setSelectedParentId(editingLabel.parentId);
     } else {
       setName('');
       setIcon('');
       setColor('');
+      setSelectedParentId(parentId);
     }
-  }, [editingLabel, isOpen]);
+  }, [editingLabel, parentId, isOpen]);
+
+  // Get available parents (only folders, and exclude self and descendants when editing)
+  const getAvailableParents = (): Label[] => {
+    const folders = allLabels.filter(l => l.type === 'Folder');
+    
+    if (!editingLabel) {
+      return folders;
+    }
+    
+    // When editing, exclude self and descendants
+    const getDescendantIds = (parentId: string): Set<string> => {
+      const ids = new Set<string>([parentId]);
+      const children = allLabels.filter(l => l.parentId === parentId);
+      children.forEach(child => {
+        const childDescendants = getDescendantIds(child.id);
+        childDescendants.forEach(id => ids.add(id));
+      });
+      return ids;
+    };
+    
+    const excludeIds = getDescendantIds(editingLabel.id);
+    return folders.filter(f => !excludeIds.has(f.id));
+  };
+
+  const availableParents = getAvailableParents();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,13 +190,13 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
         name: name.trim(),
         icon: icon || null,
         color: color || null,
-        parentId: editingLabel.parentId,
+        parentId: selectedParentId,
       });
     } else {
       onSubmit({
         name: name.trim(),
         type: labelType,
-        parentId: parentId,
+        parentId: selectedParentId,
         icon: icon || null,
         color: color || null,
       });
@@ -203,6 +232,30 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
                   required
                   autoFocus
                 />
+              </div>
+
+              <div>
+                <label htmlFor="parent" className="block text-sm font-medium text-gray-700 mb-1">
+                  Parent Folder
+                </label>
+                <select
+                  id="parent"
+                  value={selectedParentId || ''}
+                  onChange={(e) => setSelectedParentId(e.target.value || null)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  <option value="">None (Root level)</option>
+                  {availableParents.map(parent => (
+                    <option key={parent.id} value={parent.id}>
+                      {parent.icon || '📁'} {parent.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {labelType === 'Category' 
+                    ? 'Categories can be placed in folders or at root level'
+                    : 'Folders can be nested inside other folders'}
+                </p>
               </div>
 
               <div>
@@ -320,6 +373,7 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, labelName, isLoading }
 
 export default function CategoriesTab() {
   const [labels, setLabels] = useState<LabelTree[]>([]);
+  const [allLabels, setAllLabels] = useState<Label[]>([]);  // Flat list for parent dropdown
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -340,11 +394,12 @@ export default function CategoriesTab() {
     try {
       setIsLoading(true);
       setError(null);
-      const tree = await getLabelsTree();
+      const [tree, flat] = await Promise.all([getLabelsTree(), getLabels()]);
       setLabels(tree);
+      setAllLabels(flat);
       
       // Auto-expand root folders
-      const rootIds = new Set(tree.map(l => l.id));
+      const rootIds = new Set(tree.filter(l => l.type === 'Folder').map(l => l.id));
       setExpandedIds(rootIds);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load labels');
@@ -373,6 +428,13 @@ export default function CategoriesTab() {
     setEditingLabel(null);
     setNewLabelParentId(null);
     setNewLabelType('Folder');
+    setIsModalOpen(true);
+  };
+
+  const handleAddRootCategory = () => {
+    setEditingLabel(null);
+    setNewLabelParentId(null);
+    setNewLabelType('Category');
     setIsModalOpen(true);
   };
 
@@ -452,15 +514,26 @@ export default function CategoriesTab() {
         <p className="text-sm text-gray-500">
           Organize your transactions with folders and categories
         </p>
-        <button
-          onClick={handleAddRootFolder}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New Folder
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleAddRootCategory}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New Category
+          </button>
+          <button
+            onClick={handleAddRootFolder}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New Folder
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200">
@@ -468,22 +541,34 @@ export default function CategoriesTab() {
           <div className="p-8 text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
               <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
               </svg>
             </div>
             <h2 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h2>
             <p className="text-gray-500 mb-4">
-              Create folders and categories to organize your transactions.
+              Create categories to organize your transactions, or use folders to group related categories.
             </p>
-            <button
-              onClick={handleAddRootFolder}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Create First Folder
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={handleAddRootCategory}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Create Category
+              </button>
+              <button
+                onClick={handleAddRootFolder}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Create Folder
+              </button>
+            </div>
           </div>
         ) : (
           <div className="py-2">
@@ -511,6 +596,7 @@ export default function CategoriesTab() {
         parentId={newLabelParentId}
         labelType={newLabelType}
         isLoading={isSaving}
+        allLabels={allLabels}
       />
 
       <DeleteConfirmModal
