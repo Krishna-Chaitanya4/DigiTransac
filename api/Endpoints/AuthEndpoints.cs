@@ -91,7 +91,9 @@ public static class AuthEndpoints
             }
 
             var result = await authService.LoginAsync(request);
-            if (result == null)
+            
+            // Check if credentials were invalid
+            if (result.AccessToken == null && !result.RequiresTwoFactor)
             {
                 return Results.Unauthorized();
             }
@@ -99,7 +101,7 @@ public static class AuthEndpoints
             return Results.Ok(result);
         })
         .WithName("Login")
-        .Produces<AuthResponse>(200)
+        .Produces<LoginResponse>(200)
         .Produces<ErrorResponse>(400)
         .Produces(401);
 

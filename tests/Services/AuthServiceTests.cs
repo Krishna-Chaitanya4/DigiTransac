@@ -15,8 +15,10 @@ public class AuthServiceTests
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IEmailVerificationRepository> _emailVerificationRepositoryMock;
     private readonly Mock<IRefreshTokenRepository> _refreshTokenRepositoryMock;
+    private readonly Mock<ITwoFactorTokenRepository> _twoFactorTokenRepositoryMock;
     private readonly Mock<IEmailService> _emailServiceMock;
     private readonly Mock<ILabelService> _labelServiceMock;
+    private readonly Mock<ITwoFactorService> _twoFactorServiceMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
     private readonly AuthService _authService;
@@ -26,8 +28,10 @@ public class AuthServiceTests
         _userRepositoryMock = new Mock<IUserRepository>();
         _emailVerificationRepositoryMock = new Mock<IEmailVerificationRepository>();
         _refreshTokenRepositoryMock = new Mock<IRefreshTokenRepository>();
+        _twoFactorTokenRepositoryMock = new Mock<ITwoFactorTokenRepository>();
         _emailServiceMock = new Mock<IEmailService>();
         _labelServiceMock = new Mock<ILabelService>();
+        _twoFactorServiceMock = new Mock<ITwoFactorService>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
         {
@@ -46,8 +50,10 @@ public class AuthServiceTests
             _userRepositoryMock.Object,
             _emailVerificationRepositoryMock.Object,
             _refreshTokenRepositoryMock.Object,
+            _twoFactorTokenRepositoryMock.Object,
             _emailServiceMock.Object,
             _labelServiceMock.Object,
+            _twoFactorServiceMock.Object,
             _jwtSettings,
             _loggerMock.Object
         );
@@ -291,7 +297,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_WithInvalidPassword_ShouldReturnNull()
+    public async Task LoginAsync_WithInvalidPassword_ShouldReturnEmptyResponse()
     {
         // Arrange
         var user = new User
@@ -311,11 +317,13 @@ public class AuthServiceTests
         var result = await _authService.LoginAsync(request);
 
         // Assert
-        result.Should().BeNull();
+        result.Should().NotBeNull();
+        result.AccessToken.Should().BeNull();
+        result.RefreshToken.Should().BeNull();
     }
 
     [Fact]
-    public async Task LoginAsync_WithNonExistentUser_ShouldReturnNull()
+    public async Task LoginAsync_WithNonExistentUser_ShouldReturnEmptyResponse()
     {
         // Arrange
         var request = new LoginRequest(Email: "nonexistent@example.com", Password: "Test@123!");
@@ -327,7 +335,9 @@ public class AuthServiceTests
         var result = await _authService.LoginAsync(request);
 
         // Assert
-        result.Should().BeNull();
+        result.Should().NotBeNull();
+        result.AccessToken.Should().BeNull();
+        result.RefreshToken.Should().BeNull();
     }
 
     #endregion
@@ -992,6 +1002,367 @@ public class AuthServiceTests
 
         // Assert
         _refreshTokenRepositoryMock.Verify(x => x.RevokeAllByUserIdAsync(userId), Times.Once);
+    }
+
+    #endregion
+
+    #region Two-Factor Authentication Tests
+
+    [Fact]
+    public async Task LoginAsync_WithTwoFactorEnabled_ShouldReturnTwoFactorRequired()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var password = "Password123!";
+        var user = new User
+        {
+            Id = "user-123",
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            FullName = "Test User",
+            TwoFactorEnabled = true,
+            TwoFactorSecret = "TESTSECRET"
+        };
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+        _twoFactorTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<TwoFactorToken>()))
+            .ReturnsAsync((TwoFactorToken t) => t);
+
+        // Act
+        var result = await _authService.LoginAsync(new LoginRequest(email, password));
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.RequiresTwoFactor.Should().BeTrue();
+        result.TwoFactorToken.Should().NotBeNullOrEmpty();
+        result.AccessToken.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithTwoFactorDisabled_ShouldReturnTokens()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var password = "Password123!";
+        var user = new User
+        {
+            Id = "user-123",
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            FullName = "Test User",
+            TwoFactorEnabled = false
+        };
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.LoginAsync(new LoginRequest(email, password));
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.RequiresTwoFactor.Should().BeFalse();
+        result.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task VerifyTwoFactorLoginAsync_WithValidCode_ShouldReturnAuthResponse()
+    {
+        // Arrange
+        var tokenString = "valid-2fa-token";
+        var secret = "JBSWY3DPEHPK3PXP"; // Valid Base32 secret
+        var user = new User
+        {
+            Id = "user-123",
+            Email = "test@example.com",
+            FullName = "Test User",
+            TwoFactorEnabled = true,
+            TwoFactorSecret = secret
+        };
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = false
+        };
+        
+        // Generate valid code
+        var totp = new OtpNet.Totp(OtpNet.Base32Encoding.ToBytes(secret));
+        var validCode = totp.ComputeTotp();
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+        _twoFactorServiceMock.Setup(x => x.ValidateCode(secret, validCode))
+            .Returns(true);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.VerifyTwoFactorLoginAsync(tokenString, validCode);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
+        _twoFactorTokenRepositoryMock.Verify(x => x.MarkAsUsedAsync(twoFactorToken.Id), Times.Once);
+    }
+
+    [Fact]
+    public async Task VerifyTwoFactorLoginAsync_WithInvalidCode_ShouldReturnNull()
+    {
+        // Arrange
+        var tokenString = "valid-2fa-token";
+        var code = "000000";
+        var user = new User
+        {
+            Id = "user-123",
+            Email = "test@example.com",
+            FullName = "Test User",
+            TwoFactorEnabled = true,
+            TwoFactorSecret = "TESTSECRET"
+        };
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = false
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id))
+            .ReturnsAsync(user);
+        _twoFactorServiceMock.Setup(x => x.ValidateCode(It.IsAny<string>(), code))
+            .Returns(false);
+
+        // Act
+        var result = await _authService.VerifyTwoFactorLoginAsync(tokenString, code);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task VerifyTwoFactorLoginAsync_WithExpiredToken_ShouldReturnNull()
+    {
+        // Arrange
+        var tokenString = "expired-2fa-token";
+        var code = "123456";
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = "user-123",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(-5), // Expired
+            IsUsed = false
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+
+        // Act
+        var result = await _authService.VerifyTwoFactorLoginAsync(tokenString, code);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task VerifyTwoFactorLoginAsync_WithUsedToken_ShouldReturnNull()
+    {
+        // Arrange
+        var tokenString = "used-2fa-token";
+        var code = "123456";
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = "user-123",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = true // Already used
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+
+        // Act
+        var result = await _authService.VerifyTwoFactorLoginAsync(tokenString, code);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SendTwoFactorEmailOtpAsync_WithValidToken_ShouldSendEmail()
+    {
+        // Arrange
+        var tokenString = "valid-2fa-token";
+        var user = new User
+        {
+            Id = "user-123",
+            Email = "test@example.com",
+            FullName = "Test User"
+        };
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = false
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id))
+            .ReturnsAsync(user);
+        _emailServiceMock.Setup(x => x.SendTwoFactorBackupCodeAsync(user.Email, It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var (success, message) = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
+
+        // Assert
+        success.Should().BeTrue();
+        message.Should().Contain("Verification code sent");
+        _emailServiceMock.Verify(x => x.SendTwoFactorBackupCodeAsync(user.Email, It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendTwoFactorEmailOtpAsync_WithInvalidToken_ShouldReturnFalse()
+    {
+        // Arrange
+        var tokenString = "invalid-2fa-token";
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync((TwoFactorToken?)null);
+
+        // Act
+        var (success, message) = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
+
+        // Assert
+        success.Should().BeFalse();
+        message.Should().Contain("Invalid or expired session");
+    }
+
+    [Fact]
+    public async Task SendTwoFactorEmailOtpAsync_WithRecentlySentCode_ShouldRateLimitReturnFalse()
+    {
+        // Arrange
+        var tokenString = "valid-2fa-token";
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = "user-123",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = false,
+            EmailOtpSentAt = DateTime.UtcNow.AddSeconds(-30) // Sent 30 seconds ago
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+
+        // Act
+        var (success, message) = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
+
+        // Assert
+        success.Should().BeFalse();
+        message.Should().Contain("wait");
+    }
+
+    [Fact]
+    public async Task VerifyTwoFactorEmailOtpAsync_WithValidCode_ShouldReturnAuthResponse()
+    {
+        // Arrange
+        var tokenString = "valid-2fa-token";
+        var emailCode = "654321";
+        var user = new User
+        {
+            Id = "user-123",
+            Email = "test@example.com",
+            FullName = "Test User"
+        };
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = false,
+            EmailOtpCode = emailCode,
+            EmailOtpSentAt = DateTime.UtcNow.AddMinutes(-2) // Sent 2 minutes ago
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.VerifyTwoFactorEmailOtpAsync(tokenString, emailCode);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
+        _twoFactorTokenRepositoryMock.Verify(x => x.MarkAsUsedAsync(twoFactorToken.Id), Times.Once);
+    }
+
+    [Fact]
+    public async Task VerifyTwoFactorEmailOtpAsync_WithInvalidCode_ShouldReturnNull()
+    {
+        // Arrange
+        var tokenString = "valid-2fa-token";
+        var correctCode = "654321";
+        var wrongCode = "111111";
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = "user-123",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = false,
+            EmailOtpCode = correctCode,
+            EmailOtpSentAt = DateTime.UtcNow.AddMinutes(-2)
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+
+        // Act
+        var result = await _authService.VerifyTwoFactorEmailOtpAsync(tokenString, wrongCode);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task VerifyTwoFactorEmailOtpAsync_WithExpiredCode_ShouldReturnNull()
+    {
+        // Arrange
+        var tokenString = "valid-2fa-token";
+        var emailCode = "654321";
+        var twoFactorToken = new TwoFactorToken
+        {
+            Id = "token-id",
+            Token = tokenString,
+            UserId = "user-123",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            IsUsed = false,
+            EmailOtpCode = emailCode,
+            EmailOtpSentAt = DateTime.UtcNow.AddMinutes(-15) // Sent 15 minutes ago - expired
+        };
+        
+        _twoFactorTokenRepositoryMock.Setup(x => x.GetByTokenAsync(tokenString))
+            .ReturnsAsync(twoFactorToken);
+
+        // Act
+        var result = await _authService.VerifyTwoFactorEmailOtpAsync(tokenString, emailCode);
+
+        // Assert
+        result.Should().BeNull();
     }
 
     #endregion

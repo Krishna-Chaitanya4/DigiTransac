@@ -9,7 +9,9 @@ interface AuthContextType {
   isLoading: boolean;
   sessionExpiredMessage: string | null;
   clearSessionExpiredMessage: () => void;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }>;
+  verifyTwoFactorLogin: (twoFactorToken: string, code: string) => Promise<void>;
+  verifyTwoFactorEmailOtp: (twoFactorToken: string, emailCode: string) => Promise<void>;
   completeRegistration: (email: string, verificationToken: string, password: string, fullName: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -125,8 +127,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [handleAuthSuccess, clearAuth]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }> => {
     const response = await authService.login(email, password);
+    
+    if (response.requiresTwoFactor && response.twoFactorToken) {
+      return { requiresTwoFactor: true, twoFactorToken: response.twoFactorToken };
+    }
+    
+    // Normal login - no 2FA required
+    if (response.accessToken && response.refreshToken && response.email && response.fullName !== undefined) {
+      handleAuthSuccess({
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        email: response.email,
+        fullName: response.fullName,
+        isEmailVerified: response.isEmailVerified ?? false,
+      });
+    }
+    
+    return { requiresTwoFactor: false };
+  };
+
+  const verifyTwoFactorLogin = async (twoFactorToken: string, code: string) => {
+    const response = await authService.verifyTwoFactorLogin(twoFactorToken, code);
+    handleAuthSuccess(response);
+  };
+
+  const verifyTwoFactorEmailOtp = async (twoFactorToken: string, emailCode: string) => {
+    const response = await authService.verifyTwoFactorEmailOtp(twoFactorToken, emailCode);
     handleAuthSuccess(response);
   };
 
@@ -213,7 +241,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       sessionExpiredMessage,
       clearSessionExpiredMessage,
-      login, 
+      login,
+      verifyTwoFactorLogin,
+      verifyTwoFactorEmailOtp,
       completeRegistration, 
       logout, 
       logoutAll, 

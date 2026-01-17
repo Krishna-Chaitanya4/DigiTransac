@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import TwoFactorSettings from '../components/TwoFactorSettings';
 
 export default function SettingsPage() {
   const { user, logoutAll, deleteAccount, updateName, sendEmailChangeCode, verifyEmailChange } = useAuth();
@@ -229,6 +230,12 @@ export default function SettingsPage() {
         {/* Security Section */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Security</h2>
+          
+          {/* Two-Factor Authentication */}
+          <TwoFactorSettings />
+          
+          <hr className="my-4 border-gray-200" />
+          
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-gray-900">Sign out from all devices</p>

@@ -142,4 +142,425 @@ describe('LoginPage', () => {
     expect(emailInput).toBeRequired();
     expect(passwordInput).toBeRequired();
   });
+
+  describe('Two-Factor Authentication', () => {
+    it('should show 2FA verification screen when login requires 2FA', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /two-factor authentication/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should show verification code input on 2FA screen', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+      });
+    });
+
+    it('should show back to login button on 2FA screen', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /back to login/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should return to login form when back button is clicked', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /two-factor authentication/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /back to login/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /sign in to digitransac/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should only allow numeric input in 2FA code field', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+      });
+
+      const codeInput = screen.getByPlaceholderText('000000');
+      await user.type(codeInput, 'abc123xyz456');
+
+      expect(codeInput).toHaveValue('123456');
+    });
+
+    it('should disable verify button when code is not 6 digits', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /verify/i })).toBeDisabled();
+      });
+
+      await user.type(screen.getByPlaceholderText('000000'), '123');
+
+      expect(screen.getByRole('button', { name: /verify/i })).toBeDisabled();
+    });
+
+    it('should enable verify button when 6-digit code is entered', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByPlaceholderText('000000'), '123456');
+
+      expect(screen.getByRole('button', { name: /verify/i })).not.toBeDisabled();
+    });
+
+    it('should call verifyTwoFactorLogin and navigate on successful verification', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+      vi.mocked(authService.verifyTwoFactorLogin).mockResolvedValue({
+        accessToken: 'jwt-token',
+        refreshToken: 'refresh-token',
+        email: 'test@example.com',
+        fullName: 'Test User',
+        isEmailVerified: true,
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByPlaceholderText('000000'), '123456');
+      await user.click(screen.getByRole('button', { name: /verify/i }));
+
+      await waitFor(() => {
+        expect(authService.verifyTwoFactorLogin).toHaveBeenCalledWith('temp-2fa-token', '123456');
+      });
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+      });
+    });
+
+    it('should show error on invalid 2FA code', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+      vi.mocked(authService.verifyTwoFactorLogin).mockRejectedValue(new Error('Invalid verification code'));
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByPlaceholderText('000000'), '000000');
+      await user.click(screen.getByRole('button', { name: /verify/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Invalid verification code')).toBeInTheDocument();
+      });
+    });
+
+    it('should show email me a code instead option on 2FA screen', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /email me a code instead/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should switch to email OTP screen when clicking email me a code instead', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /email me a code instead/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /email me a code instead/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /email verification/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /send code to my email/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should send email OTP when clicking send code button', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+      vi.mocked(authService.sendTwoFactorEmailOtp).mockResolvedValue({
+        message: 'Verification code sent to your email',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /email me a code instead/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /email me a code instead/i }));
+      await user.click(screen.getByRole('button', { name: /send code to my email/i }));
+
+      await waitFor(() => {
+        expect(authService.sendTwoFactorEmailOtp).toHaveBeenCalledWith('temp-2fa-token');
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Verification code sent to your email')).toBeInTheDocument();
+        expect(screen.getByLabelText(/email code/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should switch back to authenticator app when clicking use authenticator app instead', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /email me a code instead/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /email me a code instead/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /use authenticator app instead/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /use authenticator app instead/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /two-factor authentication/i })).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should verify email OTP and login successfully', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+      vi.mocked(authService.sendTwoFactorEmailOtp).mockResolvedValue({
+        message: 'Verification code sent to your email',
+      });
+      vi.mocked(authService.verifyTwoFactorEmailOtp).mockResolvedValue({
+        accessToken: 'jwt-token',
+        refreshToken: 'refresh-token',
+        email: 'test@example.com',
+        fullName: 'Test User',
+        isEmailVerified: true,
+      });
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /email me a code instead/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /email me a code instead/i }));
+      await user.click(screen.getByRole('button', { name: /send code to my email/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/email code/i)).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText(/email code/i), '654321');
+      await user.click(screen.getByRole('button', { name: /verify/i }));
+
+      await waitFor(() => {
+        expect(authService.verifyTwoFactorEmailOtp).toHaveBeenCalledWith('temp-2fa-token', '654321');
+      });
+    });
+
+    it('should show error on failed email OTP send', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+      vi.mocked(authService.sendTwoFactorEmailOtp).mockRejectedValue(new Error('Please wait before requesting another code'));
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /email me a code instead/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /email me a code instead/i }));
+      await user.click(screen.getByRole('button', { name: /send code to my email/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Please wait before requesting another code')).toBeInTheDocument();
+      });
+    });
+
+    it('should show error on invalid email OTP code', async () => {
+      const user = userEvent.setup();
+      vi.mocked(authService.login).mockResolvedValue({
+        requiresTwoFactor: true,
+        twoFactorToken: 'temp-2fa-token',
+      });
+      vi.mocked(authService.sendTwoFactorEmailOtp).mockResolvedValue({
+        message: 'Verification code sent to your email',
+      });
+      vi.mocked(authService.verifyTwoFactorEmailOtp).mockRejectedValue(new Error('Invalid or expired verification code'));
+
+      renderWithRouter(<LoginPage />);
+
+      await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /email me a code instead/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /email me a code instead/i }));
+      await user.click(screen.getByRole('button', { name: /send code to my email/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/email code/i)).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText(/email code/i), '000000');
+      await user.click(screen.getByRole('button', { name: /verify/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Invalid or expired verification code')).toBeInTheDocument();
+      });
+    });
+  });
 });

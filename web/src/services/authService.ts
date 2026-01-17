@@ -100,13 +100,36 @@ export async function completeRegistration(
   return handleResponse<AuthResponse>(response);
 }
 
-export async function login(email: string, password: string): Promise<AuthResponse> {
+// Login response that may require 2FA
+export interface LoginResponse {
+  accessToken?: string;
+  refreshToken?: string;
+  email?: string;
+  fullName?: string;
+  isEmailVerified?: boolean;
+  requiresTwoFactor?: boolean;
+  twoFactorToken?: string;
+}
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ email, password }),
+  });
+  return handleResponse<LoginResponse>(response);
+}
+
+// Verify 2FA code during login
+export async function verifyTwoFactorLogin(twoFactorToken: string, code: string): Promise<AuthResponse> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/verify`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ twoFactorToken, code }),
   });
   return handleResponse<AuthResponse>(response);
 }
@@ -237,4 +260,82 @@ export async function revokeAllTokens(accessToken: string): Promise<{ message: s
     },
   });
   return handleResponse<{ message: string }>(response);
+}
+
+// Two-Factor Authentication
+export interface TwoFactorStatus {
+  enabled: boolean;
+}
+
+export interface TwoFactorSetup {
+  secret: string;
+  qrCodeUri: string;
+  manualEntryKey: string;
+}
+
+export async function getTwoFactorStatus(token: string): Promise<TwoFactorStatus> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/status`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  return handleResponse<TwoFactorStatus>(response);
+}
+
+export async function setupTwoFactor(token: string): Promise<TwoFactorSetup> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/setup`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  return handleResponse<TwoFactorSetup>(response);
+}
+
+export async function enableTwoFactor(token: string, code: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/enable`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ code }),
+  });
+  return handleResponse<{ message: string }>(response);
+}
+
+export async function disableTwoFactor(token: string, password: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/disable`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ password }),
+  });
+  return handleResponse<{ message: string }>(response);
+}
+
+// Send email OTP as backup for 2FA login
+export async function sendTwoFactorEmailOtp(twoFactorToken: string): Promise<{ message: string }> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/send-email-code`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ twoFactorToken }),
+  });
+  return handleResponse<{ message: string }>(response);
+}
+
+// Verify email OTP for 2FA login
+export async function verifyTwoFactorEmailOtp(twoFactorToken: string, emailCode: string): Promise<AuthResponse> {
+  const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/verify-email-code`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ twoFactorToken, emailCode }),
+  });
+  return handleResponse<AuthResponse>(response);
 }

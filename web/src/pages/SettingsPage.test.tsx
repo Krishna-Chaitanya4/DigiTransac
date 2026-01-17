@@ -392,4 +392,42 @@ describe('SettingsPage', () => {
       });
     });
   });
+
+  describe('Two-Factor Authentication section', () => {
+    it('should render Two-Factor Authentication section', async () => {
+      vi.mocked(authService.getTwoFactorStatus).mockResolvedValue({ enabled: false });
+      renderWithAuth();
+
+      await waitFor(() => {
+        expect(screen.getByText('Two-Factor Authentication')).toBeInTheDocument();
+      });
+    });
+
+    it('should show Enable button when 2FA is disabled', async () => {
+      vi.mocked(authService.getTwoFactorStatus).mockResolvedValue({ enabled: false });
+      renderWithAuth();
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Enable' })).toBeInTheDocument();
+      });
+    });
+
+    it('should show Disable button when 2FA is enabled', async () => {
+      vi.mocked(authService.getTwoFactorStatus).mockResolvedValue({ enabled: true });
+      renderWithAuth();
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
+      });
+    });
+
+    it('should show Enabled badge when 2FA is enabled', async () => {
+      vi.mocked(authService.getTwoFactorStatus).mockResolvedValue({ enabled: true });
+      renderWithAuth();
+
+      await waitFor(() => {
+        expect(screen.getByText('Enabled')).toBeInTheDocument();
+      });
+    });
+  });
 });

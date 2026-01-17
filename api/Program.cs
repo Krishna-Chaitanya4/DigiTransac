@@ -20,11 +20,13 @@ builder.Services.AddSingleton(emailSettings);
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<IEmailVerificationRepository, EmailVerificationRepository>();
 builder.Services.AddSingleton<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddSingleton<ITwoFactorTokenRepository, TwoFactorTokenRepository>();
 builder.Services.AddSingleton<ILabelRepository, LabelRepository>();
 builder.Services.AddSingleton<ITagRepository, TagRepository>();
 
 // Add services
 builder.Services.AddSingleton<IEmailService, GmailEmailService>();
+builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<ITagService, TagService>();
@@ -107,6 +109,7 @@ app.MapGet("/api/health", () => Results.Ok(new { Status = "Healthy", Timestamp =
    .WithTags("Health");
 
 app.MapAuthEndpoints();
+app.MapTwoFactorEndpoints();
 app.MapLabelEndpoints();
 app.MapTagEndpoints();
 

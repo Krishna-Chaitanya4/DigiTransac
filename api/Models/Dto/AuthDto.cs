@@ -32,3 +32,27 @@ public record ForgotPasswordRequest(string Email);
 public record ResetPasswordRequest(string Email, string VerificationToken, string NewPassword);
 
 public record ErrorResponse(string Message);
+
+// Two-Factor Authentication
+public record TwoFactorSetupResponse(string Secret, string QrCodeUri, string ManualEntryKey);
+public record EnableTwoFactorRequest(string Code);
+public record DisableTwoFactorRequest(string Password);
+public record VerifyTwoFactorRequest(string UserId, string Code);
+public record TwoFactorStatusResponse(bool Enabled);
+
+// Login response that may require 2FA
+public record LoginResponse(
+    string? AccessToken, 
+    string? RefreshToken, 
+    string? Email, 
+    string? FullName, 
+    bool? IsEmailVerified,
+    bool RequiresTwoFactor = false,
+    string? TwoFactorToken = null
+);
+
+public record TwoFactorLoginRequest(string TwoFactorToken, string Code);
+
+// Email OTP backup for 2FA
+public record SendTwoFactorEmailOtpRequest(string TwoFactorToken);
+public record TwoFactorEmailOtpLoginRequest(string TwoFactorToken, string EmailCode);

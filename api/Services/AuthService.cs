@@ -20,7 +20,10 @@ public interface IAuthService
     Task<AuthResponse?> CompleteRegistrationAsync(CompleteRegistrationRequest request);
     
     // Login
-    Task<AuthResponse?> LoginAsync(LoginRequest request);
+    Task<LoginResponse> LoginAsync(LoginRequest request);
+    Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorToken, string code);
+    Task<(bool Success, string Message)> SendTwoFactorEmailOtpAsync(string twoFactorToken);
+    Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorToken, string emailCode);
     Task<User?> GetCurrentUserAsync(string userId);
     
     // Token refresh
@@ -45,8 +48,10 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IEmailVerificationRepository _emailVerificationRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly ITwoFactorTokenRepository _twoFactorTokenRepository;
     private readonly IEmailService _emailService;
     private readonly ILabelService _labelService;
+    private readonly ITwoFactorService _twoFactorService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -54,16 +59,20 @@ public class AuthService : IAuthService
         IUserRepository userRepository,
         IEmailVerificationRepository emailVerificationRepository,
         IRefreshTokenRepository refreshTokenRepository,
+        ITwoFactorTokenRepository twoFactorTokenRepository,
         IEmailService emailService,
         ILabelService labelService,
+        ITwoFactorService twoFactorService,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _emailVerificationRepository = emailVerificationRepository;
         _refreshTokenRepository = refreshTokenRepository;
+        _twoFactorTokenRepository = twoFactorTokenRepository;
         _emailService = emailService;
         _labelService = labelService;
+        _twoFactorService = twoFactorService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
     }
@@ -190,7 +199,7 @@ public class AuthService : IAuthService
         return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
     }
 
-    public async Task<AuthResponse?> LoginAsync(LoginRequest request)
+    public async Task<LoginResponse> LoginAsync(LoginRequest request)
     {
         _logger.LogInformation("Login attempt for {Email}", request.Email);
 
@@ -198,10 +207,142 @@ public class AuthService : IAuthService
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
             _logger.LogWarning("Failed login attempt for {Email}", request.Email);
-            return null; // Invalid credentials
+            return new LoginResponse(null, null, null, null, null); // Invalid credentials
+        }
+
+        // Check if 2FA is enabled
+        if (user.TwoFactorEnabled)
+        {
+            _logger.LogInformation("2FA required for user {Email}", request.Email);
+            
+            // Generate a temporary 2FA token
+            var twoFactorToken = new TwoFactorToken
+            {
+                UserId = user.Id,
+                Token = GenerateSecureToken(),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(5) // 5 minutes to complete 2FA
+            };
+            
+            await _twoFactorTokenRepository.CreateAsync(twoFactorToken);
+            
+            return new LoginResponse(
+                null, null, null, null, null,
+                RequiresTwoFactor: true,
+                TwoFactorToken: twoFactorToken.Token
+            );
         }
 
         _logger.LogInformation("User logged in successfully: {Email}, UserId: {UserId}", user.Email, user.Id);
+
+        var accessToken = GenerateJwtToken(user);
+        var refreshToken = await GenerateRefreshTokenAsync(user.Id);
+        
+        return new LoginResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+    }
+
+    public async Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorTokenString, string code)
+    {
+        var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
+        if (twoFactorToken == null)
+        {
+            _logger.LogWarning("Invalid or expired 2FA token");
+            return null;
+        }
+
+        var user = await _userRepository.GetByIdAsync(twoFactorToken.UserId);
+        if (user == null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
+        {
+            _logger.LogWarning("2FA verification failed - user not found or 2FA not enabled");
+            return null;
+        }
+
+        // Verify the TOTP code
+        if (!_twoFactorService.ValidateCode(user.TwoFactorSecret, code))
+        {
+            _logger.LogWarning("Invalid 2FA code for user {UserId}", user.Id);
+            return null;
+        }
+
+        // Mark token as used
+        await _twoFactorTokenRepository.MarkAsUsedAsync(twoFactorToken.Id);
+
+        _logger.LogInformation("2FA login successful for user {Email}", user.Email);
+
+        var accessToken = GenerateJwtToken(user);
+        var refreshToken = await GenerateRefreshTokenAsync(user.Id);
+        
+        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+    }
+
+    public async Task<(bool Success, string Message)> SendTwoFactorEmailOtpAsync(string twoFactorTokenString)
+    {
+        var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
+        if (twoFactorToken == null)
+        {
+            _logger.LogWarning("Invalid or expired 2FA token for email OTP");
+            return (false, "Invalid or expired session. Please login again.");
+        }
+
+        // Rate limit: only allow one email OTP per minute
+        if (twoFactorToken.EmailOtpSentAt != null && 
+            DateTime.UtcNow - twoFactorToken.EmailOtpSentAt.Value < TimeSpan.FromMinutes(1))
+        {
+            return (false, "Please wait before requesting another code");
+        }
+
+        var user = await _userRepository.GetByIdAsync(twoFactorToken.UserId);
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        // Generate 6-digit code
+        var code = GenerateVerificationCode();
+        
+        // Store the code in the 2FA token
+        await _twoFactorTokenRepository.SetEmailOtpAsync(twoFactorToken.Id, code);
+
+        // Send email
+        await _emailService.SendTwoFactorBackupCodeAsync(user.Email, code);
+
+        _logger.LogInformation("2FA backup code sent to {Email}", user.Email);
+        return (true, "Verification code sent to your email");
+    }
+
+    public async Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorTokenString, string emailCode)
+    {
+        var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
+        if (twoFactorToken == null)
+        {
+            _logger.LogWarning("Invalid or expired 2FA token for email OTP verification");
+            return null;
+        }
+
+        // Verify the email OTP code
+        if (string.IsNullOrEmpty(twoFactorToken.EmailOtpCode) || twoFactorToken.EmailOtpCode != emailCode)
+        {
+            _logger.LogWarning("Invalid email OTP code for user {UserId}", twoFactorToken.UserId);
+            return null;
+        }
+
+        // Check if email OTP has expired (10 minutes)
+        if (twoFactorToken.EmailOtpSentAt == null || 
+            DateTime.UtcNow - twoFactorToken.EmailOtpSentAt.Value > TimeSpan.FromMinutes(10))
+        {
+            _logger.LogWarning("Email OTP expired for user {UserId}", twoFactorToken.UserId);
+            return null;
+        }
+
+        var user = await _userRepository.GetByIdAsync(twoFactorToken.UserId);
+        if (user == null)
+        {
+            return null;
+        }
+
+        // Mark token as used
+        await _twoFactorTokenRepository.MarkAsUsedAsync(twoFactorToken.Id);
+
+        _logger.LogInformation("2FA email OTP login successful for user {Email}", user.Email);
 
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);

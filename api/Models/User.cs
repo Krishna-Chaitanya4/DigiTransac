@@ -24,6 +24,12 @@ public class User
     [BsonElement("phoneNumber")]
     public string? PhoneNumber { get; set; }
 
+    [BsonElement("twoFactorEnabled")]
+    public bool TwoFactorEnabled { get; set; } = false;
+
+    [BsonElement("twoFactorSecret")]
+    public string? TwoFactorSecret { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
