@@ -98,6 +98,19 @@ public class LabelService : ILabelService
             return (false, "Label not found", null);
         }
 
+        // System labels cannot be renamed or moved
+        if (label.IsSystem)
+        {
+            if (request.Name?.Trim() != label.Name)
+            {
+                return (false, "System labels cannot be renamed", null);
+            }
+            if (request.ParentId != label.ParentId)
+            {
+                return (false, "System labels cannot be moved", null);
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return (false, "Name is required", null);
@@ -152,6 +165,12 @@ public class LabelService : ILabelService
             return (false, "Label not found");
         }
 
+        // System labels cannot be deleted
+        if (label.IsSystem)
+        {
+            return (false, "System labels cannot be deleted");
+        }
+
         // Check if folder has children
         if (label.Type == LabelType.Folder)
         {
@@ -195,6 +214,7 @@ public class LabelService : ILabelService
         var order = 0;
 
         // Helper to create folder
+        // Only root folders (parentId = null) are marked as system labels
         Label CreateFolder(string name, string? parentId = null, string? icon = null, string? color = null)
         {
             var folder = new Label
@@ -207,13 +227,13 @@ public class LabelService : ILabelService
                 Icon = icon,
                 Color = color,
                 Order = order++,
-                IsSystem = true
+                IsSystem = parentId == null  // Only root folders are system labels
             };
             labels.Add(folder);
             return folder;
         }
 
-        // Helper to create category
+        // Helper to create category (categories are never system labels)
         void CreateCategory(string name, string parentId, string? icon = null, string? color = null)
         {
             labels.Add(new Label
@@ -226,7 +246,7 @@ public class LabelService : ILabelService
                 Icon = icon,
                 Color = color,
                 Order = order++,
-                IsSystem = true
+                IsSystem = false
             });
         }
 

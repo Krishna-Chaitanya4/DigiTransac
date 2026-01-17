@@ -393,6 +393,128 @@ public class LabelServiceTests
         result.Message.Should().Contain("Cannot delete folder with children");
     }
 
+    [Fact]
+    public async Task DeleteAsync_SystemLabel_ShouldReturnFailure()
+    {
+        // Arrange
+        var systemLabel = new Label 
+        { 
+            Id = "1", 
+            UserId = TestUserId, 
+            Name = "Expenses", 
+            Type = LabelType.Folder,
+            IsSystem = true 
+        };
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(systemLabel);
+
+        // Act
+        var result = await _labelService.DeleteAsync("1", TestUserId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("System labels cannot be deleted");
+    }
+
+    #endregion
+
+    #region UpdateAsync System Label Tests
+
+    [Fact]
+    public async Task UpdateAsync_SystemLabel_CannotBeRenamed()
+    {
+        // Arrange
+        var systemLabel = new Label 
+        { 
+            Id = "1", 
+            UserId = TestUserId, 
+            Name = "Expenses", 
+            Type = LabelType.Folder,
+            ParentId = null,
+            IsSystem = true 
+        };
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(systemLabel);
+
+        var request = new UpdateLabelRequest("My Expenses", null, null, null, null);
+
+        // Act
+        var result = await _labelService.UpdateAsync("1", TestUserId, request);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("System labels cannot be renamed");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_SystemLabel_CannotBeMoved()
+    {
+        // Arrange
+        var systemLabel = new Label 
+        { 
+            Id = "1", 
+            UserId = TestUserId, 
+            Name = "Expenses", 
+            Type = LabelType.Folder,
+            ParentId = null,
+            IsSystem = true 
+        };
+        var targetFolder = new Label 
+        { 
+            Id = "2", 
+            UserId = TestUserId, 
+            Name = "Archive", 
+            Type = LabelType.Folder,
+            ParentId = null,
+            IsSystem = false 
+        };
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(systemLabel);
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("2", TestUserId))
+            .ReturnsAsync(targetFolder);
+
+        var request = new UpdateLabelRequest("Expenses", "2", null, null, null);
+
+        // Act
+        var result = await _labelService.UpdateAsync("1", TestUserId, request);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("System labels cannot be moved");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_SystemLabel_CanChangeIconAndColor()
+    {
+        // Arrange
+        var systemLabel = new Label 
+        { 
+            Id = "1", 
+            UserId = TestUserId, 
+            Name = "Expenses", 
+            Type = LabelType.Folder,
+            ParentId = null,
+            IsSystem = true,
+            Icon = "💰",
+            Color = "#ff0000"
+        };
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(systemLabel);
+        _labelRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Label>()))
+            .Returns(Task.CompletedTask);
+
+        // Request with same name/parent but different icon/color
+        var request = new UpdateLabelRequest("Expenses", null, "📊", "#00ff00", null);
+
+        // Act
+        var result = await _labelService.UpdateAsync("1", TestUserId, request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Label!.Icon.Should().Be("📊");
+        result.Label!.Color.Should().Be("#00ff00");
+    }
+
     #endregion
 
     #region CreateDefaultLabelsAsync Tests
@@ -415,6 +537,32 @@ public class LabelServiceTests
             labels.Any(l => l.Name == "Gifts") &&
             labels.Any(l => l.Name == "Transfers")
         )), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateDefaultLabelsAsync_OnlyRootFoldersShouldBeSystemLabels()
+    {
+        // Arrange
+        List<Label>? capturedLabels = null;
+        _labelRepositoryMock.Setup(x => x.CreateManyAsync(It.IsAny<List<Label>>()))
+            .Callback<List<Label>>(labels => capturedLabels = labels)
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _labelService.CreateDefaultLabelsAsync(TestUserId);
+
+        // Assert
+        capturedLabels.Should().NotBeNull();
+        
+        // Root folders (no parent) should be system labels
+        var rootFolders = capturedLabels!.Where(l => l.ParentId == null).ToList();
+        rootFolders.Should().AllSatisfy(l => l.IsSystem.Should().BeTrue());
+        rootFolders.Select(l => l.Name).Should().Contain(new[] { "Expenses", "Income", "Investments", "Gifts", "Transfers" });
+        
+        // Non-root items (have a parent) should NOT be system labels
+        var nestedItems = capturedLabels!.Where(l => l.ParentId != null).ToList();
+        nestedItems.Should().NotBeEmpty();
+        nestedItems.Should().AllSatisfy(l => l.IsSystem.Should().BeFalse());
     }
 
     #endregion

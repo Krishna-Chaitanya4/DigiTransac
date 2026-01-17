@@ -23,9 +23,10 @@ interface SearchableFolderDropdownProps {
   folders: Label[];
   allLabels: Label[];
   placeholder?: string;
+  disabled?: boolean;
 }
 
-function SearchableFolderDropdown({ value, onChange, folders, allLabels }: SearchableFolderDropdownProps) {
+function SearchableFolderDropdown({ value, onChange, folders, allLabels, disabled }: SearchableFolderDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,12 +70,18 @@ function SearchableFolderDropdown({ value, onChange, folders, allLabels }: Searc
       <button
         type="button"
         onClick={() => {
+          if (disabled) return;
           setIsOpen(!isOpen);
           if (!isOpen) {
             setTimeout(() => inputRef.current?.focus(), 0);
           }
         }}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center gap-2"
+        disabled={disabled}
+        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-left flex items-center gap-2 ${
+          disabled 
+            ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500' 
+            : 'border-gray-300 bg-white'
+        }`}
       >
         {selectedFolder ? (
           <>
@@ -179,6 +186,7 @@ interface SearchResultItemProps {
 
 function SearchResultItem({ label, path, onEdit, onDelete }: SearchResultItemProps) {
   const isFolder = label.type === 'Folder';
+  const isSystem = label.isSystem;
   
   return (
     <div className="flex items-center gap-2 py-2 px-3 hover:bg-gray-50 rounded-lg group">
@@ -191,32 +199,43 @@ function SearchResultItem({ label, path, onEdit, onDelete }: SearchResultItemPro
         </span>
         <p className="text-xs text-gray-400 truncate">{path}</p>
       </div>
+      {/* System label lock indicator */}
+      {isSystem && (
+        <span className="text-gray-400" title="System label - cannot be deleted or renamed">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+          </svg>
+        </span>
+      )}
       {label.color && (
         <span 
           className="w-3 h-3 rounded-full flex-shrink-0" 
           style={{ backgroundColor: label.color }}
         />
       )}
-      <div className="hidden group-hover:flex items-center gap-1">
-        <button
-          onClick={() => onEdit(label as unknown as Label)}
-          className="p-1 text-gray-400 hover:text-blue-600"
-          title="Edit"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-          </svg>
-        </button>
-        <button
-          onClick={() => onDelete(label as unknown as Label)}
-          className="p-1 text-gray-400 hover:text-red-600"
-          title="Delete"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-          </svg>
-        </button>
-      </div>
+      {/* Only show edit/delete for non-system labels */}
+      {!isSystem && (
+        <div className="hidden group-hover:flex items-center gap-1">
+          <button
+            onClick={() => onEdit(label as unknown as Label)}
+            className="p-1 text-gray-400 hover:text-blue-600"
+            title="Edit"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+          </button>
+          <button
+            onClick={() => onDelete(label as unknown as Label)}
+            className="p-1 text-gray-400 hover:text-red-600"
+            title="Delete"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -235,6 +254,7 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
   const isExpanded = expandedIds.has(label.id);
   const hasChildren = label.children && label.children.length > 0;
   const isFolder = label.type === 'Folder';
+  const isSystem = label.isSystem;
 
   return (
     <div>
@@ -272,6 +292,15 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
           {label.name}
         </span>
 
+        {/* System label lock indicator */}
+        {isSystem && (
+          <span className="text-gray-400" title="System label - cannot be deleted or renamed">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+          </span>
+        )}
+
         {/* Color indicator */}
         {label.color && (
           <span 
@@ -304,24 +333,29 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
               </button>
             </>
           )}
-          <button
-            onClick={() => onEdit(label)}
-            className="p-1 text-gray-400 hover:text-blue-600"
-            title="Edit"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-            </svg>
-          </button>
-          <button
-            onClick={() => onDelete(label)}
-            className="p-1 text-gray-400 hover:text-red-600"
-            title="Delete"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-            </svg>
-          </button>
+          {/* Only show edit/delete for non-system labels */}
+          {!isSystem && (
+            <>
+              <button
+                onClick={() => onEdit(label)}
+                className="p-1 text-gray-400 hover:text-blue-600"
+                title="Edit"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                </svg>
+              </button>
+              <button
+                onClick={() => onDelete(label)}
+                className="p-1 text-gray-400 hover:text-red-600"
+                title="Delete"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -362,6 +396,9 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+
+  // Check if editing a system label
+  const isSystemLabel = editingLabel?.isSystem ?? false;
 
   useEffect(() => {
     if (editingLabel) {
@@ -446,11 +483,21 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    isSystemLabel 
+                      ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500' 
+                      : 'border-gray-300'
+                  }`}
                   placeholder={`Enter ${labelType.toLowerCase()} name`}
                   required
-                  autoFocus
+                  autoFocus={!isSystemLabel}
+                  disabled={isSystemLabel}
                 />
+                {isSystemLabel && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    🔒 System labels cannot be renamed
+                  </p>
+                )}
               </div>
 
               <div>
@@ -462,12 +509,19 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
                   onChange={setSelectedParentId}
                   folders={availableParents}
                   allLabels={allLabels}
+                  disabled={isSystemLabel}
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  {labelType === 'Category' 
-                    ? 'Categories can be placed in folders or at root level'
-                    : 'Folders can be nested inside other folders'}
-                </p>
+                {isSystemLabel ? (
+                  <p className="mt-1 text-xs text-amber-600">
+                    🔒 System labels cannot be moved
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {labelType === 'Category' 
+                      ? 'Categories can be placed in folders or at root level'
+                      : 'Folders can be nested inside other folders'}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -629,7 +683,7 @@ export default function CategoriesTab() {
       setAllLabels(flat);
       
       // Auto-expand all folders by default
-      const allFolders = flat.filter(l => l.type === 'Folder').map(l => l.id);
+      const allFolders = flat.filter((l: Label) => l.type === 'Folder').map((l: Label) => l.id);
       setExpandedIds(new Set(allFolders));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load labels');
