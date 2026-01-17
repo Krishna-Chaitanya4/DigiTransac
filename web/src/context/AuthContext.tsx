@@ -1,11 +1,14 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User, AuthResponse } from '../types/auth';
 import * as authService from '../services/authService';
+import { SESSION_EXPIRED_EVENT } from '../services/apiClient';
 
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
   isLoading: boolean;
+  sessionExpiredMessage: string | null;
+  clearSessionExpiredMessage: () => void;
   login: (email: string, password: string) => Promise<void>;
   completeRegistration: (email: string, verificationToken: string, password: string, fullName: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -39,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Check for existing tokens on mount
@@ -52,6 +56,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(JSON.parse(storedUser));
     }
     setIsLoading(false);
+  }, []);
+
+  // Listen for session expiration events
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      // Clear auth state
+      setAccessToken(null);
+      setRefreshToken(null);
+      setUser(null);
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      // Set message to show on login page
+      setSessionExpiredMessage('Your session has expired. Please log in again.');
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
   }, []);
 
   const handleAuthSuccess = useCallback((authResponse: AuthResponse) => {
@@ -180,11 +202,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearSessionExpiredMessage = useCallback(() => {
+    setSessionExpiredMessage(null);
+  }, []);
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       accessToken, 
-      isLoading, 
+      isLoading,
+      sessionExpiredMessage,
+      clearSessionExpiredMessage,
       login, 
       completeRegistration, 
       logout, 

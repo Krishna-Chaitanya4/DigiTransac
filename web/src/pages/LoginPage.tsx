@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PasswordInput from '../components/PasswordInput';
@@ -8,8 +8,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login, sessionExpiredMessage, clearSessionExpiredMessage } = useAuth();
   const navigate = useNavigate();
+
+  // Show session expired message if present
+  useEffect(() => {
+    if (sessionExpiredMessage) {
+      setError(sessionExpiredMessage);
+      clearSessionExpiredMessage();
+    }
+  }, [sessionExpiredMessage, clearSessionExpiredMessage]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

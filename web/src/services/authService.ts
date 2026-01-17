@@ -1,6 +1,18 @@
 import { AuthResponse, ApiError, VerificationResponse } from '../types/auth';
 
 const API_BASE_URL = '/api';
+const ACCESS_TOKEN_KEY = 'digitransac_access_token';
+const REFRESH_TOKEN_KEY = 'digitransac_refresh_token';
+
+// Helper to get stored tokens
+export function getStoredTokens(): { accessToken: string; refreshToken: string } | null {
+  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (accessToken && refreshToken) {
+    return { accessToken, refreshToken };
+  }
+  return null;
+}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {

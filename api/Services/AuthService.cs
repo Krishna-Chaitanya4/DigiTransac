@@ -46,6 +46,7 @@ public class AuthService : IAuthService
     private readonly IEmailVerificationRepository _emailVerificationRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IEmailService _emailService;
+    private readonly ILabelService _labelService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -54,6 +55,7 @@ public class AuthService : IAuthService
         IEmailVerificationRepository emailVerificationRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IEmailService emailService,
+        ILabelService labelService,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
     {
@@ -61,6 +63,7 @@ public class AuthService : IAuthService
         _emailVerificationRepository = emailVerificationRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _emailService = emailService;
+        _labelService = labelService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
     }
@@ -172,6 +175,9 @@ public class AuthService : IAuthService
         };
 
         await _userRepository.CreateAsync(user);
+
+        // Create default labels for the new user
+        await _labelService.CreateDefaultLabelsAsync(user.Id);
 
         // Clean up verification record
         await _emailVerificationRepository.DeleteByEmailAsync(request.Email, VerificationPurpose.Registration);

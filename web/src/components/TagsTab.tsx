@@ -1,0 +1,383 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Tag, CreateTagRequest, UpdateTagRequest } from '../types/labels';
+import { getTags, createTag, updateTag, deleteTag } from '../services/tagService';
+
+// Preset colors for tags
+const PRESET_COLORS = [
+  '#ef4444', // red
+  '#f97316', // orange
+  '#f59e0b', // amber
+  '#84cc16', // lime
+  '#22c55e', // green
+  '#14b8a6', // teal
+  '#06b6d4', // cyan
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+  '#a855f7', // purple
+  '#ec4899', // pink
+  '#6b7280', // gray
+];
+
+interface TagModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: CreateTagRequest | UpdateTagRequest) => void;
+  editingTag: Tag | null;
+  isLoading: boolean;
+}
+
+function TagModal({ isOpen, onClose, onSubmit, editingTag, isLoading }: TagModalProps) {
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('');
+
+  useEffect(() => {
+    if (editingTag) {
+      setName(editingTag.name);
+      setColor(editingTag.color || '');
+    } else {
+      setName('');
+      setColor('');
+    }
+  }, [editingTag, isOpen]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      name: name.trim(),
+      color: color || null,
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            {editingTag ? 'Edit Tag' : 'New Tag'}
+          </h3>
+          
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="tagName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  id="tagName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Tax Deductible, Vacation"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Color
+                </label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {PRESET_COLORS.map(presetColor => (
+                    <button
+                      key={presetColor}
+                      type="button"
+                      onClick={() => setColor(presetColor)}
+                      className={`w-8 h-8 rounded-full border-2 ${color === presetColor ? 'border-gray-900 scale-110' : 'border-transparent'}`}
+                      style={{ backgroundColor: presetColor }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={color || '#6b7280'}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-10 h-10 p-1 border border-gray-300 rounded cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="#6b7280 (optional)"
+                  />
+                  {color && (
+                    <button
+                      type="button"
+                      onClick={() => setColor('')}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={isLoading || !name.trim()}
+              >
+                {isLoading ? 'Saving...' : editingTag ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface DeleteConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  tagName: string;
+  isLoading: boolean;
+}
+
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, tagName, isLoading }: DeleteConfirmModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Tag</h3>
+          <p className="text-gray-600 mb-6">
+            Are you sure you want to delete "{tagName}"? This action cannot be undone.
+          </p>
+          
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TagsTab() {
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Delete modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const loadTags = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await getTags();
+      setTags(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load tags');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTags();
+  }, [loadTags]);
+
+  const handleAddTag = () => {
+    setEditingTag(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (tag: Tag) => {
+    setEditingTag(tag);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (tag: Tag) => {
+    setTagToDelete(tag);
+    setDeleteModalOpen(true);
+  };
+
+  const handleModalSubmit = async (data: CreateTagRequest | UpdateTagRequest) => {
+    try {
+      setIsSaving(true);
+      if (editingTag) {
+        await updateTag(editingTag.id, data as UpdateTagRequest);
+      } else {
+        await createTag(data as CreateTagRequest);
+      }
+      await loadTags();
+      setIsModalOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save tag');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!tagToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteTag(tagToDelete.id);
+      await loadTags();
+      setDeleteModalOpen(false);
+      setTagToDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete tag');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">×</button>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-sm text-gray-500">
+          Add flexible tags to any transaction
+        </p>
+        <button
+          onClick={handleAddTag}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          New Tag
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200">
+        {tags.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-orange-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-orange-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-medium text-gray-900 mb-2">No tags yet</h2>
+            <p className="text-gray-500 mb-4">
+              Create tags like "Tax Deductible", "Vacation", or "Business" to add to any transaction.
+            </p>
+            <button
+              onClick={handleAddTag}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Create First Tag
+            </button>
+          </div>
+        ) : (
+          <div className="p-4">
+            <div className="flex flex-wrap gap-3">
+              {tags.map(tag => (
+                <div
+                  key={tag.id}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 group"
+                >
+                  {tag.color && (
+                    <span 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: tag.color }}
+                    />
+                  )}
+                  <span className="text-sm font-medium text-gray-700">{tag.name}</span>
+                  <div className="hidden group-hover:flex items-center gap-1 ml-1">
+                    <button
+                      onClick={() => handleEdit(tag)}
+                      className="p-0.5 text-gray-400 hover:text-blue-600"
+                      title="Edit"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(tag)}
+                      className="p-0.5 text-gray-400 hover:text-red-600"
+                      title="Delete"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <TagModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleModalSubmit}
+        editingTag={editingTag}
+        isLoading={isSaving}
+      />
+
+      <DeleteConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        tagName={tagToDelete?.name || ''}
+        isLoading={isDeleting}
+      />
+    </div>
+  );
+}

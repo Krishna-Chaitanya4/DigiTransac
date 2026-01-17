@@ -1,0 +1,525 @@
+import { useState, useEffect, useCallback } from 'react';
+import { LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
+import { getLabelsTree, createLabel, updateLabel, deleteLabel } from '../services/labelService';
+
+interface LabelTreeItemProps {
+  label: LabelTree;
+  level: number;
+  onEdit: (label: LabelTree) => void;
+  onDelete: (label: LabelTree) => void;
+  onAddChild: (parentId: string, type: 'Folder' | 'Category') => void;
+  expandedIds: Set<string>;
+  toggleExpand: (id: string) => void;
+}
+
+function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds, toggleExpand }: LabelTreeItemProps) {
+  const isExpanded = expandedIds.has(label.id);
+  const hasChildren = label.children && label.children.length > 0;
+  const isFolder = label.type === 'Folder';
+
+  return (
+    <div>
+      <div 
+        className={`flex items-center gap-2 py-2 px-3 hover:bg-gray-50 rounded-lg group ${level > 0 ? 'ml-6' : ''}`}
+        style={{ marginLeft: level * 24 }}
+      >
+        {/* Expand/Collapse button for folders */}
+        {isFolder ? (
+          <button
+            onClick={() => toggleExpand(label.id)}
+            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600"
+          >
+            <svg 
+              className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              strokeWidth={2} 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-5 h-5" />
+        )}
+
+        {/* Icon */}
+        <span className="text-lg" title={label.type}>
+          {label.icon || (isFolder ? '📁' : '🏷️')}
+        </span>
+
+        {/* Name */}
+        <span className={`flex-1 text-sm ${isFolder ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+          {label.name}
+        </span>
+
+        {/* Color indicator */}
+        {label.color && (
+          <span 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: label.color }}
+          />
+        )}
+
+        {/* Actions */}
+        <div className="hidden group-hover:flex items-center gap-1">
+          {isFolder && (
+            <>
+              <button
+                onClick={() => onAddChild(label.id, 'Folder')}
+                className="p-1 text-gray-400 hover:text-blue-600"
+                title="Add sub-folder"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => onAddChild(label.id, 'Category')}
+                className="p-1 text-gray-400 hover:text-green-600"
+                title="Add category"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => onEdit(label)}
+            className="p-1 text-gray-400 hover:text-blue-600"
+            title="Edit"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+          </button>
+          <button
+            onClick={() => onDelete(label)}
+            className="p-1 text-gray-400 hover:text-red-600"
+            title="Delete"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Children */}
+      {isExpanded && hasChildren && (
+        <div>
+          {label.children.map(child => (
+            <LabelTreeItem
+              key={child.id}
+              label={child}
+              level={level + 1}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onAddChild={onAddChild}
+              expandedIds={expandedIds}
+              toggleExpand={toggleExpand}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface LabelModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: CreateLabelRequest | UpdateLabelRequest) => void;
+  editingLabel: LabelTree | null;
+  parentId: string | null;
+  labelType: 'Folder' | 'Category';
+  isLoading: boolean;
+}
+
+function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelType, isLoading }: LabelModalProps) {
+  const [name, setName] = useState('');
+  const [icon, setIcon] = useState('');
+  const [color, setColor] = useState('');
+
+  useEffect(() => {
+    if (editingLabel) {
+      setName(editingLabel.name);
+      setIcon(editingLabel.icon || '');
+      setColor(editingLabel.color || '');
+    } else {
+      setName('');
+      setIcon('');
+      setColor('');
+    }
+  }, [editingLabel, isOpen]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingLabel) {
+      onSubmit({
+        name: name.trim(),
+        icon: icon || null,
+        color: color || null,
+        parentId: editingLabel.parentId,
+      });
+    } else {
+      onSubmit({
+        name: name.trim(),
+        type: labelType,
+        parentId: parentId,
+        icon: icon || null,
+        color: color || null,
+      });
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const title = editingLabel 
+    ? `Edit ${editingLabel.type}` 
+    : `New ${labelType}`;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+          
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={`Enter ${labelType.toLowerCase()} name`}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label htmlFor="icon" className="block text-sm font-medium text-gray-700 mb-1">
+                  Icon (emoji)
+                </label>
+                <input
+                  type="text"
+                  id="icon"
+                  value={icon}
+                  onChange={(e) => setIcon(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., 🍕, 🚗, 💰"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="color" className="block text-sm font-medium text-gray-700 mb-1">
+                  Color
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    id="color"
+                    value={color || '#6b7280'}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-10 h-10 p-1 border border-gray-300 rounded cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="#6b7280"
+                  />
+                  {color && (
+                    <button
+                      type="button"
+                      onClick={() => setColor('')}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={isLoading || !name.trim()}
+              >
+                {isLoading ? 'Saving...' : editingLabel ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface DeleteConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  labelName: string;
+  isLoading: boolean;
+}
+
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, labelName, isLoading }: DeleteConfirmModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Label</h3>
+          <p className="text-gray-600 mb-6">
+            Are you sure you want to delete "{labelName}"? This action cannot be undone.
+          </p>
+          
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CategoriesTab() {
+  const [labels, setLabels] = useState<LabelTree[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLabel, setEditingLabel] = useState<LabelTree | null>(null);
+  const [newLabelParentId, setNewLabelParentId] = useState<string | null>(null);
+  const [newLabelType, setNewLabelType] = useState<'Folder' | 'Category'>('Folder');
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Delete modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [labelToDelete, setLabelToDelete] = useState<LabelTree | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const loadLabels = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const tree = await getLabelsTree();
+      setLabels(tree);
+      
+      // Auto-expand root folders
+      const rootIds = new Set(tree.map(l => l.id));
+      setExpandedIds(rootIds);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load labels');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLabels();
+  }, [loadLabels]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleAddRootFolder = () => {
+    setEditingLabel(null);
+    setNewLabelParentId(null);
+    setNewLabelType('Folder');
+    setIsModalOpen(true);
+  };
+
+  const handleAddChild = (parentId: string, type: 'Folder' | 'Category') => {
+    setEditingLabel(null);
+    setNewLabelParentId(parentId);
+    setNewLabelType(type);
+    setIsModalOpen(true);
+    
+    // Auto-expand parent
+    setExpandedIds(prev => new Set([...prev, parentId]));
+  };
+
+  const handleEdit = (label: LabelTree) => {
+    setEditingLabel(label);
+    setNewLabelParentId(label.parentId);
+    setNewLabelType(label.type);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (label: LabelTree) => {
+    setLabelToDelete(label);
+    setDeleteModalOpen(true);
+  };
+
+  const handleModalSubmit = async (data: CreateLabelRequest | UpdateLabelRequest) => {
+    try {
+      setIsSaving(true);
+      if (editingLabel) {
+        await updateLabel(editingLabel.id, data as UpdateLabelRequest);
+      } else {
+        await createLabel(data as CreateLabelRequest);
+      }
+      await loadLabels();
+      setIsModalOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save label');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!labelToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteLabel(labelToDelete.id);
+      await loadLabels();
+      setDeleteModalOpen(false);
+      setLabelToDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete label');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">×</button>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-sm text-gray-500">
+          Organize your transactions with folders and categories
+        </p>
+        <button
+          onClick={handleAddRootFolder}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          New Folder
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200">
+        {labels.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h2>
+            <p className="text-gray-500 mb-4">
+              Create folders and categories to organize your transactions.
+            </p>
+            <button
+              onClick={handleAddRootFolder}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Create First Folder
+            </button>
+          </div>
+        ) : (
+          <div className="py-2">
+            {labels.map(label => (
+              <LabelTreeItem
+                key={label.id}
+                label={label}
+                level={0}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onAddChild={handleAddChild}
+                expandedIds={expandedIds}
+                toggleExpand={toggleExpand}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <LabelModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleModalSubmit}
+        editingLabel={editingLabel}
+        parentId={newLabelParentId}
+        labelType={newLabelType}
+        isLoading={isSaving}
+      />
+
+      <DeleteConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        labelName={labelToDelete?.name || ''}
+        isLoading={isDeleting}
+      />
+    </div>
+  );
+}
