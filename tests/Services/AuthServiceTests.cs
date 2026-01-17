@@ -16,6 +16,7 @@ public class AuthServiceTests
     private readonly Mock<IEmailVerificationRepository> _emailVerificationRepositoryMock;
     private readonly Mock<IRefreshTokenRepository> _refreshTokenRepositoryMock;
     private readonly Mock<IEmailService> _emailServiceMock;
+    private readonly Mock<ILabelService> _labelServiceMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
     private readonly AuthService _authService;
@@ -26,6 +27,7 @@ public class AuthServiceTests
         _emailVerificationRepositoryMock = new Mock<IEmailVerificationRepository>();
         _refreshTokenRepositoryMock = new Mock<IRefreshTokenRepository>();
         _emailServiceMock = new Mock<IEmailService>();
+        _labelServiceMock = new Mock<ILabelService>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
         {
@@ -45,6 +47,7 @@ public class AuthServiceTests
             _emailVerificationRepositoryMock.Object,
             _refreshTokenRepositoryMock.Object,
             _emailServiceMock.Object,
+            _labelServiceMock.Object,
             _jwtSettings,
             _loggerMock.Object
         );

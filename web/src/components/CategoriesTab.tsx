@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
 import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel } from '../services/labelService';
 
@@ -14,6 +14,159 @@ function getLabelPath(labelId: string, allLabels: Label[]): string {
   }
   
   return path.join(' → ');
+}
+
+// Searchable folder dropdown component
+interface SearchableFolderDropdownProps {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  folders: Label[];
+  allLabels: Label[];
+  placeholder?: string;
+}
+
+function SearchableFolderDropdown({ value, onChange, folders, allLabels }: SearchableFolderDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter folders based on search
+  const filteredFolders = useMemo(() => {
+    if (!search.trim()) return folders;
+    const searchLower = search.toLowerCase();
+    return folders.filter(folder => {
+      const path = getLabelPath(folder.id, allLabels).toLowerCase();
+      return folder.name.toLowerCase().includes(searchLower) || path.includes(searchLower);
+    });
+  }, [folders, search, allLabels]);
+
+  // Get selected folder info
+  const selectedFolder = value ? folders.find(f => f.id === value) : null;
+  const selectedPath = selectedFolder ? getLabelPath(selectedFolder.id, allLabels) : null;
+
+  const handleSelect = (folderId: string | null) => {
+    onChange(folderId);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Selected value display / trigger */}
+      <button
+        type="button"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen) {
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }
+        }}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center gap-2"
+      >
+        {selectedFolder ? (
+          <>
+            <span>{selectedFolder.icon || '📁'}</span>
+            <div className="flex-1 min-w-0">
+              <span className="text-gray-900">{selectedFolder.name}</span>
+              {selectedPath && selectedPath !== selectedFolder.name && (
+                <span className="text-xs text-gray-400 ml-2 truncate">({selectedPath})</span>
+              )}
+            </div>
+          </>
+        ) : (
+          <span className="text-gray-500">None (Root level)</span>
+        )}
+        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+          {/* Search input */}
+          <div className="p-2 border-b border-gray-100">
+            <div className="relative">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+              </svg>
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search folders..."
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Options list */}
+          <div className="max-h-60 overflow-y-auto">
+            {/* Root option */}
+            <button
+              type="button"
+              onClick={() => handleSelect(null)}
+              className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 ${
+                value === null ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+              }`}
+            >
+              <span className="text-gray-400">—</span>
+              <span>None (Root level)</span>
+            </button>
+
+            {/* Folder options */}
+            {filteredFolders.length > 0 ? (
+              filteredFolders.map(folder => {
+                const path = getLabelPath(folder.id, allLabels);
+                const isSelected = value === folder.id;
+                return (
+                  <button
+                    key={folder.id}
+                    type="button"
+                    onClick={() => handleSelect(folder.id)}
+                    className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 ${
+                      isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    }`}
+                  >
+                    <span>{folder.icon || '📁'}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={isSelected ? 'font-medium' : ''}>{folder.name}</span>
+                      {path !== folder.name && (
+                        <p className="text-xs text-gray-400 truncate">{path}</p>
+                      )}
+                    </div>
+                    {isSelected && (
+                      <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-3 py-4 text-center text-sm text-gray-500">
+                No folders found matching "{search}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Search result item component
@@ -304,19 +457,12 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
                 <label htmlFor="parent" className="block text-sm font-medium text-gray-700 mb-1">
                   Parent Folder
                 </label>
-                <select
-                  id="parent"
-                  value={selectedParentId || ''}
-                  onChange={(e) => setSelectedParentId(e.target.value || null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="">None (Root level)</option>
-                  {availableParents.map(parent => (
-                    <option key={parent.id} value={parent.id}>
-                      {parent.icon || '📁'} {parent.name}
-                    </option>
-                  ))}
-                </select>
+                <SearchableFolderDropdown
+                  value={selectedParentId}
+                  onChange={setSelectedParentId}
+                  folders={availableParents}
+                  allLabels={allLabels}
+                />
                 <p className="mt-1 text-xs text-gray-500">
                   {labelType === 'Category' 
                     ? 'Categories can be placed in folders or at root level'
@@ -482,9 +628,9 @@ export default function CategoriesTab() {
       setLabels(tree);
       setAllLabels(flat);
       
-      // Auto-expand root folders
-      const rootIds = new Set(tree.filter(l => l.type === 'Folder').map(l => l.id));
-      setExpandedIds(rootIds);
+      // Auto-expand all folders by default
+      const allFolders = flat.filter(l => l.type === 'Folder').map(l => l.id);
+      setExpandedIds(new Set(allFolders));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load labels');
     } finally {
@@ -656,28 +802,23 @@ export default function CategoriesTab() {
             )}
           </div>
 
-          {/* Expand/Collapse buttons */}
+          {/* Expand/Collapse toggle button */}
           {!searchQuery && allFolderIds.length > 0 && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={expandAll}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-                title="Expand All"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                </svg>
-              </button>
-              <button
-                onClick={collapseAll}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-                title="Collapse All"
-              >
+            <button
+              onClick={expandedIds.size === allFolderIds.length ? collapseAll : expandAll}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+              title={expandedIds.size === allFolderIds.length ? "Collapse All" : "Expand All"}
+            >
+              {expandedIds.size === allFolderIds.length ? (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
                 </svg>
-              </button>
-            </div>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+              )}
+            </button>
           )}
         </div>
       )}
