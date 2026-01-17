@@ -438,8 +438,8 @@ describe('TagsTab', () => {
       });
 
       // Act - find the Delete button in the modal (by looking at the modal dialog)
-      const modal = screen.getByRole('heading', { name: 'Delete Tag' }).closest('.relative');
-      const confirmButton = within(modal!).getByRole('button', { name: 'Delete' });
+      const modal = screen.getByRole('heading', { name: 'Delete Tag' }).closest('.relative') as HTMLElement;
+      const confirmButton = within(modal).getByRole('button', { name: 'Delete' });
       await user.click(confirmButton);
 
       // Assert
