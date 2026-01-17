@@ -1,6 +1,72 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
 import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel } from '../services/labelService';
+
+// Helper to get path for a label
+function getLabelPath(labelId: string, allLabels: Label[]): string {
+  const labelMap = new Map(allLabels.map(l => [l.id, l]));
+  const path: string[] = [];
+  let current = labelMap.get(labelId);
+  
+  while (current) {
+    path.unshift(current.name);
+    current = current.parentId ? labelMap.get(current.parentId) : undefined;
+  }
+  
+  return path.join(' → ');
+}
+
+// Search result item component
+interface SearchResultItemProps {
+  label: Label;
+  path: string;
+  onEdit: (label: Label) => void;
+  onDelete: (label: Label) => void;
+}
+
+function SearchResultItem({ label, path, onEdit, onDelete }: SearchResultItemProps) {
+  const isFolder = label.type === 'Folder';
+  
+  return (
+    <div className="flex items-center gap-2 py-2 px-3 hover:bg-gray-50 rounded-lg group">
+      <span className="text-lg">
+        {label.icon || (isFolder ? '📁' : '🏷️')}
+      </span>
+      <div className="flex-1 min-w-0">
+        <span className={`text-sm ${isFolder ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+          {label.name}
+        </span>
+        <p className="text-xs text-gray-400 truncate">{path}</p>
+      </div>
+      {label.color && (
+        <span 
+          className="w-3 h-3 rounded-full flex-shrink-0" 
+          style={{ backgroundColor: label.color }}
+        />
+      )}
+      <div className="hidden group-hover:flex items-center gap-1">
+        <button
+          onClick={() => onEdit(label as unknown as Label)}
+          className="p-1 text-gray-400 hover:text-blue-600"
+          title="Edit"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+          </svg>
+        </button>
+        <button
+          onClick={() => onDelete(label as unknown as Label)}
+          className="p-1 text-gray-400 hover:text-red-600"
+          title="Delete"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 interface LabelTreeItemProps {
   label: LabelTree;
@@ -377,6 +443,7 @@ export default function CategoriesTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -389,6 +456,23 @@ export default function CategoriesTab() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [labelToDelete, setLabelToDelete] = useState<LabelTree | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Search results
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    return allLabels
+      .filter(l => l.name.toLowerCase().includes(query))
+      .map(l => ({
+        label: l,
+        path: getLabelPath(l.id, allLabels)
+      }));
+  }, [searchQuery, allLabels]);
+
+  // Get all folder IDs for expand/collapse all
+  const allFolderIds = useMemo(() => {
+    return allLabels.filter(l => l.type === 'Folder').map(l => l.id);
+  }, [allLabels]);
 
   const loadLabels = useCallback(async () => {
     try {
@@ -422,6 +506,14 @@ export default function CategoriesTab() {
       }
       return next;
     });
+  };
+
+  const expandAll = () => {
+    setExpandedIds(new Set(allFolderIds));
+  };
+
+  const collapseAll = () => {
+    setExpandedIds(new Set());
   };
 
   const handleAddRootFolder = () => {
@@ -510,6 +602,7 @@ export default function CategoriesTab() {
         </div>
       )}
 
+      {/* Header with buttons */}
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">
           Organize your transactions with folders and categories
@@ -536,35 +629,116 @@ export default function CategoriesTab() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
-        {labels.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
-              <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
-              </svg>
-            </div>
-            <h2 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h2>
-            <p className="text-gray-500 mb-4">
-              Create categories to organize your transactions, or use folders to group related categories.
-            </p>
-            <div className="flex items-center justify-center gap-3">
+      {/* Search and Expand/Collapse controls */}
+      {labels.length > 0 && (
+        <div className="flex items-center gap-3 mb-4">
+          {/* Search */}
+          <div className="relative flex-1 max-w-sm">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search categories..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            {searchQuery && (
               <button
-                onClick={handleAddRootCategory}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                 </svg>
-                Create Category
+              </button>
+            )}
+          </div>
+
+          {/* Expand/Collapse buttons */}
+          {!searchQuery && allFolderIds.length > 0 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={expandAll}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                title="Expand All"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
               </button>
               <button
-                onClick={handleAddRootFolder}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                onClick={collapseAll}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                title="Collapse All"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Search Results */}
+      {searchQuery && (
+        <div className="bg-white rounded-lg border border-gray-200 mb-4">
+          {searchResults.length === 0 ? (
+            <div className="p-4 text-center text-gray-500 text-sm">
+              No results found for "{searchQuery}"
+            </div>
+          ) : (
+            <div className="py-2">
+              <div className="px-3 py-1 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+              </div>
+              {searchResults.map(({ label, path }) => (
+                <SearchResultItem
+                  key={label.id}
+                  label={label}
+                  path={path}
+                  onEdit={(l) => handleEdit(l as unknown as LabelTree)}
+                  onDelete={(l) => handleDelete(l as unknown as LabelTree)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tree View (hidden during search) */}
+      {!searchQuery && (
+        <div className="bg-white rounded-lg border border-gray-200">
+          {labels.length === 0 ? (
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h2>
+              <p className="text-gray-500 mb-4">
+                Create categories to organize your transactions, or use folders to group related categories.
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={handleAddRootCategory}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Create Category
+                </button>
+                <button
+                  onClick={handleAddRootFolder}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
                 Create Folder
               </button>
@@ -587,6 +761,7 @@ export default function CategoriesTab() {
           </div>
         )}
       </div>
+      )}
 
       <LabelModal
         isOpen={isModalOpen}

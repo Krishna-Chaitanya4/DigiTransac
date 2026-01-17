@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Tag, CreateTagRequest, UpdateTagRequest } from '../types/labels';
 import { getTags, createTag, updateTag, deleteTag } from '../services/tagService';
 
@@ -190,6 +190,7 @@ export default function TagsTab() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -217,6 +218,13 @@ export default function TagsTab() {
   useEffect(() => {
     loadTags();
   }, [loadTags]);
+
+  // Filtered tags based on search
+  const filteredTags = useMemo(() => {
+    if (!searchQuery.trim()) return tags;
+    const query = searchQuery.toLowerCase();
+    return tags.filter(t => t.name.toLowerCase().includes(query));
+  }, [searchQuery, tags]);
 
   const handleAddTag = () => {
     setEditingTag(null);
@@ -298,6 +306,32 @@ export default function TagsTab() {
         </button>
       </div>
 
+      {/* Search bar (only when there are tags) */}
+      {tags.length > 0 && (
+        <div className="relative max-w-sm mb-4">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search tags..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg border border-gray-200">
         {tags.length === 0 ? (
           <div className="p-8 text-center">
@@ -321,10 +355,14 @@ export default function TagsTab() {
               Create First Tag
             </button>
           </div>
+        ) : filteredTags.length === 0 ? (
+          <div className="p-4 text-center text-gray-500 text-sm">
+            No tags found for "{searchQuery}"
+          </div>
         ) : (
           <div className="p-4">
             <div className="flex flex-wrap gap-3">
-              {tags.map(tag => (
+              {filteredTags.map(tag => (
                 <div
                   key={tag.id}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 group"
