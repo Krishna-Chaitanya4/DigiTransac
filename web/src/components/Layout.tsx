@@ -101,11 +101,7 @@ export default function Layout() {
         {/* Logo */}
         <div className={`flex items-center h-16 border-b border-gray-200 ${sidebarCollapsed ? 'lg:justify-center lg:px-0 px-4' : 'px-4'}`}>
           <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-            </div>
+            <img src="/favicon.svg" alt="DigiTransac" className="w-8 h-8 flex-shrink-0" />
             <span className={`text-xl font-bold text-gray-900 transition-opacity duration-300 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
               DigiTransac
             </span>
