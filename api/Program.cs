@@ -23,6 +23,7 @@ builder.Services.AddSingleton<IRefreshTokenRepository, RefreshTokenRepository>()
 builder.Services.AddSingleton<ITwoFactorTokenRepository, TwoFactorTokenRepository>();
 builder.Services.AddSingleton<ILabelRepository, LabelRepository>();
 builder.Services.AddSingleton<ITagRepository, TagRepository>();
+builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
 
 // Add services
 builder.Services.AddSingleton<IEmailService, GmailEmailService>();
@@ -30,6 +31,7 @@ builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<ITagService, TagService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 
 // Add JWT authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
@@ -112,5 +114,6 @@ app.MapAuthEndpoints();
 app.MapTwoFactorEndpoints();
 app.MapLabelEndpoints();
 app.MapTagEndpoints();
+app.MapAccountEndpoints();
 
 app.Run();

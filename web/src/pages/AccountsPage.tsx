@@ -1,20 +1,893 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  Account,
+  AccountType,
+  AccountSummary,
+  CreateAccountRequest,
+  UpdateAccountRequest,
+  accountTypeConfig,
+  getAccounts,
+  getAccountSummary,
+  createAccount,
+  updateAccount,
+  deleteAccount,
+  adjustBalance,
+  formatCurrency,
+} from '../services/accountService';
+
+// Preset colors for accounts
+const PRESET_COLORS = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+];
+
+interface AccountModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: CreateAccountRequest | UpdateAccountRequest) => void;
+  editingAccount: Account | null;
+  isLoading: boolean;
+}
+
+function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading }: AccountModalProps) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<AccountType>('Bank');
+  const [color, setColor] = useState('');
+  const [currency, setCurrency] = useState('INR');
+  const [initialBalance, setInitialBalance] = useState('0');
+  const [institution, setInstitution] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [notes, setNotes] = useState('');
+  const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
+
+  useEffect(() => {
+    if (editingAccount) {
+      setName(editingAccount.name);
+      setType(editingAccount.type);
+      setColor(editingAccount.color || '');
+      setCurrency(editingAccount.currency);
+      setInitialBalance(editingAccount.initialBalance.toString());
+      setInstitution(editingAccount.institution || '');
+      setAccountNumber(editingAccount.accountNumber || '');
+      setNotes(editingAccount.notes || '');
+      setIncludeInNetWorth(editingAccount.includeInNetWorth);
+    } else {
+      setName('');
+      setType('Bank');
+      setColor('');
+      setCurrency('INR');
+      setInitialBalance('0');
+      setInstitution('');
+      setAccountNumber('');
+      setNotes('');
+      setIncludeInNetWorth(true);
+    }
+  }, [editingAccount, isOpen]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingAccount) {
+      onSubmit({
+        name: name.trim(),
+        color: color || null,
+        currency,
+        institution: institution.trim() || null,
+        accountNumber: accountNumber.trim() || null,
+        notes: notes.trim() || null,
+        includeInNetWorth,
+      });
+    } else {
+      onSubmit({
+        name: name.trim(),
+        type,
+        color: color || null,
+        currency,
+        initialBalance: parseFloat(initialBalance) || 0,
+        institution: institution.trim() || null,
+        accountNumber: accountNumber.trim() || null,
+        notes: notes.trim() || null,
+        includeInNetWorth,
+      });
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            {editingAccount ? 'Edit Account' : 'New Account'}
+          </h3>
+
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              {/* Account Name */}
+              <div>
+                <label htmlFor="accountName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Account Name *
+                </label>
+                <input
+                  type="text"
+                  id="accountName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., HDFC Savings"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {/* Account Type (only for new accounts) */}
+              {!editingAccount && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Account Type *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(Object.keys(accountTypeConfig) as AccountType[]).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setType(t)}
+                        className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors ${
+                          type === t
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="text-xl">{accountTypeConfig[t].icon}</span>
+                        <span className="text-sm font-medium">{accountTypeConfig[t].label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Initial Balance (only for new accounts) */}
+              {!editingAccount && (
+                <div>
+                  <label htmlFor="initialBalance" className="block text-sm font-medium text-gray-700 mb-1">
+                    Initial Balance
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                    <input
+                      type="number"
+                      id="initialBalance"
+                      value={initialBalance}
+                      onChange={(e) => setInitialBalance(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {accountTypeConfig[type].isLiability
+                      ? 'Enter the amount you owe (as positive number)'
+                      : 'Enter your current balance'}
+                  </p>
+                </div>
+              )}
+
+              {/* Color */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Color
+                </label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {PRESET_COLORS.map((presetColor) => (
+                    <button
+                      key={presetColor}
+                      type="button"
+                      onClick={() => setColor(presetColor)}
+                      className={`w-8 h-8 rounded-full border-2 ${
+                        color === presetColor ? 'border-gray-900 scale-110' : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: presetColor }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={color || accountTypeConfig[type].defaultColor}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-10 h-10 p-1 border border-gray-300 rounded cursor-pointer"
+                  />
+                  {color && (
+                    <button
+                      type="button"
+                      onClick={() => setColor('')}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Use default
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Institution */}
+              <div>
+                <label htmlFor="institution" className="block text-sm font-medium text-gray-700 mb-1">
+                  Institution / Bank
+                </label>
+                <input
+                  type="text"
+                  id="institution"
+                  value={institution}
+                  onChange={(e) => setInstitution(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., HDFC Bank"
+                />
+              </div>
+
+              {/* Account Number */}
+              <div>
+                <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                  Account Number (last 4 digits)
+                </label>
+                <input
+                  type="text"
+                  id="accountNumber"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., ****1234"
+                  maxLength={10}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Optional notes..."
+                  rows={2}
+                />
+              </div>
+
+              {/* Include in Net Worth */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="includeInNetWorth"
+                  checked={includeInNetWorth}
+                  onChange={(e) => setIncludeInNetWorth(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="includeInNetWorth" className="text-sm text-gray-700">
+                  Include in net worth calculation
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={isLoading || !name.trim()}
+              >
+                {isLoading ? 'Saving...' : editingAccount ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface DeleteConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  accountName: string;
+  isLoading: boolean;
+}
+
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, accountName, isLoading }: DeleteConfirmModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Account</h3>
+          <p className="text-gray-600 mb-4">
+            Are you sure you want to delete <strong>{accountName}</strong>? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface AdjustBalanceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (newBalance: number, notes: string) => void;
+  account: Account | null;
+  isLoading: boolean;
+}
+
+function AdjustBalanceModal({ isOpen, onClose, onSubmit, account, isLoading }: AdjustBalanceModalProps) {
+  const [newBalance, setNewBalance] = useState('');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (account) {
+      setNewBalance(account.currentBalance.toString());
+      setNotes('');
+    }
+  }, [account, isOpen]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(parseFloat(newBalance) || 0, notes);
+  };
+
+  if (!isOpen || !account) return null;
+
+  const difference = (parseFloat(newBalance) || 0) - account.currentBalance;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Adjust Balance - {account.name}
+          </h3>
+
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Balance
+                </label>
+                <div className="text-lg font-semibold text-gray-900">
+                  {formatCurrency(account.currentBalance, account.currency)}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="newBalance" className="block text-sm font-medium text-gray-700 mb-1">
+                  New Balance
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <input
+                    type="number"
+                    id="newBalance"
+                    value={newBalance}
+                    onChange={(e) => setNewBalance(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    step="0.01"
+                    autoFocus
+                  />
+                </div>
+                {difference !== 0 && (
+                  <p className={`mt-1 text-sm ${difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {difference > 0 ? '+' : ''}{formatCurrency(difference, account.currency)}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="adjustNotes" className="block text-sm font-medium text-gray-700 mb-1">
+                  Reason (optional)
+                </label>
+                <input
+                  type="text"
+                  id="adjustNotes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Bank reconciliation"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Updating...' : 'Update Balance'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface AccountCardProps {
+  account: Account;
+  onEdit: () => void;
+  onDelete: () => void;
+  onAdjustBalance: () => void;
+  onArchiveToggle: () => void;
+}
+
+function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveToggle }: AccountCardProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const config = accountTypeConfig[account.type];
+  const displayColor = account.color || config.defaultColor;
+
+  return (
+    <div
+      className={`bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow ${
+        account.isArchived ? 'opacity-60' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl"
+            style={{ backgroundColor: displayColor }}
+          >
+            {config.icon}
+          </div>
+          <div>
+            <h3 className="font-medium text-gray-900">{account.name}</h3>
+            <p className="text-sm text-gray-500">
+              {config.label}
+              {account.institution && ` • ${account.institution}`}
+              {account.accountNumber && ` • ${account.accountNumber}`}
+            </p>
+          </div>
+        </div>
+
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-1 rounded hover:bg-gray-100"
+          >
+            <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+            </svg>
+          </button>
+
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+              <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onAdjustBalance();
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Adjust Balance
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onEdit();
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onArchiveToggle();
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  {account.isArchived ? 'Unarchive' : 'Archive'}
+                </button>
+                <hr className="my-1" />
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onDelete();
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-end justify-between">
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Current Balance</p>
+          <p
+            className={`text-2xl font-bold ${
+              config.isLiability
+                ? account.currentBalance > 0
+                  ? 'text-red-600'
+                  : 'text-green-600'
+                : account.currentBalance >= 0
+                ? 'text-gray-900'
+                : 'text-red-600'
+            }`}
+          >
+            {formatCurrency(account.currentBalance, account.currency)}
+          </p>
+        </div>
+
+        {!account.includeInNetWorth && (
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
+            Not in net worth
+          </span>
+        )}
+        {account.isArchived && (
+          <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+            Archived
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({ summary }: { summary: AccountSummary }) {
+  return (
+    <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg p-6 text-white mb-6">
+      <h2 className="text-lg font-medium mb-4">Net Worth</h2>
+      <div className="text-4xl font-bold mb-4">
+        {formatCurrency(summary.netWorth)}
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-blue-200 text-sm">Assets</p>
+          <p className="text-xl font-semibold">{formatCurrency(summary.totalAssets)}</p>
+        </div>
+        <div>
+          <p className="text-blue-200 text-sm">Liabilities</p>
+          <p className="text-xl font-semibold">{formatCurrency(summary.totalLiabilities)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AccountsPage() {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [summary, setSummary] = useState<AccountSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
+
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [adjustingAccount, setAdjustingAccount] = useState<Account | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const [accountsData, summaryData] = await Promise.all([
+        getAccounts(showArchived),
+        getAccountSummary(),
+      ]);
+      setAccounts(accountsData);
+      setSummary(summaryData);
+    } catch {
+      setError('Failed to load accounts');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [showArchived]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Group accounts by type
+  const groupedAccounts = useMemo(() => {
+    const groups: Record<AccountType, Account[]> = {
+      Bank: [],
+      CreditCard: [],
+      Cash: [],
+      DigitalWallet: [],
+      Investment: [],
+      Loan: [],
+    };
+
+    accounts.forEach((account) => {
+      groups[account.type].push(account);
+    });
+
+    return groups;
+  }, [accounts]);
+
+  const handleCreate = () => {
+    setEditingAccount(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (account: Account) => {
+    setEditingAccount(account);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (account: Account) => {
+    setDeletingAccount(account);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleAdjustBalance = (account: Account) => {
+    setAdjustingAccount(account);
+    setIsAdjustModalOpen(true);
+  };
+
+  const handleArchiveToggle = async (account: Account) => {
+    try {
+      await updateAccount(account.id, { isArchived: !account.isArchived });
+      await loadData();
+    } catch {
+      setError('Failed to update account');
+    }
+  };
+
+  const handleModalSubmit = async (data: CreateAccountRequest | UpdateAccountRequest) => {
+    try {
+      setIsSubmitting(true);
+      if (editingAccount) {
+        await updateAccount(editingAccount.id, data as UpdateAccountRequest);
+      } else {
+        await createAccount(data as CreateAccountRequest);
+      }
+      setIsModalOpen(false);
+      await loadData();
+    } catch {
+      setError(editingAccount ? 'Failed to update account' : 'Failed to create account');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingAccount) return;
+
+    try {
+      setIsSubmitting(true);
+      await deleteAccount(deletingAccount.id);
+      setIsDeleteModalOpen(false);
+      setDeletingAccount(null);
+      await loadData();
+    } catch {
+      setError('Failed to delete account');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAdjustSubmit = async (newBalance: number, notes: string) => {
+    if (!adjustingAccount) return;
+
+    try {
+      setIsSubmitting(true);
+      await adjustBalance(adjustingAccount.id, { newBalance, notes });
+      setIsAdjustModalOpen(false);
+      setAdjustingAccount(null);
+      await loadData();
+    } catch {
+      setError('Failed to adjust balance');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Accounts</h1>
-      
-      <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
-          <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
+        <button
+          onClick={handleCreate}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-        </div>
-        <h2 className="text-lg font-medium text-gray-900 mb-2">Manage Your Accounts</h2>
-        <p className="text-gray-500 mb-4">
-          Add and manage your bank accounts, credit cards, wallets, and cash accounts.
-        </p>
-        <p className="text-sm text-gray-400">Coming soon...</p>
+          Add Account
+        </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+          <button onClick={() => setError(null)} className="float-right font-bold">×</button>
+        </div>
+      )}
+
+      {/* Summary Card */}
+      {summary && accounts.length > 0 && <SummaryCard summary={summary} />}
+
+      {/* Show Archived Toggle */}
+      {accounts.length > 0 && (
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="checkbox"
+            id="showArchived"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="showArchived" className="text-sm text-gray-600">
+            Show archived accounts
+          </label>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {accounts.length === 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
+            <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-medium text-gray-900 mb-2">No Accounts Yet</h2>
+          <p className="text-gray-500 mb-4">
+            Add your bank accounts, credit cards, and other financial accounts to track your money.
+          </p>
+          <button
+            onClick={handleCreate}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add Your First Account
+          </button>
+        </div>
+      )}
+
+      {/* Accounts grouped by type */}
+      {accounts.length > 0 && (
+        <div className="space-y-6">
+          {(Object.keys(groupedAccounts) as AccountType[]).map((type) => {
+            const typeAccounts = groupedAccounts[type];
+            if (typeAccounts.length === 0) return null;
+
+            const config = accountTypeConfig[type];
+            const typeTotal = typeAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
+
+            return (
+              <div key={type}>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <span>{config.icon}</span>
+                    {config.label}s
+                    <span className="text-sm font-normal text-gray-500">
+                      ({typeAccounts.length})
+                    </span>
+                  </h2>
+                  <span
+                    className={`text-lg font-semibold ${
+                      config.isLiability ? 'text-red-600' : 'text-gray-900'
+                    }`}
+                  >
+                    {formatCurrency(typeTotal)}
+                  </span>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {typeAccounts.map((account) => (
+                    <AccountCard
+                      key={account.id}
+                      account={account}
+                      onEdit={() => handleEdit(account)}
+                      onDelete={() => handleDelete(account)}
+                      onAdjustBalance={() => handleAdjustBalance(account)}
+                      onArchiveToggle={() => handleArchiveToggle(account)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modals */}
+      <AccountModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleModalSubmit}
+        editingAccount={editingAccount}
+        isLoading={isSubmitting}
+      />
+
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingAccount(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        accountName={deletingAccount?.name || ''}
+        isLoading={isSubmitting}
+      />
+
+      <AdjustBalanceModal
+        isOpen={isAdjustModalOpen}
+        onClose={() => {
+          setIsAdjustModalOpen(false);
+          setAdjustingAccount(null);
+        }}
+        onSubmit={handleAdjustSubmit}
+        account={adjustingAccount}
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }
