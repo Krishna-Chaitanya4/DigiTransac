@@ -37,7 +37,7 @@ public class Account
     public string? Color { get; set; }
 
     [BsonElement("currency")]
-    public string Currency { get; set; } = "INR";
+    public string Currency { get; set; } = "USD";
 
     [BsonElement("initialBalance")]
     public decimal InitialBalance { get; set; } = 0;

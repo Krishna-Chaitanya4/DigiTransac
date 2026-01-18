@@ -43,13 +43,14 @@ interface AccountModalProps {
   onSubmit: (data: CreateAccountRequest | UpdateAccountRequest) => void;
   editingAccount: Account | null;
   isLoading: boolean;
+  primaryCurrency: string;
 }
 
-function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading }: AccountModalProps) {
+function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading, primaryCurrency }: AccountModalProps) {
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('Bank');
   const [color, setColor] = useState('');
-  const [currency, setCurrency] = useState('INR');
+  const [currency, setCurrency] = useState(primaryCurrency);
   const [initialBalance, setInitialBalance] = useState('0');
   const [institution, setInstitution] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -83,14 +84,14 @@ function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading }: 
       setName('');
       setType('Bank');
       setColor('');
-      setCurrency('INR');
+      setCurrency(primaryCurrency);
       setInitialBalance('0');
       setInstitution('');
       setAccountNumber('');
       setNotes('');
       setIncludeInNetWorth(true);
     }
-  }, [editingAccount, isOpen]);
+  }, [editingAccount, isOpen, primaryCurrency]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1032,6 +1033,7 @@ export default function AccountsPage() {
         onSubmit={handleModalSubmit}
         editingAccount={editingAccount}
         isLoading={isSubmitting}
+        primaryCurrency={summary?.primaryCurrency || 'USD'}
       />
 
       <DeleteConfirmModal

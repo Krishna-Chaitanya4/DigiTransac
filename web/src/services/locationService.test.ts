@@ -55,9 +55,6 @@ describe('locationService', () => {
       // @ts-expect-error - Testing undefined geolocation
       delete mockNavigator.geolocation;
       
-      // Check the 'in' operator behavior
-      const hasGeolocation = 'geolocation' in navigator && navigator.geolocation !== undefined;
-      
       // Since jsdom always has geolocation, we test by directly checking our function logic
       // Our function checks: 'geolocation' in navigator
       // We can't truly remove it from jsdom's navigator, so we test the positive case

@@ -31,7 +31,7 @@ public class User
     public string? TwoFactorSecret { get; set; }
 
     [BsonElement("primaryCurrency")]
-    public string PrimaryCurrency { get; set; } = "INR";
+    public string PrimaryCurrency { get; set; } = "USD";
 
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

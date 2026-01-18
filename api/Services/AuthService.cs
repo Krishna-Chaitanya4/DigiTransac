@@ -174,7 +174,7 @@ public class AuthService : IAuthService
         }
 
         // Validate and set primary currency
-        var primaryCurrency = "INR"; // Default
+        var primaryCurrency = "USD"; // Default (international)
         if (!string.IsNullOrWhiteSpace(request.PrimaryCurrency))
         {
             var currencyCode = request.PrimaryCurrency.ToUpperInvariant();

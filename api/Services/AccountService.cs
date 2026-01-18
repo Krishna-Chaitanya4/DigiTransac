@@ -51,7 +51,7 @@ public class AccountService : IAccountService
         
         // Get user's primary currency preference
         var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "INR";
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
         
         // Get exchange rates
         var ratesResponse = await _exchangeRateService.GetRatesAsync();
@@ -148,6 +148,14 @@ public class AccountService : IAccountService
 
         var count = await _accountRepository.GetCountByUserIdAsync(userId);
 
+        // Get user's primary currency if not specified
+        var currency = request.Currency;
+        if (string.IsNullOrWhiteSpace(currency))
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            currency = user?.PrimaryCurrency ?? "USD";
+        }
+
         var account = new Account
         {
             UserId = userId,
@@ -155,7 +163,7 @@ public class AccountService : IAccountService
             Type = accountType,
             Icon = request.Icon,
             Color = request.Color,
-            Currency = request.Currency ?? "INR",
+            Currency = currency,
             InitialBalance = request.InitialBalance ?? 0,
             CurrentBalance = request.InitialBalance ?? 0,
             Institution = request.Institution,
