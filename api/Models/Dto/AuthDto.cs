@@ -14,9 +14,13 @@ public record RegisterRequest(string Email, string Password, string FullName);
 
 public record LoginRequest(string Email, string Password);
 
+// Full auth response with refresh token (used internally)
 public record AuthResponse(string AccessToken, string RefreshToken, string Email, string FullName, bool IsEmailVerified);
 
-public record RefreshTokenRequest(string RefreshToken);
+// Auth response without refresh token (refresh token goes in HttpOnly cookie)
+public record AuthResponseWithoutRefresh(string AccessToken, string Email, string FullName, bool IsEmailVerified);
+
+public record RefreshTokenRequest(string? RefreshToken);
 
 public record VerificationResponse(string Message, string? VerificationToken = null);
 
@@ -26,6 +30,9 @@ public record DeleteAccountRequest(string Password);
 public record UpdateNameRequest(string FullName);
 public record UpdateEmailRequest(string NewEmail);
 public record VerifyEmailChangeRequest(string NewEmail, string Code);
+
+// Password change (while logged in - preserves encrypted data)
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
 // Forgot Password flow
 public record ForgotPasswordRequest(string Email);
@@ -40,10 +47,20 @@ public record DisableTwoFactorRequest(string Password);
 public record VerifyTwoFactorRequest(string UserId, string Code);
 public record TwoFactorStatusResponse(bool Enabled);
 
-// Login response that may require 2FA
+// Login response that may require 2FA (refresh token in HttpOnly cookie)
 public record LoginResponse(
     string? AccessToken, 
     string? RefreshToken, 
+    string? Email, 
+    string? FullName, 
+    bool? IsEmailVerified,
+    bool RequiresTwoFactor = false,
+    string? TwoFactorToken = null
+);
+
+// Login response without refresh token (sent in HttpOnly cookie)
+public record LoginResponseWithoutRefresh(
+    string? AccessToken, 
     string? Email, 
     string? FullName, 
     bool? IsEmailVerified,

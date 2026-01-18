@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -118,7 +120,12 @@ public static class TwoFactorEndpoints
         .Produces(401);
 
         // Verify 2FA during login
-        group.MapPost("/verify", async ([FromBody] TwoFactorLoginRequest request, IAuthService authService) =>
+        group.MapPost("/verify", async (
+            [FromBody] TwoFactorLoginRequest request, 
+            IAuthService authService,
+            ICookieService cookieService,
+            IOptions<JwtSettings> jwtSettings,
+            HttpContext httpContext) =>
         {
             if (string.IsNullOrWhiteSpace(request.TwoFactorToken) || string.IsNullOrWhiteSpace(request.Code))
             {
@@ -132,10 +139,17 @@ public static class TwoFactorEndpoints
                 return Results.BadRequest(new ErrorResponse("Invalid or expired verification code"));
             }
 
-            return Results.Ok(result);
+            // Set refresh token as HttpOnly cookie
+            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+
+            return Results.Ok(new AuthResponseWithoutRefresh(
+                result.AccessToken,
+                result.Email,
+                result.FullName,
+                result.IsEmailVerified));
         })
         .WithName("VerifyTwoFactorLogin")
-        .Produces<AuthResponse>(200)
+        .Produces<AuthResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400);
 
         // Send email OTP as backup for 2FA
@@ -160,7 +174,12 @@ public static class TwoFactorEndpoints
         .Produces<ErrorResponse>(400);
 
         // Verify email OTP for 2FA login
-        group.MapPost("/verify-email-code", async ([FromBody] TwoFactorEmailOtpLoginRequest request, IAuthService authService) =>
+        group.MapPost("/verify-email-code", async (
+            [FromBody] TwoFactorEmailOtpLoginRequest request, 
+            IAuthService authService,
+            ICookieService cookieService,
+            IOptions<JwtSettings> jwtSettings,
+            HttpContext httpContext) =>
         {
             if (string.IsNullOrWhiteSpace(request.TwoFactorToken) || string.IsNullOrWhiteSpace(request.EmailCode))
             {
@@ -174,10 +193,17 @@ public static class TwoFactorEndpoints
                 return Results.BadRequest(new ErrorResponse("Invalid or expired verification code"));
             }
 
-            return Results.Ok(result);
+            // Set refresh token as HttpOnly cookie
+            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+
+            return Results.Ok(new AuthResponseWithoutRefresh(
+                result.AccessToken,
+                result.Email,
+                result.FullName,
+                result.IsEmailVerified));
         })
         .WithName("VerifyTwoFactorEmailOtp")
-        .Produces<AuthResponse>(200)
+        .Produces<AuthResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400);
     }
 }

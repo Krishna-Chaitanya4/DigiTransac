@@ -91,7 +91,8 @@ public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory
             Email = "test@example.com",
             FullName = "Test User",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-            IsEmailVerified = true
+            IsEmailVerified = true,
+            WrappedDek = new byte[64] // Server-wrapped DEK
         };
 
         _factory.UserRepositoryMock.Setup(x => x.GetByEmailAsync(user.Email))
@@ -108,7 +109,10 @@ public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory
         result.Should().NotBeNull();
         result!.Email.Should().Be(user.Email);
         result.AccessToken.Should().NotBeNullOrEmpty();
-        result.RefreshToken.Should().NotBeNullOrEmpty();
+        // RefreshToken is now sent via HttpOnly cookie, not in the response body
+        // Verify the Set-Cookie header is present
+        response.Headers.TryGetValues("Set-Cookie", out var cookies).Should().BeTrue();
+        cookies.Should().Contain(c => c.Contains("digitransac_refresh_token"));
     }
 
     [Fact]

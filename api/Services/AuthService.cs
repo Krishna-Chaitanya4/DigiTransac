@@ -37,6 +37,9 @@ public interface IAuthService
     Task<(bool Success, string Message)> SendEmailChangeCodeAsync(string userId, string newEmail);
     Task<(bool Success, string Message)> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code);
     
+    // Password management
+    Task<(bool Success, string Message)> ChangePasswordAsync(string userId, string currentPassword, string newPassword);
+    
     // Forgot password flow
     Task<(bool Success, string Message)> SendPasswordResetCodeAsync(string email);
     Task<(bool Success, string Message, string? VerificationToken)> VerifyPasswordResetCodeAsync(string email, string code);
@@ -52,6 +55,7 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly ILabelService _labelService;
     private readonly ITwoFactorService _twoFactorService;
+    private readonly IKeyManagementService _keyManagementService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -63,6 +67,7 @@ public class AuthService : IAuthService
         IEmailService emailService,
         ILabelService labelService,
         ITwoFactorService twoFactorService,
+        IKeyManagementService keyManagementService,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
     {
@@ -73,6 +78,8 @@ public class AuthService : IAuthService
         _emailService = emailService;
         _labelService = labelService;
         _twoFactorService = twoFactorService;
+        _keyManagementService = keyManagementService;
+        _keyManagementService = keyManagementService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
     }
@@ -184,6 +191,10 @@ public class AuthService : IAuthService
             }
         }
 
+        // Generate server-side DEK for user (wrapped with server KEK)
+        var dek = _keyManagementService.GenerateDek();
+        var wrappedDek = await _keyManagementService.WrapKeyAsync(dek);
+
         // Create user
         var user = new User
         {
@@ -192,6 +203,7 @@ public class AuthService : IAuthService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             IsEmailVerified = true, // Already verified!
             PrimaryCurrency = primaryCurrency,
+            WrappedDek = wrappedDek,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -537,6 +549,46 @@ public class AuthService : IAuthService
         return (true, "Email updated successfully");
     }
 
+    public async Task<(bool Success, string Message)> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+    {
+        _logger.LogInformation("Password change attempt for UserId: {UserId}", userId);
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        // Verify current password
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+        {
+            _logger.LogWarning("Password change failed - incorrect current password for UserId: {UserId}", userId);
+            return (false, "Current password is incorrect");
+        }
+
+        // Validate new password strength
+        var passwordValidation = ValidatePassword(newPassword);
+        if (!passwordValidation.IsValid)
+        {
+            return (false, passwordValidation.Message);
+        }
+
+        // Check new password is different
+        if (BCrypt.Net.BCrypt.Verify(newPassword, user.PasswordHash))
+        {
+            return (false, "New password must be different from current password");
+        }
+
+        // With server-side encryption, we don't need to re-encrypt the DEK
+        // The DEK is wrapped with server KEK, not user password
+        // Just update the password hash
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await _userRepository.UpdateAsync(user);
+
+        _logger.LogInformation("Password changed successfully for UserId: {UserId}", userId);
+        return (true, "Password changed successfully");
+    }
+
     public async Task<(bool Success, string Message)> SendPasswordResetCodeAsync(string email)
     {
         _logger.LogInformation("Sending password reset code to {Email}", email);
@@ -636,6 +688,15 @@ public class AuthService : IAuthService
 
         // Update password
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+
+        // With server-side encryption, the DEK doesn't need to change on password reset
+        // Generate DEK if user doesn't have one (legacy account migration)
+        if (user.WrappedDek == null)
+        {
+            var dek = _keyManagementService.GenerateDek();
+            user.WrappedDek = await _keyManagementService.WrapKeyAsync(dek);
+        }
+        
         await _userRepository.UpdateAsync(user);
 
         // Clean up verification record

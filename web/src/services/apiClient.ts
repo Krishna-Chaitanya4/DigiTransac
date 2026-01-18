@@ -41,6 +41,8 @@ function getFriendlyErrorMessage(status: number): string {
       return 'The requested item was not found.';
     case 409:
       return 'This item already exists.';
+    case 429:
+      return 'Too many requests. Please wait a moment and try again.';
     case 500:
       return 'Server error. Please try again later.';
     default:
@@ -80,11 +82,13 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 // Generic API client methods
+// Note: credentials: 'include' is needed for HttpOnly cookies to be sent
 export const apiClient = {
   async get<T>(endpoint: string): Promise<T> {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',
       headers: getAuthHeaders(),
+      credentials: 'include', // Include HttpOnly cookies
     });
     return handleResponse<T>(response);
   },
@@ -93,6 +97,7 @@ export const apiClient = {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: getAuthHeaders(),
+      credentials: 'include', // Include HttpOnly cookies
       body: data ? JSON.stringify(data) : undefined,
     });
     return handleResponse<T>(response);
@@ -102,6 +107,7 @@ export const apiClient = {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
+      credentials: 'include', // Include HttpOnly cookies
       body: JSON.stringify(data),
     });
     return handleResponse<T>(response);
@@ -111,6 +117,7 @@ export const apiClient = {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
+      credentials: 'include', // Include HttpOnly cookies
     });
     return handleResponse<T>(response);
   },

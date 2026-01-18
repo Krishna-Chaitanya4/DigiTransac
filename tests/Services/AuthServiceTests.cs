@@ -19,9 +19,11 @@ public class AuthServiceTests
     private readonly Mock<IEmailService> _emailServiceMock;
     private readonly Mock<ILabelService> _labelServiceMock;
     private readonly Mock<ITwoFactorService> _twoFactorServiceMock;
+    private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
     private readonly AuthService _authService;
+    private readonly byte[] _testDek = new byte[32];
 
     public AuthServiceTests()
     {
@@ -32,6 +34,7 @@ public class AuthServiceTests
         _emailServiceMock = new Mock<IEmailService>();
         _labelServiceMock = new Mock<ILabelService>();
         _twoFactorServiceMock = new Mock<ITwoFactorService>();
+        _keyManagementServiceMock = new Mock<IKeyManagementService>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
         {
@@ -41,6 +44,14 @@ public class AuthServiceTests
             AccessTokenExpireMinutes = 15,
             RefreshTokenExpireDays = 7
         });
+
+        // Setup key management service for server-side encryption
+        _keyManagementServiceMock.Setup(x => x.GenerateDek())
+            .Returns(_testDek);
+        _keyManagementServiceMock.Setup(x => x.WrapKeyAsync(It.IsAny<byte[]>()))
+            .ReturnsAsync(new byte[64]);
+        _keyManagementServiceMock.Setup(x => x.UnwrapKeyAsync(It.IsAny<byte[]>()))
+            .ReturnsAsync(_testDek);
 
         // Setup refresh token repository to return the token passed to it
         _refreshTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<RefreshToken>()))
@@ -54,6 +65,7 @@ public class AuthServiceTests
             _emailServiceMock.Object,
             _labelServiceMock.Object,
             _twoFactorServiceMock.Object,
+            _keyManagementServiceMock.Object,
             _jwtSettings,
             _loggerMock.Object
         );

@@ -26,7 +26,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ACCESS_TOKEN_KEY = 'digitransac_access_token';
-const REFRESH_TOKEN_KEY = 'digitransac_refresh_token';
 const USER_KEY = 'digitransac_user';
 
 // Check if token is expired (with 30s buffer for API calls)
@@ -43,20 +42,18 @@ function isTokenExpired(token: string): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Check for existing tokens on mount
+    // Note: Refresh token is now stored in HttpOnly cookie (not accessible via JS)
     const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     const storedUser = localStorage.getItem(USER_KEY);
 
-    if (storedAccessToken && storedRefreshToken && storedUser) {
+    if (storedAccessToken && storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setAccessToken(storedAccessToken);
-      setRefreshToken(storedRefreshToken);
       setUser(parsedUser);
       // Set Sentry user for error tracking
       setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
@@ -69,10 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSessionExpired = () => {
       // Clear auth state
       setAccessToken(null);
-      setRefreshToken(null);
       setUser(null);
       localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
       // Clear Sentry user
       clearSentryUser();
@@ -91,10 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isEmailVerified: authResponse.isEmailVerified
     };
     setAccessToken(authResponse.accessToken);
-    setRefreshToken(authResponse.refreshToken);
     setUser(userData);
     localStorage.setItem(ACCESS_TOKEN_KEY, authResponse.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, authResponse.refreshToken);
+    // Note: Refresh token is now stored in HttpOnly cookie by the server
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
     // Set Sentry user for error tracking
     setSentryUser({ id: userData.email, email: userData.email, name: userData.fullName });
@@ -102,32 +96,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearAuth = useCallback(() => {
     setAccessToken(null);
-    setRefreshToken(null);
     setUser(null);
     localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    // Note: HttpOnly cookie will be cleared by the server on logout
     // Clear Sentry user
     clearSentryUser();
   }, []);
 
   // Get a valid access token, refreshing if necessary
-  // Read from localStorage to avoid stale closure issues
+  // Note: Refresh token is sent automatically via HttpOnly cookie
   const getValidAccessToken = useCallback(async (): Promise<string | null> => {
     const currentAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    const currentRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    const currentUser = localStorage.getItem(USER_KEY);
 
-    if (!currentAccessToken || !currentRefreshToken) {
+    // If no user stored, we're not logged in
+    if (!currentUser) {
       return null;
     }
 
-    if (!isTokenExpired(currentAccessToken)) {
+    // If token exists and not expired, use it
+    if (currentAccessToken && !isTokenExpired(currentAccessToken)) {
       return currentAccessToken;
     }
 
-    // Token is expired, try to refresh
+    // Token is expired or missing, try to refresh using HttpOnly cookie
     try {
-      const response = await authService.refreshToken(currentRefreshToken);
+      const response = await authService.refreshToken();
       handleAuthSuccess(response);
       return response.accessToken;
     } catch {
@@ -145,10 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     // Normal login - no 2FA required
-    if (response.accessToken && response.refreshToken && response.email && response.fullName !== undefined) {
+    // Note: Refresh token is now in HttpOnly cookie, not in response
+    if (response.accessToken && response.email && response.fullName !== undefined) {
       handleAuthSuccess({
         accessToken: response.accessToken,
-        refreshToken: response.refreshToken,
+        refreshToken: '', // Not used - stored in HttpOnly cookie
         email: response.email,
         fullName: response.fullName,
         isEmailVerified: response.isEmailVerified ?? false,
@@ -174,9 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    if (accessToken && refreshToken) {
+    if (accessToken) {
       try {
-        await authService.revokeToken(accessToken, refreshToken);
+        // Server will clear the HttpOnly cookie
+        await authService.revokeToken(accessToken);
       } catch {
         // Ignore errors - we're logging out anyway
       }
@@ -187,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutAll = async () => {
     if (accessToken) {
       try {
+        // Server will clear the HttpOnly cookie
         await authService.revokeAllTokens(accessToken);
       } catch {
         // Ignore errors - we're logging out anyway

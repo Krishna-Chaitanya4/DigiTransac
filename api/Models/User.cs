@@ -33,6 +33,13 @@ public class User
     [BsonElement("primaryCurrency")]
     public string PrimaryCurrency { get; set; } = "USD";
 
+    /// <summary>
+    /// User's Data Encryption Key (DEK), wrapped (encrypted) with the server's KEK.
+    /// Used for envelope encryption of sensitive user data.
+    /// </summary>
+    [BsonElement("wrappedDek")]
+    public byte[]? WrappedDek { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

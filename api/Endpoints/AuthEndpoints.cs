@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -55,7 +57,12 @@ public static class AuthEndpoints
         .Produces<ErrorResponse>(400);
 
         // Step 3: Complete registration (after email verified)
-        group.MapPost("/complete-registration", async (CompleteRegistrationRequest request, IAuthService authService) =>
+        group.MapPost("/complete-registration", async (
+            CompleteRegistrationRequest request, 
+            IAuthService authService,
+            ICookieService cookieService,
+            IOptions<JwtSettings> jwtSettings,
+            HttpContext httpContext) =>
         {
             if (string.IsNullOrWhiteSpace(request.Email) ||
                 string.IsNullOrWhiteSpace(request.VerificationToken) ||
@@ -76,14 +83,27 @@ public static class AuthEndpoints
                 return Results.BadRequest(new ErrorResponse("Invalid or expired verification token"));
             }
 
-            return Results.Ok(result);
+            // Set refresh token as HttpOnly cookie
+            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+
+            // Return response without refresh token (it's in the cookie)
+            return Results.Ok(new AuthResponseWithoutRefresh(
+                result.AccessToken, 
+                result.Email, 
+                result.FullName, 
+                result.IsEmailVerified));
         })
         .WithName("CompleteRegistration")
-        .Produces<AuthResponse>(200)
+        .Produces<AuthResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400);
 
         // Login
-        group.MapPost("/login", async (LoginRequest request, IAuthService authService) =>
+        group.MapPost("/login", async (
+            LoginRequest request, 
+            IAuthService authService,
+            ICookieService cookieService,
+            IOptions<JwtSettings> jwtSettings,
+            HttpContext httpContext) =>
         {
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
             {
@@ -98,43 +118,90 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            return Results.Ok(result);
+            // If 2FA is required, don't set cookie yet
+            if (result.RequiresTwoFactor)
+            {
+                return Results.Ok(new LoginResponseWithoutRefresh(
+                    null, null, null, null,
+                    RequiresTwoFactor: true,
+                    TwoFactorToken: result.TwoFactorToken));
+            }
+
+            // Set refresh token as HttpOnly cookie
+            if (result.RefreshToken != null)
+            {
+                cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+            }
+
+            return Results.Ok(new LoginResponseWithoutRefresh(
+                result.AccessToken,
+                result.Email,
+                result.FullName,
+                result.IsEmailVerified));
         })
         .WithName("Login")
-        .Produces<LoginResponse>(200)
+        .Produces<LoginResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400)
         .Produces(401);
 
-        // Refresh access token
-        group.MapPost("/refresh-token", async (RefreshTokenRequest request, IAuthService authService) =>
+        // Refresh access token (reads refresh token from HttpOnly cookie)
+        group.MapPost("/refresh-token", async (
+            RefreshTokenRequest? request,
+            IAuthService authService,
+            ICookieService cookieService,
+            IOptions<JwtSettings> jwtSettings,
+            HttpContext httpContext) =>
         {
-            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            // Try to get refresh token from cookie first, then from request body (for backward compatibility)
+            var refreshToken = cookieService.GetRefreshTokenFromCookie(httpContext) ?? request?.RefreshToken;
+            
+            if (string.IsNullOrWhiteSpace(refreshToken))
             {
                 return Results.BadRequest(new ErrorResponse("Refresh token is required"));
             }
 
-            var result = await authService.RefreshTokenAsync(request.RefreshToken);
+            var result = await authService.RefreshTokenAsync(refreshToken);
             if (result == null)
             {
+                // Clear the invalid cookies
+                cookieService.ClearRefreshTokenCookie(httpContext);
                 return Results.Unauthorized();
             }
 
-            return Results.Ok(result);
+            // Set new refresh token as HttpOnly cookie
+            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+
+            return Results.Ok(new AuthResponseWithoutRefresh(
+                result.AccessToken,
+                result.Email,
+                result.FullName,
+                result.IsEmailVerified));
         })
         .WithName("RefreshToken")
-        .Produces<AuthResponse>(200)
+        .Produces<AuthResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400)
         .Produces(401);
 
         // Revoke refresh token (logout from specific device)
-        group.MapPost("/revoke-token", [Authorize] async (RefreshTokenRequest request, IAuthService authService) =>
+        group.MapPost("/revoke-token", [Authorize] async (
+            RefreshTokenRequest? request, 
+            IAuthService authService,
+            ICookieService cookieService,
+            HttpContext httpContext) =>
         {
-            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            // Try to get refresh token from cookie first, then from request body
+            var refreshToken = cookieService.GetRefreshTokenFromCookie(httpContext) ?? request?.RefreshToken;
+            
+            if (string.IsNullOrWhiteSpace(refreshToken))
             {
                 return Results.BadRequest(new ErrorResponse("Refresh token is required"));
             }
 
-            var revoked = await authService.RevokeTokenAsync(request.RefreshToken);
+            var revoked = await authService.RevokeTokenAsync(refreshToken);
+            
+            // Always clear the cookies on logout attempt
+            cookieService.ClearRefreshTokenCookie(httpContext);
+            
             if (!revoked)
             {
                 return Results.BadRequest(new ErrorResponse("Token not found or already revoked"));
@@ -148,7 +215,11 @@ public static class AuthEndpoints
         .Produces(401);
 
         // Revoke all refresh tokens (logout from all devices)
-        group.MapPost("/revoke-all-tokens", [Authorize] async (ClaimsPrincipal user, IAuthService authService) =>
+        group.MapPost("/revoke-all-tokens", [Authorize] async (
+            ClaimsPrincipal user, 
+            IAuthService authService,
+            ICookieService cookieService,
+            HttpContext httpContext) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -157,6 +228,10 @@ public static class AuthEndpoints
             }
 
             await authService.RevokeAllUserTokensAsync(userId);
+            
+            // Clear the cookies on current device
+            cookieService.ClearRefreshTokenCookie(httpContext);
+            
             return Results.Ok(new { message = "All tokens revoked successfully" });
         })
         .WithName("RevokeAllTokens")
@@ -356,5 +431,37 @@ public static class AuthEndpoints
         .WithName("ResetPassword")
         .Produces(200)
         .Produces<ErrorResponse>(400);
+
+        // Change password (while logged in - preserves all encrypted data)
+        group.MapPost("/change-password", [Authorize] async (
+            ChangePasswordRequest request,
+            ClaimsPrincipal user,
+            IAuthService authService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
+                string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                return Results.BadRequest(new ErrorResponse("Current password and new password are required"));
+            }
+
+            var (success, message) = await authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+            
+            if (!success)
+            {
+                return Results.BadRequest(new ErrorResponse(message));
+            }
+
+            return Results.Ok(new { message });
+        })
+        .WithName("ChangePassword")
+        .Produces(200)
+        .Produces<ErrorResponse>(400)
+        .Produces(401);
     }
 }

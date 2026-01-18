@@ -13,7 +13,10 @@ public static class AccountEndpoints
             .RequireAuthorization();
 
         // Get all accounts
-        group.MapGet("/", async (bool? includeArchived, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapGet("/", async (
+            bool? includeArchived, 
+            ClaimsPrincipal user, 
+            IAccountService accountService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -43,7 +46,10 @@ public static class AccountEndpoints
         .Produces<AccountSummaryResponse>(200);
 
         // Get single account
-        group.MapGet("/{id}", async (string id, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapGet("/{id}", async (
+            string id, 
+            ClaimsPrincipal user, 
+            IAccountService accountService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -64,7 +70,10 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(404);
 
         // Create account
-        group.MapPost("/", async (CreateAccountRequest request, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapPost("/", async (
+            CreateAccountRequest request, 
+            ClaimsPrincipal user, 
+            IAccountService accountService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -85,7 +94,11 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(400);
 
         // Update account
-        group.MapPut("/{id}", async (string id, UpdateAccountRequest request, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapPut("/{id}", async (
+            string id, 
+            UpdateAccountRequest request, 
+            ClaimsPrincipal user, 
+            IAccountService accountService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))

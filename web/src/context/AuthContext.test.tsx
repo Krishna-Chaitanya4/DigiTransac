@@ -70,7 +70,6 @@ describe('AuthContext', () => {
   it('should restore user from localStorage on mount', async () => {
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
     localStorage.setItem('digitransac_access_token', 'stored-token');
-    localStorage.setItem('digitransac_refresh_token', 'stored-refresh-token');
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     render(
@@ -89,7 +88,6 @@ describe('AuthContext', () => {
     const user = userEvent.setup();
     const mockResponse = {
       accessToken: 'new-jwt-token',
-      refreshToken: 'new-refresh-token',
       email: 'test@example.com',
       fullName: 'Test User',
       isEmailVerified: true,
@@ -113,9 +111,8 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('token')).toHaveTextContent('new-jwt-token');
     });
 
-    // Verify localStorage was updated
+    // Verify localStorage was updated (refresh token is in HttpOnly cookie, not localStorage)
     expect(localStorage.getItem('digitransac_access_token')).toBe('new-jwt-token');
-    expect(localStorage.getItem('digitransac_refresh_token')).toBe('new-refresh-token');
     expect(JSON.parse(localStorage.getItem('digitransac_user')!).email).toBe('test@example.com');
   });
 
@@ -123,7 +120,6 @@ describe('AuthContext', () => {
     const user = userEvent.setup();
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
     localStorage.setItem('digitransac_access_token', 'stored-token');
-    localStorage.setItem('digitransac_refresh_token', 'stored-refresh-token');
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     // Mock the revokeToken call
@@ -146,9 +142,8 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('token')).toHaveTextContent('no-token');
     });
 
-    // Verify localStorage was cleared
+    // Verify localStorage was cleared (refresh token is in HttpOnly cookie, cleared by server)
     expect(localStorage.getItem('digitransac_access_token')).toBeNull();
-    expect(localStorage.getItem('digitransac_refresh_token')).toBeNull();
     expect(localStorage.getItem('digitransac_user')).toBeNull();
   });
 
@@ -156,7 +151,6 @@ describe('AuthContext', () => {
     const user = userEvent.setup();
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
     localStorage.setItem('digitransac_access_token', 'stored-token');
-    localStorage.setItem('digitransac_refresh_token', 'stored-refresh-token');
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     // Mock the revokeAllTokens call
@@ -192,9 +186,8 @@ describe('AuthContext', () => {
     // Verify revokeAllTokens was called
     expect(authService.revokeAllTokens).toHaveBeenCalledWith('stored-token');
 
-    // Verify localStorage was cleared
+    // Verify localStorage was cleared (refresh token is in HttpOnly cookie, cleared by server)
     expect(localStorage.getItem('digitransac_access_token')).toBeNull();
-    expect(localStorage.getItem('digitransac_refresh_token')).toBeNull();
   });
 
   it('should refresh access token when expired', async () => {
@@ -204,15 +197,14 @@ describe('AuthContext', () => {
 
     const storedUser = { email: 'test@example.com', fullName: 'Test User', isEmailVerified: true };
     localStorage.setItem('digitransac_access_token', expiredToken);
-    localStorage.setItem('digitransac_refresh_token', 'valid-refresh-token');
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     const newTokenPayload = { sub: 'user-123', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
     const newAccessToken = `header.${btoa(JSON.stringify(newTokenPayload))}.signature`;
 
+    // refreshToken no longer takes a parameter - refresh token is sent via HttpOnly cookie
     vi.mocked(authService.refreshToken).mockResolvedValue({
       accessToken: newAccessToken,
-      refreshToken: 'new-refresh-token',
       email: 'test@example.com',
       fullName: 'Test User',
       isEmailVerified: true,
@@ -245,7 +237,8 @@ describe('AuthContext', () => {
     await user.click(screen.getByText('Get Valid Token'));
 
     await waitFor(() => {
-      expect(authService.refreshToken).toHaveBeenCalledWith('valid-refresh-token');
+      // refreshToken is now called without parameters (uses HttpOnly cookie)
+      expect(authService.refreshToken).toHaveBeenCalled();
     });
 
     // Token should be refreshed
@@ -263,7 +256,6 @@ describe('AuthContext', () => {
 
     const storedUser = { email: 'test@example.com', fullName: 'Test User', isEmailVerified: true };
     localStorage.setItem('digitransac_access_token', expiredToken);
-    localStorage.setItem('digitransac_refresh_token', 'invalid-refresh-token');
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     vi.mocked(authService.refreshToken).mockRejectedValue(new Error('Invalid refresh token'));

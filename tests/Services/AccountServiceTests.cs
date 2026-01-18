@@ -12,18 +12,39 @@ public class AccountServiceTests
     private readonly Mock<IAccountRepository> _accountRepositoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
+    private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
+    private readonly Mock<IDekCacheService> _dekCacheServiceMock;
+    private readonly Mock<IEncryptionService> _encryptionServiceMock;
     private readonly AccountService _accountService;
     private const string TestUserId = "test-user-id";
+    private readonly byte[] _testDek = new byte[32];
 
     public AccountServiceTests()
     {
         _accountRepositoryMock = new Mock<IAccountRepository>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _exchangeRateServiceMock = new Mock<IExchangeRateService>();
+        _keyManagementServiceMock = new Mock<IKeyManagementService>();
+        _dekCacheServiceMock = new Mock<IDekCacheService>();
+        _encryptionServiceMock = new Mock<IEncryptionService>();
         
-        // Setup default user with primary currency
+        // Setup encryption service to pass through values (no-op for tests)
+        _encryptionServiceMock.Setup(x => x.Encrypt(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .Returns((string plainText, byte[] dek) => plainText);
+        _encryptionServiceMock.Setup(x => x.Decrypt(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .Returns((string cipherText, byte[] dek) => cipherText);
+        
+        // Setup DEK cache to return test DEK
+        _dekCacheServiceMock.Setup(x => x.GetDek(TestUserId))
+            .Returns(_testDek);
+        
+        // Setup default user with primary currency and wrapped DEK
         _userRepositoryMock.Setup(x => x.GetByIdAsync(TestUserId))
-            .ReturnsAsync(new User { Id = TestUserId, PrimaryCurrency = "INR" });
+            .ReturnsAsync(new User { Id = TestUserId, PrimaryCurrency = "INR", WrappedDek = new byte[64] });
+        
+        // Setup key management to return test DEK when unwrapping
+        _keyManagementServiceMock.Setup(x => x.UnwrapKeyAsync(It.IsAny<byte[]>()))
+            .ReturnsAsync(_testDek);
         
         // Setup default exchange rates
         _exchangeRateServiceMock.Setup(x => x.GetRatesAsync(It.IsAny<string>()))
@@ -41,7 +62,10 @@ public class AccountServiceTests
         _accountService = new AccountService(
             _accountRepositoryMock.Object,
             _userRepositoryMock.Object,
-            _exchangeRateServiceMock.Object);
+            _exchangeRateServiceMock.Object,
+            _keyManagementServiceMock.Object,
+            _dekCacheServiceMock.Object,
+            _encryptionServiceMock.Object);
     }
 
     #region GetAllAsync Tests

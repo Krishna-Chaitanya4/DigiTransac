@@ -1,6 +1,6 @@
 export interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string; // Kept for type compatibility, but now stored in HttpOnly cookie
   email: string;
   fullName: string;
   isEmailVerified: boolean;

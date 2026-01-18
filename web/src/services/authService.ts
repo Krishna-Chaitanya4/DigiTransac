@@ -2,16 +2,10 @@ import { AuthResponse, ApiError, VerificationResponse } from '../types/auth';
 
 const API_BASE_URL = '/api';
 const ACCESS_TOKEN_KEY = 'digitransac_access_token';
-const REFRESH_TOKEN_KEY = 'digitransac_refresh_token';
 
-// Helper to get stored tokens
-export function getStoredTokens(): { accessToken: string; refreshToken: string } | null {
-  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (accessToken && refreshToken) {
-    return { accessToken, refreshToken };
-  }
-  return null;
+// Helper to get stored access token (refresh token is now in HttpOnly cookie)
+export function getStoredAccessToken(): string | null {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -35,6 +29,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
           break;
         case 404:
           errorMessage = 'The requested resource was not found.';
+          break;
+        case 429:
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
           break;
         case 500:
           errorMessage = 'Server error. Please try again later.';
@@ -83,7 +80,7 @@ export async function verifyCode(email: string, code: string): Promise<Verificat
   return handleResponse<VerificationResponse>(response);
 }
 
-// Step 3: Complete registration
+// Step 3: Complete registration (refresh token comes back in HttpOnly cookie)
 export async function completeRegistration(
   email: string, 
   verificationToken: string, 
@@ -96,15 +93,15 @@ export async function completeRegistration(
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // Required for HttpOnly cookie
     body: JSON.stringify({ email, verificationToken, password, fullName, primaryCurrency }),
   });
   return handleResponse<AuthResponse>(response);
 }
 
-// Login response that may require 2FA
+// Login response that may require 2FA (refresh token in HttpOnly cookie)
 export interface LoginResponse {
   accessToken?: string;
-  refreshToken?: string;
   email?: string;
   fullName?: string;
   isEmailVerified?: boolean;
@@ -118,18 +115,20 @@ export async function login(email: string, password: string): Promise<LoginRespo
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // Required for HttpOnly cookie
     body: JSON.stringify({ email, password }),
   });
   return handleResponse<LoginResponse>(response);
 }
 
-// Verify 2FA code during login
+// Verify 2FA code during login (refresh token comes back in HttpOnly cookie)
 export async function verifyTwoFactorLogin(twoFactorToken: string, code: string): Promise<AuthResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/verify`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // Required for HttpOnly cookie
     body: JSON.stringify({ twoFactorToken, code }),
   });
   return handleResponse<AuthResponse>(response);
@@ -227,27 +226,27 @@ export async function resetPassword(email: string, verificationToken: string, ne
   return handleResponse<{ message: string }>(response);
 }
 
-// Refresh access token
-export async function refreshToken(refreshTokenValue: string): Promise<AuthResponse> {
+// Refresh access token (refresh token is sent automatically via HttpOnly cookie)
+export async function refreshToken(): Promise<AuthResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/refresh-token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ refreshToken: refreshTokenValue }),
+    credentials: 'include', // Required for HttpOnly cookie
   });
   return handleResponse<AuthResponse>(response);
 }
 
 // Revoke refresh token (logout from current device)
-export async function revokeToken(accessToken: string, refreshTokenValue: string): Promise<{ message: string }> {
+export async function revokeToken(accessToken: string): Promise<{ message: string }> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/revoke-token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ refreshToken: refreshTokenValue }),
+    credentials: 'include', // Required for HttpOnly cookie
   });
   return handleResponse<{ message: string }>(response);
 }
@@ -259,6 +258,7 @@ export async function revokeAllTokens(accessToken: string): Promise<{ message: s
     headers: {
       'Authorization': `Bearer ${accessToken}`,
     },
+    credentials: 'include', // Required for HttpOnly cookie
   });
   return handleResponse<{ message: string }>(response);
 }
@@ -329,13 +329,14 @@ export async function sendTwoFactorEmailOtp(twoFactorToken: string): Promise<{ m
   return handleResponse<{ message: string }>(response);
 }
 
-// Verify email OTP for 2FA login
+// Verify email OTP for 2FA login (refresh token comes back in HttpOnly cookie)
 export async function verifyTwoFactorEmailOtp(twoFactorToken: string, emailCode: string): Promise<AuthResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/verify-email-code`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // Required for HttpOnly cookie
     body: JSON.stringify({ twoFactorToken, emailCode }),
   });
   return handleResponse<AuthResponse>(response);

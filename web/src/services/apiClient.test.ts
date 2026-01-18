@@ -34,6 +34,7 @@ describe('apiClient', () => {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer test-token',
         },
+        credentials: 'include',
       });
       expect(result).toEqual({ data: 'test' });
     });
@@ -54,6 +55,7 @@ describe('apiClient', () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
     });
   });
@@ -77,6 +79,7 @@ describe('apiClient', () => {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer test-token',
         },
+        credentials: 'include',
         body: JSON.stringify({ name: 'test' }),
       });
       expect(result).toEqual({ id: '123' });
@@ -98,6 +101,7 @@ describe('apiClient', () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: undefined,
       });
     });
@@ -122,6 +126,7 @@ describe('apiClient', () => {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer test-token',
         },
+        credentials: 'include',
         body: JSON.stringify({ name: 'updated' }),
       });
       expect(result).toEqual({ updated: true });
@@ -147,6 +152,7 @@ describe('apiClient', () => {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer test-token',
         },
+        credentials: 'include',
       });
     });
   });
