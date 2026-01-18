@@ -205,6 +205,7 @@ describe('AuthContext', () => {
     // refreshToken no longer takes a parameter - refresh token is sent via HttpOnly cookie
     vi.mocked(authService.refreshToken).mockResolvedValue({
       accessToken: newAccessToken,
+      refreshToken: '', // Kept for type compatibility
       email: 'test@example.com',
       fullName: 'Test User',
       isEmailVerified: true,

@@ -76,6 +76,7 @@ builder.Services.AddSingleton<ILabelRepository, LabelRepository>();
 builder.Services.AddSingleton<ITagRepository, TagRepository>();
 builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
 builder.Services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>();
+builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
 
 // Add HttpClient for external API calls
 builder.Services.AddHttpClient();
@@ -98,6 +99,7 @@ builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
+builder.Services.AddScoped<ITransactionService, TransactionService>();
 
 // Add Rate Limiting
 var rateLimitSettings = builder.Configuration.GetSection("RateLimit").Get<RateLimitSettings>() ?? new RateLimitSettings();
@@ -242,5 +244,6 @@ app.MapLabelEndpoints();
 app.MapTagEndpoints();
 app.MapAccountEndpoints();
 app.MapCurrencyEndpoints();
+app.MapTransactionEndpoints();
 
 app.Run();
