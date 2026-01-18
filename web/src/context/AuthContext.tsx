@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { User, AuthResponse } from '../types/auth';
 import * as authService from '../services/authService';
 import { SESSION_EXPIRED_EVENT } from '../services/apiClient';
+import { setSentryUser, clearSentryUser } from '../services/sentry';
 
 interface AuthContextType {
   user: User | null;
@@ -53,9 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem(USER_KEY);
 
     if (storedAccessToken && storedRefreshToken && storedUser) {
+      const parsedUser = JSON.parse(storedUser);
       setAccessToken(storedAccessToken);
       setRefreshToken(storedRefreshToken);
-      setUser(JSON.parse(storedUser));
+      setUser(parsedUser);
+      // Set Sentry user for error tracking
+      setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
     }
     setIsLoading(false);
   }, []);
@@ -70,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      // Clear Sentry user
+      clearSentryUser();
       // Set message to show on login page
       setSessionExpiredMessage('Your session has expired. Please log in again.');
     };
@@ -90,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ACCESS_TOKEN_KEY, authResponse.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, authResponse.refreshToken);
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    // Set Sentry user for error tracking
+    setSentryUser({ id: userData.email, email: userData.email, name: userData.fullName });
   }, []);
 
   const clearAuth = useCallback(() => {
@@ -99,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    // Clear Sentry user
+    clearSentryUser();
   }, []);
 
   // Get a valid access token, refreshing if necessary

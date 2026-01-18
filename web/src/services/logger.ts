@@ -11,6 +11,8 @@
  *   logger.error('Something failed', error);
  */
 
+import { captureException } from './sentry';
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface Logger {
@@ -63,8 +65,9 @@ export const logger: Logger = {
     if (shouldLog('error')) {
       console.error(formatMessage('error', message), ...args);
       
-      // TODO: When you add Sentry, uncomment this:
-      // Sentry.captureException(args[0] instanceof Error ? args[0] : new Error(message));
+      // Send error to Sentry
+      const error = args[0] instanceof Error ? args[0] : new Error(message);
+      captureException(error, { message, additionalArgs: args.slice(1) });
     }
   },
 };
