@@ -19,10 +19,17 @@ public interface IAccountService
 public class AccountService : IAccountService
 {
     private readonly IAccountRepository _accountRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IExchangeRateService _exchangeRateService;
 
-    public AccountService(IAccountRepository accountRepository)
+    public AccountService(
+        IAccountRepository accountRepository,
+        IUserRepository userRepository,
+        IExchangeRateService exchangeRateService)
     {
         _accountRepository = accountRepository;
+        _userRepository = userRepository;
+        _exchangeRateService = exchangeRateService;
     }
 
     public async Task<List<AccountResponse>> GetAllAsync(string userId, bool includeArchived = false)
@@ -41,40 +48,89 @@ public class AccountService : IAccountService
     {
         var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: false);
         var includedAccounts = accounts.Where(a => a.IncludeInNetWorth).ToList();
+        
+        // Get user's primary currency preference
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "INR";
+        
+        // Get exchange rates
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse.Rates;
 
-        // Assets: Bank, Cash, DigitalWallet, Investment with positive balance
-        // Liabilities: CreditCard, Loan (negative represents what you owe)
+        // Assets: Bank, Cash, DigitalWallet, Investment
+        // Liabilities: CreditCard, Loan
         var liabilityTypes = new[] { AccountType.CreditCard, AccountType.Loan };
         
-        decimal totalAssets = 0;
-        decimal totalLiabilities = 0;
         var balancesByType = new Dictionary<string, decimal>();
+        var balancesByCurrency = new Dictionary<string, CurrencyBalances>();
+        
+        decimal totalAssetsConverted = 0;
+        decimal totalLiabilitiesConverted = 0;
 
-        foreach (var account in includedAccounts)
+        // Group accounts by currency first
+        var accountsByCurrency = includedAccounts.GroupBy(a => a.Currency.ToUpperInvariant());
+
+        foreach (var currencyGroup in accountsByCurrency)
         {
-            var typeName = account.Type.ToString();
-            if (!balancesByType.ContainsKey(typeName))
-            {
-                balancesByType[typeName] = 0;
-            }
-            balancesByType[typeName] += account.CurrentBalance;
+            var currency = currencyGroup.Key;
+            decimal assets = 0;
+            decimal liabilities = 0;
 
-            if (liabilityTypes.Contains(account.Type))
+            foreach (var account in currencyGroup)
             {
-                // For credit cards and loans, the balance represents what you owe
-                totalLiabilities += Math.Abs(account.CurrentBalance);
+                // Track by type (in original currency)
+                var typeName = account.Type.ToString();
+                if (!balancesByType.ContainsKey(typeName))
+                {
+                    balancesByType[typeName] = 0;
+                }
+                
+                // Convert to primary currency for type totals
+                var convertedBalance = _exchangeRateService.Convert(
+                    account.CurrentBalance, 
+                    currency, 
+                    primaryCurrency, 
+                    rates);
+                balancesByType[typeName] += convertedBalance;
+
+                if (liabilityTypes.Contains(account.Type))
+                {
+                    liabilities += Math.Abs(account.CurrentBalance);
+                }
+                else
+                {
+                    assets += account.CurrentBalance;
+                }
             }
-            else
-            {
-                totalAssets += account.CurrentBalance;
-            }
+
+            var netWorth = assets - liabilities;
+            
+            // Convert to primary currency
+            var assetsConverted = _exchangeRateService.Convert(assets, currency, primaryCurrency, rates);
+            var liabilitiesConverted = _exchangeRateService.Convert(liabilities, currency, primaryCurrency, rates);
+            var netWorthConverted = assetsConverted - liabilitiesConverted;
+
+            balancesByCurrency[currency] = new CurrencyBalances(
+                Assets: assets,
+                Liabilities: liabilities,
+                NetWorth: netWorth,
+                AssetsConverted: assetsConverted,
+                LiabilitiesConverted: liabilitiesConverted,
+                NetWorthConverted: netWorthConverted
+            );
+
+            totalAssetsConverted += assetsConverted;
+            totalLiabilitiesConverted += liabilitiesConverted;
         }
 
         return new AccountSummaryResponse(
-            TotalAssets: totalAssets,
-            TotalLiabilities: totalLiabilities,
-            NetWorth: totalAssets - totalLiabilities,
-            BalancesByType: balancesByType
+            TotalAssets: totalAssetsConverted,
+            TotalLiabilities: totalLiabilitiesConverted,
+            NetWorth: totalAssetsConverted - totalLiabilitiesConverted,
+            PrimaryCurrency: primaryCurrency,
+            BalancesByType: balancesByType,
+            BalancesByCurrency: balancesByCurrency,
+            RatesLastUpdated: ratesResponse.LastUpdated
         );
     }
 

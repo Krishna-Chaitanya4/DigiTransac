@@ -65,5 +65,17 @@ public record AccountSummaryResponse(
     decimal TotalAssets,
     decimal TotalLiabilities,
     decimal NetWorth,
-    Dictionary<string, decimal> BalancesByType
+    string PrimaryCurrency,
+    Dictionary<string, decimal> BalancesByType,
+    Dictionary<string, CurrencyBalances> BalancesByCurrency,
+    DateTime? RatesLastUpdated
+);
+
+public record CurrencyBalances(
+    decimal Assets,
+    decimal Liabilities,
+    decimal NetWorth,
+    decimal AssetsConverted,
+    decimal LiabilitiesConverted,
+    decimal NetWorthConverted
 );

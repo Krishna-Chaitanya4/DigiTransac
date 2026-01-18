@@ -14,6 +14,15 @@ import {
   adjustBalance,
   formatCurrency,
 } from '../services/accountService';
+import { 
+  formatCurrency as formatCurrencyWithCode, 
+  getCurrencySymbol, 
+  formatRelativeTime,
+  refreshExchangeRates,
+  Currency,
+  getSupportedCurrencies,
+  COMMON_CURRENCIES,
+} from '../services/currencyService';
 
 // Preset colors for accounts
 const PRESET_COLORS = [
@@ -45,6 +54,18 @@ function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading }: 
   const [accountNumber, setAccountNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
+  
+  // Currency dropdown state
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [currencySearch, setCurrencySearch] = useState('');
+  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
+  
+  // Load currencies on mount
+  useEffect(() => {
+    getSupportedCurrencies()
+      .then(setCurrencies)
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (editingAccount) {
@@ -159,14 +180,82 @@ function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading }: 
                   <label htmlFor="initialBalance" className="block text-sm font-medium text-gray-700 mb-1">
                     Initial Balance
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <div className="flex gap-2">
+                    {/* Currency Dropdown */}
+                    <div className="relative flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
+                        className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium min-w-[90px]"
+                      >
+                        <span>{getCurrencySymbol(currency)}</span>
+                        <span className="text-gray-600">{currency}</span>
+                        <svg className="w-4 h-4 text-gray-400 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      {isCurrencyDropdownOpen && (
+                        <div className="absolute z-20 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg">
+                          <div className="p-2 border-b border-gray-100">
+                            <input
+                              type="text"
+                              value={currencySearch}
+                              onChange={(e) => setCurrencySearch(e.target.value)}
+                              placeholder="Search currencies..."
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {/* Common currencies section */}
+                            {currencySearch === '' && (
+                              <div className="px-3 py-1 text-xs text-gray-400 bg-gray-50">Common Currencies</div>
+                            )}
+                            {currencies
+                              .filter(c => 
+                                currencySearch === '' 
+                                  ? COMMON_CURRENCIES.includes(c.code)
+                                  : c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                                    c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                              )
+                              .map((c) => (
+                                <button
+                                  key={c.code}
+                                  type="button"
+                                  onClick={() => {
+                                    setCurrency(c.code);
+                                    setIsCurrencyDropdownOpen(false);
+                                    setCurrencySearch('');
+                                  }}
+                                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 ${
+                                    c.code === currency ? 'bg-blue-50 text-blue-700' : ''
+                                  }`}
+                                >
+                                  <span className="w-6">{c.symbol}</span>
+                                  <span className="flex-1">{c.name}</span>
+                                  <span className="text-gray-400">{c.code}</span>
+                                </button>
+                              ))
+                            }
+                            {currencySearch !== '' && currencies.filter(c => 
+                              c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                              c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                            ).length === 0 && (
+                              <p className="px-3 py-2 text-sm text-gray-500">No currencies found</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Amount Input */}
                     <input
                       type="number"
                       id="initialBalance"
                       value={initialBalance}
                       onChange={(e) => setInitialBalance(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="0.00"
                       step="0.01"
                     />
@@ -582,23 +671,88 @@ function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveTogg
   );
 }
 
-function SummaryCard({ summary }: { summary: AccountSummary }) {
+function SummaryCard({ summary, onRefreshRates }: { summary: AccountSummary; onRefreshRates: () => void }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const currencyCodes = Object.keys(summary.balancesByCurrency || {});
+  const hasMultipleCurrencies = currencyCodes.length > 1;
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await onRefreshRates();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg p-6 text-white mb-6">
-      <h2 className="text-lg font-medium mb-4">Net Worth</h2>
-      <div className="text-4xl font-bold mb-4">
-        {formatCurrency(summary.netWorth)}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-medium">Net Worth</h2>
+        {hasMultipleCurrencies && summary.ratesLastUpdated && (
+          <div className="flex items-center gap-2 text-xs text-blue-200">
+            <span>Rates: {formatRelativeTime(summary.ratesLastUpdated)}</span>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-1 hover:bg-blue-500 rounded transition-colors disabled:opacity-50"
+              title="Refresh exchange rates"
+            >
+              <svg 
+                className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="text-4xl font-bold mb-4">
+        {formatCurrencyWithCode(summary.netWorth, summary.primaryCurrency)}
+      </div>
+      <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-blue-200 text-sm">Assets</p>
-          <p className="text-xl font-semibold">{formatCurrency(summary.totalAssets)}</p>
+          <p className="text-xl font-semibold">{formatCurrencyWithCode(summary.totalAssets, summary.primaryCurrency)}</p>
         </div>
         <div>
           <p className="text-blue-200 text-sm">Liabilities</p>
-          <p className="text-xl font-semibold">{formatCurrency(summary.totalLiabilities)}</p>
+          <p className="text-xl font-semibold">{formatCurrencyWithCode(summary.totalLiabilities, summary.primaryCurrency)}</p>
         </div>
       </div>
+      
+      {/* Currency Breakdown */}
+      {hasMultipleCurrencies && (
+        <div className="border-t border-blue-500 pt-4 mt-4">
+          <p className="text-xs text-blue-200 mb-2">Breakdown by Currency</p>
+          <div className="space-y-2">
+            {currencyCodes.map((code) => {
+              const balances = summary.balancesByCurrency[code];
+              const isPrimary = code === summary.primaryCurrency;
+              return (
+                <div key={code} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">{getCurrencySymbol(code)}</span>
+                    <span className="text-blue-200">{code}</span>
+                    {isPrimary && <span className="text-xs bg-blue-500 px-1.5 py-0.5 rounded">Primary</span>}
+                  </span>
+                  <div className="text-right">
+                    <span>{formatCurrencyWithCode(balances.netWorth, code)}</span>
+                    {!isPrimary && (
+                      <span className="text-blue-200 text-xs ml-1">
+                        (≈ {formatCurrencyWithCode(balances.netWorthConverted, summary.primaryCurrency)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -641,6 +795,17 @@ export default function AccountsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleRefreshRates = useCallback(async () => {
+    try {
+      await refreshExchangeRates();
+      // Reload summary to get updated converted values
+      const summaryData = await getAccountSummary();
+      setSummary(summaryData);
+    } catch {
+      setError('Failed to refresh exchange rates');
+    }
+  }, []);
 
   // Group accounts by type
   const groupedAccounts = useMemo(() => {
@@ -769,7 +934,7 @@ export default function AccountsPage() {
       )}
 
       {/* Summary Card */}
-      {summary && accounts.length > 0 && <SummaryCard summary={summary} />}
+      {summary && accounts.length > 0 && <SummaryCard summary={summary} onRefreshRates={handleRefreshRates} />}
 
       {/* Show Archived Toggle */}
       {accounts.length > 0 && (
@@ -819,7 +984,8 @@ export default function AccountsPage() {
             if (typeAccounts.length === 0) return null;
 
             const config = accountTypeConfig[type];
-            const typeTotal = typeAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
+            // Use the converted total from summary (properly handles multi-currency)
+            const typeTotal = summary?.balancesByType?.[type] ?? 0;
 
             return (
               <div key={type}>
@@ -836,7 +1002,7 @@ export default function AccountsPage() {
                       config.isLiability ? 'text-red-600' : 'text-gray-900'
                     }`}
                   >
-                    {formatCurrency(typeTotal)}
+                    {formatCurrencyWithCode(typeTotal, summary?.primaryCurrency || 'INR')}
                   </span>
                 </div>
 

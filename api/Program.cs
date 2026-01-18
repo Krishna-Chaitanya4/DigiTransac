@@ -24,6 +24,10 @@ builder.Services.AddSingleton<ITwoFactorTokenRepository, TwoFactorTokenRepositor
 builder.Services.AddSingleton<ILabelRepository, LabelRepository>();
 builder.Services.AddSingleton<ITagRepository, TagRepository>();
 builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
+builder.Services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>();
+
+// Add HttpClient for external API calls
+builder.Services.AddHttpClient();
 
 // Add services
 builder.Services.AddSingleton<IEmailService, GmailEmailService>();
@@ -32,6 +36,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 
 // Add JWT authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
@@ -115,5 +120,6 @@ app.MapTwoFactorEndpoints();
 app.MapLabelEndpoints();
 app.MapTagEndpoints();
 app.MapAccountEndpoints();
+app.MapCurrencyEndpoints();
 
 app.Run();

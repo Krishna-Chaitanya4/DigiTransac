@@ -78,11 +78,33 @@ const mockSummary: accountService.AccountSummary = {
   totalAssets: 78000,
   totalLiabilities: 15000,
   netWorth: 63000,
+  primaryCurrency: 'INR',
   balancesByType: {
     Bank: 75000,
     CreditCard: 15000,
     Cash: 3000,
   },
+  balancesByCurrency: {
+    INR: {
+      assets: 78000,
+      liabilities: 15000,
+      netWorth: 63000,
+      assetsConverted: 78000,
+      liabilitiesConverted: 15000,
+      netWorthConverted: 63000,
+    },
+  },
+  ratesLastUpdated: '2024-01-01T00:00:00Z',
+};
+
+const emptyMockSummary: accountService.AccountSummary = {
+  totalAssets: 0,
+  totalLiabilities: 0,
+  netWorth: 0,
+  primaryCurrency: 'INR',
+  balancesByType: {},
+  balancesByCurrency: {},
+  ratesLastUpdated: null,
 };
 
 describe('AccountsPage', () => {
@@ -101,12 +123,7 @@ describe('AccountsPage', () => {
 
   it('should render empty state when no accounts', async () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue([]);
-    vi.mocked(accountService.getAccountSummary).mockResolvedValue({
-      totalAssets: 0,
-      totalLiabilities: 0,
-      netWorth: 0,
-      balancesByType: {},
-    });
+    vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
 
     render(<AccountsPage />);
 
@@ -144,12 +161,7 @@ describe('AccountsPage', () => {
 
   it('should open create modal when clicking Add Account', async () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue([]);
-    vi.mocked(accountService.getAccountSummary).mockResolvedValue({
-      totalAssets: 0,
-      totalLiabilities: 0,
-      netWorth: 0,
-      balancesByType: {},
-    });
+    vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
 
     render(<AccountsPage />);
 
@@ -165,12 +177,7 @@ describe('AccountsPage', () => {
 
   it('should show account types in create modal', async () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue([]);
-    vi.mocked(accountService.getAccountSummary).mockResolvedValue({
-      totalAssets: 0,
-      totalLiabilities: 0,
-      netWorth: 0,
-      balancesByType: {},
-    });
+    vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
 
     render(<AccountsPage />);
 
@@ -190,12 +197,7 @@ describe('AccountsPage', () => {
 
   it('should create account when form is submitted', async () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue([]);
-    vi.mocked(accountService.getAccountSummary).mockResolvedValue({
-      totalAssets: 0,
-      totalLiabilities: 0,
-      netWorth: 0,
-      balancesByType: {},
-    });
+    vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
     vi.mocked(accountService.createAccount).mockResolvedValue(mockAccounts[0]);
 
     render(<AccountsPage />);

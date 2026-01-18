@@ -28,11 +28,23 @@ export type AccountType =
   | 'Investment'
   | 'Loan';
 
+export interface CurrencyBalances {
+  assets: number;
+  liabilities: number;
+  netWorth: number;
+  assetsConverted: number;
+  liabilitiesConverted: number;
+  netWorthConverted: number;
+}
+
 export interface AccountSummary {
   totalAssets: number;
   totalLiabilities: number;
   netWorth: number;
   balancesByType: Record<string, number>;
+  primaryCurrency: string;
+  balancesByCurrency: Record<string, CurrencyBalances>;
+  ratesLastUpdated: string | null;
 }
 
 export interface CreateAccountRequest {

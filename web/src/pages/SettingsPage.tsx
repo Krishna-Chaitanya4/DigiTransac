@@ -1,9 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import TwoFactorSettings from '../components/TwoFactorSettings';
+import { 
+  getSupportedCurrencies, 
+  getCurrencyPreference, 
+  updateCurrencyPreference, 
+  getCurrencySymbol,
+  Currency 
+} from '../services/currencyService';
 
 export default function SettingsPage() {
   const { user, logoutAll, deleteAccount, updateName, sendEmailChangeCode, verifyEmailChange } = useAuth();
+  
+  // Currency preference state
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [primaryCurrency, setPrimaryCurrency] = useState<string>('');
+  const [currencySearch, setCurrencySearch] = useState('');
+  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
+  const [isCurrencyLoading, setIsCurrencyLoading] = useState(true);
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false);
+  const [currencyError, setCurrencyError] = useState('');
   
   // Name editing state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -26,6 +42,55 @@ export default function SettingsPage() {
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  // Load currency data on mount
+  useEffect(() => {
+    async function loadCurrencyData() {
+      try {
+        const [currencyList, preference] = await Promise.all([
+          getSupportedCurrencies(),
+          getCurrencyPreference()
+        ]);
+        setCurrencies(currencyList);
+        setPrimaryCurrency(preference);
+      } catch (err) {
+        console.error('Failed to load currency data:', err);
+        setCurrencyError('Failed to load currency settings');
+      } finally {
+        setIsCurrencyLoading(false);
+      }
+    }
+    loadCurrencyData();
+  }, []);
+
+  // Currency preference handlers
+  const handleCurrencyChange = async (currency: string) => {
+    if (currency === primaryCurrency) {
+      setIsCurrencyDropdownOpen(false);
+      setCurrencySearch('');
+      return;
+    }
+
+    setIsSavingCurrency(true);
+    setCurrencyError('');
+    try {
+      await updateCurrencyPreference(currency);
+      setPrimaryCurrency(currency);
+      setIsCurrencyDropdownOpen(false);
+      setCurrencySearch('');
+    } catch (err) {
+      setCurrencyError(err instanceof Error ? err.message : 'Failed to update currency');
+    } finally {
+      setIsSavingCurrency(false);
+    }
+  };
+
+  const filteredCurrencies = currencies.filter(c =>
+    c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+    c.name.toLowerCase().includes(currencySearch.toLowerCase())
+  );
+
+  const selectedCurrency = currencies.find(c => c.code === primaryCurrency);
 
   // Name editing handlers
   const handleEditName = () => {
@@ -223,6 +288,85 @@ export default function SettingsPage() {
                   Change
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Preferences Section */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Preferences</h2>
+          <div className="space-y-4">
+            {/* Primary Currency */}
+            <div>
+              <label className="block text-sm font-medium text-gray-500 mb-1">Primary Currency</label>
+              <p className="text-xs text-gray-400 mb-2">Your primary currency for displaying net worth and totals</p>
+              {isCurrencyLoading ? (
+                <div className="animate-pulse h-10 bg-gray-100 rounded-lg"></div>
+              ) : (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
+                    disabled={isSavingCurrency}
+                    className="w-full sm:w-64 flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-lg">{getCurrencySymbol(primaryCurrency)}</span>
+                      <span>{selectedCurrency?.name || primaryCurrency}</span>
+                      <span className="text-gray-400">({primaryCurrency})</span>
+                    </span>
+                    <svg className={`h-4 w-4 text-gray-400 transition-transform ${isCurrencyDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {isCurrencyDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full sm:w-64 bg-white border border-gray-200 rounded-lg shadow-lg">
+                      <div className="p-2 border-b border-gray-100">
+                        <input
+                          type="text"
+                          value={currencySearch}
+                          onChange={(e) => setCurrencySearch(e.target.value)}
+                          placeholder="Search currencies..."
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-60 overflow-y-auto">
+                        {filteredCurrencies.length === 0 ? (
+                          <p className="px-3 py-2 text-sm text-gray-500">No currencies found</p>
+                        ) : (
+                          filteredCurrencies.map((currency) => (
+                            <button
+                              key={currency.code}
+                              type="button"
+                              onClick={() => handleCurrencyChange(currency.code)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 ${
+                                currency.code === primaryCurrency ? 'bg-blue-50 text-blue-700' : ''
+                              }`}
+                            >
+                              <span className="text-lg w-6">{currency.symbol}</span>
+                              <span className="flex-1">{currency.name}</span>
+                              <span className="text-gray-400">{currency.code}</span>
+                              {currency.code === primaryCurrency && (
+                                <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {currencyError && (
+                <p className="mt-1 text-sm text-red-600">{currencyError}</p>
+              )}
+              {isSavingCurrency && (
+                <p className="mt-1 text-sm text-blue-600">Saving...</p>
+              )}
             </div>
           </div>
         </div>

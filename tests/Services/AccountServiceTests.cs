@@ -10,13 +10,38 @@ namespace DigiTransac.Tests.Services;
 public class AccountServiceTests
 {
     private readonly Mock<IAccountRepository> _accountRepositoryMock;
+    private readonly Mock<IUserRepository> _userRepositoryMock;
+    private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
     private readonly AccountService _accountService;
     private const string TestUserId = "test-user-id";
 
     public AccountServiceTests()
     {
         _accountRepositoryMock = new Mock<IAccountRepository>();
-        _accountService = new AccountService(_accountRepositoryMock.Object);
+        _userRepositoryMock = new Mock<IUserRepository>();
+        _exchangeRateServiceMock = new Mock<IExchangeRateService>();
+        
+        // Setup default user with primary currency
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(TestUserId))
+            .ReturnsAsync(new User { Id = TestUserId, PrimaryCurrency = "INR" });
+        
+        // Setup default exchange rates
+        _exchangeRateServiceMock.Setup(x => x.GetRatesAsync(It.IsAny<string>()))
+            .ReturnsAsync(new ExchangeRateResponse(
+                BaseCurrency: "USD",
+                Rates: new Dictionary<string, decimal> { { "INR", 83.0m }, { "USD", 1.0m } },
+                LastUpdated: DateTime.UtcNow,
+                Source: "mock"
+            ));
+        
+        // Setup Convert to return same amount when converting INR to INR
+        _exchangeRateServiceMock.Setup(x => x.Convert(It.IsAny<decimal>(), "INR", "INR", It.IsAny<Dictionary<string, decimal>>()))
+            .Returns((decimal amount, string from, string to, Dictionary<string, decimal> rates) => amount);
+        
+        _accountService = new AccountService(
+            _accountRepositoryMock.Object,
+            _userRepositoryMock.Object,
+            _exchangeRateServiceMock.Object);
     }
 
     #region GetAllAsync Tests
@@ -128,9 +153,9 @@ public class AccountServiceTests
         // Arrange
         var accounts = new List<Account>
         {
-            new() { Id = "1", UserId = TestUserId, Name = "Savings", Type = AccountType.Bank, CurrentBalance = 50000, IncludeInNetWorth = true },
-            new() { Id = "2", UserId = TestUserId, Name = "Cash", Type = AccountType.Cash, CurrentBalance = 5000, IncludeInNetWorth = true },
-            new() { Id = "3", UserId = TestUserId, Name = "Credit Card", Type = AccountType.CreditCard, CurrentBalance = 10000, IncludeInNetWorth = true }
+            new() { Id = "1", UserId = TestUserId, Name = "Savings", Type = AccountType.Bank, Currency = "INR", CurrentBalance = 50000, IncludeInNetWorth = true },
+            new() { Id = "2", UserId = TestUserId, Name = "Cash", Type = AccountType.Cash, Currency = "INR", CurrentBalance = 5000, IncludeInNetWorth = true },
+            new() { Id = "3", UserId = TestUserId, Name = "Credit Card", Type = AccountType.CreditCard, Currency = "INR", CurrentBalance = 10000, IncludeInNetWorth = true }
         };
         _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId, false))
             .ReturnsAsync(accounts);
@@ -150,8 +175,8 @@ public class AccountServiceTests
         // Arrange
         var accounts = new List<Account>
         {
-            new() { Id = "1", UserId = TestUserId, Name = "Savings", Type = AccountType.Bank, CurrentBalance = 50000, IncludeInNetWorth = true },
-            new() { Id = "2", UserId = TestUserId, Name = "Emergency Fund", Type = AccountType.Bank, CurrentBalance = 20000, IncludeInNetWorth = false }
+            new() { Id = "1", UserId = TestUserId, Name = "Savings", Type = AccountType.Bank, Currency = "INR", CurrentBalance = 50000, IncludeInNetWorth = true },
+            new() { Id = "2", UserId = TestUserId, Name = "Emergency Fund", Type = AccountType.Bank, Currency = "INR", CurrentBalance = 20000, IncludeInNetWorth = false }
         };
         _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId, false))
             .ReturnsAsync(accounts);
@@ -170,9 +195,9 @@ public class AccountServiceTests
         // Arrange
         var accounts = new List<Account>
         {
-            new() { Id = "1", UserId = TestUserId, Name = "Savings 1", Type = AccountType.Bank, CurrentBalance = 30000, IncludeInNetWorth = true },
-            new() { Id = "2", UserId = TestUserId, Name = "Savings 2", Type = AccountType.Bank, CurrentBalance = 20000, IncludeInNetWorth = true },
-            new() { Id = "3", UserId = TestUserId, Name = "Wallet", Type = AccountType.Cash, CurrentBalance = 5000, IncludeInNetWorth = true }
+            new() { Id = "1", UserId = TestUserId, Name = "Savings 1", Type = AccountType.Bank, Currency = "INR", CurrentBalance = 30000, IncludeInNetWorth = true },
+            new() { Id = "2", UserId = TestUserId, Name = "Savings 2", Type = AccountType.Bank, Currency = "INR", CurrentBalance = 20000, IncludeInNetWorth = true },
+            new() { Id = "3", UserId = TestUserId, Name = "Wallet", Type = AccountType.Cash, Currency = "INR", CurrentBalance = 5000, IncludeInNetWorth = true }
         };
         _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId, false))
             .ReturnsAsync(accounts);
@@ -193,8 +218,8 @@ public class AccountServiceTests
         // Arrange
         var accounts = new List<Account>
         {
-            new() { Id = "1", UserId = TestUserId, Name = "Savings", Type = AccountType.Bank, CurrentBalance = 100000, IncludeInNetWorth = true },
-            new() { Id = "2", UserId = TestUserId, Name = "Home Loan", Type = AccountType.Loan, CurrentBalance = 500000, IncludeInNetWorth = true }
+            new() { Id = "1", UserId = TestUserId, Name = "Savings", Type = AccountType.Bank, Currency = "INR", CurrentBalance = 100000, IncludeInNetWorth = true },
+            new() { Id = "2", UserId = TestUserId, Name = "Home Loan", Type = AccountType.Loan, Currency = "INR", CurrentBalance = 500000, IncludeInNetWorth = true }
         };
         _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId, false))
             .ReturnsAsync(accounts);
@@ -214,8 +239,8 @@ public class AccountServiceTests
         // Arrange
         var accounts = new List<Account>
         {
-            new() { Id = "1", UserId = TestUserId, Name = "PayTM", Type = AccountType.DigitalWallet, CurrentBalance = 2000, IncludeInNetWorth = true },
-            new() { Id = "2", UserId = TestUserId, Name = "Stocks", Type = AccountType.Investment, CurrentBalance = 100000, IncludeInNetWorth = true }
+            new() { Id = "1", UserId = TestUserId, Name = "PayTM", Type = AccountType.DigitalWallet, Currency = "INR", CurrentBalance = 2000, IncludeInNetWorth = true },
+            new() { Id = "2", UserId = TestUserId, Name = "Stocks", Type = AccountType.Investment, Currency = "INR", CurrentBalance = 100000, IncludeInNetWorth = true }
         };
         _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId, false))
             .ReturnsAsync(accounts);

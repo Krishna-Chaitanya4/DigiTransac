@@ -138,12 +138,18 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             TotalAssets: 100000,
             TotalLiabilities: 20000,
             NetWorth: 80000,
+            PrimaryCurrency: "INR",
             BalancesByType: new Dictionary<string, decimal>
             {
                 { "Bank", 95000 },
                 { "Cash", 5000 },
                 { "CreditCard", 20000 }
-            }
+            },
+            BalancesByCurrency: new Dictionary<string, CurrencyBalances>
+            {
+                { "INR", new CurrencyBalances(100000, 20000, 80000, 100000, 20000, 80000) }
+            },
+            RatesLastUpdated: DateTime.UtcNow
         );
 
         _factory.AccountServiceMock.Setup(x => x.GetSummaryAsync(TestUserId))
