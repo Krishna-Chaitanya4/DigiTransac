@@ -270,6 +270,95 @@ function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading, pr
                 </div>
               )}
 
+              {/* Currency (only for editing accounts) */}
+              {editingAccount && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Currency
+                  </label>
+                  {editingAccount.canEditCurrency ? (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
+                        className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium min-w-[120px]"
+                      >
+                        <span>{getCurrencySymbol(currency)}</span>
+                        <span className="text-gray-600">{currency}</span>
+                        <svg className="w-4 h-4 text-gray-400 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      {isCurrencyDropdownOpen && (
+                        <div className="absolute z-20 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg">
+                          <div className="p-2 border-b border-gray-100">
+                            <input
+                              type="text"
+                              value={currencySearch}
+                              onChange={(e) => setCurrencySearch(e.target.value)}
+                              placeholder="Search currencies..."
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {currencySearch === '' && (
+                              <div className="px-3 py-1 text-xs text-gray-400 bg-gray-50">Common Currencies</div>
+                            )}
+                            {currencies
+                              .filter(c => 
+                                currencySearch === '' 
+                                  ? COMMON_CURRENCIES.includes(c.code)
+                                  : c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                                    c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                              )
+                              .map((c) => (
+                                <button
+                                  key={c.code}
+                                  type="button"
+                                  onClick={() => {
+                                    setCurrency(c.code);
+                                    setIsCurrencyDropdownOpen(false);
+                                    setCurrencySearch('');
+                                  }}
+                                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 ${
+                                    c.code === currency ? 'bg-blue-50 text-blue-700' : ''
+                                  }`}
+                                >
+                                  <span className="w-6">{c.symbol}</span>
+                                  <span className="flex-1">{c.name}</span>
+                                  <span className="text-gray-400">{c.code}</span>
+                                </button>
+                              ))
+                            }
+                            {currencySearch !== '' && currencies.filter(c => 
+                              c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                              c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                            ).length === 0 && (
+                              <p className="px-3 py-2 text-sm text-gray-500">No currencies found</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">
+                        <span>{getCurrencySymbol(currency)}</span>
+                        <span>{currency}</span>
+                      </span>
+                      <span className="text-xs text-gray-500" title="Currency cannot be changed after balance has been modified">
+                        <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-10a4 4 0 00-4 4v1a2 2 0 002 2h4a2 2 0 002-2v-1a4 4 0 00-4-4z" />
+                        </svg>
+                        Locked (balance modified)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Color */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

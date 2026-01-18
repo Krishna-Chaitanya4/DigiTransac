@@ -57,6 +57,7 @@ public record AccountResponse(
     bool IsArchived,
     bool IncludeInNetWorth,
     int Order,
+    bool CanEditCurrency,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

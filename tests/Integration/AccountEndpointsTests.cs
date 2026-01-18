@@ -75,6 +75,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
                 IsArchived: false,
                 IncludeInNetWorth: true,
                 Order: 0,
+                CanEditCurrency: false,
                 CreatedAt: DateTime.UtcNow,
                 UpdatedAt: DateTime.UtcNow
             )
@@ -191,6 +192,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             IsArchived: false,
             IncludeInNetWorth: true,
             Order: 0,
+            CanEditCurrency: false,
             CreatedAt: DateTime.UtcNow,
             UpdatedAt: DateTime.UtcNow
         );
@@ -262,6 +264,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             IsArchived: false,
             IncludeInNetWorth: true,
             Order: 0,
+            CanEditCurrency: true,
             CreatedAt: DateTime.UtcNow,
             UpdatedAt: DateTime.UtcNow
         );
@@ -346,6 +349,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             IsArchived: false,
             IncludeInNetWorth: true,
             Order: 0,
+            CanEditCurrency: false,
             CreatedAt: DateTime.UtcNow,
             UpdatedAt: DateTime.UtcNow
         );

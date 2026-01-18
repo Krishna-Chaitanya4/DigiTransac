@@ -16,6 +16,7 @@ export interface Account {
   isArchived: boolean;
   includeInNetWorth: boolean;
   order: number;
+  canEditCurrency: boolean;
   createdAt: string;
   updatedAt: string;
 }

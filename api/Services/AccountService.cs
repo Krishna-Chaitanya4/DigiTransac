@@ -198,7 +198,17 @@ public class AccountService : IAccountService
 
         if (request.Icon != null) account.Icon = request.Icon;
         if (request.Color != null) account.Color = request.Color;
-        if (request.Currency != null) account.Currency = request.Currency;
+        
+        // Currency can only be changed if balance hasn't been modified
+        if (request.Currency != null && request.Currency != account.Currency)
+        {
+            if (account.CurrentBalance != account.InitialBalance)
+            {
+                return (false, "Currency cannot be changed after balance has been modified", null);
+            }
+            account.Currency = request.Currency;
+        }
+        
         if (request.Institution != null) account.Institution = request.Institution;
         if (request.AccountNumber != null) account.AccountNumber = request.AccountNumber;
         if (request.Notes != null) account.Notes = request.Notes;
@@ -260,6 +270,9 @@ public class AccountService : IAccountService
 
     private static AccountResponse MapToResponse(Account account)
     {
+        // Currency can only be edited if balance hasn't changed (no transactions/adjustments)
+        var canEditCurrency = account.CurrentBalance == account.InitialBalance;
+        
         return new AccountResponse(
             Id: account.Id,
             Name: account.Name,
@@ -275,6 +288,7 @@ public class AccountService : IAccountService
             IsArchived: account.IsArchived,
             IncludeInNetWorth: account.IncludeInNetWorth,
             Order: account.Order,
+            CanEditCurrency: canEditCurrency,
             CreatedAt: account.CreatedAt,
             UpdatedAt: account.UpdatedAt
         );
