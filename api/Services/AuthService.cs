@@ -173,6 +173,17 @@ public class AuthService : IAuthService
             return null;
         }
 
+        // Validate and set primary currency
+        var primaryCurrency = "INR"; // Default
+        if (!string.IsNullOrWhiteSpace(request.PrimaryCurrency))
+        {
+            var currencyCode = request.PrimaryCurrency.ToUpperInvariant();
+            if (CurrencyConfig.IsValidCurrency(currencyCode))
+            {
+                primaryCurrency = currencyCode;
+            }
+        }
+
         // Create user
         var user = new User
         {
@@ -180,6 +191,7 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             IsEmailVerified = true, // Already verified!
+            PrimaryCurrency = primaryCurrency,
             CreatedAt = DateTime.UtcNow
         };
 

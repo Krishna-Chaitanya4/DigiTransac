@@ -1,10 +1,24 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { logger } from '../services/logger';
 import { useAuth } from '../context/AuthContext';
 import * as authService from '../services/authService';
 import PasswordInput from '../components/PasswordInput';
+import { 
+  detectCurrencyFromLocation, 
+  checkLocationPermission,
+  isGeolocationSupported 
+} from '../services/locationService';
+import { 
+  getSupportedCurrencies, 
+  getCurrencySymbol,
+  Currency,
+  COMMON_CURRENCIES 
+} from '../services/currencyService';
 
 type Step = 'email' | 'verify' | 'complete';
+
+type LocationStatus = 'idle' | 'requesting' | 'detected' | 'denied' | 'manual';
 
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>('email');
@@ -18,8 +32,70 @@ export default function RegisterPage() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Currency & Location state
+  const [primaryCurrency, setPrimaryCurrency] = useState('');
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
+  const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [currencySearch, setCurrencySearch] = useState('');
+  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
+  
   const { completeRegistration } = useAuth();
   const navigate = useNavigate();
+  
+  // Ref to prevent double detection
+  const locationDetectionStarted = useRef(false);
+
+  // Load currencies on mount
+  useEffect(() => {
+    getSupportedCurrencies()
+      .then(setCurrencies)
+      .catch((err) => logger.error('Failed to load currencies:', err));
+  }, []);
+
+  // Request location function wrapped in useCallback
+  const requestLocation = useCallback(async () => {
+    // Prevent running twice
+    if (locationDetectionStarted.current) {
+      return;
+    }
+    locationDetectionStarted.current = true;
+    
+    if (!isGeolocationSupported()) {
+      setLocationStatus('manual');
+      setPrimaryCurrency('USD');
+      return;
+    }
+
+    // Check if already granted
+    const permission = await checkLocationPermission();
+    
+    if (permission === 'denied') {
+      setLocationStatus('denied');
+      setPrimaryCurrency('USD');
+      return;
+    }
+
+    setLocationStatus('requesting');
+    
+    const result = await detectCurrencyFromLocation();
+    
+    if (result.detected) {
+      setPrimaryCurrency(result.currency);
+      setDetectedCountry(result.country);
+      setLocationStatus('detected');
+    } else {
+      setLocationStatus('denied');
+      setPrimaryCurrency('USD');
+    }
+  }, []);
+
+  // Request location when entering step 3
+  useEffect(() => {
+    if (step === 'complete' && locationStatus === 'idle') {
+      requestLocation();
+    }
+  }, [step, locationStatus, requestLocation]);
 
   // Step 1: Send verification code
   const handleSendCode = async (e: FormEvent) => {
@@ -100,7 +176,7 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await completeRegistration(email, verificationToken, password, fullName);
+      await completeRegistration(email, verificationToken, password, fullName, primaryCurrency || undefined);
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -277,6 +353,119 @@ export default function RegisterPage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                 />
+              </div>
+
+              {/* Primary Currency Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Primary Currency
+                </label>
+                
+                {/* Location detection status */}
+                {locationStatus === 'requesting' && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                    <svg className="animate-spin h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Detecting your location...
+                  </div>
+                )}
+                
+                {locationStatus === 'detected' && detectedCountry && (
+                  <div className="flex items-center gap-2 text-sm text-green-600 mb-2">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Detected: {detectedCountry}
+                  </div>
+                )}
+                
+                {(locationStatus === 'denied' || locationStatus === 'manual') && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    Select your preferred currency for displaying totals
+                  </p>
+                )}
+
+                {/* Currency dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
+                    disabled={locationStatus === 'requesting'}
+                    className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-2">
+                      {primaryCurrency ? (
+                        <>
+                          <span className="text-lg">{getCurrencySymbol(primaryCurrency)}</span>
+                          <span>{currencies.find(c => c.code === primaryCurrency)?.name || primaryCurrency}</span>
+                          <span className="text-gray-400">({primaryCurrency})</span>
+                        </>
+                      ) : (
+                        <span className="text-gray-400">Select currency...</span>
+                      )}
+                    </span>
+                    <svg className={`h-4 w-4 text-gray-400 transition-transform ${isCurrencyDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {isCurrencyDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                      <div className="p-2 border-b border-gray-100">
+                        <input
+                          type="text"
+                          value={currencySearch}
+                          onChange={(e) => setCurrencySearch(e.target.value)}
+                          placeholder="Search currencies..."
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {/* Common currencies first */}
+                        {currencySearch === '' && (
+                          <div className="px-3 py-1 text-xs text-gray-400 bg-gray-50">Common Currencies</div>
+                        )}
+                        {currencies
+                          .filter(c => 
+                            currencySearch === '' 
+                              ? COMMON_CURRENCIES.includes(c.code)
+                              : c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                                c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                          )
+                          .map((c) => (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => {
+                                setPrimaryCurrency(c.code);
+                                setIsCurrencyDropdownOpen(false);
+                                setCurrencySearch('');
+                                setLocationStatus('manual');
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 ${
+                                c.code === primaryCurrency ? 'bg-indigo-50 text-indigo-700' : ''
+                              }`}
+                            >
+                              <span className="w-6">{c.symbol}</span>
+                              <span className="flex-1">{c.name}</span>
+                              <span className="text-gray-400">{c.code}</span>
+                            </button>
+                          ))
+                        }
+                        {currencySearch !== '' && currencies.filter(c => 
+                          c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                          c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                        ).length === 0 && (
+                          <p className="px-3 py-2 text-sm text-gray-500">No currencies found</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <PasswordInput

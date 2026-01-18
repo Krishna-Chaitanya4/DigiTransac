@@ -7,7 +7,7 @@ public record SendVerificationRequest(string Email);
 public record VerifyCodeRequest(string Email, string Code);
 
 // Step 3: Complete registration (after email verified)
-public record CompleteRegistrationRequest(string Email, string VerificationToken, string Password, string FullName);
+public record CompleteRegistrationRequest(string Email, string VerificationToken, string Password, string FullName, string? PrimaryCurrency = null);
 
 // Legacy - keeping for now
 public record RegisterRequest(string Email, string Password, string FullName);

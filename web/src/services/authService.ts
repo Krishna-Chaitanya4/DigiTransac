@@ -88,14 +88,15 @@ export async function completeRegistration(
   email: string, 
   verificationToken: string, 
   password: string, 
-  fullName: string
+  fullName: string,
+  primaryCurrency?: string
 ): Promise<AuthResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/complete-registration`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, verificationToken, password, fullName }),
+    body: JSON.stringify({ email, verificationToken, password, fullName, primaryCurrency }),
   });
   return handleResponse<AuthResponse>(response);
 }

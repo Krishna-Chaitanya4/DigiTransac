@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { logger } from '../services/logger';
 import TwoFactorSettings from '../components/TwoFactorSettings';
 import { 
   getSupportedCurrencies, 
@@ -54,7 +55,7 @@ export default function SettingsPage() {
         setCurrencies(currencyList);
         setPrimaryCurrency(preference);
       } catch (err) {
-        console.error('Failed to load currency data:', err);
+        logger.error('Failed to load currency data:', err);
         setCurrencyError('Failed to load currency settings');
       } finally {
         setIsCurrencyLoading(false);

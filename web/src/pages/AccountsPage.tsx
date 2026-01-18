@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { logger } from '../services/logger';
 import {
   Account,
   AccountType,
@@ -64,7 +65,7 @@ function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading }: 
   useEffect(() => {
     getSupportedCurrencies()
       .then(setCurrencies)
-      .catch(console.error);
+      .catch((err) => logger.error('Failed to load currencies:', err));
   }, []);
 
   useEffect(() => {

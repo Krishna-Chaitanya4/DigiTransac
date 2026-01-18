@@ -1,4 +1,5 @@
 import { useState, useEffect, useSyncExternalStore } from 'react';
+import { logger } from '../services/logger';
 
 function subscribe(callback: () => void) {
   window.addEventListener('online', callback);
@@ -55,7 +56,7 @@ export function useOfflineQueue() {
         await executeAction(action);
         successfulIds.push(action.id!);
       } catch (error) {
-        console.error('Failed to sync action:', action, error);
+        logger.error('Failed to sync action:', action, error);
         // Stop syncing on first failure to maintain order
         break;
       }

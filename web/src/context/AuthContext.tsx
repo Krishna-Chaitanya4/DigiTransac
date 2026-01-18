@@ -12,7 +12,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }>;
   verifyTwoFactorLogin: (twoFactorToken: string, code: string) => Promise<void>;
   verifyTwoFactorEmailOtp: (twoFactorToken: string, emailCode: string) => Promise<void>;
-  completeRegistration: (email: string, verificationToken: string, password: string, fullName: string) => Promise<void>;
+  completeRegistration: (email: string, verificationToken: string, password: string, fullName: string, primaryCurrency?: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
@@ -158,8 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     handleAuthSuccess(response);
   };
 
-  const completeRegistration = async (email: string, verificationToken: string, password: string, fullName: string) => {
-    const response = await authService.completeRegistration(email, verificationToken, password, fullName);
+  const completeRegistration = async (email: string, verificationToken: string, password: string, fullName: string, primaryCurrency?: string) => {
+    const response = await authService.completeRegistration(email, verificationToken, password, fullName, primaryCurrency);
     handleAuthSuccess(response);
   };
 
