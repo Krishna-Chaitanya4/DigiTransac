@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
+import { DatePicker } from '../components/DatePicker';
 import { getLabels } from '../services/labelService';
 import { getTags, createTag } from '../services/tagService';
 import { getAccounts, type Account } from '../services/accountService';
@@ -1055,28 +1056,29 @@ export default function TransactionsPage() {
 
       {/* Custom Date Range */}
       {datePreset === 'custom' && (
-        <div className="flex flex-wrap gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600 dark:text-gray-400">From:</label>
-            <input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg 
-                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div className="w-40">
+              <DatePicker
+                value={customStartDate}
+                onChange={(value) => setCustomStartDate(value)}
+                placeholder="Start date"
+                maxDate={customEndDate ? new Date(customEndDate) : new Date()}
+              />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600 dark:text-gray-400">To:</label>
-            <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg 
-                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div className="w-40">
+              <DatePicker
+                value={customEndDate}
+                onChange={(value) => setCustomEndDate(value)}
+                placeholder="End date"
+                minDate={customStartDate ? new Date(customStartDate) : undefined}
+                maxDate={new Date()}
+              />
+            </div>
           </div>
         </div>
       )}
