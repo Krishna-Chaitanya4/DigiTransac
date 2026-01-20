@@ -57,8 +57,11 @@ export function CalculatorInput({
   useEffect(() => {
     if (value > 0 && !isExpression) {
       setInputValue(value.toString());
-    } else if (value === 0 && !inputValue) {
+    } else if (value === 0) {
+      // Always clear input when value is reset to 0 (e.g., form reset)
       setInputValue('');
+      setIsExpression(false);
+      setEvaluatedValue(null);
     }
   }, [value]);
 

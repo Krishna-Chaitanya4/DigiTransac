@@ -189,7 +189,7 @@ export function TransactionForm({
         setPlaceSearchResults([]);
         setHighlightedPlaceIndex(-1);
       } else {
-        // Reset to defaults
+        // Reset to defaults for new transaction
         setType('Debit');
         setAccountId(defaultAccountId || accounts[0]?.id || '');
         setAmount(0);
@@ -197,7 +197,10 @@ export function TransactionForm({
         setTitle('');
         setPayee('');
         setNotes('');
-        setSelectedLabelId(categoryLabels[0]?.id || '');
+        const defaultCategoryId = categoryLabels[0]?.id || '';
+        setSelectedLabelId(defaultCategoryId);
+        // Reset splits to match the default state (empty since amount is 0)
+        setSplits([]);
         setSelectedTagIds([]);
         setTransferToAccountId('');
         setIsRecurring(false);
@@ -206,7 +209,6 @@ export function TransactionForm({
         setRecurrenceEndDate('');
         setIncludeLocation(false);
         setLocation(null);
-        setSplits([]);
         setShowSplits(false);
         setTagSearch('');
         setIsTagDropdownOpen(false);
@@ -216,6 +218,9 @@ export function TransactionForm({
         setLocationError(null);
         setPlaceSearchResults([]);
         setHighlightedPlaceIndex(-1);
+        setCategorySearch('');
+        setIsCategoryDropdownOpen(false);
+        setHighlightedCategoryIndex(-1);
         
         // Auto-capture location for new transactions
         if (autoLocationEnabled) {
@@ -252,8 +257,13 @@ export function TransactionForm({
 
   // Update single split when amount or label changes (non-split mode)
   useEffect(() => {
-    if (!showSplits && selectedLabelId && amount > 0) {
-      setSplits([{ labelId: selectedLabelId, amount, notes: undefined }]);
+    if (!showSplits && selectedLabelId) {
+      if (amount > 0) {
+        setSplits([{ labelId: selectedLabelId, amount, notes: undefined }]);
+      } else {
+        // Clear splits when amount is 0 or negative
+        setSplits([]);
+      }
     }
   }, [amount, selectedLabelId, showSplits]);
 
