@@ -12,6 +12,7 @@ public class TransactionServiceTests
     private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<IAccountRepository> _accountRepositoryMock;
     private readonly Mock<ILabelRepository> _labelRepositoryMock;
+    private readonly Mock<ITagRepository> _tagRepositoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
     private readonly Mock<IDekCacheService> _dekCacheServiceMock;
@@ -27,6 +28,7 @@ public class TransactionServiceTests
         _transactionRepositoryMock = new Mock<ITransactionRepository>();
         _accountRepositoryMock = new Mock<IAccountRepository>();
         _labelRepositoryMock = new Mock<ILabelRepository>();
+        _tagRepositoryMock = new Mock<ITagRepository>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
         _dekCacheServiceMock = new Mock<IDekCacheService>();
@@ -67,10 +69,15 @@ public class TransactionServiceTests
                 new() { Id = TestLabelId, UserId = TestUserId, Name = "Groceries", Type = LabelType.Category }
             });
 
+        // Setup default tags
+        _tagRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId))
+            .ReturnsAsync(new List<Tag>());
+
         _transactionService = new TransactionService(
             _transactionRepositoryMock.Object,
             _accountRepositoryMock.Object,
             _labelRepositoryMock.Object,
+            _tagRepositoryMock.Object,
             _userRepositoryMock.Object,
             _keyManagementServiceMock.Object,
             _dekCacheServiceMock.Object,
@@ -568,10 +575,10 @@ public class TransactionServiceTests
         var filter = new TransactionFilterRequest(
             StartDate: DateTime.UtcNow.AddDays(-30),
             EndDate: DateTime.UtcNow,
-            AccountId: TestAccountId,
-            Type: null,
-            LabelId: null,
-            TagId: null,
+            AccountIds: new List<string> { TestAccountId },
+            Types: null,
+            LabelIds: null,
+            TagIds: null,
             MinAmount: null,
             MaxAmount: null,
             SearchText: null,
@@ -588,6 +595,206 @@ public class TransactionServiceTests
         result.TotalCount.Should().Be(1);
         result.Page.Should().Be(1);
         result.PageSize.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithMultipleAccountIds_ShouldPassToRepository()
+    {
+        // Arrange
+        var accountId1 = "account-1";
+        var accountId2 = "account-2";
+        var transactions = new List<Transaction>();
+
+        _transactionRepositoryMock.Setup(x => x.GetFilteredAsync(TestUserId, It.IsAny<TransactionFilterRequest>()))
+            .ReturnsAsync((transactions, 0));
+
+        var filter = new TransactionFilterRequest(
+            StartDate: null,
+            EndDate: null,
+            AccountIds: new List<string> { accountId1, accountId2 },
+            Types: null,
+            LabelIds: null,
+            TagIds: null,
+            MinAmount: null,
+            MaxAmount: null,
+            SearchText: null,
+            IsCleared: null,
+            IsRecurring: null,
+            Page: 1,
+            PageSize: 50);
+
+        // Act
+        await _transactionService.GetAllAsync(TestUserId, filter);
+
+        // Assert
+        _transactionRepositoryMock.Verify(x => x.GetFilteredAsync(
+            TestUserId,
+            It.Is<TransactionFilterRequest>(f => 
+                f.AccountIds != null && 
+                f.AccountIds.Count == 2 &&
+                f.AccountIds.Contains(accountId1) &&
+                f.AccountIds.Contains(accountId2))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithMultipleTypes_ShouldPassToRepository()
+    {
+        // Arrange
+        var transactions = new List<Transaction>();
+
+        _transactionRepositoryMock.Setup(x => x.GetFilteredAsync(TestUserId, It.IsAny<TransactionFilterRequest>()))
+            .ReturnsAsync((transactions, 0));
+
+        var filter = new TransactionFilterRequest(
+            StartDate: null,
+            EndDate: null,
+            AccountIds: null,
+            Types: new List<string> { "Debit", "Credit" },
+            LabelIds: null,
+            TagIds: null,
+            MinAmount: null,
+            MaxAmount: null,
+            SearchText: null,
+            IsCleared: null,
+            IsRecurring: null,
+            Page: 1,
+            PageSize: 50);
+
+        // Act
+        await _transactionService.GetAllAsync(TestUserId, filter);
+
+        // Assert
+        _transactionRepositoryMock.Verify(x => x.GetFilteredAsync(
+            TestUserId,
+            It.Is<TransactionFilterRequest>(f => 
+                f.Types != null && 
+                f.Types.Count == 2 &&
+                f.Types.Contains("Debit") &&
+                f.Types.Contains("Credit"))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithMultipleLabelIds_ShouldPassToRepository()
+    {
+        // Arrange
+        var labelId1 = "label-1";
+        var labelId2 = "label-2";
+        var transactions = new List<Transaction>();
+
+        _transactionRepositoryMock.Setup(x => x.GetFilteredAsync(TestUserId, It.IsAny<TransactionFilterRequest>()))
+            .ReturnsAsync((transactions, 0));
+
+        var filter = new TransactionFilterRequest(
+            StartDate: null,
+            EndDate: null,
+            AccountIds: null,
+            Types: null,
+            LabelIds: new List<string> { labelId1, labelId2 },
+            TagIds: null,
+            MinAmount: null,
+            MaxAmount: null,
+            SearchText: null,
+            IsCleared: null,
+            IsRecurring: null,
+            Page: 1,
+            PageSize: 50);
+
+        // Act
+        await _transactionService.GetAllAsync(TestUserId, filter);
+
+        // Assert
+        _transactionRepositoryMock.Verify(x => x.GetFilteredAsync(
+            TestUserId,
+            It.Is<TransactionFilterRequest>(f => 
+                f.LabelIds != null && 
+                f.LabelIds.Count == 2 &&
+                f.LabelIds.Contains(labelId1) &&
+                f.LabelIds.Contains(labelId2))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithMultipleTagIds_ShouldPassToRepository()
+    {
+        // Arrange
+        var tagId1 = "tag-1";
+        var tagId2 = "tag-2";
+        var transactions = new List<Transaction>();
+
+        _transactionRepositoryMock.Setup(x => x.GetFilteredAsync(TestUserId, It.IsAny<TransactionFilterRequest>()))
+            .ReturnsAsync((transactions, 0));
+
+        var filter = new TransactionFilterRequest(
+            StartDate: null,
+            EndDate: null,
+            AccountIds: null,
+            Types: null,
+            LabelIds: null,
+            TagIds: new List<string> { tagId1, tagId2 },
+            MinAmount: null,
+            MaxAmount: null,
+            SearchText: null,
+            IsCleared: null,
+            IsRecurring: null,
+            Page: 1,
+            PageSize: 50);
+
+        // Act
+        await _transactionService.GetAllAsync(TestUserId, filter);
+
+        // Assert
+        _transactionRepositoryMock.Verify(x => x.GetFilteredAsync(
+            TestUserId,
+            It.Is<TransactionFilterRequest>(f => 
+                f.TagIds != null && 
+                f.TagIds.Count == 2 &&
+                f.TagIds.Contains(tagId1) &&
+                f.TagIds.Contains(tagId2))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithSearchText_ShouldFindMatchingLabelsAndTags()
+    {
+        // Arrange
+        var transactions = new List<Transaction>();
+        var matchingLabel = new Label { Id = "matching-label", UserId = TestUserId, Name = "Groceries", Type = LabelType.Category };
+        var matchingTag = new Api.Models.Tag { Id = "matching-tag", UserId = TestUserId, Name = "Shopping" };
+
+        _transactionRepositoryMock.Setup(x => x.GetFilteredAsync(TestUserId, It.IsAny<TransactionFilterRequest>()))
+            .ReturnsAsync((transactions, 0));
+
+        _labelRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId))
+            .ReturnsAsync(new List<Label> { matchingLabel });
+
+        var filter = new TransactionFilterRequest(
+            StartDate: null,
+            EndDate: null,
+            AccountIds: null,
+            Types: null,
+            LabelIds: null,
+            TagIds: null,
+            MinAmount: null,
+            MaxAmount: null,
+            SearchText: "groc",
+            IsCleared: null,
+            IsRecurring: null,
+            Page: 1,
+            PageSize: 50);
+
+        // Act
+        await _transactionService.GetAllAsync(TestUserId, filter);
+
+        // Assert - verify search was passed with matching label IDs
+        _transactionRepositoryMock.Verify(x => x.GetFilteredAsync(
+            TestUserId,
+            It.Is<TransactionFilterRequest>(f => 
+                f.SearchText == "groc" &&
+                f.SearchLabelIds != null &&
+                f.SearchLabelIds.Contains("matching-label"))),
+            Times.Once);
     }
 
     #endregion

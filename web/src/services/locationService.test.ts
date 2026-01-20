@@ -466,4 +466,98 @@ describe('locationService', () => {
       expect(result).toBe('prompt');
     });
   });
+
+  describe('searchPlaces', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return empty array for short queries', async () => {
+      const { searchPlaces } = await import('./locationService');
+      
+      const result = await searchPlaces('a');
+      
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array for empty query', async () => {
+      const { searchPlaces } = await import('./locationService');
+      
+      const result = await searchPlaces('');
+      
+      expect(result).toEqual([]);
+    });
+
+    it('should return parsed results from Nominatim API', async () => {
+      const mockResponse = [
+        {
+          place_id: 12345,
+          display_name: 'Coffee Shop, Main Street, New York, USA',
+          lat: '40.7128',
+          lon: '-74.0060',
+          address: {
+            city: 'New York',
+            country: 'United States',
+          },
+        },
+        {
+          place_id: 67890,
+          display_name: 'Coffee House, London, UK',
+          lat: '51.5074',
+          lon: '-0.1278',
+          address: {
+            city: 'London',
+            country: 'United Kingdom',
+          },
+        },
+      ];
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const { searchPlaces } = await import('./locationService');
+      const result = await searchPlaces('coffee');
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        placeId: '12345',
+        displayName: 'Coffee Shop, Main Street, New York, USA',
+        latitude: 40.7128,
+        longitude: -74.0060,
+        city: 'New York',
+        country: 'United States',
+      });
+      expect(result[1]).toEqual({
+        placeId: '67890',
+        displayName: 'Coffee House, London, UK',
+        latitude: 51.5074,
+        longitude: -0.1278,
+        city: 'London',
+        country: 'United Kingdom',
+      });
+    });
+
+    it('should return empty array on API error', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+
+      const { searchPlaces } = await import('./locationService');
+      const result = await searchPlaces('coffee shop');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array on network error', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      const { searchPlaces } = await import('./locationService');
+      const result = await searchPlaces('coffee shop');
+
+      expect(result).toEqual([]);
+    });
+  });
 });

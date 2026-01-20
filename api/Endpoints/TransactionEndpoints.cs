@@ -16,10 +16,10 @@ public static class TransactionEndpoints
         group.MapGet("/", async (
             DateTime? startDate,
             DateTime? endDate,
-            string? accountId,
-            string? type,
-            string? labelId,
-            string? tagId,
+            string? accountIds,
+            string? types,
+            string? labelIds,
+            string? tagIds,
             decimal? minAmount,
             decimal? maxAmount,
             string? searchText,
@@ -34,8 +34,33 @@ public static class TransactionEndpoints
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
+            // Parse comma-separated values
+            List<string>? accountIdList = null;
+            if (!string.IsNullOrEmpty(accountIds))
+            {
+                accountIdList = accountIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            }
+
+            List<string>? typeList = null;
+            if (!string.IsNullOrEmpty(types))
+            {
+                typeList = types.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            }
+
+            List<string>? labelIdList = null;
+            if (!string.IsNullOrEmpty(labelIds))
+            {
+                labelIdList = labelIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            }
+
+            List<string>? tagIdList = null;
+            if (!string.IsNullOrEmpty(tagIds))
+            {
+                tagIdList = tagIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            }
+
             var filter = new TransactionFilterRequest(
-                startDate, endDate, accountId, type, labelId, tagId,
+                startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
                 minAmount, maxAmount, searchText, isCleared, isRecurring,
                 page, pageSize);
 

@@ -144,10 +144,10 @@ export interface UpdateTransactionRequest {
 export interface TransactionFilter {
   startDate?: string;
   endDate?: string;
-  accountId?: string;
-  type?: TransactionType;
-  labelId?: string;
-  tagId?: string;
+  accountIds?: string[];
+  types?: TransactionType[];
+  labelIds?: string[];
+  tagIds?: string[];
   minAmount?: number;
   maxAmount?: number;
   searchText?: string;

@@ -15,10 +15,22 @@ function buildFilterQuery(filter: TransactionFilter): string {
   
   if (filter.startDate) params.append('startDate', filter.startDate);
   if (filter.endDate) params.append('endDate', filter.endDate);
-  if (filter.accountId) params.append('accountId', filter.accountId);
-  if (filter.type) params.append('type', filter.type);
-  if (filter.labelId) params.append('labelId', filter.labelId);
-  if (filter.tagId) params.append('tagId', filter.tagId);
+  // Multiple account IDs - send as comma-separated string
+  if (filter.accountIds && filter.accountIds.length > 0) {
+    params.append('accountIds', filter.accountIds.join(','));
+  }
+  // Multiple types - send as comma-separated string
+  if (filter.types && filter.types.length > 0) {
+    params.append('types', filter.types.join(','));
+  }
+  // Multiple label IDs (categories) - send as comma-separated string
+  if (filter.labelIds && filter.labelIds.length > 0) {
+    params.append('labelIds', filter.labelIds.join(','));
+  }
+  // Multiple tag IDs - send as comma-separated string
+  if (filter.tagIds && filter.tagIds.length > 0) {
+    params.append('tagIds', filter.tagIds.join(','));
+  }
   if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());
   if (filter.maxAmount !== undefined) params.append('maxAmount', filter.maxAmount.toString());
   if (filter.searchText) params.append('searchText', filter.searchText);
@@ -111,7 +123,7 @@ export async function getCurrentMonthTransactions(accountId?: string): Promise<T
   return getTransactions({
     startDate: formatDateToStartOfDay(startOfMonth),
     endDate: formatDateToEndOfDay(endOfMonth),
-    accountId,
+    accountIds: accountId ? [accountId] : undefined,
     pageSize: 100,
   });
 }
@@ -125,7 +137,7 @@ export async function getTransactionsByDateRange(
   return getTransactions({
     startDate: formatDateToStartOfDay(startDate),
     endDate: formatDateToEndOfDay(endDate),
-    accountId,
+    accountIds: accountId ? [accountId] : undefined,
     pageSize: 100,
   });
 }

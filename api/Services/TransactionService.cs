@@ -22,6 +22,7 @@ public class TransactionService : ITransactionService
     private readonly ITransactionRepository _transactionRepository;
     private readonly IAccountRepository _accountRepository;
     private readonly ILabelRepository _labelRepository;
+    private readonly ITagRepository _tagRepository;
     private readonly IUserRepository _userRepository;
     private readonly IKeyManagementService _keyManagementService;
     private readonly IDekCacheService _dekCacheService;
@@ -31,6 +32,7 @@ public class TransactionService : ITransactionService
         ITransactionRepository transactionRepository,
         IAccountRepository accountRepository,
         ILabelRepository labelRepository,
+        ITagRepository tagRepository,
         IUserRepository userRepository,
         IKeyManagementService keyManagementService,
         IDekCacheService dekCacheService,
@@ -39,6 +41,7 @@ public class TransactionService : ITransactionService
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
         _labelRepository = labelRepository;
+        _tagRepository = tagRepository;
         _userRepository = userRepository;
         _keyManagementService = keyManagementService;
         _dekCacheService = dekCacheService;
@@ -51,7 +54,18 @@ public class TransactionService : ITransactionService
         if (cachedDek != null) return cachedDek;
 
         var user = await _userRepository.GetByIdAsync(userId);
-        if (user?.WrappedDek == null) return null;
+        if (user == null) return null;
+
+        // If user doesn't have a DEK, generate one (migration for existing users)
+        if (user.WrappedDek == null)
+        {
+            var newDek = _keyManagementService.GenerateDek();
+            var wrappedDek = await _keyManagementService.WrapKeyAsync(newDek);
+            user.WrappedDek = wrappedDek;
+            await _userRepository.UpdateAsync(user);
+            _dekCacheService.SetDek(userId, newDek);
+            return newDek;
+        }
 
         var dek = await _keyManagementService.UnwrapKeyAsync(user.WrappedDek);
         _dekCacheService.SetDek(userId, dek);
@@ -73,12 +87,46 @@ public class TransactionService : ITransactionService
 
     public async Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter)
     {
-        var (transactions, totalCount) = await _transactionRepository.GetFilteredAsync(userId, filter);
-        var dek = await GetUserDekAsync(userId);
-        
-        // Get accounts and labels for mapping
+        // Get accounts and labels for mapping (needed for search and response)
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labels = await _labelRepository.GetByUserIdAsync(userId);
+        var tags = await _tagRepository.GetByUserIdAsync(userId);
+        
+        // If there's a search text, find matching label/tag/account IDs by name
+        var enrichedFilter = filter;
+        if (!string.IsNullOrEmpty(filter.SearchText))
+        {
+            var searchLower = filter.SearchText.ToLowerInvariant();
+            
+            // Find labels whose name contains the search text
+            var matchingLabelIds = labels
+                .Where(l => l.Name.ToLowerInvariant().Contains(searchLower))
+                .Select(l => l.Id)
+                .ToList();
+            
+            // Find tags whose name contains the search text
+            var matchingTagIds = tags
+                .Where(t => t.Name.ToLowerInvariant().Contains(searchLower))
+                .Select(t => t.Id)
+                .ToList();
+            
+            // Find accounts whose name contains the search text
+            var matchingAccountIds = accounts
+                .Where(a => a.Name.ToLowerInvariant().Contains(searchLower))
+                .Select(a => a.Id)
+                .ToList();
+            
+            // Create enriched filter with matching IDs
+            enrichedFilter = filter with 
+            { 
+                SearchLabelIds = matchingLabelIds.Count > 0 ? matchingLabelIds : null,
+                SearchTagIds = matchingTagIds.Count > 0 ? matchingTagIds : null,
+                SearchAccountIds = matchingAccountIds.Count > 0 ? matchingAccountIds : null
+            };
+        }
+        
+        var (transactions, totalCount) = await _transactionRepository.GetFilteredAsync(userId, enrichedFilter);
+        var dek = await GetUserDekAsync(userId);
 
         var accountDict = accounts.ToDictionary(a => a.Id);
         var labelDict = labels.ToDictionary(l => l.Id);
@@ -110,8 +158,10 @@ public class TransactionService : ITransactionService
         DateTime? endDate, 
         string? accountId)
     {
+        // Convert single accountId to list for filter
+        List<string>? accountIds = !string.IsNullOrEmpty(accountId) ? new List<string> { accountId } : null;
         var filter = new TransactionFilterRequest(
-            startDate, endDate, accountId, null, null, null, null, null, null, null, null, 1, int.MaxValue);
+            startDate, endDate, accountIds, null, null, null, null, null, null, null, null, 1, int.MaxValue);
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
         
@@ -226,7 +276,8 @@ public class TransactionService : ITransactionService
                 Notes = s.Notes
             }).ToList(),
             TagIds = request.TagIds ?? new List<string>(),
-            TransferToAccountId = request.TransferToAccountId
+            TransferToAccountId = request.TransferToAccountId,
+            IsCleared = true // Default to cleared since users enter transactions after completion
         };
 
         // Handle location

@@ -53,17 +53,20 @@ public record UpdateTransactionRequest(
 public record TransactionFilterRequest(
     DateTime? StartDate,
     DateTime? EndDate,
-    string? AccountId,
-    string? Type,
-    string? LabelId,
-    string? TagId,
+    List<string>? AccountIds,
+    List<string>? Types,
+    List<string>? LabelIds,
+    List<string>? TagIds,
     decimal? MinAmount,
     decimal? MaxAmount,
     string? SearchText,
     bool? IsCleared,
     bool? IsRecurring,
     int? Page,
-    int? PageSize
+    int? PageSize,
+    List<string>? SearchLabelIds = null,
+    List<string>? SearchTagIds = null,
+    List<string>? SearchAccountIds = null
 );
 
 // Response DTOs

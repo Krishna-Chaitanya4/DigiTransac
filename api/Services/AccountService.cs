@@ -50,11 +50,22 @@ public class AccountService : IAccountService
             return cachedDek;
         }
 
-        // Get user's wrapped DEK from database
+        // Get user from database
         var user = await _userRepository.GetByIdAsync(userId);
-        if (user?.WrappedDek == null)
+        if (user == null)
         {
             return null;
+        }
+
+        // If user doesn't have a DEK, generate one (migration for existing users)
+        if (user.WrappedDek == null)
+        {
+            var newDek = _keyManagementService.GenerateDek();
+            var wrappedDek = await _keyManagementService.WrapKeyAsync(newDek);
+            user.WrappedDek = wrappedDek;
+            await _userRepository.UpdateAsync(user);
+            _dekCacheService.SetDek(userId, newDek);
+            return newDek;
         }
 
         // Unwrap and cache

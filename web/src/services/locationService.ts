@@ -214,3 +214,69 @@ export async function checkLocationPermission(): Promise<'granted' | 'denied' | 
     return 'prompt';
   }
 }
+
+/**
+ * Place search result from Nominatim
+ */
+export interface PlaceSearchResult {
+  placeId: string;
+  displayName: string;
+  city?: string;
+  country?: string;
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * Search for places using OpenStreetMap Nominatim API (free, no API key needed)
+ * Returns a list of matching places with coordinates
+ */
+export async function searchPlaces(query: string, limit = 5): Promise<PlaceSearchResult[]> {
+  if (!query || query.trim().length < 2) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=${limit}&addressdetails=1`,
+      {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          // Nominatim requires a User-Agent header
+          'User-Agent': 'DigiTransac/1.0',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Place search failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return data.map((place: {
+      place_id: number;
+      display_name: string;
+      lat: string;
+      lon: string;
+      address?: {
+        city?: string;
+        town?: string;
+        village?: string;
+        municipality?: string;
+        country?: string;
+      };
+    }) => ({
+      placeId: String(place.place_id),
+      displayName: place.display_name,
+      city: place.address?.city || place.address?.town || place.address?.village || place.address?.municipality,
+      country: place.address?.country,
+      latitude: parseFloat(place.lat),
+      longitude: parseFloat(place.lon),
+    }));
+  } catch (error) {
+    logger.error('Place search failed:', error);
+    return [];
+  }
+}

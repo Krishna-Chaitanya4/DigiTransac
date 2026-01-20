@@ -97,24 +97,36 @@ public class TransactionRepository : ITransactionRepository
             filters.Add(filterBuilder.Lte(t => t.Date, filter.EndDate.Value));
         }
 
-        if (!string.IsNullOrEmpty(filter.AccountId))
+        // Filter by multiple accounts (OR logic)
+        if (filter.AccountIds?.Count > 0)
         {
-            filters.Add(filterBuilder.Eq(t => t.AccountId, filter.AccountId));
+            filters.Add(filterBuilder.In(t => t.AccountId, filter.AccountIds));
         }
 
-        if (!string.IsNullOrEmpty(filter.Type) && Enum.TryParse<TransactionType>(filter.Type, true, out var type))
+        // Filter by multiple types (OR logic)
+        if (filter.Types?.Count > 0)
         {
-            filters.Add(filterBuilder.Eq(t => t.Type, type));
+            var parsedTypes = filter.Types
+                .Where(t => Enum.TryParse<TransactionType>(t, true, out _))
+                .Select(t => Enum.Parse<TransactionType>(t, true))
+                .ToList();
+            if (parsedTypes.Count > 0)
+            {
+                filters.Add(filterBuilder.In(t => t.Type, parsedTypes));
+            }
         }
 
-        if (!string.IsNullOrEmpty(filter.LabelId))
+        // Filter by multiple labels/categories (OR logic)
+        if (filter.LabelIds?.Count > 0)
         {
-            filters.Add(filterBuilder.ElemMatch(t => t.Splits, s => s.LabelId == filter.LabelId));
+            filters.Add(filterBuilder.ElemMatch(t => t.Splits, 
+                Builders<TransactionSplit>.Filter.In(s => s.LabelId, filter.LabelIds)));
         }
 
-        if (!string.IsNullOrEmpty(filter.TagId))
+        // Filter by multiple tags (OR logic - match any of the selected tags)
+        if (filter.TagIds?.Count > 0)
         {
-            filters.Add(filterBuilder.AnyEq(t => t.TagIds, filter.TagId));
+            filters.Add(filterBuilder.AnyIn(t => t.TagIds, filter.TagIds));
         }
 
         if (filter.MinAmount.HasValue)
@@ -144,11 +156,40 @@ public class TransactionRepository : ITransactionRepository
             }
         }
 
-        // Text search on title (not encrypted)
+        // Text search on title (not encrypted) OR matching labels/tags by name OR city/country
         if (!string.IsNullOrEmpty(filter.SearchText))
         {
             var searchRegex = new BsonRegularExpression(filter.SearchText, "i");
-            filters.Add(filterBuilder.Regex(t => t.Title, searchRegex));
+            var searchFilters = new List<FilterDefinition<Transaction>>
+            {
+                filterBuilder.Regex(t => t.Title, searchRegex),
+                // Search by city (unencrypted)
+                filterBuilder.Regex(t => t.Location!.City, searchRegex),
+                // Search by country (unencrypted)
+                filterBuilder.Regex(t => t.Location!.Country, searchRegex)
+            };
+            
+            // Add label name matches (if service provided matching IDs)
+            if (filter.SearchLabelIds?.Count > 0)
+            {
+                searchFilters.Add(filterBuilder.ElemMatch(t => t.Splits, 
+                    Builders<TransactionSplit>.Filter.In(s => s.LabelId, filter.SearchLabelIds)));
+            }
+            
+            // Add tag name matches (if service provided matching IDs)
+            if (filter.SearchTagIds?.Count > 0)
+            {
+                searchFilters.Add(filterBuilder.AnyIn(t => t.TagIds, filter.SearchTagIds));
+            }
+            
+            // Add account name matches (if service provided matching IDs)
+            if (filter.SearchAccountIds?.Count > 0)
+            {
+                searchFilters.Add(filterBuilder.In(t => t.AccountId, filter.SearchAccountIds));
+            }
+            
+            // Use OR - match any of title, label, tag, city, country, or account
+            filters.Add(filterBuilder.Or(searchFilters));
         }
 
         var combinedFilter = filterBuilder.And(filters);
@@ -296,9 +337,11 @@ public class TransactionRepository : ITransactionRepository
             });
 
         var results = await pipeline.ToListAsync();
-        return results.ToDictionary(
-            r => r["_id"].AsString,
-            r => r["total"].ToDecimal());
+        return results
+            .Where(r => !r["_id"].IsBsonNull)
+            .ToDictionary(
+                r => r["_id"].IsString ? r["_id"].AsString : r["_id"].AsObjectId.ToString(),
+                r => r["total"].ToDecimal());
     }
 
     public async Task<Dictionary<string, decimal>> GetSumByTagAsync(
@@ -333,8 +376,10 @@ public class TransactionRepository : ITransactionRepository
             });
 
         var results = await pipeline.ToListAsync();
-        return results.ToDictionary(
-            r => r["_id"].AsString,
-            r => r["total"].ToDecimal());
+        return results
+            .Where(r => !r["_id"].IsBsonNull)
+            .ToDictionary(
+                r => r["_id"].IsString ? r["_id"].AsString : r["_id"].AsObjectId.ToString(),
+                r => r["total"].ToDecimal());
     }
 }
