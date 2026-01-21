@@ -79,7 +79,6 @@ public class AuthService : IAuthService
         _labelService = labelService;
         _twoFactorService = twoFactorService;
         _keyManagementService = keyManagementService;
-        _keyManagementService = keyManagementService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
     }

@@ -151,7 +151,8 @@ public static class TwoFactorEndpoints
         })
         .WithName("VerifyTwoFactorLogin")
         .Produces<AuthResponseWithoutRefresh>(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("sensitive");
 
         // Send email OTP as backup for 2FA
         group.MapPost("/send-email-code", async ([FromBody] SendTwoFactorEmailOtpRequest request, IAuthService authService) =>
@@ -172,7 +173,8 @@ public static class TwoFactorEndpoints
         })
         .WithName("SendTwoFactorEmailOtp")
         .Produces(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("sensitive");
 
         // Verify email OTP for 2FA login
         group.MapPost("/verify-email-code", async (
@@ -206,6 +208,7 @@ public static class TwoFactorEndpoints
         })
         .WithName("VerifyTwoFactorEmailOtp")
         .Produces<AuthResponseWithoutRefresh>(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("sensitive");
     }
 }

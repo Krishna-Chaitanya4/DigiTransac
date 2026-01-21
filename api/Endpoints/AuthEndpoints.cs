@@ -33,7 +33,8 @@ public static class AuthEndpoints
         })
         .WithName("SendVerification")
         .Produces<VerificationResponse>(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("auth");
 
         // Step 2: Verify the code
         group.MapPost("/verify-code", async (VerifyCodeRequest request, IAuthService authService) =>
@@ -54,7 +55,8 @@ public static class AuthEndpoints
         })
         .WithName("VerifyCode")
         .Produces<VerificationResponse>(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("auth");
 
         // Step 3: Complete registration (after email verified)
         group.MapPost("/complete-registration", async (
@@ -96,7 +98,8 @@ public static class AuthEndpoints
         })
         .WithName("CompleteRegistration")
         .Produces<AuthResponseWithoutRefresh>(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("auth");
 
         // Login
         group.MapPost("/login", async (
@@ -144,7 +147,8 @@ public static class AuthEndpoints
         .WithName("Login")
         .Produces<LoginResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400)
-        .Produces(401);
+        .Produces(401)
+        .RequireRateLimiting("auth");
 
         // Refresh access token (reads refresh token from HttpOnly cookie)
         group.MapPost("/refresh-token", async (
@@ -394,7 +398,8 @@ public static class AuthEndpoints
         })
         .WithName("ForgotPassword")
         .Produces<VerificationResponse>(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("sensitive");
 
         // Forgot password - Step 2: Verify reset code
         group.MapPost("/verify-reset-code", async (VerifyCodeRequest request, IAuthService authService) =>
@@ -415,7 +420,8 @@ public static class AuthEndpoints
         })
         .WithName("VerifyResetCode")
         .Produces<VerificationResponse>(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("sensitive");
 
         // Forgot password - Step 3: Reset password
         group.MapPost("/reset-password", async (ResetPasswordRequest request, IAuthService authService) =>
@@ -438,7 +444,8 @@ public static class AuthEndpoints
         })
         .WithName("ResetPassword")
         .Produces(200)
-        .Produces<ErrorResponse>(400);
+        .Produces<ErrorResponse>(400)
+        .RequireRateLimiting("sensitive");
 
         // Change password (while logged in - preserves all encrypted data)
         group.MapPost("/change-password", [Authorize] async (
