@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -18,24 +19,37 @@ public class ExchangeRateService : IExchangeRateService
 {
     private readonly IExchangeRateRepository _exchangeRateRepository;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<ExchangeRateService> _logger;
     
     // Free tier: 1,500 requests/month - https://www.exchangerate-api.com/
     private const string ExchangeRateApiUrl = "https://open.er-api.com/v6/latest/USD";
     private const int CacheHours = 24; // Refresh once per day
+    private const string RatesCacheKey = "exchange_rates";
+    private const string CurrenciesCacheKey = "supported_currencies";
+    private static readonly TimeSpan MemoryCacheDuration = TimeSpan.FromMinutes(30);
 
     public ExchangeRateService(
         IExchangeRateRepository exchangeRateRepository,
         IHttpClientFactory httpClientFactory,
+        IMemoryCache cache,
         ILogger<ExchangeRateService> logger)
     {
         _exchangeRateRepository = exchangeRateRepository;
         _httpClientFactory = httpClientFactory;
+        _cache = cache;
         _logger = logger;
     }
 
     public async Task<ExchangeRateResponse> GetRatesAsync(string? baseCurrency = null)
     {
+        // Try memory cache first for fastest response
+        var cacheKey = $"{RatesCacheKey}_{baseCurrency ?? "USD"}";
+        if (_cache.TryGetValue(cacheKey, out ExchangeRateResponse? cachedResponse) && cachedResponse != null)
+        {
+            return cachedResponse;
+        }
+
         var stored = await _exchangeRateRepository.GetLatestAsync();
         
         // If no rates or rates are stale, try to refresh
@@ -60,7 +74,9 @@ public class ExchangeRateService : IExchangeRateService
             }
         }
 
-        return MapToResponse(stored, baseCurrency);
+        var response = MapToResponse(stored, baseCurrency);
+        _cache.Set(cacheKey, response, MemoryCacheDuration);
+        return response;
     }
 
     public async Task<ExchangeRateResponse> RefreshRatesAsync()
@@ -96,9 +112,14 @@ public class ExchangeRateService : IExchangeRateService
 
             await _exchangeRateRepository.CreateOrUpdateAsync(exchangeRate);
             
+            // Clear memory cache to force refresh
+            InvalidateCache();
+            
             _logger.LogInformation("Successfully updated exchange rates with {Count} currencies", exchangeRate.Rates.Count);
             
-            return MapToResponse(exchangeRate, null);
+            var result = MapToResponse(exchangeRate, null);
+            _cache.Set($"{RatesCacheKey}_USD", result, MemoryCacheDuration);
+            return result;
         }
         catch (Exception ex)
         {
@@ -181,6 +202,16 @@ public class ExchangeRateService : IExchangeRateService
             LastUpdated: DateTime.UtcNow,
             Source: "default"
         );
+    }
+
+    private void InvalidateCache()
+    {
+        // Remove all cached exchange rates
+        foreach (var currency in CurrencyConfig.Currencies.Keys)
+        {
+            _cache.Remove($"{RatesCacheKey}_{currency}");
+        }
+        _cache.Remove(CurrenciesCacheKey);
     }
 }
 

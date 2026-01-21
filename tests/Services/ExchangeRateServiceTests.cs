@@ -3,6 +3,7 @@ using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
@@ -16,6 +17,7 @@ public class ExchangeRateServiceTests
     private readonly Mock<IExchangeRateRepository> _repositoryMock;
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
     private readonly Mock<HttpMessageHandler> _httpHandlerMock;
+    private readonly IMemoryCache _memoryCache;
     private readonly Mock<ILogger<ExchangeRateService>> _loggerMock;
     private readonly ExchangeRateService _service;
 
@@ -24,13 +26,14 @@ public class ExchangeRateServiceTests
         _repositoryMock = new Mock<IExchangeRateRepository>();
         _httpClientFactoryMock = new Mock<IHttpClientFactory>();
         _httpHandlerMock = new Mock<HttpMessageHandler>();
+        _memoryCache = new MemoryCache(new MemoryCacheOptions());
         _loggerMock = new Mock<ILogger<ExchangeRateService>>();
 
         var httpClient = new HttpClient(_httpHandlerMock.Object);
         _httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>()))
             .Returns(httpClient);
 
-        _service = new ExchangeRateService(_repositoryMock.Object, _httpClientFactoryMock.Object, _loggerMock.Object);
+        _service = new ExchangeRateService(_repositoryMock.Object, _httpClientFactoryMock.Object, _memoryCache, _loggerMock.Object);
     }
 
     #region GetRatesAsync Tests
