@@ -91,7 +91,8 @@ public static class AuthEndpoints
                 result.AccessToken, 
                 result.Email, 
                 result.FullName, 
-                result.IsEmailVerified));
+                result.IsEmailVerified,
+                result.PrimaryCurrency));
         })
         .WithName("CompleteRegistration")
         .Produces<AuthResponseWithoutRefresh>(200)
@@ -137,7 +138,8 @@ public static class AuthEndpoints
                 result.AccessToken,
                 result.Email,
                 result.FullName,
-                result.IsEmailVerified));
+                result.IsEmailVerified,
+                result.PrimaryCurrency));
         })
         .WithName("Login")
         .Produces<LoginResponseWithoutRefresh>(200)
@@ -175,7 +177,8 @@ public static class AuthEndpoints
                 result.AccessToken,
                 result.Email,
                 result.FullName,
-                result.IsEmailVerified));
+                result.IsEmailVerified,
+                result.PrimaryCurrency));
         })
         .WithName("RefreshToken")
         .Produces<AuthResponseWithoutRefresh>(200)
@@ -253,7 +256,12 @@ public static class AuthEndpoints
                 return Results.NotFound();
             }
 
-            return Results.Ok(new { currentUser.Email, currentUser.FullName, currentUser.IsEmailVerified });
+            return Results.Ok(new { 
+                currentUser.Email, 
+                currentUser.FullName, 
+                currentUser.IsEmailVerified,
+                currentUser.PrimaryCurrency 
+            });
         })
         .WithName("GetCurrentUser")
         .Produces(200)

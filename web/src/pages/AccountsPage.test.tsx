@@ -1,7 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AccountsPage from './AccountsPage';
 import * as accountService from '../services/accountService';
+import { CurrencyProvider } from '../context/CurrencyContext';
+import { AuthProvider } from '../context/AuthContext';
+import { BrowserRouter } from 'react-router-dom';
 
 // Mock the account service
 vi.mock('../services/accountService', async () => {
@@ -16,6 +19,39 @@ vi.mock('../services/accountService', async () => {
     adjustBalance: vi.fn(),
   };
 });
+
+// Mock the currency service to prevent API calls
+vi.mock('../services/currencyService', async () => {
+  const actual = await vi.importActual('../services/currencyService');
+  return {
+    ...actual,
+    getExchangeRates: vi.fn().mockResolvedValue({
+      baseCurrency: 'USD',
+      rates: { USD: 1, INR: 83, EUR: 0.92 },
+      lastUpdated: '2024-01-01T00:00:00Z',
+      source: 'mock',
+    }),
+    getSupportedCurrencies: vi.fn().mockResolvedValue([
+      { code: 'USD', name: 'US Dollar', symbol: '$' },
+      { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+    ]),
+  };
+});
+
+// Wrapper with all required providers
+const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+  <BrowserRouter>
+    <AuthProvider>
+      <CurrencyProvider>
+        {children}
+      </CurrencyProvider>
+    </AuthProvider>
+  </BrowserRouter>
+);
+
+const renderWithProviders = (ui: React.ReactElement) => {
+  return render(ui, { wrapper: TestWrapper });
+};
 
 const mockAccounts: accountService.Account[] = [
   {
@@ -119,7 +155,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockImplementation(() => new Promise(() => {}));
     vi.mocked(accountService.getAccountSummary).mockImplementation(() => new Promise(() => {}));
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
     
     expect(document.querySelector('.animate-spin')).toBeInTheDocument();
   });
@@ -128,7 +164,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue([]);
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('No Accounts Yet')).toBeInTheDocument();
@@ -140,7 +176,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue(mockAccounts);
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(mockSummary);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
@@ -153,7 +189,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue(mockAccounts);
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(mockSummary);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Net Worth')).toBeInTheDocument();
@@ -166,7 +202,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue([]);
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Add Your First Account')).toBeInTheDocument();
@@ -182,7 +218,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue([]);
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Add Your First Account')).toBeInTheDocument();
@@ -203,7 +239,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(emptyMockSummary);
     vi.mocked(accountService.createAccount).mockResolvedValue(mockAccounts[0]);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Add Your First Account')).toBeInTheDocument();
@@ -230,7 +266,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockRejectedValue(new Error('Failed'));
     vi.mocked(accountService.getAccountSummary).mockRejectedValue(new Error('Failed'));
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Failed to load accounts')).toBeInTheDocument();
@@ -241,7 +277,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue(mockAccounts);
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(mockSummary);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Show archived accounts')).toBeInTheDocument();
@@ -252,7 +288,7 @@ describe('AccountsPage', () => {
     vi.mocked(accountService.getAccounts).mockResolvedValue(mockAccounts);
     vi.mocked(accountService.getAccountSummary).mockResolvedValue(mockSummary);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/HDFC Bank/)).toBeInTheDocument();
@@ -269,7 +305,7 @@ describe('AccountsPage - Account Card Menu', () => {
   });
 
   it('should show menu when clicking three dots', async () => {
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
@@ -289,7 +325,7 @@ describe('AccountsPage - Account Card Menu', () => {
   });
 
   it('should open delete confirmation when clicking Delete', async () => {
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
@@ -309,7 +345,7 @@ describe('AccountsPage - Account Card Menu', () => {
   it('should delete account when confirmed', async () => {
     vi.mocked(accountService.deleteAccount).mockResolvedValue(undefined);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
@@ -341,7 +377,7 @@ describe('AccountsPage - Account Card Menu', () => {
       isArchived: true,
     });
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
@@ -368,7 +404,7 @@ describe('AccountsPage - Adjust Balance Modal', () => {
   });
 
   it('should open adjust balance modal when clicking Adjust Balance', async () => {
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
@@ -390,7 +426,7 @@ describe('AccountsPage - Adjust Balance Modal', () => {
   it('should adjust balance when form is submitted', async () => {
     vi.mocked(accountService.adjustBalance).mockResolvedValue(undefined);
 
-    render(<AccountsPage />);
+    renderWithProviders(<AccountsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('HDFC Savings')).toBeInTheDocument();

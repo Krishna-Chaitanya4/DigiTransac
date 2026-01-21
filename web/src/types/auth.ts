@@ -4,12 +4,14 @@ export interface AuthResponse {
   email: string;
   fullName: string;
   isEmailVerified: boolean;
+  primaryCurrency: string;
 }
 
 export interface User {
   email: string;
   fullName: string;
   isEmailVerified: boolean;
+  primaryCurrency: string;
 }
 
 export interface VerificationResponse {

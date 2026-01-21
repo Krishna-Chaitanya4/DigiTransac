@@ -6,6 +6,7 @@ import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transac
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
+import { useCurrency } from '../context/CurrencyContext';
 import { 
   DatePreset, 
   getDateRangeForPreset, 
@@ -39,6 +40,9 @@ import type {
 import type { Label, Tag } from '../types/labels';
 
 export default function TransactionsPage() {
+  // Currency context - backend returns summary already converted to primary currency
+  const { primaryCurrency } = useCurrency();
+  
   // Data state
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -443,7 +447,8 @@ export default function TransactionsPage() {
     filter.maxAmount !== undefined,
   ].filter(Boolean).length;
 
-  const primaryCurrency = summary?.currency || 'USD';
+  // Summary is already converted to user's primary currency by the backend
+  // Just use it directly with the primaryCurrency from context
 
   return (
     <div className="flex flex-col h-full">
@@ -547,7 +552,7 @@ export default function TransactionsPage() {
                 onChange={(value) => setCustomEndDate(value)}
                 placeholder="End date"
                 minDate={customStartDate ? new Date(customStartDate) : undefined}
-                maxDate={new Date()}
+              maxDate={new Date()}
               />
             </div>
           </div>

@@ -146,7 +146,8 @@ public static class TwoFactorEndpoints
                 result.AccessToken,
                 result.Email,
                 result.FullName,
-                result.IsEmailVerified));
+                result.IsEmailVerified,
+                result.PrimaryCurrency));
         })
         .WithName("VerifyTwoFactorLogin")
         .Produces<AuthResponseWithoutRefresh>(200)
@@ -200,7 +201,8 @@ public static class TwoFactorEndpoints
                 result.AccessToken,
                 result.Email,
                 result.FullName,
-                result.IsEmailVerified));
+                result.IsEmailVerified,
+                result.PrimaryCurrency));
         })
         .WithName("VerifyTwoFactorEmailOtp")
         .Produces<AuthResponseWithoutRefresh>(200)

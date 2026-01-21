@@ -37,6 +37,7 @@ public class TransactionService : ITransactionService
     private readonly IKeyManagementService _keyManagementService;
     private readonly IDekCacheService _dekCacheService;
     private readonly IEncryptionService _encryptionService;
+    private readonly IExchangeRateService _exchangeRateService;
 
     public TransactionService(
         ITransactionRepository transactionRepository,
@@ -46,7 +47,8 @@ public class TransactionService : ITransactionService
         IUserRepository userRepository,
         IKeyManagementService keyManagementService,
         IDekCacheService dekCacheService,
-        IEncryptionService encryptionService)
+        IEncryptionService encryptionService,
+        IExchangeRateService exchangeRateService)
     {
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
@@ -56,6 +58,7 @@ public class TransactionService : ITransactionService
         _keyManagementService = keyManagementService;
         _dekCacheService = dekCacheService;
         _encryptionService = encryptionService;
+        _exchangeRateService = exchangeRateService;
     }
 
     private async Task<byte[]?> GetUserDekAsync(string userId)
@@ -172,9 +175,32 @@ public class TransactionService : ITransactionService
         
         var user = await _userRepository.GetByIdAsync(userId);
         var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        
+        // Get accounts to know transaction currencies
+        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: true);
+        var accountDict = accounts.ToDictionary(a => a.Id);
+        
+        // Get exchange rates for currency conversion
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse.Rates;
 
-        var totalCredits = transactions.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount);
-        var totalDebits = transactions.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount);
+        // Convert all transaction amounts to user's primary currency before summing
+        decimal totalCredits = 0;
+        decimal totalDebits = 0;
+        
+        foreach (var t in transactions)
+        {
+            var transactionCurrency = accountDict.TryGetValue(t.AccountId, out var account) 
+                ? account.Currency 
+                : primaryCurrency;
+            
+            var convertedAmount = _exchangeRateService.Convert(t.Amount, transactionCurrency, primaryCurrency, rates);
+            
+            if (t.Type == TransactionType.Credit)
+                totalCredits += convertedAmount;
+            else if (t.Type == TransactionType.Debit)
+                totalDebits += convertedAmount;
+        }
 
         // Get sums by label (for the filtered date range)
         var byCategory = await _transactionRepository.GetSumByLabelAsync(userId, filter.StartDate, filter.EndDate);
@@ -798,6 +824,16 @@ public class TransactionService : ITransactionService
         var labels = (await _labelRepository.GetByUserIdAsync(userId))
             .ToDictionary(l => l.Id);
 
+        // Get user's primary currency and exchange rates
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse.Rates;
+
+        // Helper to get transaction currency
+        string GetTransactionCurrency(Transaction t) => 
+            accounts.TryGetValue(t.AccountId, out var acc) ? acc.Currency : primaryCurrency;
+
         // Get all transactions for the period
         var filter = new TransactionFilterRequest(
             startDate, endDate, 
@@ -806,10 +842,11 @@ public class TransactionService : ITransactionService
         
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Calculate category breakdown
+        // Calculate category breakdown with currency conversion
         var categoryTotals = new Dictionary<string, (decimal amount, int count)>();
         foreach (var t in transactions.Where(t => !t.IsRecurringTemplate))
         {
+            var transactionCurrency = GetTransactionCurrency(t);
             foreach (var split in t.Splits)
             {
                 if (!categoryTotals.ContainsKey(split.LabelId))
@@ -817,7 +854,8 @@ public class TransactionService : ITransactionService
                     categoryTotals[split.LabelId] = (0, 0);
                 }
                 var current = categoryTotals[split.LabelId];
-                categoryTotals[split.LabelId] = (current.amount + split.Amount, current.count + 1);
+                var convertedAmount = _exchangeRateService.Convert(split.Amount, transactionCurrency, primaryCurrency, rates);
+                categoryTotals[split.LabelId] = (current.amount + convertedAmount, current.count + 1);
             }
         }
 
@@ -840,38 +878,42 @@ public class TransactionService : ITransactionService
             })
             .ToList();
 
-        // Calculate spending trends (by month)
+        // Calculate spending trends (by month) with currency conversion
         var trends = transactions
             .Where(t => !t.IsRecurringTemplate)
             .GroupBy(t => t.Date.ToString("yyyy-MM"))
             .OrderBy(g => g.Key)
             .Select(g => new SpendingTrend(
                 g.Key,
-                g.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount),
-                g.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount),
-                g.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount) -
-                g.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount),
+                g.Where(t => t.Type == TransactionType.Credit)
+                    .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
+                g.Where(t => t.Type == TransactionType.Debit)
+                    .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
+                g.Where(t => t.Type == TransactionType.Credit)
+                    .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)) -
+                g.Where(t => t.Type == TransactionType.Debit)
+                    .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
                 g.Count()
             ))
             .ToList();
 
-        // Calculate averages by type
+        // Calculate averages by type with currency conversion
         var actualTransactions = transactions.Where(t => !t.IsRecurringTemplate).ToList();
         var credits = actualTransactions.Where(t => t.Type == TransactionType.Credit).ToList();
         var debits = actualTransactions.Where(t => t.Type == TransactionType.Debit).ToList();
         var transfers = actualTransactions.Where(t => t.Type == TransactionType.Transfer).ToList();
 
         var averagesByType = new AveragesByType(
-            credits.Any() ? Math.Round(credits.Average(t => t.Amount), 2) : 0,
-            debits.Any() ? Math.Round(debits.Average(t => t.Amount), 2) : 0,
-            transfers.Any() ? Math.Round(transfers.Average(t => t.Amount), 2) : 0
+            credits.Any() ? Math.Round(credits.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
+            debits.Any() ? Math.Round(debits.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
+            transfers.Any() ? Math.Round(transfers.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0
         );
 
-        // Calculate daily and monthly averages
+        // Calculate daily and monthly averages with currency conversion
         var dateRange = (endDate ?? DateTime.UtcNow) - (startDate ?? actualTransactions.Min(t => t.Date));
         var days = Math.Max(1, dateRange.Days);
         var months = Math.Max(1, days / 30.0);
-        var totalDebits = debits.Sum(t => t.Amount);
+        var totalDebits = debits.Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
 
         return new TransactionAnalyticsResponse(
             topCategories,

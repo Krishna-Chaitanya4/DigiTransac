@@ -106,6 +106,37 @@ export function getCurrencySymbol(currencyCode: string): string {
   return currencyConfig[currencyCode.toUpperCase()]?.symbol || currencyCode;
 }
 
+/**
+ * Convert an amount from one currency to another using exchange rates
+ * @param amount - The amount to convert
+ * @param fromCurrency - Source currency code (e.g., 'USD')
+ * @param toCurrency - Target currency code (e.g., 'INR')
+ * @param rates - Exchange rates object where keys are currency codes and values are rates relative to base currency
+ * @returns The converted amount, or the original amount if conversion is not possible
+ */
+export function convertAmount(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string,
+  rates: Record<string, number>
+): number {
+  if (fromCurrency === toCurrency) {
+    return amount;
+  }
+  
+  const fromRate = rates[fromCurrency.toUpperCase()];
+  const toRate = rates[toCurrency.toUpperCase()];
+  
+  if (!fromRate || !toRate) {
+    // If we can't convert, return the original amount
+    return amount;
+  }
+  
+  // Convert: amount in fromCurrency -> base currency -> toCurrency
+  // Formula: amount / fromRate * toRate
+  return (amount / fromRate) * toRate;
+}
+
 export function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();

@@ -17,6 +17,7 @@ public class TransactionServiceTests
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
     private readonly Mock<IDekCacheService> _dekCacheServiceMock;
     private readonly Mock<IEncryptionService> _encryptionServiceMock;
+    private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
     private readonly TransactionService _transactionService;
     private const string TestUserId = "test-user-id";
     private const string TestAccountId = "test-account-id";
@@ -33,6 +34,7 @@ public class TransactionServiceTests
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
         _dekCacheServiceMock = new Mock<IDekCacheService>();
         _encryptionServiceMock = new Mock<IEncryptionService>();
+        _exchangeRateServiceMock = new Mock<IExchangeRateService>();
 
         // Setup encryption service pass-through
         _encryptionServiceMock.Setup(x => x.Encrypt(It.IsAny<string>(), It.IsAny<byte[]>()))
@@ -47,6 +49,12 @@ public class TransactionServiceTests
         // Setup default user
         _userRepositoryMock.Setup(x => x.GetByIdAsync(TestUserId))
             .ReturnsAsync(new User { Id = TestUserId, PrimaryCurrency = "USD", WrappedDek = new byte[64] });
+
+        // Setup exchange rate service - pass-through for same currency
+        _exchangeRateServiceMock.Setup(x => x.GetRatesAsync())
+            .ReturnsAsync(new ExchangeRateResponse("USD", new Dictionary<string, decimal> { { "USD", 1m }, { "INR", 83m }, { "AED", 3.67m } }, DateTime.UtcNow, "test"));
+        _exchangeRateServiceMock.Setup(x => x.Convert(It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Dictionary<string, decimal>>()))
+            .Returns((decimal amount, string from, string to, Dictionary<string, decimal> rates) => amount); // Pass-through for simplicity
 
         // Setup key management
         _keyManagementServiceMock.Setup(x => x.UnwrapKeyAsync(It.IsAny<byte[]>()))
@@ -81,7 +89,8 @@ public class TransactionServiceTests
             _userRepositoryMock.Object,
             _keyManagementServiceMock.Object,
             _dekCacheServiceMock.Object,
-            _encryptionServiceMock.Object);
+            _encryptionServiceMock.Object,
+            _exchangeRateServiceMock.Object);
     }
 
     #region CreateAsync Tests

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { logger } from '../services/logger';
+import { useCurrency } from '../context/CurrencyContext';
 import {
   Account,
   AccountType,
@@ -641,9 +642,11 @@ interface AccountCardProps {
   onDelete: () => void;
   onAdjustBalance: () => void;
   onArchiveToggle: () => void;
+  formatWithConversion: (amount: number, fromCurrency: string) => { original: string; converted: string | null };
+  primaryCurrency: string;
 }
 
-function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveToggle }: AccountCardProps) {
+function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveToggle, formatWithConversion, primaryCurrency }: AccountCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const config = accountTypeConfig[account.type];
   const displayColor = account.color || config.defaultColor;
@@ -745,6 +748,12 @@ function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveTogg
           >
             {formatCurrency(account.currentBalance, account.currency)}
           </p>
+          {/* Show converted amount if currency differs from primary */}
+          {account.currency !== primaryCurrency && (
+            <p className="text-sm text-gray-500">
+              ≈ {formatWithConversion(account.currentBalance, account.currency).converted}
+            </p>
+          )}
         </div>
 
         {!account.includeInNetWorth && (
@@ -849,6 +858,8 @@ function SummaryCard({ summary, onRefreshRates }: { summary: AccountSummary; onR
 }
 
 export default function AccountsPage() {
+  const { formatWithConversion, primaryCurrency: userPrimaryCurrency } = useCurrency();
+  
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [summary, setSummary] = useState<AccountSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -1106,6 +1117,8 @@ export default function AccountsPage() {
                       onDelete={() => handleDelete(account)}
                       onAdjustBalance={() => handleAdjustBalance(account)}
                       onArchiveToggle={() => handleArchiveToggle(account)}
+                      formatWithConversion={formatWithConversion}
+                      primaryCurrency={userPrimaryCurrency}
                     />
                   ))}
                 </div>

@@ -220,7 +220,7 @@ public class AuthService : IAuthService
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);
         
-        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request)
@@ -261,7 +261,7 @@ public class AuthService : IAuthService
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);
         
-        return new LoginResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+        return new LoginResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
     public async Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorTokenString, string code)
@@ -295,7 +295,7 @@ public class AuthService : IAuthService
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);
         
-        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
     public async Task<(bool Success, string Message)> SendTwoFactorEmailOtpAsync(string twoFactorTokenString)
@@ -371,7 +371,7 @@ public class AuthService : IAuthService
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);
         
-        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+        return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
     public async Task<User?> GetCurrentUserAsync(string userId)
@@ -748,7 +748,7 @@ public class AuthService : IAuthService
         var accessToken = GenerateJwtToken(user);
 
         _logger.LogInformation("Token refreshed successfully for UserId: {UserId}", user.Id);
-        return new AuthResponse(accessToken, newRefreshToken.Token, user.Email, user.FullName, user.IsEmailVerified);
+        return new AuthResponse(accessToken, newRefreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
     public async Task<bool> RevokeTokenAsync(string refreshToken)

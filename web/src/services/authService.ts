@@ -105,6 +105,7 @@ export interface LoginResponse {
   email?: string;
   fullName?: string;
   isEmailVerified?: boolean;
+  primaryCurrency?: string;
   requiresTwoFactor?: boolean;
   twoFactorToken?: string;
 }
@@ -134,13 +135,13 @@ export async function verifyTwoFactorLogin(twoFactorToken: string, code: string)
   return handleResponse<AuthResponse>(response);
 }
 
-export async function getCurrentUser(token: string): Promise<{ email: string; fullName: string; isEmailVerified: boolean }> {
+export async function getCurrentUser(token: string): Promise<{ email: string; fullName: string; isEmailVerified: boolean; primaryCurrency: string }> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/me`, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
   });
-  return handleResponse<{ email: string; fullName: string; isEmailVerified: boolean }>(response);
+  return handleResponse<{ email: string; fullName: string; isEmailVerified: boolean; primaryCurrency: string }>(response);
 }
 
 export async function deleteAccount(token: string, password: string): Promise<{ message: string }> {

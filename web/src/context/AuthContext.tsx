@@ -83,7 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userData: User = { 
       email: authResponse.email, 
       fullName: authResponse.fullName,
-      isEmailVerified: authResponse.isEmailVerified
+      isEmailVerified: authResponse.isEmailVerified,
+      primaryCurrency: authResponse.primaryCurrency
     };
     setAccessToken(authResponse.accessToken);
     setUser(userData);
@@ -148,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: response.email,
         fullName: response.fullName,
         isEmailVerified: response.isEmailVerified ?? false,
+        primaryCurrency: response.primaryCurrency ?? 'USD',
       });
     }
     

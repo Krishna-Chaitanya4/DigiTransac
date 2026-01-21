@@ -2,9 +2,10 @@ import { useState } from 'react';
 import type { Transaction, TransactionType } from '../types/transactions';
 import type { Account } from '../services/accountService';
 import type { Label, Tag } from '../types/labels';
-import { getCurrencySymbol } from '../services/currencyService';
+import { getCurrencySymbol, formatCurrency } from '../services/currencyService';
 import { formatAmount } from '../utils/formatters';
 import { SwipeableRow, SwipeActionIcon } from './SwipeableRow';
+import { useCurrency } from '../context/CurrencyContext';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -104,6 +105,7 @@ export function TransactionList({
   onToggleSelection,
 }: TransactionListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { formatWithConversion, primaryCurrency, convert } = useCurrency();
   
   // Create lookup maps
   const accountMap = new Map(accounts.map(a => [a.id, a]));
@@ -150,10 +152,11 @@ export function TransactionList({
         const dateTransactions = groupedTransactions[dateString];
         const displayDate = formatDate(dateTransactions[0].date);
         
-        // Calculate daily total
+        // Calculate daily total - convert each transaction to primary currency before summing
         const dailyTotal = dateTransactions.reduce((sum, t) => {
-          if (t.type === 'Credit') return sum + t.amount;
-          if (t.type === 'Debit') return sum - t.amount;
+          const convertedAmount = convert(t.amount, t.currency);
+          if (t.type === 'Credit') return sum + convertedAmount;
+          if (t.type === 'Debit') return sum - convertedAmount;
           return sum;
         }, 0);
         
@@ -165,7 +168,7 @@ export function TransactionList({
                 {displayDate}
               </h3>
               <span className={`text-sm font-medium ${dailyTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {dailyTotal >= 0 ? '+' : '-'}{formatAmount(Math.abs(dailyTotal))}
+                {dailyTotal >= 0 ? '+' : '-'}{formatCurrency(Math.abs(dailyTotal), primaryCurrency)}
               </span>
             </div>
             
@@ -279,6 +282,12 @@ export function TransactionList({
                           {transaction.type === 'Credit' ? '+' : transaction.type === 'Debit' ? '-' : ''}
                           {currencySymbol}{formatAmount(transaction.amount, transaction.currency)}
                         </span>
+                        {/* Show converted amount if currency differs from primary */}
+                        {transaction.currency !== primaryCurrency && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            ≈ {formatWithConversion(transaction.amount, transaction.currency).converted}
+                          </div>
+                        )}
                         <div className="text-xs opacity-70">
                           {getTypeIcon(transaction.type)} {transaction.type}
                         </div>

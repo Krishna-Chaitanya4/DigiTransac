@@ -15,10 +15,10 @@ public record RegisterRequest(string Email, string Password, string FullName);
 public record LoginRequest(string Email, string Password);
 
 // Full auth response with refresh token (used internally)
-public record AuthResponse(string AccessToken, string RefreshToken, string Email, string FullName, bool IsEmailVerified);
+public record AuthResponse(string AccessToken, string RefreshToken, string Email, string FullName, bool IsEmailVerified, string PrimaryCurrency);
 
 // Auth response without refresh token (refresh token goes in HttpOnly cookie)
-public record AuthResponseWithoutRefresh(string AccessToken, string Email, string FullName, bool IsEmailVerified);
+public record AuthResponseWithoutRefresh(string AccessToken, string Email, string FullName, bool IsEmailVerified, string PrimaryCurrency);
 
 public record RefreshTokenRequest(string? RefreshToken);
 
@@ -54,6 +54,7 @@ public record LoginResponse(
     string? Email, 
     string? FullName, 
     bool? IsEmailVerified,
+    string? PrimaryCurrency = null,
     bool RequiresTwoFactor = false,
     string? TwoFactorToken = null
 );
@@ -64,6 +65,7 @@ public record LoginResponseWithoutRefresh(
     string? Email, 
     string? FullName, 
     bool? IsEmailVerified,
+    string? PrimaryCurrency = null,
     bool RequiresTwoFactor = false,
     string? TwoFactorToken = null
 );
