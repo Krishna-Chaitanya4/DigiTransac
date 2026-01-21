@@ -4,11 +4,11 @@ import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
 import type { Label } from '../types/labels';
 
 const mockCategories: Label[] = [
-  { id: '1', userId: 'user1', name: 'Food', icon: '🍔', isFolder: false, parentId: null, color: null, order: 0, isSystem: false },
-  { id: '2', userId: 'user1', name: 'Transport', icon: '🚗', isFolder: false, parentId: null, color: null, order: 1, isSystem: false },
-  { id: '3', userId: 'user1', name: 'Shopping', icon: '🛒', isFolder: false, parentId: null, color: null, order: 2, isSystem: false },
-  { id: '4', userId: 'user1', name: 'Entertainment', icon: '🎬', isFolder: false, parentId: null, color: null, order: 3, isSystem: false },
-  { id: '5', userId: 'user1', name: 'Utilities', icon: '💡', isFolder: false, parentId: null, color: null, order: 4, isSystem: false },
+  { id: '1', name: 'Food', icon: '🍔', type: 'Category', parentId: null, color: null, order: 0, isSystem: false, createdAt: '2024-01-01T00:00:00Z' },
+  { id: '2', name: 'Transport', icon: '🚗', type: 'Category', parentId: null, color: null, order: 1, isSystem: false, createdAt: '2024-01-01T00:00:00Z' },
+  { id: '3', name: 'Shopping', icon: '🛒', type: 'Category', parentId: null, color: null, order: 2, isSystem: false, createdAt: '2024-01-01T00:00:00Z' },
+  { id: '4', name: 'Entertainment', icon: '🎬', type: 'Category', parentId: null, color: null, order: 3, isSystem: false, createdAt: '2024-01-01T00:00:00Z' },
+  { id: '5', name: 'Utilities', icon: '💡', type: 'Category', parentId: null, color: null, order: 4, isSystem: false, createdAt: '2024-01-01T00:00:00Z' },
 ];
 
 describe('SearchableCategoryDropdown', () => {

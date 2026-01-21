@@ -227,6 +227,7 @@ describe('RegisterPage', () => {
         email: 'test@example.com',
         fullName: 'Test User',
         isEmailVerified: true,
+        primaryCurrency: 'USD',
       });
 
       await user.type(screen.getByLabelText(/full name/i), 'Test User');

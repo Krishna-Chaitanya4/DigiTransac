@@ -209,6 +209,7 @@ describe('AuthContext', () => {
       email: 'test@example.com',
       fullName: 'Test User',
       isEmailVerified: true,
+      primaryCurrency: 'USD',
     });
 
     let validToken: string | null = null;

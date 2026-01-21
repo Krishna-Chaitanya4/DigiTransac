@@ -302,6 +302,7 @@ describe('LoginPage', () => {
         email: 'test@example.com',
         fullName: 'Test User',
         isEmailVerified: true,
+        primaryCurrency: 'USD',
       });
 
       renderWithRouter(<LoginPage />);
@@ -474,6 +475,7 @@ describe('LoginPage', () => {
         email: 'test@example.com',
         fullName: 'Test User',
         isEmailVerified: true,
+        primaryCurrency: 'USD',
       });
 
       renderWithRouter(<LoginPage />);

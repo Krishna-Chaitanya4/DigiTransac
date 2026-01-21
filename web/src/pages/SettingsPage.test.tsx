@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import SettingsPage from './SettingsPage';
 import { AuthProvider } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import * as authService from '../services/authService';
 
 // Mock the auth service
@@ -19,11 +20,13 @@ function renderWithAuth(initialUser = { email: 'test@example.com', fullName: 'Te
   localStorage.setItem('digitransac_user', JSON.stringify(initialUser));
 
   return render(
-    <BrowserRouter>
-      <AuthProvider>
-        <SettingsPage />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <SettingsPage />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 
