@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
 import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel, getLabelTransactionCount, deleteLabelWithReassignment } from '../services/labelService';
+import { EmojiPickerInput } from './EmojiPickerInput';
 
 // Helper to get path for a label
 function getLabelPath(labelId: string, allLabels: Label[]): string {
@@ -532,16 +533,12 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
               </div>
 
               <div>
-                <label htmlFor="icon" className="block text-sm font-medium text-gray-700 mb-1">
-                  Icon (emoji)
-                </label>
-                <input
-                  type="text"
+                <EmojiPickerInput
                   id="icon"
+                  label="Icon (emoji)"
                   value={icon}
-                  onChange={(e) => setIcon(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., 🍕, 🚗, 💰"
+                  onChange={setIcon}
+                  placeholder="Select an emoji"
                 />
               </div>
 
