@@ -104,11 +104,11 @@ describe('LoginPage', () => {
   it('should disable submit button while submitting', async () => {
     const user = userEvent.setup();
     // Create a promise that we can control
-    let resolveLogin: (value: any) => void;
-    const loginPromise = new Promise((resolve) => {
+    let resolveLogin: (value: unknown) => void;
+    const loginPromise = new Promise<unknown>((resolve) => {
       resolveLogin = resolve;
     });
-    vi.mocked(authService.login).mockReturnValue(loginPromise as any);
+    vi.mocked(authService.login).mockReturnValue(loginPromise as Promise<{ accessToken: string; user: { email: string; fullName: string; primaryCurrency: string } } | { requires2FA: boolean; twoFactorToken: string }>);
 
     renderWithRouter(<LoginPage />);
 

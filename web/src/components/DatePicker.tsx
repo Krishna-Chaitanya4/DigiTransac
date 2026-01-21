@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 interface DatePickerProps {
   value?: string;
@@ -96,7 +96,7 @@ export function DatePicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const selectedDate = value ? parseDateString(value) : null;
 
   // Update view date when value changes externally
@@ -123,6 +123,17 @@ export function DatePicker({
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
+
+  const navigateDay = React.useCallback((days: number) => {
+    const current = selectedDate || today;
+    const newDate = new Date(current);
+    newDate.setDate(newDate.getDate() + days);
+    
+    if (isDateInRange(newDate, minDate, maxDate)) {
+      onChange?.(formatDateForInput(newDate));
+      setViewDate(newDate);
+    }
+  }, [selectedDate, today, minDate, maxDate, onChange]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -170,18 +181,7 @@ export function DatePicker({
       document.addEventListener('keydown', handleKeyDown);
     }
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, showYearPicker, selectedDate]);
-
-  const navigateDay = (days: number) => {
-    const current = selectedDate || today;
-    const newDate = new Date(current);
-    newDate.setDate(newDate.getDate() + days);
-    
-    if (isDateInRange(newDate, minDate, maxDate)) {
-      onChange?.(formatDateForInput(newDate));
-      setViewDate(newDate);
-    }
-  };
+  }, [isOpen, showYearPicker, selectedDate, navigateDay]);
 
   const handleDateSelect = (day: number) => {
     const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);

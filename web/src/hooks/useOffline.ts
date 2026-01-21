@@ -1,4 +1,4 @@
-import { useState, useEffect, useSyncExternalStore } from 'react';
+import { useState, useEffect, useSyncExternalStore, useCallback } from 'react';
 import { logger } from '../services/logger';
 
 function subscribe(callback: () => void) {
@@ -32,20 +32,13 @@ export function useOfflineQueue() {
     loadQueue().then(setQueue);
   }, []);
 
-  // Sync when coming back online
-  useEffect(() => {
-    if (isOnline && queue.length > 0 && !isSyncing) {
-      syncQueue();
-    }
-  }, [isOnline, queue.length]);
-
   const addToQueue = async (action: OfflineAction) => {
     const newQueue = [...queue, { ...action, id: Date.now().toString(), timestamp: new Date().toISOString() }];
     setQueue(newQueue);
     await saveQueue(newQueue);
   };
 
-  const syncQueue = async () => {
+  const syncQueue = useCallback(async () => {
     if (isSyncing || queue.length === 0) return;
     
     setIsSyncing(true);
@@ -66,7 +59,14 @@ export function useOfflineQueue() {
     setQueue(remainingQueue);
     await saveQueue(remainingQueue);
     setIsSyncing(false);
-  };
+  }, [isSyncing, queue]);
+
+  // Sync when coming back online
+  useEffect(() => {
+    if (isOnline && queue.length > 0 && !isSyncing) {
+      syncQueue();
+    }
+  }, [isOnline, queue.length, isSyncing, syncQueue]);
 
   return { queue, addToQueue, syncQueue, isSyncing };
 }

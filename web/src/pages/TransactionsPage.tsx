@@ -273,6 +273,7 @@ export default function TransactionsPage() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText]);
 
   // Handle date preset change

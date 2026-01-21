@@ -50,7 +50,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 async function fetchWithErrorHandling(url: string, options: RequestInit): Promise<Response> {
   try {
     return await fetch(url, options);
-  } catch (error) {
+  } catch {
     // Network error - server is unreachable
     throw new Error('Unable to connect to server. Please check your internet connection and try again.');
   }

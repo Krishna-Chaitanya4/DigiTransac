@@ -146,7 +146,7 @@ export async function reverseGeocode(coords: LocationCoordinates, retries = 2): 
         city: data.city || data.locality || '',
         state: data.principalSubdivision || '',
       };
-    } catch (error) {
+    } catch {
       if (attempt < retries) {
         await new Promise(r => setTimeout(r, 500)); // Wait 500ms before retry
         continue;

@@ -206,7 +206,7 @@ export function TransactionForm({
         }
       }
     }
-  }, [isOpen, editingTransaction, defaultAccountId, accounts, labels]);
+  }, [isOpen, editingTransaction, defaultAccountId, accounts, labels, autoLocationEnabled]);
   
   // Auto-capture location silently (for new transactions)
   const captureLocationAuto = async () => {

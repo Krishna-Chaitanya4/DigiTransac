@@ -63,7 +63,7 @@ export function CalculatorInput({
       setIsExpression(false);
       setEvaluatedValue(null);
     }
-  }, [value]);
+  }, [value, isExpression]);
 
   // Auto-focus if requested
   useEffect(() => {
