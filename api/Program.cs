@@ -6,8 +6,11 @@ using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
 using DigiTransac.Api.Validators;
 using FluentValidation;
+using HealthChecks.MongoDb;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -91,6 +94,21 @@ builder.Services.AddMemoryCache(options =>
 {
     options.SizeLimit = 10000; // Limit cache size (number of entries)
 });
+
+// Add health checks
+var mongoSettings = builder.Configuration.GetSection("MongoDb").Get<MongoDbSettings>();
+var mongoConnectionStr = mongoSettings?.ConnectionString ?? "mongodb://localhost:27017";
+builder.Services.AddHealthChecks()
+    .AddMongoDb(
+        sp => new MongoDB.Driver.MongoClient(mongoConnectionStr),
+        name: "mongodb",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: new[] { "db", "mongodb" })
+    .AddUrlGroup(
+        new Uri("https://open.er-api.com/v6/latest/USD"),
+        name: "exchange-rate-api",
+        failureStatus: HealthStatus.Degraded,
+        tags: new[] { "external", "api" });
 
 // Add services
 builder.Services.AddSingleton<IEmailService, GmailEmailService>();
@@ -250,10 +268,56 @@ app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map endpoints
-app.MapGet("/api/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow }))
-   .WithName("Health")
-   .WithTags("Health");
+// Map health check endpoints
+app.MapHealthChecks("/api/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = new
+        {
+            status = report.Status.ToString(),
+            timestamp = DateTime.UtcNow,
+            totalDuration = report.TotalDuration.TotalMilliseconds,
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                duration = e.Value.Duration.TotalMilliseconds,
+                description = e.Value.Description,
+                tags = e.Value.Tags
+            })
+        };
+        await context.Response.WriteAsJsonAsync(result);
+    }
+});
+
+// Liveness probe (just checks if app is running)
+app.MapHealthChecks("/api/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false, // No checks, just confirms app is running
+    ResponseWriter = async (context, _) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { status = "Healthy", timestamp = DateTime.UtcNow });
+    }
+});
+
+// Readiness probe (checks if app can serve requests)
+app.MapHealthChecks("/api/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("db"), // Only check database
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new 
+        { 
+            status = report.Status.ToString(), 
+            timestamp = DateTime.UtcNow,
+            database = report.Entries.FirstOrDefault().Value.Status.ToString()
+        });
+    }
+});
 
 app.MapAuthEndpoints();
 app.MapTwoFactorEndpoints();
