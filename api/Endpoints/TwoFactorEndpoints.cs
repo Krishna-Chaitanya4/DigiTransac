@@ -2,6 +2,8 @@ using System.Security.Claims;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
+using DigiTransac.Api.Validators;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -64,7 +66,11 @@ public static class TwoFactorEndpoints
         .Produces(401);
 
         // Enable 2FA (verify code and activate)
-        group.MapPost("/enable", [Authorize] async ([FromBody] EnableTwoFactorRequest request, ClaimsPrincipal user, ITwoFactorService twoFactorService) =>
+        group.MapPost("/enable", [Authorize] async (
+            [FromBody] EnableTwoFactorRequest request, 
+            IValidator<EnableTwoFactorRequest> validator,
+            ClaimsPrincipal user, 
+            ITwoFactorService twoFactorService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -72,10 +78,8 @@ public static class TwoFactorEndpoints
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.Code))
-            {
-                return Results.BadRequest(new ErrorResponse("Verification code is required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await twoFactorService.EnableTwoFactorAsync(userId, request.Code);
             
@@ -92,7 +96,11 @@ public static class TwoFactorEndpoints
         .Produces(401);
 
         // Disable 2FA (requires password)
-        group.MapPost("/disable", [Authorize] async ([FromBody] DisableTwoFactorRequest request, ClaimsPrincipal user, ITwoFactorService twoFactorService) =>
+        group.MapPost("/disable", [Authorize] async (
+            [FromBody] DisableTwoFactorRequest request, 
+            IValidator<DisableTwoFactorRequest> validator,
+            ClaimsPrincipal user, 
+            ITwoFactorService twoFactorService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -100,10 +108,8 @@ public static class TwoFactorEndpoints
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.Password))
-            {
-                return Results.BadRequest(new ErrorResponse("Password is required to disable two-factor authentication"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await twoFactorService.DisableTwoFactorAsync(userId, request.Password);
             
@@ -121,16 +127,15 @@ public static class TwoFactorEndpoints
 
         // Verify 2FA during login
         group.MapPost("/verify", async (
-            [FromBody] TwoFactorLoginRequest request, 
+            [FromBody] TwoFactorLoginRequest request,
+            IValidator<TwoFactorLoginRequest> validator,
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
             HttpContext httpContext) =>
         {
-            if (string.IsNullOrWhiteSpace(request.TwoFactorToken) || string.IsNullOrWhiteSpace(request.Code))
-            {
-                return Results.BadRequest(new ErrorResponse("Two-factor token and code are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var result = await authService.VerifyTwoFactorLoginAsync(request.TwoFactorToken, request.Code);
             
@@ -155,12 +160,13 @@ public static class TwoFactorEndpoints
         .RequireRateLimiting("sensitive");
 
         // Send email OTP as backup for 2FA
-        group.MapPost("/send-email-code", async ([FromBody] SendTwoFactorEmailOtpRequest request, IAuthService authService) =>
+        group.MapPost("/send-email-code", async (
+            [FromBody] SendTwoFactorEmailOtpRequest request, 
+            IValidator<SendTwoFactorEmailOtpRequest> validator,
+            IAuthService authService) =>
         {
-            if (string.IsNullOrWhiteSpace(request.TwoFactorToken))
-            {
-                return Results.BadRequest(new ErrorResponse("Two-factor token is required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.SendTwoFactorEmailOtpAsync(request.TwoFactorToken);
             
@@ -178,16 +184,15 @@ public static class TwoFactorEndpoints
 
         // Verify email OTP for 2FA login
         group.MapPost("/verify-email-code", async (
-            [FromBody] TwoFactorEmailOtpLoginRequest request, 
+            [FromBody] TwoFactorEmailOtpLoginRequest request,
+            IValidator<TwoFactorEmailOtpLoginRequest> validator,
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
             HttpContext httpContext) =>
         {
-            if (string.IsNullOrWhiteSpace(request.TwoFactorToken) || string.IsNullOrWhiteSpace(request.EmailCode))
-            {
-                return Results.BadRequest(new ErrorResponse("Two-factor token and email code are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var result = await authService.VerifyTwoFactorEmailOtpAsync(request.TwoFactorToken, request.EmailCode);
             

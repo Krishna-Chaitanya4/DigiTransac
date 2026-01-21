@@ -2,6 +2,8 @@ using System.Security.Claims;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
+using DigiTransac.Api.Validators;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -15,12 +17,13 @@ public static class AuthEndpoints
         var group = app.MapGroup("/api/auth").WithTags("Auth");
 
         // Step 1: Send verification code to email
-        group.MapPost("/send-verification", async (SendVerificationRequest request, IAuthService authService) =>
+        group.MapPost("/send-verification", async (
+            SendVerificationRequest request, 
+            IValidator<SendVerificationRequest> validator,
+            IAuthService authService) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email))
-            {
-                return Results.BadRequest(new ErrorResponse("Email is required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.SendVerificationCodeAsync(request.Email);
             
@@ -37,12 +40,13 @@ public static class AuthEndpoints
         .RequireRateLimiting("auth");
 
         // Step 2: Verify the code
-        group.MapPost("/verify-code", async (VerifyCodeRequest request, IAuthService authService) =>
+        group.MapPost("/verify-code", async (
+            VerifyCodeRequest request, 
+            IValidator<VerifyCodeRequest> validator,
+            IAuthService authService) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Code))
-            {
-                return Results.BadRequest(new ErrorResponse("Email and code are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message, verificationToken) = await authService.VerifyCodeAsync(request.Email, request.Code);
             
@@ -60,24 +64,15 @@ public static class AuthEndpoints
 
         // Step 3: Complete registration (after email verified)
         group.MapPost("/complete-registration", async (
-            CompleteRegistrationRequest request, 
+            CompleteRegistrationRequest request,
+            IValidator<CompleteRegistrationRequest> validator,
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
             HttpContext httpContext) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email) ||
-                string.IsNullOrWhiteSpace(request.VerificationToken) ||
-                string.IsNullOrWhiteSpace(request.Password) ||
-                string.IsNullOrWhiteSpace(request.FullName))
-            {
-                return Results.BadRequest(new ErrorResponse("All fields are required"));
-            }
-
-            if (request.Password.Length < 6)
-            {
-                return Results.BadRequest(new ErrorResponse("Password must be at least 6 characters"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var result = await authService.CompleteRegistrationAsync(request);
             if (result == null)
@@ -103,16 +98,15 @@ public static class AuthEndpoints
 
         // Login
         group.MapPost("/login", async (
-            LoginRequest request, 
+            LoginRequest request,
+            IValidator<LoginRequest> validator,
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
             HttpContext httpContext) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
-            {
-                return Results.BadRequest(new ErrorResponse("Email and password are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var result = await authService.LoginAsync(request);
             
@@ -272,7 +266,11 @@ public static class AuthEndpoints
         .Produces(401);
 
         // Delete account (requires password confirmation)
-        group.MapDelete("/account", [Authorize] async ([FromBody] DeleteAccountRequest request, ClaimsPrincipal user, IAuthService authService) =>
+        group.MapDelete("/account", [Authorize] async (
+            [FromBody] DeleteAccountRequest request, 
+            IValidator<DeleteAccountRequest> validator,
+            ClaimsPrincipal user, 
+            IAuthService authService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -280,10 +278,8 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.Password))
-            {
-                return Results.BadRequest(new ErrorResponse("Password is required to confirm account deletion"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.DeleteAccountAsync(userId, request.Password);
             
@@ -300,7 +296,11 @@ public static class AuthEndpoints
         .Produces(401);
 
         // Update name
-        group.MapPut("/profile/name", [Authorize] async ([FromBody] UpdateNameRequest request, ClaimsPrincipal user, IAuthService authService) =>
+        group.MapPut("/profile/name", [Authorize] async (
+            [FromBody] UpdateNameRequest request, 
+            IValidator<UpdateNameRequest> validator,
+            ClaimsPrincipal user, 
+            IAuthService authService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -308,10 +308,8 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.FullName))
-            {
-                return Results.BadRequest(new ErrorResponse("Name is required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.UpdateNameAsync(userId, request.FullName);
             
@@ -328,7 +326,11 @@ public static class AuthEndpoints
         .Produces(401);
 
         // Send email change verification code
-        group.MapPost("/profile/email/send-code", [Authorize] async ([FromBody] UpdateEmailRequest request, ClaimsPrincipal user, IAuthService authService) =>
+        group.MapPost("/profile/email/send-code", [Authorize] async (
+            [FromBody] UpdateEmailRequest request, 
+            IValidator<UpdateEmailRequest> validator,
+            ClaimsPrincipal user, 
+            IAuthService authService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -336,10 +338,8 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.NewEmail))
-            {
-                return Results.BadRequest(new ErrorResponse("New email is required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.SendEmailChangeCodeAsync(userId, request.NewEmail);
             
@@ -356,7 +356,11 @@ public static class AuthEndpoints
         .Produces(401);
 
         // Verify and update email
-        group.MapPost("/profile/email/verify", [Authorize] async ([FromBody] VerifyEmailChangeRequest request, ClaimsPrincipal user, IAuthService authService) =>
+        group.MapPost("/profile/email/verify", [Authorize] async (
+            [FromBody] VerifyEmailChangeRequest request, 
+            IValidator<VerifyEmailChangeRequest> validator,
+            ClaimsPrincipal user, 
+            IAuthService authService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -364,10 +368,8 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.NewEmail) || string.IsNullOrWhiteSpace(request.Code))
-            {
-                return Results.BadRequest(new ErrorResponse("New email and verification code are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.VerifyAndUpdateEmailAsync(userId, request.NewEmail, request.Code);
             
@@ -384,12 +386,13 @@ public static class AuthEndpoints
         .Produces(401);
 
         // Forgot password - Step 1: Send reset code
-        group.MapPost("/forgot-password", async (ForgotPasswordRequest request, IAuthService authService) =>
+        group.MapPost("/forgot-password", async (
+            ForgotPasswordRequest request, 
+            IValidator<ForgotPasswordRequest> validator,
+            IAuthService authService) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email))
-            {
-                return Results.BadRequest(new ErrorResponse("Email is required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.SendPasswordResetCodeAsync(request.Email);
             
@@ -402,12 +405,13 @@ public static class AuthEndpoints
         .RequireRateLimiting("sensitive");
 
         // Forgot password - Step 2: Verify reset code
-        group.MapPost("/verify-reset-code", async (VerifyCodeRequest request, IAuthService authService) =>
+        group.MapPost("/verify-reset-code", async (
+            VerifyCodeRequest request, 
+            IValidator<VerifyCodeRequest> validator,
+            IAuthService authService) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Code))
-            {
-                return Results.BadRequest(new ErrorResponse("Email and code are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message, verificationToken) = await authService.VerifyPasswordResetCodeAsync(request.Email, request.Code);
             
@@ -424,14 +428,13 @@ public static class AuthEndpoints
         .RequireRateLimiting("sensitive");
 
         // Forgot password - Step 3: Reset password
-        group.MapPost("/reset-password", async (ResetPasswordRequest request, IAuthService authService) =>
+        group.MapPost("/reset-password", async (
+            ResetPasswordRequest request, 
+            IValidator<ResetPasswordRequest> validator,
+            IAuthService authService) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email) ||
-                string.IsNullOrWhiteSpace(request.VerificationToken) ||
-                string.IsNullOrWhiteSpace(request.NewPassword))
-            {
-                return Results.BadRequest(new ErrorResponse("All fields are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.ResetPasswordAsync(request);
             
@@ -450,6 +453,7 @@ public static class AuthEndpoints
         // Change password (while logged in - preserves all encrypted data)
         group.MapPost("/change-password", [Authorize] async (
             ChangePasswordRequest request,
+            IValidator<ChangePasswordRequest> validator,
             ClaimsPrincipal user,
             IAuthService authService) =>
         {
@@ -459,11 +463,8 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
-                string.IsNullOrWhiteSpace(request.NewPassword))
-            {
-                return Results.BadRequest(new ErrorResponse("Current password and new password are required"));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
             var (success, message) = await authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
             

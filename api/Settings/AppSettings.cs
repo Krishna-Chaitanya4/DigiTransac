@@ -44,6 +44,10 @@ public class RateLimitSettings
     public int PermitLimit { get; set; } = 100;
     public int WindowSeconds { get; set; } = 60;
     public int QueueLimit { get; set; } = 0;
+    public int? AuthPermitLimit { get; set; }
+    public int? AuthWindowSeconds { get; set; }
+    public int? SensitivePermitLimit { get; set; }
+    public int? SensitiveWindowSeconds { get; set; }
 }
 
 public class SecuritySettings

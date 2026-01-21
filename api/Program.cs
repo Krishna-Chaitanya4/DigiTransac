@@ -4,6 +4,8 @@ using DigiTransac.Api.Endpoints;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
+using DigiTransac.Api.Validators;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -104,6 +106,9 @@ builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 
+// Add FluentValidation validators
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
 // Add Rate Limiting
 var rateLimitSettings = builder.Configuration.GetSection("RateLimit").Get<RateLimitSettings>() ?? new RateLimitSettings();
 builder.Services.AddRateLimiter(options =>
@@ -128,8 +133,8 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,         // 10 attempts
-                Window = TimeSpan.FromMinutes(1),  // per minute
+                PermitLimit = rateLimitSettings.AuthPermitLimit ?? 10,         // 10 attempts default
+                Window = TimeSpan.FromSeconds(rateLimitSettings.AuthWindowSeconds ?? 60),  // per minute default
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0
             }));
@@ -140,8 +145,8 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,          // 5 attempts
-                Window = TimeSpan.FromMinutes(5),  // per 5 minutes
+                PermitLimit = rateLimitSettings.SensitivePermitLimit ?? 5,          // 5 attempts default
+                Window = TimeSpan.FromSeconds(rateLimitSettings.SensitiveWindowSeconds ?? 300),  // per 5 minutes default
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0
             }));

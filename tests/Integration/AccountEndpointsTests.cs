@@ -40,7 +40,11 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         // Login to get token
         var loginRequest = new LoginRequest(TestEmail, TestPassword);
         var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        var authResponse = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        
+        // Ensure login was successful before trying to parse
+        loginResponse.EnsureSuccessStatusCode();
+        
+        var authResponse = await loginResponse.Content.ReadFromJsonAsync<LoginResponseWithoutRefresh>();
 
         // Create authenticated client
         var authClient = _factory.CreateClient();
