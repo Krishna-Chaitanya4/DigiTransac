@@ -143,6 +143,9 @@ builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 
+// Background services
+builder.Services.AddHostedService<RecurringTransactionBackgroundService>();
+
 // Add FluentValidation validators
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 

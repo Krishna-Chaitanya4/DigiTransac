@@ -492,7 +492,7 @@ public class TransactionServiceTests
     #region Recurring Transaction Tests
 
     [Fact]
-    public async Task CreateAsync_WithRecurringRule_ShouldCreateTemplate()
+    public async Task CreateAsync_WithRecurringRule_ShouldCreateTemplateAndFirstInstance()
     {
         // Arrange
         var request = new CreateTransactionRequest(
@@ -509,23 +509,43 @@ public class TransactionServiceTests
             TransferToAccountId: null,
             RecurringRule: new RecurringRuleRequest("Monthly", 1, null));
 
-        Transaction? createdTransaction = null;
+        var createdTransactions = new List<Transaction>();
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
-            .ReturnsAsync((Transaction t) => { t.Id = "recurring-id"; createdTransaction = t; return t; });
+            .ReturnsAsync((Transaction t) => { 
+                t.Id = $"trans-{createdTransactions.Count}"; 
+                createdTransactions.Add(t); 
+                return t; 
+            });
+        
+        _transactionRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Transaction>()))
+            .Returns(Task.CompletedTask);
 
         // Act
         var (success, _, transaction) = await _transactionService.CreateAsync(TestUserId, request);
 
         // Assert
         success.Should().BeTrue();
-        createdTransaction.Should().NotBeNull();
-        createdTransaction!.IsRecurringTemplate.Should().BeTrue();
-        createdTransaction.RecurringRule.Should().NotBeNull();
-        createdTransaction.RecurringRule!.Frequency.Should().Be(RecurrenceFrequency.Monthly);
-        createdTransaction.RecurringRule.Interval.Should().Be(1);
         
-        // Template should not update account balance
-        _accountRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Account>()), Times.Never);
+        // Should have created 2 transactions: template + first instance
+        createdTransactions.Should().HaveCount(2);
+        
+        // First created should be the template
+        var template = createdTransactions[0];
+        template.IsRecurringTemplate.Should().BeTrue();
+        template.RecurringRule.Should().NotBeNull();
+        template.RecurringRule!.Frequency.Should().Be(RecurrenceFrequency.Monthly);
+        template.RecurringRule.Interval.Should().Be(1);
+        
+        // Second should be the first instance
+        var firstInstance = createdTransactions[1];
+        firstInstance.IsRecurringTemplate.Should().BeFalse();
+        firstInstance.ParentTransactionId.Should().Be(template.Id);
+        
+        // Returned transaction should be the first instance (not the template)
+        transaction!.IsRecurringTemplate.Should().BeFalse();
+        
+        // First instance should update account balance (Debit decreases balance: 1000 - 50 = 950)
+        _accountRepositoryMock.Verify(x => x.UpdateAsync(It.Is<Account>(a => a.CurrentBalance == 950m)), Times.Once);
     }
 
     [Fact]

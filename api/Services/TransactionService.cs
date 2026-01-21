@@ -328,6 +328,7 @@ public class TransactionService : ITransactionService
         }
 
         // Handle recurring
+        Transaction? firstInstance = null;
         if (request.RecurringRule != null)
         {
             if (!Enum.TryParse<RecurrenceFrequency>(request.RecurringRule.Frequency, true, out var frequency))
@@ -339,11 +340,68 @@ public class TransactionService : ITransactionService
                 Frequency = frequency,
                 Interval = request.RecurringRule.Interval ?? 1,
                 EndDate = request.RecurringRule.EndDate,
-                NextOccurrence = request.Date
+                NextOccurrence = request.Date,
+                LastProcessed = DateTime.UtcNow
             };
         }
 
         await _transactionRepository.CreateAsync(transaction);
+
+        // For recurring templates, create the first transaction instance immediately
+        if (transaction.IsRecurringTemplate)
+        {
+            firstInstance = new Transaction
+            {
+                UserId = userId,
+                AccountId = account.Id,
+                Type = type,
+                Amount = request.Amount,
+                Currency = account.Currency,
+                Date = request.Date,
+                Title = request.Title,
+                EncryptedPayee = transaction.EncryptedPayee,
+                EncryptedNotes = transaction.EncryptedNotes,
+                Splits = transaction.Splits,
+                TagIds = transaction.TagIds,
+                Location = transaction.Location,
+                ParentTransactionId = transaction.Id,
+                IsRecurringTemplate = false,
+                IsCleared = true // First instance is auto-cleared since user is actively creating it
+            };
+            
+            await _transactionRepository.CreateAsync(firstInstance);
+            await UpdateAccountBalanceAsync(account, type, request.Amount, true);
+            
+            // Handle transfer for the first instance
+            if (type == TransactionType.Transfer && transferToAccount != null)
+            {
+                var linkedFirstInstance = new Transaction
+                {
+                    UserId = userId,
+                    AccountId = transferToAccount.Id,
+                    Type = TransactionType.Credit,
+                    Amount = request.Amount,
+                    Currency = transferToAccount.Currency,
+                    Date = request.Date,
+                    Title = request.Title,
+                    EncryptedPayee = transaction.EncryptedPayee,
+                    EncryptedNotes = transaction.EncryptedNotes,
+                    Splits = transaction.Splits,
+                    TagIds = transaction.TagIds,
+                    LinkedTransactionId = firstInstance.Id,
+                    IsCleared = true // First instance is auto-cleared
+                };
+                
+                await _transactionRepository.CreateAsync(linkedFirstInstance);
+                firstInstance.LinkedTransactionId = linkedFirstInstance.Id;
+                await _transactionRepository.UpdateAsync(firstInstance);
+                await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, request.Amount, true);
+            }
+            
+            // Update NextOccurrence to the next date
+            transaction.RecurringRule!.NextOccurrence = CalculateNextOccurrence(transaction.RecurringRule);
+            await _transactionRepository.UpdateAsync(transaction);
+        }
 
         // Update account balance (unless it's a recurring template)
         if (!transaction.IsRecurringTemplate)
@@ -381,7 +439,10 @@ public class TransactionService : ITransactionService
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labelsDict = labels.ToDictionary(l => l.Id);
         var tagsDict = tags.ToDictionary(t => t.Id);
-        var response = MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labelsDict, tagsDict);
+        
+        // Return the first instance for recurring transactions, otherwise return the transaction itself
+        var transactionToReturn = firstInstance ?? transaction;
+        var response = MapToResponse(transactionToReturn, dek, accounts.ToDictionary(a => a.Id), labelsDict, tagsDict);
 
         return (true, "Transaction created successfully", response);
     }
