@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { logger } from '../services/logger';
 import TwoFactorSettings from '../components/TwoFactorSettings';
@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [isCurrencyLoading, setIsCurrencyLoading] = useState(true);
   const [isSavingCurrency, setIsSavingCurrency] = useState(false);
   const [currencyError, setCurrencyError] = useState('');
+  const [highlightedCurrencyIndex, setHighlightedCurrencyIndex] = useState(-1);
+  const currencyDropdownRef = useRef<HTMLDivElement>(null);
   
   // Name editing state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -93,6 +95,49 @@ export default function SettingsPage() {
   );
 
   const selectedCurrency = currencies.find(c => c.code === primaryCurrency);
+
+  // Reset highlighted index when search changes or dropdown closes
+  useEffect(() => {
+    setHighlightedCurrencyIndex(-1);
+  }, [currencySearch, isCurrencyDropdownOpen]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedCurrencyIndex >= 0 && currencyDropdownRef.current) {
+      const items = currencyDropdownRef.current.querySelectorAll('button');
+      if (items[highlightedCurrencyIndex]) {
+        items[highlightedCurrencyIndex].scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [highlightedCurrencyIndex]);
+
+  const handleCurrencyKeyDown = (e: React.KeyboardEvent) => {
+    if (!isCurrencyDropdownOpen) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedCurrencyIndex(prev => 
+          prev < filteredCurrencies.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedCurrencyIndex(prev => prev > 0 ? prev - 1 : prev);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightedCurrencyIndex >= 0 && highlightedCurrencyIndex < filteredCurrencies.length) {
+          handleCurrencyChange(filteredCurrencies[highlightedCurrencyIndex].code);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsCurrencyDropdownOpen(false);
+        setCurrencySearch('');
+        break;
+    }
+  };
 
   // Name editing handlers
   const handleEditName = () => {
@@ -329,23 +374,24 @@ export default function SettingsPage() {
                           type="text"
                           value={currencySearch}
                           onChange={(e) => setCurrencySearch(e.target.value)}
+                          onKeyDown={handleCurrencyKeyDown}
                           placeholder="Search currencies..."
                           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                           autoFocus
                         />
                       </div>
-                      <div className="max-h-60 overflow-y-auto">
+                      <div ref={currencyDropdownRef} className="max-h-60 overflow-y-auto">
                         {filteredCurrencies.length === 0 ? (
                           <p className="px-3 py-2 text-sm text-gray-500">No currencies found</p>
                         ) : (
-                          filteredCurrencies.map((currency) => (
+                          filteredCurrencies.map((currency, index) => (
                             <button
                               key={currency.code}
                               type="button"
                               onClick={() => handleCurrencyChange(currency.code)}
                               className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 ${
                                 currency.code === primaryCurrency ? 'bg-blue-50 text-blue-700' : ''
-                              }`}
+                              } ${index === highlightedCurrencyIndex ? 'bg-gray-100' : ''}`}
                             >
                               <span className="text-lg w-6">{currency.symbol}</span>
                               <span className="flex-1">{currency.name}</span>
