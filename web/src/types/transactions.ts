@@ -154,6 +154,7 @@ export interface TransactionFilter {
   accountIds?: string[];
   types?: TransactionType[];
   labelIds?: string[];
+  folderIds?: string[];  // UI-only: selected folders (expanded to labelIds for API)
   tagIds?: string[];
   minAmount?: number;
   maxAmount?: number;

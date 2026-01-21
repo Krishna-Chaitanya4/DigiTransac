@@ -977,7 +977,8 @@ public class TransactionServiceTests
             .ReturnsAsync(new Dictionary<string, decimal>());
 
         // Act
-        var summary = await _transactionService.GetSummaryAsync(TestUserId, null, null, null);
+        var filter = new TransactionFilterRequest(null, null, null, null, null, null, null, null, null, null, null, 1, int.MaxValue);
+        var summary = await _transactionService.GetSummaryAsync(TestUserId, filter);
 
         // Assert
         summary.TotalCredits.Should().Be(1500m);

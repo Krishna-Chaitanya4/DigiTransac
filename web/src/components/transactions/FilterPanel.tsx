@@ -45,11 +45,39 @@ export function FilterPanel({
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const tagDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Get categories (labels that are not parent containers only)
-  const categories = useMemo(() => 
-    labels.filter(l => !l.parentId || labels.some(child => child.parentId === l.id)),
-    [labels]
-  );
+  // Get all folders and categories for the dropdown
+  const foldersAndCategories = useMemo(() => {
+    // Get all folders
+    const folders = labels.filter(l => l.type === 'Folder');
+    // Get all categories (non-folders)
+    const categories = labels.filter(l => l.type === 'Category');
+    
+    // Sort: folders first (alphabetically), then categories (alphabetically)
+    return [
+      ...folders.sort((a, b) => a.name.localeCompare(b.name)),
+      ...categories.sort((a, b) => a.name.localeCompare(b.name)),
+    ];
+  }, [labels]);
+
+  // Get ALL leaf category IDs for a folder (recursively)
+  const getChildCategoryIds = (folderId: string): string[] => {
+    const result: string[] = [];
+    
+    const collectCategories = (parentId: string) => {
+      const children = labels.filter(l => l.parentId === parentId);
+      for (const child of children) {
+        if (child.type === 'Category') {
+          result.push(child.id);
+        } else if (child.type === 'Folder') {
+          // Recursively get categories from sub-folders
+          collectCategories(child.id);
+        }
+      }
+    };
+    
+    collectCategories(folderId);
+    return result;
+  };
 
   // Filter items based on search
   const filteredAccounts = useMemo(() => {
@@ -61,12 +89,14 @@ export function FilterPanel({
   }, [accounts, accountSearch, filter.accountIds]);
 
   const filteredCategories = useMemo(() => {
-    const selectedIds = new Set(filter.labelIds || []);
-    return categories.filter(c => 
-      !selectedIds.has(c.id) &&
+    const selectedLabelIds = new Set(filter.labelIds || []);
+    const selectedFolderIds = new Set(filter.folderIds || []);
+    return foldersAndCategories.filter(c => 
+      !selectedLabelIds.has(c.id) &&
+      !selectedFolderIds.has(c.id) &&
       c.name.toLowerCase().includes(categorySearch.toLowerCase())
     );
-  }, [categories, categorySearch, filter.labelIds]);
+  }, [foldersAndCategories, categorySearch, filter.labelIds, filter.folderIds]);
 
   const filteredTags = useMemo(() => {
     const selectedIds = new Set(filter.tagIds || []);
@@ -152,16 +182,43 @@ export function FilterPanel({
     });
   };
 
-  // Toggle category selection
-  const toggleCategory = (categoryId: string) => {
-    const currentCategories = filter.labelIds || [];
-    const isSelected = currentCategories.includes(categoryId);
-    const newCategories = isSelected
-      ? currentCategories.filter(id => id !== categoryId)
-      : [...currentCategories, categoryId];
+  // Toggle category or folder selection
+  const toggleCategory = (labelId: string) => {
+    const label = labels.find(l => l.id === labelId);
+    if (!label) return;
+
+    if (label.type === 'Folder') {
+      // Handle folder selection
+      const currentFolders = filter.folderIds || [];
+      const isSelected = currentFolders.includes(labelId);
+      const newFolders = isSelected
+        ? currentFolders.filter(id => id !== labelId)
+        : [...currentFolders, labelId];
+      onFilterChange({
+        ...filter,
+        folderIds: newFolders.length > 0 ? newFolders : undefined
+      });
+    } else {
+      // Handle category selection
+      const currentCategories = filter.labelIds || [];
+      const isSelected = currentCategories.includes(labelId);
+      const newCategories = isSelected
+        ? currentCategories.filter(id => id !== labelId)
+        : [...currentCategories, labelId];
+      onFilterChange({
+        ...filter,
+        labelIds: newCategories.length > 0 ? newCategories : undefined
+      });
+    }
+  };
+
+  // Remove folder from selection
+  const removeFolder = (folderId: string) => {
+    const currentFolders = filter.folderIds || [];
+    const newFolders = currentFolders.filter(id => id !== folderId);
     onFilterChange({
       ...filter,
-      labelIds: newCategories.length > 0 ? newCategories : undefined
+      folderIds: newFolders.length > 0 ? newFolders : undefined
     });
   };
 
@@ -343,9 +400,41 @@ export function FilterPanel({
               className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 min-h-[42px] rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent cursor-text"
               onClick={() => categoryInputRef.current?.focus()}
             >
+              {/* Selected folders as tokens */}
+              {(filter.folderIds || []).map((folderId) => {
+                const folder = labels.find(l => l.id === folderId);
+                if (!folder) return null;
+                const childCount = getChildCategoryIds(folderId).length;
+                return (
+                  <span
+                    key={folder.id}
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-sm font-medium rounded-full bg-blue-500 text-white"
+                    style={folder.color ? { backgroundColor: folder.color } : undefined}
+                  >
+                    {folder.icon && <span>{folder.icon}</span>}
+                    {folder.name}
+                    {childCount > 0 && (
+                      <span className="text-xs opacity-75">({childCount})</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFolder(folder.id);
+                      }}
+                      className="flex items-center justify-center w-4 h-4 ml-0.5 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                );
+              })}
+              
               {/* Selected categories as tokens */}
               {(filter.labelIds || []).map((labelId) => {
-                const category = categories.find(c => c.id === labelId);
+                const category = labels.find(l => l.id === labelId);
                 if (!category) return null;
                 return (
                   <span
@@ -403,11 +492,16 @@ export function FilterPanel({
                   } else if (e.key === 'Escape') {
                     setIsCategoryDropdownOpen(false);
                     setCategorySearch('');
-                  } else if (e.key === 'Backspace' && !categorySearch && filter.labelIds?.length) {
-                    toggleCategory(filter.labelIds[filter.labelIds.length - 1]);
+                  } else if (e.key === 'Backspace' && !categorySearch) {
+                    // Remove last selected item (category first, then folder)
+                    if (filter.labelIds?.length) {
+                      toggleCategory(filter.labelIds[filter.labelIds.length - 1]);
+                    } else if (filter.folderIds?.length) {
+                      removeFolder(filter.folderIds[filter.folderIds.length - 1]);
+                    }
                   }
                 }}
-                placeholder={!filter.labelIds?.length ? "Search categories..." : ""}
+                placeholder={!(filter.labelIds?.length || filter.folderIds?.length) ? "Search categories..." : ""}
                 className="flex-1 min-w-[80px] bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm"
               />
             </div>
@@ -415,27 +509,37 @@ export function FilterPanel({
             {/* Dropdown */}
             {isCategoryDropdownOpen && filteredCategories.length > 0 && (
               <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {filteredCategories.map((category, index) => (
-                  <button
-                    key={category.id}
-                    type="button"
-                    onClick={() => selectCategory(category.id)}
-                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${
-                      index === highlightedCategoryIndex
-                        ? 'bg-amber-50 dark:bg-amber-900/30'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    {category.icon && <span>{category.icon}</span>}
-                    {category.color && (
-                      <span
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: category.color }}
-                      />
-                    )}
-                    <span className="text-gray-900 dark:text-white">{category.name}</span>
-                  </button>
-                ))}
+                {filteredCategories.map((item, index) => {
+                  const isFolder = item.type === 'Folder';
+                  const childCount = isFolder ? getChildCategoryIds(item.id).length : 0;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => selectCategory(item.id)}
+                      className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${
+                        index === highlightedCategoryIndex
+                          ? 'bg-amber-50 dark:bg-amber-900/30'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {item.icon ? (
+                        <span>{item.icon}</span>
+                      ) : item.color ? (
+                        <span
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                      ) : null}
+                      <span className="text-gray-900 dark:text-white flex-1">{item.name}</span>
+                      {isFolder && childCount > 0 && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {childCount} categories
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
             

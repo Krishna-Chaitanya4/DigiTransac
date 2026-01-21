@@ -54,16 +54,20 @@ export async function getTransaction(id: string): Promise<Transaction> {
   return apiClient.get<Transaction>(`/transactions/${id}`);
 }
 
-// Get transaction summary
+// Get transaction summary (supports all filter parameters)
 export async function getTransactionSummary(
-  startDate?: string,
-  endDate?: string,
-  accountId?: string
+  filter: TransactionFilter
 ): Promise<TransactionSummary> {
   const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  if (accountId) params.append('accountId', accountId);
+  if (filter.startDate) params.append('startDate', filter.startDate);
+  if (filter.endDate) params.append('endDate', filter.endDate);
+  if (filter.accountIds?.length) params.append('accountIds', filter.accountIds.join(','));
+  if (filter.types?.length) params.append('types', filter.types.join(','));
+  if (filter.labelIds?.length) params.append('labelIds', filter.labelIds.join(','));
+  if (filter.tagIds?.length) params.append('tagIds', filter.tagIds.join(','));
+  if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());
+  if (filter.maxAmount !== undefined) params.append('maxAmount', filter.maxAmount.toString());
+  if (filter.isCleared !== undefined) params.append('isCleared', filter.isCleared.toString());
   
   const query = params.toString();
   return apiClient.get<TransactionSummary>(`/transactions/summary${query ? `?${query}` : ''}`);

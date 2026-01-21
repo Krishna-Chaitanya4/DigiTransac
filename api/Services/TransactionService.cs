@@ -8,7 +8,7 @@ public interface ITransactionService
 {
     Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter);
     Task<TransactionResponse?> GetByIdAsync(string id, string userId);
-    Task<TransactionSummaryResponse> GetSummaryAsync(string userId, DateTime? startDate, DateTime? endDate, string? accountId);
+    Task<TransactionSummaryResponse> GetSummaryAsync(string userId, TransactionFilterRequest filter);
     Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId);
     Task<(bool Success, string Message, TransactionResponse? Transaction)> CreateAsync(string userId, CreateTransactionRequest request);
     Task<(bool Success, string Message, TransactionResponse? Transaction)> UpdateAsync(string id, string userId, UpdateTransactionRequest request);
@@ -166,15 +166,8 @@ public class TransactionService : ITransactionService
 
     public async Task<TransactionSummaryResponse> GetSummaryAsync(
         string userId, 
-        DateTime? startDate, 
-        DateTime? endDate, 
-        string? accountId)
+        TransactionFilterRequest filter)
     {
-        // Convert single accountId to list for filter
-        List<string>? accountIds = !string.IsNullOrEmpty(accountId) ? new List<string> { accountId } : null;
-        var filter = new TransactionFilterRequest(
-            startDate, endDate, accountIds, null, null, null, null, null, null, null, null, 1, int.MaxValue);
-
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
         
         var user = await _userRepository.GetByIdAsync(userId);
@@ -183,9 +176,9 @@ public class TransactionService : ITransactionService
         var totalCredits = transactions.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount);
         var totalDebits = transactions.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount);
 
-        // Get sums by label
-        var byCategory = await _transactionRepository.GetSumByLabelAsync(userId, startDate, endDate);
-        var byTag = await _transactionRepository.GetSumByTagAsync(userId, startDate, endDate);
+        // Get sums by label (for the filtered date range)
+        var byCategory = await _transactionRepository.GetSumByLabelAsync(userId, filter.StartDate, filter.EndDate);
+        var byTag = await _transactionRepository.GetSumByTagAsync(userId, filter.StartDate, filter.EndDate);
 
         return new TransactionSummaryResponse(
             totalCredits,

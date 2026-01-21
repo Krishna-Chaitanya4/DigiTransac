@@ -181,6 +181,24 @@ export default function TransactionsPage() {
     loadInitialData();
   }, []);
 
+  // Helper to get all category IDs from selected folders
+  const getExpandedLabelIds = useCallback(() => {
+    const labelIds = new Set(filter.labelIds || []);
+    
+    // Expand folderIds to their child categories
+    if (filter.folderIds?.length) {
+      for (const folderId of filter.folderIds) {
+        // Get all categories that belong to this folder
+        const childCategories = labels.filter(l => l.parentId === folderId && l.type === 'Category');
+        for (const child of childCategories) {
+          labelIds.add(child.id);
+        }
+      }
+    }
+    
+    return labelIds.size > 0 ? Array.from(labelIds) : undefined;
+  }, [filter.labelIds, filter.folderIds, labels]);
+
   // Load transactions when filter changes
   const loadTransactions = useCallback(async (page = 1, append = false) => {
     if (page === 1) {
@@ -192,9 +210,12 @@ export default function TransactionsPage() {
 
     try {
       const dateRange = getDateRange();
+      const expandedLabelIds = getExpandedLabelIds();
       const fullFilter: TransactionFilter = {
         ...filter,
         ...dateRange,
+        labelIds: expandedLabelIds, // Use expanded labelIds
+        folderIds: undefined, // Don't send folderIds to API
         searchText: searchText || undefined,
         page,
         pageSize,
@@ -202,8 +223,8 @@ export default function TransactionsPage() {
 
       const [transactionsData, summaryData] = await Promise.all([
         getTransactions(fullFilter),
-        // For summary, use first selected account or undefined for all
-        page === 1 ? getTransactionSummary(dateRange.startDate, dateRange.endDate, filter.accountIds?.[0]) : Promise.resolve(null),
+        // Pass full filter to summary for consistent results
+        page === 1 ? getTransactionSummary(fullFilter) : Promise.resolve(null),
       ]);
 
       if (append) {
@@ -226,7 +247,7 @@ export default function TransactionsPage() {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [filter, searchText, getDateRange, clearSelection]);
+  }, [filter, searchText, getDateRange, clearSelection, getExpandedLabelIds]);
 
   // Initial load and reload on filter changes
   useEffect(() => {
@@ -375,9 +396,12 @@ export default function TransactionsPage() {
   const handleExport = async (format: 'csv' | 'json') => {
     try {
       const dateRange = getDateRange();
+      const expandedLabelIds = getExpandedLabelIds();
       const exportFilter: TransactionFilter = {
         ...filter,
         ...dateRange,
+        labelIds: expandedLabelIds,
+        folderIds: undefined,
         searchText: searchText || undefined,
       };
       
@@ -412,7 +436,7 @@ export default function TransactionsPage() {
   const activeFilterCount = [
     filter.accountIds && filter.accountIds.length > 0,
     filter.types && filter.types.length > 0,
-    filter.labelIds && filter.labelIds.length > 0,
+    (filter.labelIds && filter.labelIds.length > 0) || (filter.folderIds && filter.folderIds.length > 0),
     filter.tagIds && filter.tagIds.length > 0,
     filter.isCleared !== undefined,
     filter.minAmount !== undefined,

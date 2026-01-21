@@ -184,7 +184,7 @@ describe('transactionService', () => {
   });
 
   describe('getTransactionSummary', () => {
-    it('should call summary endpoint with date range', async () => {
+    it('should call summary endpoint with filter parameters', async () => {
       const { apiClient } = await import('./apiClient');
       const { getTransactionSummary } = await import('./transactionService');
 
@@ -196,10 +196,10 @@ describe('transactionService', () => {
         currency: 'USD',
       });
 
-      await getTransactionSummary(
-        '2024-01-01T00:00:00.000Z',
-        '2024-12-31T23:59:59.999Z'
-      );
+      await getTransactionSummary({
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2024-12-31T23:59:59.999Z',
+      });
 
       expect(apiClient.get).toHaveBeenCalledWith(
         expect.stringContaining('/transactions/summary')
@@ -212,7 +212,7 @@ describe('transactionService', () => {
       );
     });
 
-    it('should include accountId when provided', async () => {
+    it('should include all filter parameters when provided', async () => {
       const { apiClient } = await import('./apiClient');
       const { getTransactionSummary } = await import('./transactionService');
 
@@ -224,14 +224,22 @@ describe('transactionService', () => {
         currency: 'USD',
       });
 
-      await getTransactionSummary(
-        '2024-01-01T00:00:00.000Z',
-        '2024-12-31T23:59:59.999Z',
-        'acc-123'
-      );
+      await getTransactionSummary({
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2024-12-31T23:59:59.999Z',
+        accountIds: ['acc-123'],
+        types: ['Debit'],
+        labelIds: ['label-1'],
+      });
 
       expect(apiClient.get).toHaveBeenCalledWith(
-        expect.stringContaining('accountId=acc-123')
+        expect.stringContaining('accountIds=acc-123')
+      );
+      expect(apiClient.get).toHaveBeenCalledWith(
+        expect.stringContaining('types=Debit')
+      );
+      expect(apiClient.get).toHaveBeenCalledWith(
+        expect.stringContaining('labelIds=label-1')
       );
     });
   });

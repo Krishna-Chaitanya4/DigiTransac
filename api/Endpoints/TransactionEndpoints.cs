@@ -74,7 +74,13 @@ public static class TransactionEndpoints
         group.MapGet("/summary", async (
             DateTime? startDate,
             DateTime? endDate,
-            string? accountId,
+            string? accountIds,
+            string? types,
+            string? labelIds,
+            string? tagIds,
+            decimal? minAmount,
+            decimal? maxAmount,
+            bool? isCleared,
             ClaimsPrincipal user,
             ITransactionService transactionService) =>
         {
@@ -82,7 +88,25 @@ public static class TransactionEndpoints
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var summary = await transactionService.GetSummaryAsync(userId, startDate, endDate, accountId);
+            // Parse comma-separated values
+            var accountIdList = !string.IsNullOrEmpty(accountIds) 
+                ? accountIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() 
+                : null;
+            var typeList = !string.IsNullOrEmpty(types)
+                ? types.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+                : null;
+            var labelIdList = !string.IsNullOrEmpty(labelIds)
+                ? labelIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+                : null;
+            var tagIdList = !string.IsNullOrEmpty(tagIds)
+                ? tagIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+                : null;
+
+            var filter = new TransactionFilterRequest(
+                startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
+                minAmount, maxAmount, null, isCleared, null, 1, int.MaxValue);
+
+            var summary = await transactionService.GetSummaryAsync(userId, filter);
             return Results.Ok(summary);
         })
         .WithName("GetTransactionSummary")
