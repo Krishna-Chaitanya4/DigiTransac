@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using FluentValidation;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Validators;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -64,8 +66,11 @@ public static class LabelEndpoints
         .Produces<ErrorResponse>(404);
 
         // Create label
-        group.MapPost("/", async (CreateLabelRequest request, ClaimsPrincipal user, ILabelService labelService) =>
+        group.MapPost("/", async (CreateLabelRequest request, ClaimsPrincipal user, ILabelService labelService, IValidator<CreateLabelRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
@@ -85,8 +90,11 @@ public static class LabelEndpoints
         .Produces<ErrorResponse>(400);
 
         // Update label
-        group.MapPut("/{id}", async (string id, UpdateLabelRequest request, ClaimsPrincipal user, ILabelService labelService) =>
+        group.MapPut("/{id}", async (string id, UpdateLabelRequest request, ClaimsPrincipal user, ILabelService labelService, IValidator<UpdateLabelRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {

@@ -5,7 +5,7 @@ namespace DigiTransac.Api.Validators;
 
 public class CreateAccountRequestValidator : AbstractValidator<CreateAccountRequest>
 {
-    private static readonly string[] ValidAccountTypes = { "Checking", "Savings", "Credit Card", "Cash", "Investment", "Loan", "Other" };
+    private static readonly string[] ValidAccountTypes = { "Bank", "CreditCard", "Cash", "DigitalWallet", "Investment", "Loan" };
     
     public CreateAccountRequestValidator()
     {

@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using FluentValidation;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Validators;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -73,8 +75,12 @@ public static class AccountEndpoints
         group.MapPost("/", async (
             CreateAccountRequest request, 
             ClaimsPrincipal user, 
-            IAccountService accountService) =>
+            IAccountService accountService,
+            IValidator<CreateAccountRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
@@ -98,8 +104,12 @@ public static class AccountEndpoints
             string id, 
             UpdateAccountRequest request, 
             ClaimsPrincipal user, 
-            IAccountService accountService) =>
+            IAccountService accountService,
+            IValidator<UpdateAccountRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
@@ -119,8 +129,11 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(400);
 
         // Adjust balance
-        group.MapPost("/{id}/adjust-balance", async (string id, AdjustBalanceRequest request, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapPost("/{id}/adjust-balance", async (string id, AdjustBalanceRequest request, ClaimsPrincipal user, IAccountService accountService, IValidator<AdjustBalanceRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
@@ -140,8 +153,11 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(400);
 
         // Reorder accounts
-        group.MapPost("/reorder", async (ReorderAccountsRequest request, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapPost("/reorder", async (ReorderAccountsRequest request, ClaimsPrincipal user, IAccountService accountService, IValidator<ReorderAccountsRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {

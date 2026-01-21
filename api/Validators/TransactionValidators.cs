@@ -167,3 +167,24 @@ public class TransactionFilterRequestValidator : AbstractValidator<TransactionFi
             .WithMessage($"Transaction type must be one of: {string.Join(", ", ValidTypes)}");
     }
 }
+
+public class BatchOperationRequestValidator : AbstractValidator<BatchOperationRequest>
+{
+    private static readonly string[] ValidActions = { "delete", "markcleared", "markpending", "updatecategory" };
+    
+    public BatchOperationRequestValidator()
+    {
+        RuleFor(x => x.Ids)
+            .NotEmpty().WithMessage("No transaction IDs provided");
+        
+        RuleFor(x => x.Action)
+            .NotEmpty().WithMessage("Action is required")
+            .Must(action => ValidActions.Contains(action.ToLowerInvariant()))
+            .When(x => !string.IsNullOrEmpty(x.Action))
+            .WithMessage($"Action must be one of: {string.Join(", ", ValidActions)}");
+        
+        RuleFor(x => x.LabelId)
+            .NotEmpty().When(x => x.Action?.ToLowerInvariant() == "updatecategory")
+            .WithMessage("Label ID is required for updateCategory action");
+    }
+}

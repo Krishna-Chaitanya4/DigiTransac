@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using FluentValidation;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Validators;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -49,8 +51,11 @@ public static class TagEndpoints
         .Produces<ErrorResponse>(404);
 
         // Create tag
-        group.MapPost("/", async (CreateTagRequest request, ClaimsPrincipal user, ITagService tagService) =>
+        group.MapPost("/", async (CreateTagRequest request, ClaimsPrincipal user, ITagService tagService, IValidator<CreateTagRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
@@ -70,8 +75,11 @@ public static class TagEndpoints
         .Produces<ErrorResponse>(400);
 
         // Update tag
-        group.MapPut("/{id}", async (string id, UpdateTagRequest request, ClaimsPrincipal user, ITagService tagService) =>
+        group.MapPut("/{id}", async (string id, UpdateTagRequest request, ClaimsPrincipal user, ITagService tagService, IValidator<UpdateTagRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {

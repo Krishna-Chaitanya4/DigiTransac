@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using FluentValidation;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Validators;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -151,8 +153,12 @@ public static class TransactionEndpoints
         group.MapPost("/", async (
             CreateTransactionRequest request,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            IValidator<CreateTransactionRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
@@ -172,8 +178,12 @@ public static class TransactionEndpoints
             string id,
             UpdateTransactionRequest request,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            IValidator<UpdateTransactionRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
@@ -238,14 +248,15 @@ public static class TransactionEndpoints
         group.MapPost("/batch", async (
             BatchOperationRequest request,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            IValidator<BatchOperationRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
-
-            if (request.Ids == null || request.Ids.Count == 0)
-                return Results.BadRequest(new ErrorResponse("No transaction IDs provided"));
 
             BatchOperationResponse result;
             switch (request.Action.ToLowerInvariant())

@@ -1,8 +1,10 @@
 using System.Security.Claims;
+using FluentValidation;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Validators;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -81,24 +83,19 @@ public static class CurrencyEndpoints
         group.MapPut("/preference", async (
             UpdatePrimaryCurrencyRequest request,
             ClaimsPrincipal user,
-            IUserRepository userRepository) =>
+            IUserRepository userRepository,
+            IValidator<UpdatePrimaryCurrencyRequest> validator) =>
         {
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
+
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
                 return Results.Unauthorized();
             }
 
-            if (string.IsNullOrWhiteSpace(request.Currency))
-            {
-                return Results.BadRequest(new ErrorResponse("Currency code is required"));
-            }
-
             var currencyCode = request.Currency.ToUpperInvariant();
-            if (!CurrencyConfig.IsValidCurrency(currencyCode))
-            {
-                return Results.BadRequest(new ErrorResponse($"Unsupported currency: {currencyCode}"));
-            }
 
             var dbUser = await userRepository.GetByIdAsync(userId);
             if (dbUser == null)
