@@ -10,6 +10,7 @@ namespace DigiTransac.Tests.Services;
 public class AccountServiceTests
 {
     private readonly Mock<IAccountRepository> _accountRepositoryMock;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
@@ -22,6 +23,7 @@ public class AccountServiceTests
     public AccountServiceTests()
     {
         _accountRepositoryMock = new Mock<IAccountRepository>();
+        _transactionRepositoryMock = new Mock<ITransactionRepository>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _exchangeRateServiceMock = new Mock<IExchangeRateService>();
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
@@ -59,8 +61,17 @@ public class AccountServiceTests
         _exchangeRateServiceMock.Setup(x => x.Convert(It.IsAny<decimal>(), "INR", "INR", It.IsAny<Dictionary<string, decimal>>()))
             .Returns((decimal amount, string from, string to, Dictionary<string, decimal> rates) => amount);
         
+        // Setup default transaction counts to return empty dictionary (no transactions)
+        _transactionRepositoryMock.Setup(x => x.GetCountsByAccountIdsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string>()))
+            .ReturnsAsync(new Dictionary<string, int>());
+        
+        // Setup default GetCountByAccountIdAsync to return 0
+        _transactionRepositoryMock.Setup(x => x.GetCountByAccountIdAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(0);
+        
         _accountService = new AccountService(
             _accountRepositoryMock.Object,
+            _transactionRepositoryMock.Object,
             _userRepositoryMock.Object,
             _exchangeRateServiceMock.Object,
             _keyManagementServiceMock.Object,

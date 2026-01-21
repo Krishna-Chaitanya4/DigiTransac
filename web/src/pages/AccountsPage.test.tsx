@@ -394,6 +394,71 @@ describe('AccountsPage - Account Card Menu', () => {
       expect(accountService.updateAccount).toHaveBeenCalledWith('1', { isArchived: true });
     });
   });
+
+  it('should show error in delete modal when account has transactions', async () => {
+    vi.mocked(accountService.deleteAccount).mockRejectedValue(
+      new Error('Cannot delete account with 5 transaction(s). Archive it instead.')
+    );
+
+    renderWithProviders(<AccountsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
+    });
+
+    const menuButtons = screen.getAllByRole('button').filter(btn => 
+      btn.querySelector('svg[viewBox="0 0 20 20"]')
+    );
+    
+    fireEvent.click(menuButtons[0]);
+    fireEvent.click(screen.getByText('Delete'));
+
+    // Click the delete button in the confirmation modal
+    const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+    const confirmButton = deleteButtons.find(btn => btn.classList.contains('bg-red-600'));
+    
+    if (confirmButton) {
+      fireEvent.click(confirmButton);
+    }
+
+    await waitFor(() => {
+      expect(screen.getByText(/Cannot delete account with 5 transaction/)).toBeInTheDocument();
+    });
+    // Should also show archive option
+    expect(screen.getByText('Archive Instead')).toBeInTheDocument();
+  });
+
+  it('should show error in edit modal when update fails', async () => {
+    vi.mocked(accountService.updateAccount).mockRejectedValue(
+      new Error('Currency cannot be changed. This account has 3 transaction(s).')
+    );
+
+    renderWithProviders(<AccountsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('HDFC Savings')).toBeInTheDocument();
+    });
+
+    const menuButtons = screen.getAllByRole('button').filter(btn => 
+      btn.querySelector('svg[viewBox="0 0 20 20"]')
+    );
+    
+    fireEvent.click(menuButtons[0]);
+    fireEvent.click(screen.getByText('Edit'));
+
+    // Wait for the edit modal to appear
+    await waitFor(() => {
+      expect(screen.getByText('Edit Account')).toBeInTheDocument();
+    });
+
+    // Submit the form (click Update button)
+    fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    // Error should be displayed inside the modal
+    await waitFor(() => {
+      expect(screen.getByText(/Currency cannot be changed/)).toBeInTheDocument();
+    });
+  });
 });
 
 describe('AccountsPage - Adjust Balance Modal', () => {

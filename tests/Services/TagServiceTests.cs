@@ -12,6 +12,7 @@ namespace DigiTransac.Tests.Services;
 public class TagServiceTests
 {
     private readonly Mock<ITagRepository> _tagRepositoryMock;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<ILogger<TagService>> _loggerMock;
     private readonly TagService _tagService;
     private const string TestUserId = "test-user-id";
@@ -19,8 +20,9 @@ public class TagServiceTests
     public TagServiceTests()
     {
         _tagRepositoryMock = new Mock<ITagRepository>();
+        _transactionRepositoryMock = new Mock<ITransactionRepository>();
         _loggerMock = new Mock<ILogger<TagService>>();
-        _tagService = new TagService(_tagRepositoryMock.Object, _loggerMock.Object);
+        _tagService = new TagService(_tagRepositoryMock.Object, _transactionRepositoryMock.Object, _loggerMock.Object);
     }
 
     #region GetAllAsync Tests

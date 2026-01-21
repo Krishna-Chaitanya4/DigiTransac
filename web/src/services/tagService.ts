@@ -25,3 +25,13 @@ export async function updateTag(id: string, request: UpdateTagRequest): Promise<
 export async function deleteTag(id: string): Promise<void> {
   return apiClient.delete<void>(`/tags/${id}`);
 }
+
+// Get transaction count for a tag
+export async function getTagTransactionCount(id: string): Promise<{ transactionCount: number }> {
+  return apiClient.get<{ transactionCount: number }>(`/tags/${id}/transaction-count`);
+}
+
+// Delete tag with confirmation (removes from all transactions)
+export async function deleteTagConfirmed(id: string): Promise<void> {
+  return apiClient.delete<void>(`/tags/${id}/confirmed`);
+}

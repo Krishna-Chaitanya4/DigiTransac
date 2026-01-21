@@ -12,6 +12,8 @@ vi.mock('../services/labelService', () => ({
   createLabel: vi.fn(),
   updateLabel: vi.fn(),
   deleteLabel: vi.fn(),
+  getLabelTransactionCount: vi.fn(),
+  deleteLabelWithReassignment: vi.fn(),
 }));
 
 // Sample test data
@@ -47,6 +49,8 @@ describe('CategoriesTab', () => {
     vi.clearAllMocks();
     vi.mocked(labelService.getLabels).mockResolvedValue(mockFlatLabels);
     vi.mocked(labelService.getLabelsTree).mockResolvedValue(mockTreeLabels);
+    vi.mocked(labelService.getLabelTransactionCount).mockResolvedValue({ transactionCount: 0 });
+    vi.mocked(labelService.deleteLabelWithReassignment).mockResolvedValue(undefined);
   });
 
   afterEach(() => {

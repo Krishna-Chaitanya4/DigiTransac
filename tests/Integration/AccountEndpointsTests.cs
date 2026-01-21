@@ -480,7 +480,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         var authClient = await GetAuthenticatedClientAsync();
         
         _factory.AccountServiceMock.Setup(x => x.DeleteAsync("1", TestUserId))
-            .ReturnsAsync((true, "Account deleted successfully"));
+            .ReturnsAsync((true, "Account deleted successfully", ""));
 
         // Act
         var response = await authClient.DeleteAsync("/api/accounts/1");
@@ -496,13 +496,31 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         var authClient = await GetAuthenticatedClientAsync();
         
         _factory.AccountServiceMock.Setup(x => x.DeleteAsync("invalid", TestUserId))
-            .ReturnsAsync((false, "Account not found"));
+            .ReturnsAsync((false, "Account not found", "NotFound"));
 
         // Act
         var response = await authClient.DeleteAsync("/api/accounts/invalid");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_WithTransactions_ReturnsBadRequest()
+    {
+        // Arrange
+        var authClient = await GetAuthenticatedClientAsync();
+        
+        _factory.AccountServiceMock.Setup(x => x.DeleteAsync("1", TestUserId))
+            .ReturnsAsync((false, "Cannot delete account with 5 transaction(s). Archive it instead to preserve your transaction history.", "HasTransactions"));
+
+        // Act
+        var response = await authClient.DeleteAsync("/api/accounts/1");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Cannot delete account");
     }
 
     #endregion

@@ -13,12 +13,13 @@ public interface IAccountService
     Task<(bool Success, string Message, AccountResponse? Account)> UpdateAsync(string id, string userId, UpdateAccountRequest request);
     Task<(bool Success, string Message)> AdjustBalanceAsync(string id, string userId, AdjustBalanceRequest request);
     Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderAccountsRequest request);
-    Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
+    Task<(bool Success, string Message, string ErrorType)> DeleteAsync(string id, string userId);
 }
 
 public class AccountService : IAccountService
 {
     private readonly IAccountRepository _accountRepository;
+    private readonly ITransactionRepository _transactionRepository;
     private readonly IUserRepository _userRepository;
     private readonly IExchangeRateService _exchangeRateService;
     private readonly IKeyManagementService _keyManagementService;
@@ -27,6 +28,7 @@ public class AccountService : IAccountService
 
     public AccountService(
         IAccountRepository accountRepository,
+        ITransactionRepository transactionRepository,
         IUserRepository userRepository,
         IExchangeRateService exchangeRateService,
         IKeyManagementService keyManagementService,
@@ -34,6 +36,7 @@ public class AccountService : IAccountService
         IEncryptionService encryptionService)
     {
         _accountRepository = accountRepository;
+        _transactionRepository = transactionRepository;
         _userRepository = userRepository;
         _exchangeRateService = exchangeRateService;
         _keyManagementService = keyManagementService;
@@ -98,7 +101,12 @@ public class AccountService : IAccountService
     {
         var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived);
         var dek = await GetUserDekAsync(userId);
-        return accounts.Select(a => MapToResponse(a, dek)).ToList();
+        
+        // Batch get transaction counts for all accounts
+        var accountIds = accounts.Select(a => a.Id).ToList();
+        var transactionCounts = await _transactionRepository.GetCountsByAccountIdsAsync(accountIds, userId);
+        
+        return accounts.Select(a => MapToResponse(a, transactionCounts.GetValueOrDefault(a.Id, 0), dek)).ToList();
     }
 
     public async Task<AccountResponse?> GetByIdAsync(string id, string userId)
@@ -107,7 +115,8 @@ public class AccountService : IAccountService
         if (account == null) return null;
         
         var dek = await GetUserDekAsync(userId);
-        return MapToResponse(account, dek);
+        var transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
+        return MapToResponse(account, transactionCount, dek);
     }
 
     public async Task<AccountSummaryResponse> GetSummaryAsync(string userId)
@@ -250,7 +259,8 @@ public class AccountService : IAccountService
         };
 
         await _accountRepository.CreateAsync(account);
-        return (true, "Account created successfully", MapToResponse(account, dek));
+        // New account has 0 transactions
+        return (true, "Account created successfully", MapToResponse(account, 0, dek));
     }
 
     public async Task<(bool Success, string Message, AccountResponse? Account)> UpdateAsync(string id, string userId, UpdateAccountRequest request)
@@ -276,12 +286,14 @@ public class AccountService : IAccountService
         if (request.Icon != null) account.Icon = request.Icon;
         if (request.Color != null) account.Color = request.Color;
         
-        // Currency can only be changed if balance hasn't been modified
+        // Currency can only be changed if no transactions exist
+        var transactionCount = 0;
         if (request.Currency != null && request.Currency != account.Currency)
         {
-            if (account.CurrentBalance != account.InitialBalance)
+            transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
+            if (transactionCount > 0)
             {
-                return (false, "Currency cannot be changed after balance has been modified", null);
+                return (false, $"Currency cannot be changed. This account has {transactionCount} transaction(s). Archive this account and create a new one instead.", null);
             }
             account.Currency = request.Currency;
         }
@@ -305,7 +317,13 @@ public class AccountService : IAccountService
         if (request.Order.HasValue) account.Order = request.Order.Value;
 
         await _accountRepository.UpdateAsync(account);
-        return (true, "Account updated successfully", MapToResponse(account, dek));
+        
+        // Get transaction count for the updated response (if not already fetched)
+        if (transactionCount == 0)
+        {
+            transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
+        }
+        return (true, "Account updated successfully", MapToResponse(account, transactionCount, dek));
     }
 
     public async Task<(bool Success, string Message)> AdjustBalanceAsync(string id, string userId, AdjustBalanceRequest request)
@@ -344,25 +362,29 @@ public class AccountService : IAccountService
         return (true, "Accounts reordered successfully");
     }
 
-    public async Task<(bool Success, string Message)> DeleteAsync(string id, string userId)
+    public async Task<(bool Success, string Message, string ErrorType)> DeleteAsync(string id, string userId)
     {
         var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
         if (account == null)
         {
-            return (false, "Account not found");
+            return (false, "Account not found", "NotFound");
         }
 
-        // TODO: Check if account has transactions before deleting
-        // For now, allow deletion
+        // Check if account has transactions - block deletion if so
+        var transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
+        if (transactionCount > 0)
+        {
+            return (false, $"Cannot delete account with {transactionCount} transaction(s). Archive it instead to preserve your transaction history.", "HasTransactions");
+        }
 
         await _accountRepository.DeleteAsync(id, userId);
-        return (true, "Account deleted successfully");
+        return (true, "Account deleted successfully", "");
     }
 
-    private AccountResponse MapToResponse(Account account, byte[]? dek = null)
+    private AccountResponse MapToResponse(Account account, int transactionCount, byte[]? dek = null)
     {
-        // Currency can only be edited if balance hasn't changed (no transactions/adjustments)
-        var canEditCurrency = account.CurrentBalance == account.InitialBalance;
+        // Currency can only be edited if there are no transactions for this account
+        var canEditCurrency = transactionCount == 0;
         
         // Decrypt sensitive fields with server-managed DEK if available
         var accountNumber = dek != null 

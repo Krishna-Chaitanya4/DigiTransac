@@ -45,9 +45,10 @@ interface AccountModalProps {
   editingAccount: Account | null;
   isLoading: boolean;
   primaryCurrency: string;
+  error?: string | null;
 }
 
-function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading, primaryCurrency }: AccountModalProps) {
+function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading, primaryCurrency, error }: AccountModalProps) {
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('Bank');
   const [color, setColor] = useState('');
@@ -133,6 +134,18 @@ function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading, pr
           </h3>
 
           <form onSubmit={handleSubmit}>
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               {/* Account Name */}
               <div>
@@ -349,11 +362,11 @@ function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoading, pr
                         <span>{getCurrencySymbol(currency)}</span>
                         <span>{currency}</span>
                       </span>
-                      <span className="text-xs text-gray-500" title="Currency cannot be changed after balance has been modified">
+                      <span className="text-xs text-gray-500" title="Currency cannot be changed because this account has transactions">
                         <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-10a4 4 0 00-4 4v1a2 2 0 002 2h4a2 2 0 002-2v-1a4 4 0 00-4-4z" />
                         </svg>
-                        Locked (balance modified)
+                        Locked (has transactions)
                       </span>
                     </div>
                   )}
@@ -486,40 +499,82 @@ interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onArchive?: () => void;
   accountName: string;
   isLoading: boolean;
+  errorMessage?: string | null;
 }
 
-function DeleteConfirmModal({ isOpen, onClose, onConfirm, accountName, isLoading }: DeleteConfirmModalProps) {
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, onArchive, accountName, isLoading, errorMessage }: DeleteConfirmModalProps) {
   if (!isOpen) return null;
+
+  const hasTransactionError = errorMessage && errorMessage.includes('transaction');
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-        <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Account</h3>
-          <p className="text-gray-600 mb-4">
-            Are you sure you want to delete <strong>{accountName}</strong>? This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Deleting...' : 'Delete'}
-            </button>
-          </div>
+          
+          {hasTransactionError ? (
+            <div className="space-y-4">
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <div className="text-sm text-red-800">
+                  <p className="font-medium">Cannot delete this account</p>
+                  <p>{errorMessage}</p>
+                </div>
+              </div>
+              <p className="text-gray-600 text-sm">
+                To hide this account from your dashboard, you can archive it instead. Archived accounts will still appear in reports and transaction history.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                {onArchive && (
+                  <button
+                    type="button"
+                    onClick={onArchive}
+                    className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700"
+                  >
+                    Archive Instead
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete <strong>{accountName}</strong>? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={isLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={onConfirm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -870,9 +925,11 @@ export default function AccountsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [adjustingAccount, setAdjustingAccount] = useState<Account | null>(null);
@@ -929,22 +986,42 @@ export default function AccountsPage() {
 
   const handleCreate = () => {
     setEditingAccount(null);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
   const handleEdit = (account: Account) => {
     setEditingAccount(account);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
   const handleDelete = (account: Account) => {
     setDeletingAccount(account);
+    setDeleteError(null);
     setIsDeleteModalOpen(true);
   };
 
   const handleAdjustBalance = (account: Account) => {
     setAdjustingAccount(account);
     setIsAdjustModalOpen(true);
+  };
+
+  const handleArchiveFromDeleteModal = async () => {
+    if (!deletingAccount) return;
+    
+    try {
+      setIsSubmitting(true);
+      await updateAccount(deletingAccount.id, { isArchived: true });
+      setIsDeleteModalOpen(false);
+      setDeletingAccount(null);
+      setDeleteError(null);
+      await loadData();
+    } catch {
+      setError('Failed to archive account');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleArchiveToggle = async (account: Account) => {
@@ -959,15 +1036,19 @@ export default function AccountsPage() {
   const handleModalSubmit = async (data: CreateAccountRequest | UpdateAccountRequest) => {
     try {
       setIsSubmitting(true);
+      setModalError(null);
       if (editingAccount) {
         await updateAccount(editingAccount.id, data as UpdateAccountRequest);
       } else {
         await createAccount(data as CreateAccountRequest);
       }
       setIsModalOpen(false);
+      setModalError(null);
       await loadData();
-    } catch {
-      setError(editingAccount ? 'Failed to update account' : 'Failed to create account');
+    } catch (err) {
+      // Show error in the modal
+      const message = err instanceof Error ? err.message : (editingAccount ? 'Failed to update account' : 'Failed to create account');
+      setModalError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -981,9 +1062,12 @@ export default function AccountsPage() {
       await deleteAccount(deletingAccount.id);
       setIsDeleteModalOpen(false);
       setDeletingAccount(null);
+      setDeleteError(null);
       await loadData();
-    } catch {
-      setError('Failed to delete account');
+    } catch (err) {
+      // Show error in the modal instead of the global error
+      const message = err instanceof Error ? err.message : 'Failed to delete account';
+      setDeleteError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -1131,11 +1215,15 @@ export default function AccountsPage() {
       {/* Modals */}
       <AccountModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setModalError(null);
+        }}
         onSubmit={handleModalSubmit}
         editingAccount={editingAccount}
         isLoading={isSubmitting}
         primaryCurrency={summary?.primaryCurrency || 'USD'}
+        error={modalError}
       />
 
       <DeleteConfirmModal
@@ -1143,10 +1231,13 @@ export default function AccountsPage() {
         onClose={() => {
           setIsDeleteModalOpen(false);
           setDeletingAccount(null);
+          setDeleteError(null);
         }}
         onConfirm={handleDeleteConfirm}
+        onArchive={handleArchiveFromDeleteModal}
         accountName={deletingAccount?.name || ''}
         isLoading={isSubmitting}
+        errorMessage={deleteError}
       />
 
       <AdjustBalanceModal

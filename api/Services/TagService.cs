@@ -11,16 +11,20 @@ public interface ITagService
     Task<(bool Success, string Message, TagResponse? Tag)> CreateAsync(string userId, CreateTagRequest request);
     Task<(bool Success, string Message, TagResponse? Tag)> UpdateAsync(string id, string userId, UpdateTagRequest request);
     Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
+    Task<(bool Success, string Message, int TransactionCount)> DeleteWithConfirmationAsync(string id, string userId, bool confirmed);
+    Task<int> GetTransactionCountAsync(string id, string userId);
 }
 
 public class TagService : ITagService
 {
     private readonly ITagRepository _tagRepository;
+    private readonly ITransactionRepository _transactionRepository;
     private readonly ILogger<TagService> _logger;
 
-    public TagService(ITagRepository tagRepository, ILogger<TagService> logger)
+    public TagService(ITagRepository tagRepository, ITransactionRepository transactionRepository, ILogger<TagService> logger)
     {
         _tagRepository = tagRepository;
+        _transactionRepository = transactionRepository;
         _logger = logger;
     }
 
@@ -100,7 +104,12 @@ public class TagService : ITagService
             return (false, "Tag not found");
         }
 
-        // TODO: Remove tag from all transactions before deleting
+        // Check if tag is used in transactions - require confirmation
+        var transactionCount = await _transactionRepository.GetCountByTagIdAsync(id, userId);
+        if (transactionCount > 0)
+        {
+            return (false, $"This tag is used in {transactionCount} transaction(s). Please confirm to remove it from all transactions.");
+        }
 
         var deleted = await _tagRepository.DeleteAsync(id, userId);
         if (!deleted)
@@ -110,6 +119,44 @@ public class TagService : ITagService
 
         _logger.LogInformation("Deleted tag {TagId} for user {UserId}", id, userId);
         return (true, "Tag deleted successfully");
+    }
+
+    public async Task<int> GetTransactionCountAsync(string id, string userId)
+    {
+        return await _transactionRepository.GetCountByTagIdAsync(id, userId);
+    }
+
+    public async Task<(bool Success, string Message, int TransactionCount)> DeleteWithConfirmationAsync(string id, string userId, bool confirmed)
+    {
+        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId);
+        if (tag == null)
+        {
+            return (false, "Tag not found", 0);
+        }
+
+        var transactionCount = await _transactionRepository.GetCountByTagIdAsync(id, userId);
+        
+        if (transactionCount > 0 && !confirmed)
+        {
+            // Return count so frontend can show confirmation
+            return (false, $"This tag is used in {transactionCount} transaction(s). Confirm to remove it from all.", transactionCount);
+        }
+
+        if (transactionCount > 0)
+        {
+            // Remove tag from all transactions
+            await _transactionRepository.RemoveTagFromAllAsync(id, userId);
+            _logger.LogInformation("Removed tag {TagId} from {Count} transactions", id, transactionCount);
+        }
+
+        var deleted = await _tagRepository.DeleteAsync(id, userId);
+        if (!deleted)
+        {
+            return (false, "Failed to delete tag", 0);
+        }
+
+        _logger.LogInformation("Deleted tag {TagId} for user {UserId}", id, userId);
+        return (true, $"Tag deleted successfully. Removed from {transactionCount} transaction(s).", transactionCount);
     }
 
     private static TagResponse MapToResponse(Tag tag)

@@ -11,6 +11,8 @@ vi.mock('../services/tagService', () => ({
   createTag: vi.fn(),
   updateTag: vi.fn(),
   deleteTag: vi.fn(),
+  getTagTransactionCount: vi.fn(),
+  deleteTagConfirmed: vi.fn(),
 }));
 
 // Sample test data
@@ -25,6 +27,8 @@ describe('TagsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(tagService.getTags).mockResolvedValue(mockTags);
+    vi.mocked(tagService.getTagTransactionCount).mockResolvedValue({ transactionCount: 0 });
+    vi.mocked(tagService.deleteTagConfirmed).mockResolvedValue(undefined);
   });
 
   afterEach(() => {

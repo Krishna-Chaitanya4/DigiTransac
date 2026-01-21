@@ -169,16 +169,19 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message) = await accountService.DeleteAsync(id, userId);
+            var (success, message, errorType) = await accountService.DeleteAsync(id, userId);
             if (!success)
             {
-                return Results.NotFound(new ErrorResponse(message));
+                return errorType == "NotFound" 
+                    ? Results.NotFound(new ErrorResponse(message))
+                    : Results.BadRequest(new ErrorResponse(message));
             }
 
             return Results.Ok(new { message });
         })
         .WithName("DeleteFinancialAccount")
         .Produces(200)
+        .Produces<ErrorResponse>(400)
         .Produces<ErrorResponse>(404);
     }
 }

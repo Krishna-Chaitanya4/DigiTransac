@@ -12,6 +12,8 @@ public interface ILabelService
     Task<(bool Success, string Message, LabelResponse? Label)> CreateAsync(string userId, CreateLabelRequest request);
     Task<(bool Success, string Message, LabelResponse? Label)> UpdateAsync(string id, string userId, UpdateLabelRequest request);
     Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
+    Task<(bool Success, string Message, int TransactionCount)> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId);
+    Task<int> GetTransactionCountAsync(string id, string userId);
     Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderLabelsRequest request);
     Task CreateDefaultLabelsAsync(string userId);
 }
@@ -19,11 +21,13 @@ public interface ILabelService
 public class LabelService : ILabelService
 {
     private readonly ILabelRepository _labelRepository;
+    private readonly ITransactionRepository _transactionRepository;
     private readonly ILogger<LabelService> _logger;
 
-    public LabelService(ILabelRepository labelRepository, ILogger<LabelService> logger)
+    public LabelService(ILabelRepository labelRepository, ITransactionRepository transactionRepository, ILogger<LabelService> logger)
     {
         _labelRepository = labelRepository;
+        _transactionRepository = transactionRepository;
         _logger = logger;
     }
 
@@ -181,7 +185,12 @@ public class LabelService : ILabelService
             }
         }
 
-        // TODO: Check if label is used in transactions before deleting
+        // Check if label is used in transactions - require reassignment
+        var transactionCount = await _transactionRepository.GetCountByLabelIdAsync(id, userId);
+        if (transactionCount > 0)
+        {
+            return (false, $"Cannot delete label with {transactionCount} transaction(s). Please reassign them first.");
+        }
 
         var deleted = await _labelRepository.DeleteAsync(id, userId);
         if (!deleted)
@@ -191,6 +200,72 @@ public class LabelService : ILabelService
 
         _logger.LogInformation("Deleted label {LabelId} for user {UserId}", id, userId);
         return (true, "Label deleted successfully");
+    }
+
+    public async Task<int> GetTransactionCountAsync(string id, string userId)
+    {
+        return await _transactionRepository.GetCountByLabelIdAsync(id, userId);
+    }
+
+    public async Task<(bool Success, string Message, int TransactionCount)> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId)
+    {
+        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId);
+        if (label == null)
+        {
+            return (false, "Label not found", 0);
+        }
+
+        // System labels cannot be deleted
+        if (label.IsSystem)
+        {
+            return (false, "System labels cannot be deleted", 0);
+        }
+
+        // Check if folder has children
+        if (label.Type == LabelType.Folder)
+        {
+            var hasChildren = await _labelRepository.HasChildrenAsync(id, userId);
+            if (hasChildren)
+            {
+                return (false, "Cannot delete folder with children. Delete or move children first.", 0);
+            }
+        }
+
+        var transactionCount = await _transactionRepository.GetCountByLabelIdAsync(id, userId);
+        
+        if (transactionCount > 0)
+        {
+            if (string.IsNullOrEmpty(reassignToLabelId))
+            {
+                // Return count so frontend can show reassignment modal
+                return (false, $"This label has {transactionCount} transaction(s). Please select a label to reassign them to.", transactionCount);
+            }
+
+            // Validate target label exists
+            var targetLabel = await _labelRepository.GetByIdAndUserIdAsync(reassignToLabelId, userId);
+            if (targetLabel == null)
+            {
+                return (false, "Target label not found", transactionCount);
+            }
+
+            if (targetLabel.Type != LabelType.Category)
+            {
+                return (false, "Can only reassign to a category, not a folder", transactionCount);
+            }
+
+            // Reassign all transactions to the target label
+            await _transactionRepository.ReassignLabelAsync(id, reassignToLabelId, userId);
+            _logger.LogInformation("Reassigned {Count} transactions from label {FromId} to {ToId}", transactionCount, id, reassignToLabelId);
+        }
+
+        var deleted = await _labelRepository.DeleteAsync(id, userId);
+        if (!deleted)
+        {
+            return (false, "Failed to delete label", 0);
+        }
+
+        _logger.LogInformation("Deleted label {LabelId} for user {UserId}", id, userId);
+        return (true, $"Label deleted successfully. {transactionCount} transaction(s) reassigned.", transactionCount);
     }
 
     public async Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderLabelsRequest request)

@@ -11,6 +11,7 @@ namespace DigiTransac.Tests.Services;
 public class LabelServiceTests
 {
     private readonly Mock<ILabelRepository> _labelRepositoryMock;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<ILogger<LabelService>> _loggerMock;
     private readonly LabelService _labelService;
     private const string TestUserId = "test-user-id";
@@ -18,8 +19,9 @@ public class LabelServiceTests
     public LabelServiceTests()
     {
         _labelRepositoryMock = new Mock<ILabelRepository>();
+        _transactionRepositoryMock = new Mock<ITransactionRepository>();
         _loggerMock = new Mock<ILogger<LabelService>>();
-        _labelService = new LabelService(_labelRepositoryMock.Object, _loggerMock.Object);
+        _labelService = new LabelService(_labelRepositoryMock.Object, _transactionRepositoryMock.Object, _loggerMock.Object);
     }
 
     #region GetAllAsync Tests

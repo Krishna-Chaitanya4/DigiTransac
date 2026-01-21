@@ -6,7 +6,9 @@ import {
   createLabel, 
   updateLabel, 
   deleteLabel, 
-  reorderLabels 
+  reorderLabels,
+  getLabelTransactionCount,
+  deleteLabelWithReassignment 
 } from './labelService';
 import { apiClient } from './apiClient';
 
@@ -244,6 +246,55 @@ describe('labelService', () => {
 
       // Assert
       expect(apiClient.post).toHaveBeenCalledWith('/labels/reorder', { items: [] });
+    });
+  });
+
+  describe('getLabelTransactionCount', () => {
+    it('should fetch transaction count for a label', async () => {
+      // Arrange
+      vi.mocked(apiClient.get).mockResolvedValueOnce({ transactionCount: 5 });
+
+      // Act
+      const result = await getLabelTransactionCount('1');
+
+      // Assert
+      expect(apiClient.get).toHaveBeenCalledWith('/labels/1/transaction-count');
+      expect(result).toEqual({ transactionCount: 5 });
+    });
+
+    it('should return zero transaction count', async () => {
+      // Arrange
+      vi.mocked(apiClient.get).mockResolvedValueOnce({ transactionCount: 0 });
+
+      // Act
+      const result = await getLabelTransactionCount('1');
+
+      // Assert
+      expect(result).toEqual({ transactionCount: 0 });
+    });
+  });
+
+  describe('deleteLabelWithReassignment', () => {
+    it('should delete label without reassignment', async () => {
+      // Arrange
+      vi.mocked(apiClient.delete).mockResolvedValueOnce(undefined);
+
+      // Act
+      await deleteLabelWithReassignment('1');
+
+      // Assert
+      expect(apiClient.delete).toHaveBeenCalledWith('/labels/1/with-reassignment');
+    });
+
+    it('should delete label with reassignment to another label', async () => {
+      // Arrange
+      vi.mocked(apiClient.delete).mockResolvedValueOnce(undefined);
+
+      // Act
+      await deleteLabelWithReassignment('1', '2');
+
+      // Assert
+      expect(apiClient.delete).toHaveBeenCalledWith('/labels/1/with-reassignment?reassignToId=2');
     });
   });
 });

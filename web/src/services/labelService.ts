@@ -31,6 +31,19 @@ export async function deleteLabel(id: string): Promise<void> {
   return apiClient.delete<void>(`/labels/${id}`);
 }
 
+// Get transaction count for a label
+export async function getLabelTransactionCount(id: string): Promise<{ transactionCount: number }> {
+  return apiClient.get<{ transactionCount: number }>(`/labels/${id}/transaction-count`);
+}
+
+// Delete label with reassignment (reassigns all transactions to another label)
+export async function deleteLabelWithReassignment(id: string, reassignToId?: string): Promise<void> {
+  const url = reassignToId 
+    ? `/labels/${id}/with-reassignment?reassignToId=${reassignToId}`
+    : `/labels/${id}/with-reassignment`;
+  return apiClient.delete<void>(url);
+}
+
 // Reorder labels
 export async function reorderLabels(items: { id: string; order: number }[]): Promise<void> {
   return apiClient.post<void>('/labels/reorder', { items });

@@ -110,5 +110,41 @@ public static class TagEndpoints
         .WithName("DeleteTag")
         .Produces(200)
         .Produces<ErrorResponse>(400);
+
+        // Get transaction count for a tag
+        group.MapGet("/{id}/transaction-count", async (string id, ClaimsPrincipal user, ITagService tagService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var count = await tagService.GetTransactionCountAsync(id, userId);
+            return Results.Ok(new { transactionCount = count });
+        })
+        .WithName("GetTagTransactionCount")
+        .Produces(200);
+
+        // Delete tag with confirmation (removes from all transactions)
+        group.MapDelete("/{id}/confirmed", async (string id, ClaimsPrincipal user, ITagService tagService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var (success, message, transactionCount) = await tagService.DeleteWithConfirmationAsync(id, userId, confirmed: true);
+            if (!success)
+            {
+                return Results.BadRequest(new { message, transactionCount });
+            }
+
+            return Results.Ok(new { message, transactionCount });
+        })
+        .WithName("DeleteTagConfirmed")
+        .Produces(200)
+        .Produces(400);
     }
 }

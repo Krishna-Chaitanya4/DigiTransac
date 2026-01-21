@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
-import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel } from '../services/labelService';
+import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel, getLabelTransactionCount, deleteLabelWithReassignment } from '../services/labelService';
 
 // Helper to get path for a label
 function getLabelPath(labelId: string, allLabels: Label[]): string {
@@ -597,25 +597,105 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
 interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (reassignToId?: string) => void;
   labelName: string;
+  labelType: 'Folder' | 'Category';
+  transactionCount: number;
+  allLabels: Label[];
+  labelToDeleteId: string;
   isLoading: boolean;
 }
 
-function DeleteConfirmModal({ isOpen, onClose, onConfirm, labelName, isLoading }: DeleteConfirmModalProps) {
+function DeleteConfirmModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  labelName, 
+  labelType,
+  transactionCount,
+  allLabels,
+  labelToDeleteId,
+  isLoading 
+}: DeleteConfirmModalProps) {
+  const [reassignToId, setReassignToId] = useState<string>('');
+  const hasTransactions = transactionCount > 0;
+  
+  // Reset reassignment selection when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setReassignToId('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  // Get available labels for reassignment (exclude the one being deleted and its descendants)
+  const getDescendantIds = (parentId: string): Set<string> => {
+    const ids = new Set<string>([parentId]);
+    const children = allLabels.filter(l => l.parentId === parentId);
+    children.forEach(child => {
+      const childDescendants = getDescendantIds(child.id);
+      childDescendants.forEach(id => ids.add(id));
+    });
+    return ids;
+  };
+  
+  const excludeIds = getDescendantIds(labelToDeleteId);
+  const reassignableLabels = allLabels.filter(l => 
+    l.type === 'Category' && !excludeIds.has(l.id)
+  );
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-        <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Label</h3>
-          <p className="text-gray-600 mb-6">
-            Are you sure you want to delete "{labelName}"? This action cannot be undone.
-          </p>
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Delete {labelType}
+          </h3>
           
-          <div className="flex justify-end gap-3">
+          {hasTransactions ? (
+            <div className="space-y-4">
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <p className="text-sm text-amber-800">
+                  This category is used in <strong>{transactionCount}</strong> transaction split{transactionCount === 1 ? '' : 's'}.
+                  Please choose what to do with these transactions.
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reassign transactions to:
+                </label>
+                <select
+                  value={reassignToId}
+                  onChange={(e) => setReassignToId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">-- Leave without category --</option>
+                  {reassignableLabels.map(l => (
+                    <option key={l.id} value={l.id}>
+                      {l.icon && `${l.icon} `}{l.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {reassignToId 
+                    ? 'Transactions will be moved to the selected category before deletion.'
+                    : 'Transaction splits will have their category cleared.'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete "{labelName}"? This action cannot be undone.
+            </p>
+          )}
+          
+          <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -624,11 +704,11 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, labelName, isLoading }
               Cancel
             </button>
             <button
-              onClick={onConfirm}
+              onClick={() => onConfirm(reassignToId || undefined)}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               disabled={isLoading}
             >
-              {isLoading ? 'Deleting...' : 'Delete'}
+              {isLoading ? 'Deleting...' : hasTransactions ? 'Delete & Reassign' : 'Delete'}
             </button>
           </div>
         </div>
@@ -655,6 +735,7 @@ export default function CategoriesTab() {
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [labelToDelete, setLabelToDelete] = useState<LabelTree | null>(null);
+  const [labelTransactionCount, setLabelTransactionCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Search results
@@ -747,9 +828,20 @@ export default function CategoriesTab() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (label: LabelTree) => {
+  const handleDelete = async (label: LabelTree) => {
     setLabelToDelete(label);
+    setLabelTransactionCount(0);
     setDeleteModalOpen(true);
+    
+    // Fetch transaction count for categories (folders don't have direct transactions)
+    if (label.type === 'Category') {
+      try {
+        const { transactionCount } = await getLabelTransactionCount(label.id);
+        setLabelTransactionCount(transactionCount);
+      } catch (err) {
+        console.error('Failed to get transaction count:', err);
+      }
+    }
   };
 
   const handleModalSubmit = async (data: CreateLabelRequest | UpdateLabelRequest) => {
@@ -769,12 +861,17 @@ export default function CategoriesTab() {
     }
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = async (reassignToId?: string) => {
     if (!labelToDelete) return;
     
     try {
       setIsDeleting(true);
-      await deleteLabel(labelToDelete.id);
+      // Use reassignment delete if there are transactions
+      if (labelTransactionCount > 0) {
+        await deleteLabelWithReassignment(labelToDelete.id, reassignToId);
+      } else {
+        await deleteLabel(labelToDelete.id);
+      }
       await loadLabels();
       setDeleteModalOpen(false);
       setLabelToDelete(null);
@@ -974,6 +1071,10 @@ export default function CategoriesTab() {
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleDeleteConfirm}
         labelName={labelToDelete?.name || ''}
+        labelType={labelToDelete?.type || 'Category'}
+        transactionCount={labelTransactionCount}
+        allLabels={allLabels}
+        labelToDeleteId={labelToDelete?.id || ''}
         isLoading={isDeleting}
       />
     </div>

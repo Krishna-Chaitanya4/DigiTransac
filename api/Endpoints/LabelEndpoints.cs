@@ -126,6 +126,46 @@ public static class LabelEndpoints
         .Produces(200)
         .Produces<ErrorResponse>(400);
 
+        // Get transaction count for a label
+        group.MapGet("/{id}/transaction-count", async (string id, ClaimsPrincipal user, ILabelService labelService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var count = await labelService.GetTransactionCountAsync(id, userId);
+            return Results.Ok(new { transactionCount = count });
+        })
+        .WithName("GetLabelTransactionCount")
+        .Produces(200);
+
+        // Delete label with reassignment
+        group.MapDelete("/{id}/with-reassignment", async (
+            string id, 
+            string? reassignToId,
+            ClaimsPrincipal user, 
+            ILabelService labelService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var (success, message, transactionCount) = await labelService.DeleteWithReassignmentAsync(id, userId, reassignToId);
+            if (!success)
+            {
+                return Results.BadRequest(new { message, transactionCount });
+            }
+
+            return Results.Ok(new { message, transactionCount });
+        })
+        .WithName("DeleteLabelWithReassignment")
+        .Produces(200)
+        .Produces(400);
+
         // Reorder labels
         group.MapPost("/reorder", async (ReorderLabelsRequest request, ClaimsPrincipal user, ILabelService labelService) =>
         {

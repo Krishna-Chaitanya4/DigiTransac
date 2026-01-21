@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getTags, getTag, createTag, updateTag, deleteTag } from './tagService';
+import { getTags, getTag, createTag, updateTag, deleteTag, getTagTransactionCount, deleteTagConfirmed } from './tagService';
 import { apiClient } from './apiClient';
 
 // Mock apiClient
@@ -183,6 +183,44 @@ describe('tagService', () => {
 
       // Act & Assert
       await expect(deleteTag('non-existent')).rejects.toThrow('The requested item was not found.');
+    });
+  });
+
+  describe('getTagTransactionCount', () => {
+    it('should fetch transaction count for a tag', async () => {
+      // Arrange
+      vi.mocked(apiClient.get).mockResolvedValueOnce({ transactionCount: 10 });
+
+      // Act
+      const result = await getTagTransactionCount('1');
+
+      // Assert
+      expect(apiClient.get).toHaveBeenCalledWith('/tags/1/transaction-count');
+      expect(result).toEqual({ transactionCount: 10 });
+    });
+
+    it('should return zero transaction count', async () => {
+      // Arrange
+      vi.mocked(apiClient.get).mockResolvedValueOnce({ transactionCount: 0 });
+
+      // Act
+      const result = await getTagTransactionCount('1');
+
+      // Assert
+      expect(result).toEqual({ transactionCount: 0 });
+    });
+  });
+
+  describe('deleteTagConfirmed', () => {
+    it('should delete tag with confirmation', async () => {
+      // Arrange
+      vi.mocked(apiClient.delete).mockResolvedValueOnce(undefined);
+
+      // Act
+      await deleteTagConfirmed('1');
+
+      // Assert
+      expect(apiClient.delete).toHaveBeenCalledWith('/tags/1/confirmed');
     });
   });
 });

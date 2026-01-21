@@ -24,6 +24,16 @@ public interface ITransactionRepository
     Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null);
     Task<Dictionary<string, decimal>> GetSumByLabelAsync(string userId, DateTime? startDate, DateTime? endDate);
     Task<Dictionary<string, decimal>> GetSumByTagAsync(string userId, DateTime? startDate, DateTime? endDate);
+    
+    // Count methods for validation before deletion
+    Task<int> GetCountByAccountIdAsync(string accountId, string userId);
+    Task<Dictionary<string, int>> GetCountsByAccountIdsAsync(IEnumerable<string> accountIds, string userId);
+    Task<int> GetCountByLabelIdAsync(string labelId, string userId);
+    Task<int> GetCountByTagIdAsync(string tagId, string userId);
+    
+    // Reassignment methods
+    Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId);
+    Task RemoveTagFromAllAsync(string tagId, string userId);
 }
 
 public class TransactionRepository : ITransactionRepository
@@ -381,5 +391,105 @@ public class TransactionRepository : ITransactionRepository
             .ToDictionary(
                 r => r["_id"].IsString ? r["_id"].AsString : r["_id"].AsObjectId.ToString(),
                 r => r["total"].ToDecimal());
+    }
+
+    public async Task<int> GetCountByAccountIdAsync(string accountId, string userId)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.AccountId, accountId),
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+        );
+        return (int)await _transactions.CountDocumentsAsync(filter);
+    }
+
+    public async Task<Dictionary<string, int>> GetCountsByAccountIdsAsync(IEnumerable<string> accountIds, string userId)
+    {
+        var accountIdList = accountIds.ToList();
+        if (accountIdList.Count == 0)
+        {
+            return new Dictionary<string, int>();
+        }
+
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.In(t => t.AccountId, accountIdList),
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+        );
+
+        var pipeline = new[]
+        {
+            new BsonDocument("$match", filter.ToBsonDocument()),
+            new BsonDocument("$group", new BsonDocument
+            {
+                { "_id", "$AccountId" },
+                { "count", new BsonDocument("$sum", 1) }
+            })
+        };
+
+        var results = await _transactions.Aggregate<BsonDocument>(pipeline).ToListAsync();
+        
+        // Initialize with zero for all account IDs
+        var counts = accountIdList.ToDictionary(id => id, _ => 0);
+        
+        // Update with actual counts
+        foreach (var result in results)
+        {
+            var accountId = result["_id"].AsString;
+            var count = result["count"].ToInt32();
+            counts[accountId] = count;
+        }
+
+        return counts;
+    }
+
+    public async Task<int> GetCountByLabelIdAsync(string labelId, string userId)
+    {
+        // Count transactions that have this label in any of their splits
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.ElemMatch(t => t.Splits, s => s.LabelId == labelId)
+        );
+        return (int)await _transactions.CountDocumentsAsync(filter);
+    }
+
+    public async Task<int> GetCountByTagIdAsync(string tagId, string userId)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.AnyEq(t => t.TagIds, tagId)
+        );
+        return (int)await _transactions.CountDocumentsAsync(filter);
+    }
+
+    public async Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId)
+    {
+        // Update all splits that use fromLabelId to use toLabelId instead
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.ElemMatch(t => t.Splits, s => s.LabelId == fromLabelId)
+        );
+        
+        var update = Builders<Transaction>.Update.Set("splits.$[elem].labelId", toLabelId);
+        var arrayFilters = new List<ArrayFilterDefinition>
+        {
+            new BsonDocumentArrayFilterDefinition<BsonDocument>(
+                new BsonDocument("elem.labelId", fromLabelId))
+        };
+        
+        await _transactions.UpdateManyAsync(filter, update, new UpdateOptions { ArrayFilters = arrayFilters });
+    }
+
+    public async Task RemoveTagFromAllAsync(string tagId, string userId)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.AnyEq(t => t.TagIds, tagId)
+        );
+        
+        var update = Builders<Transaction>.Update.Pull(t => t.TagIds, tagId);
+        await _transactions.UpdateManyAsync(filter, update);
     }
 }
