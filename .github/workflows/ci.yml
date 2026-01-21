@@ -1,0 +1,126 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '22.x'
+
+jobs:
+  # Backend API Tests
+  api-test:
+    name: API Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: 'preview'
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+      
+      - name: Run tests
+        run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+        env:
+          MONGODB_CONNECTION_STRING: mongodb://localhost:27017
+          MONGODB_DATABASE_NAME: DigiTransac_Test
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-testing-32chars
+          ENCRYPTION_KEY: test-encryption-key-for-ci-testing
+          ENCRYPTION_KEK: test-kek-32-characters-exactly!
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: '**/coverage.cobertura.xml'
+          flags: api
+          fail_ci_if_error: false
+
+  # Frontend Web Tests
+  web-test:
+    name: Web Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      
+      - name: Type check
+        working-directory: web
+        run: npx tsc --noEmit
+      
+      - name: Run tests
+        working-directory: web
+        run: npm test -- --run --coverage
+      
+      - name: Build
+        working-directory: web
+        run: npm run build
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: 'web/coverage/coverage-final.json'
+          flags: web
+          fail_ci_if_error: false
+
+  # Build Docker images (on main branch only)
+  docker-build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [api-test, web-test]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          push: false
+          tags: digitransac-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./web
+          push: false
+          tags: digitransac-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
