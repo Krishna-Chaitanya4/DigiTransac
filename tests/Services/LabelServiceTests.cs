@@ -420,6 +420,132 @@ public class LabelServiceTests
 
     #endregion
 
+    #region DeleteWithReassignmentAsync Tests
+
+    [Fact]
+    public async Task DeleteWithReassignmentAsync_WithTransactionsAndReassignTo_ShouldReassignAndDelete()
+    {
+        // Arrange
+        var label = new Label { Id = "1", UserId = TestUserId, Name = "OldCategory", Type = LabelType.Category };
+        var targetLabel = new Label { Id = "2", UserId = TestUserId, Name = "NewCategory", Type = LabelType.Category };
+        
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(label);
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("2", TestUserId))
+            .ReturnsAsync(targetLabel);
+        _transactionRepositoryMock.Setup(x => x.GetCountByLabelIdAsync("1", TestUserId))
+            .ReturnsAsync(5);
+        _transactionRepositoryMock.Setup(x => x.ReassignLabelAsync("1", "2", TestUserId))
+            .Returns(Task.CompletedTask);
+        _labelRepositoryMock.Setup(x => x.DeleteAsync("1", TestUserId))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, "2");
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.TransactionCount.Should().Be(5);
+        result.Message.Should().Contain("5 transaction(s) reassigned");
+        
+        // Verify ReassignLabelAsync was called with correct parameters
+        _transactionRepositoryMock.Verify(x => x.ReassignLabelAsync("1", "2", TestUserId), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteWithReassignmentAsync_WithTransactionsButNoReassignTo_ShouldReturnFailure()
+    {
+        // Arrange
+        var label = new Label { Id = "1", UserId = TestUserId, Name = "OldCategory", Type = LabelType.Category };
+        
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(label);
+        _transactionRepositoryMock.Setup(x => x.GetCountByLabelIdAsync("1", TestUserId))
+            .ReturnsAsync(5);
+
+        // Act
+        var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, null);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.TransactionCount.Should().Be(5);
+        result.Message.Should().Contain("has 5 transaction(s)");
+        
+        // Verify ReassignLabelAsync was NOT called
+        _transactionRepositoryMock.Verify(x => x.ReassignLabelAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteWithReassignmentAsync_ReassignToFolder_ShouldReturnFailure()
+    {
+        // Arrange
+        var label = new Label { Id = "1", UserId = TestUserId, Name = "OldCategory", Type = LabelType.Category };
+        var folderLabel = new Label { Id = "2", UserId = TestUserId, Name = "SomeFolder", Type = LabelType.Folder };
+        
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(label);
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("2", TestUserId))
+            .ReturnsAsync(folderLabel);
+        _transactionRepositoryMock.Setup(x => x.GetCountByLabelIdAsync("1", TestUserId))
+            .ReturnsAsync(3);
+
+        // Act
+        var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, "2");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("Can only reassign to a category, not a folder");
+    }
+
+    [Fact]
+    public async Task DeleteWithReassignmentAsync_WithNoTransactions_ShouldDeleteDirectly()
+    {
+        // Arrange
+        var label = new Label { Id = "1", UserId = TestUserId, Name = "EmptyCategory", Type = LabelType.Category };
+        
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(label);
+        _transactionRepositoryMock.Setup(x => x.GetCountByLabelIdAsync("1", TestUserId))
+            .ReturnsAsync(0);
+        _labelRepositoryMock.Setup(x => x.DeleteAsync("1", TestUserId))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, null);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.TransactionCount.Should().Be(0);
+        
+        // Verify ReassignLabelAsync was NOT called (no transactions to reassign)
+        _transactionRepositoryMock.Verify(x => x.ReassignLabelAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteWithReassignmentAsync_SystemLabel_ShouldReturnFailure()
+    {
+        // Arrange
+        var systemLabel = new Label 
+        { 
+            Id = "1", 
+            UserId = TestUserId, 
+            Name = "Balance Adjustment", 
+            Type = LabelType.Category,
+            IsSystem = true 
+        };
+        _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(systemLabel);
+
+        // Act
+        var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, "2");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("System labels cannot be deleted");
+    }
+
+    #endregion
+
     #region UpdateAsync System Label Tests
 
     [Fact]

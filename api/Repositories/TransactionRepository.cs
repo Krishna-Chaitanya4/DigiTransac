@@ -472,11 +472,12 @@ public class TransactionRepository : ITransactionRepository
             Builders<Transaction>.Filter.ElemMatch(t => t.Splits, s => s.LabelId == fromLabelId)
         );
         
-        var update = Builders<Transaction>.Update.Set("splits.$[elem].labelId", toLabelId);
+        // Use ObjectId for the update since LabelId is stored as ObjectId in MongoDB
+        var update = Builders<Transaction>.Update.Set("splits.$[elem].labelId", new ObjectId(toLabelId));
         var arrayFilters = new List<ArrayFilterDefinition>
         {
             new BsonDocumentArrayFilterDefinition<BsonDocument>(
-                new BsonDocument("elem.labelId", fromLabelId))
+                new BsonDocument("elem.labelId", new ObjectId(fromLabelId)))
         };
         
         await _transactions.UpdateManyAsync(filter, update, new UpdateOptions { ArrayFilters = arrayFilters });
