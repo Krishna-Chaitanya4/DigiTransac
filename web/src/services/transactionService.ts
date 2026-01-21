@@ -193,7 +193,13 @@ export async function exportTransactions(
   
   if (format === 'csv') {
     // For CSV, we need to get the raw text response
+    const token = localStorage.getItem('digitransac_access_token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     const response = await fetch(`/api/transactions/export?${query}`, {
+      headers,
       credentials: 'include',
     });
     return response.text();

@@ -299,13 +299,13 @@ public static class TransactionEndpoints
                 foreach (var t in transactions)
                 {
                     var categoryName = t.Splits.FirstOrDefault()?.LabelName ?? "";
-                    var tags = string.Join(";", t.TagIds);
+                    var tagNames = string.Join(";", t.Tags.Select(tag => tag.Name));
                     var status = t.IsCleared ? "Cleared" : "Pending";
                     var notes = (t.Notes ?? "").Replace("\"", "\"\"");
                     var title = (t.Title ?? "").Replace("\"", "\"\"");
                     var payee = (t.Payee ?? "").Replace("\"", "\"\"");
                     
-                    csv.AppendLine($"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tags}\",{status},\"{notes}\"");
+                    csv.AppendLine($"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tagNames}\",{status},\"{notes}\"");
                 }
                 
                 return Results.Text(csv.ToString(), "text/csv");

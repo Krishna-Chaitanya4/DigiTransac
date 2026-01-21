@@ -140,12 +140,13 @@ public class TransactionService : ITransactionService
 
         var accountDict = accounts.ToDictionary(a => a.Id);
         var labelDict = labels.ToDictionary(l => l.Id);
+        var tagDict = tags.ToDictionary(t => t.Id);
 
         var page = filter.Page ?? 1;
         var pageSize = filter.PageSize ?? 50;
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
-        var responses = transactions.Select(t => MapToResponse(t, dek, accountDict, labelDict)).ToList();
+        var responses = transactions.Select(t => MapToResponse(t, dek, accountDict, labelDict, tagDict)).ToList();
 
         return new TransactionListResponse(responses, totalCount, page, pageSize, totalPages);
     }
@@ -158,8 +159,9 @@ public class TransactionService : ITransactionService
         var dek = await GetUserDekAsync(userId);
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labels = await _labelRepository.GetByUserIdAsync(userId);
+        var tags = await _tagRepository.GetByUserIdAsync(userId);
 
-        return MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id));
+        return MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id), tags.ToDictionary(t => t.Id));
     }
 
     public async Task<TransactionSummaryResponse> GetSummaryAsync(
@@ -247,6 +249,9 @@ public class TransactionService : ITransactionService
             if (!labelIds.Contains(split.LabelId))
                 return (false, $"Label {split.LabelId} not found", null);
         }
+
+        // Fetch tags for response mapping
+        var tags = await _tagRepository.GetByUserIdAsync(userId);
 
         // Validate transfer
         Account? transferToAccount = null;
@@ -356,7 +361,8 @@ public class TransactionService : ITransactionService
 
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labelsDict = labels.ToDictionary(l => l.Id);
-        var response = MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labelsDict);
+        var tagsDict = tags.ToDictionary(t => t.Id);
+        var response = MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labelsDict, tagsDict);
 
         return (true, "Transaction created successfully", response);
     }
@@ -456,7 +462,8 @@ public class TransactionService : ITransactionService
 
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labels = await _labelRepository.GetByUserIdAsync(userId);
-        var response = MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id));
+        var tags = await _tagRepository.GetByUserIdAsync(userId);
+        var response = MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id), tags.ToDictionary(t => t.Id));
 
         return (true, "Transaction updated successfully", response);
     }
@@ -630,10 +637,18 @@ public class TransactionService : ITransactionService
         Transaction t, 
         byte[]? dek, 
         Dictionary<string, Account> accounts,
-        Dictionary<string, Label> labels)
+        Dictionary<string, Label> labels,
+        Dictionary<string, Tag> tags)
     {
         accounts.TryGetValue(t.AccountId, out var account);
         accounts.TryGetValue(t.TransferToAccountId ?? "", out var transferToAccount);
+
+        // Map tag IDs to tag info with names
+        var tagInfos = t.TagIds
+            .Select(tagId => tags.TryGetValue(tagId, out var tag) 
+                ? new TagInfo(tagId, tag.Name, tag.Color) 
+                : new TagInfo(tagId, "Unknown", null))
+            .ToList();
 
         return new TransactionResponse(
             t.Id,
@@ -648,6 +663,7 @@ public class TransactionService : ITransactionService
             dek != null ? DecryptIfNotEmpty(t.EncryptedNotes, dek) : null,
             t.Splits.Select(s => MapSplitToResponse(s, dek, labels)).ToList(),
             t.TagIds,
+            tagInfos,
             MapLocationToResponse(t.Location, dek),
             t.TransferToAccountId,
             transferToAccount?.Name,
@@ -883,12 +899,14 @@ public class TransactionService : ITransactionService
             .ToDictionary(a => a.Id);
         var labels = (await _labelRepository.GetByUserIdAsync(userId))
             .ToDictionary(l => l.Id);
+        var tags = (await _tagRepository.GetByUserIdAsync(userId))
+            .ToDictionary(t => t.Id);
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, exportFilter);
 
         return transactions
             .Where(t => !t.IsRecurringTemplate)
-            .Select(t => MapToResponse(t, dek, accounts, labels))
+            .Select(t => MapToResponse(t, dek, accounts, labels, tags))
             .ToList();
     }
 }

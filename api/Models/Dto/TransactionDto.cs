@@ -94,6 +94,12 @@ public record RecurringRuleResponse(
     DateTime NextOccurrence
 );
 
+public record TagInfo(
+    string Id,
+    string Name,
+    string? Color
+);
+
 public record TransactionResponse(
     string Id,
     string AccountId,
@@ -107,6 +113,7 @@ public record TransactionResponse(
     string? Notes,
     List<TransactionSplitResponse> Splits,
     List<string> TagIds,
+    List<TagInfo> Tags,
     TransactionLocationResponse? Location,
     string? TransferToAccountId,
     string? TransferToAccountName,

@@ -34,6 +34,12 @@ export interface RecurringRule {
   nextOccurrence: string;
 }
 
+export interface TagInfo {
+  id: string;
+  name: string;
+  color?: string;
+}
+
 export interface Transaction {
   id: string;
   accountId: string;
@@ -47,6 +53,7 @@ export interface Transaction {
   notes?: string;
   splits: TransactionSplit[];
   tagIds: string[];
+  tags: TagInfo[];
   location?: TransactionLocation;
   transferToAccountId?: string;
   transferToAccountName?: string;
