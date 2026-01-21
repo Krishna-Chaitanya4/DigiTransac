@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { DatePicker } from '../DatePicker';
 import type { RecurrenceFrequency } from '../../types/transactions';
 import { recurrenceFrequencyConfig } from '../../types/transactions';
@@ -13,7 +14,7 @@ interface RecurringSectionProps {
   onEndDateChange: (value: string) => void;
 }
 
-export function RecurringSection({
+export const RecurringSection = memo(function RecurringSection({
   isRecurring,
   onIsRecurringChange,
   frequency,
@@ -83,4 +84,4 @@ export function RecurringSection({
       )}
     </div>
   );
-}
+});

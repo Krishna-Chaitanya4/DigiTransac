@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import type { Label } from '../types/labels';
 
 interface SearchableCategoryDropdownProps {
@@ -11,7 +11,7 @@ interface SearchableCategoryDropdownProps {
   className?: string;
 }
 
-export function SearchableCategoryDropdown({
+export const SearchableCategoryDropdown = memo(function SearchableCategoryDropdown({
   value,
   onChange,
   categories,
@@ -186,4 +186,4 @@ export function SearchableCategoryDropdown({
       )}
     </div>
   );
-}
+});

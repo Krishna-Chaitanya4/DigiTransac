@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { getCurrencySymbol } from '../../services/currencyService';
 import { formatAmount } from '../../utils/formatters';
 
@@ -9,7 +10,7 @@ interface SummaryCardProps {
   currency: string;
 }
 
-export function SummaryCard({ 
+export const SummaryCard = memo(function SummaryCard({ 
   label, 
   amount, 
   icon, 
@@ -30,7 +31,7 @@ export function SummaryCard({
       </div>
     </div>
   );
-}
+});
 
 interface SummaryCardsProps {
   totalCredits: number;
@@ -39,7 +40,7 @@ interface SummaryCardsProps {
   currency: string;
 }
 
-export function SummaryCards({ 
+export const SummaryCards = memo(function SummaryCards({ 
   totalCredits, 
   totalDebits, 
   netChange, 
@@ -72,4 +73,4 @@ export function SummaryCards({
       />
     </div>
   );
-}
+});

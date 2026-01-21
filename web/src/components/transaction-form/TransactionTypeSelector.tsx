@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { TransactionType } from '../../types/transactions';
 
 interface TransactionTypeSelectorProps {
@@ -5,7 +6,7 @@ interface TransactionTypeSelectorProps {
   onChange: (type: TransactionType) => void;
 }
 
-export function TransactionTypeSelector({ value, onChange }: TransactionTypeSelectorProps) {
+export const TransactionTypeSelector = memo(function TransactionTypeSelector({ value, onChange }: TransactionTypeSelectorProps) {
   const types: TransactionType[] = ['Debit', 'Credit', 'Transfer'];
 
   return (
@@ -30,4 +31,4 @@ export function TransactionTypeSelector({ value, onChange }: TransactionTypeSele
       ))}
     </div>
   );
-}
+});
