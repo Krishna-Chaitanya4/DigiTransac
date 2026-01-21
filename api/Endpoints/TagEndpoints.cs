@@ -27,7 +27,8 @@ public static class TagEndpoints
             return Results.Ok(tags);
         })
         .WithName("GetTags")
-        .Produces<List<TagResponse>>(200);
+        .Produces<List<TagResponse>>(200)
+        .CacheOutput("StaticData");
 
         // Get single tag
         group.MapGet("/{id}", async (string id, ClaimsPrincipal user, ITagService tagService) =>

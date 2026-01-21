@@ -45,7 +45,8 @@ public static class AccountEndpoints
             return Results.Ok(summary);
         })
         .WithName("GetAccountSummary")
-        .Produces<AccountSummaryResponse>(200);
+        .Produces<AccountSummaryResponse>(200)
+        .CacheOutput("AccountSummary");
 
         // Get single account
         group.MapGet("/{id}", async (

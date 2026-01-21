@@ -222,6 +222,31 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Add output caching for read-heavy endpoints
+builder.Services.AddOutputCache(options =>
+{
+    // Default policy - short cache for general read endpoints
+    options.AddPolicy("Default", builder => 
+        builder.Expire(TimeSpan.FromSeconds(30)));
+    
+    // Currency/Exchange rate data - cache longer as it updates less frequently
+    options.AddPolicy("ExchangeRates", builder => 
+        builder.Expire(TimeSpan.FromMinutes(5))
+               .Tag("exchange-rates"));
+    
+    // Account summary - user-specific, moderate cache
+    options.AddPolicy("AccountSummary", builder =>
+        builder.Expire(TimeSpan.FromSeconds(60))
+               .SetVaryByHeader("Authorization")
+               .Tag("accounts"));
+    
+    // Labels and tags - relatively static data
+    options.AddPolicy("StaticData", builder =>
+        builder.Expire(TimeSpan.FromMinutes(2))
+               .SetVaryByHeader("Authorization")
+               .Tag("static-data"));
+});
+
 // Add Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -286,6 +311,9 @@ app.UseRateLimiter();
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Output caching middleware (after auth so it can vary by authorization)
+app.UseOutputCache();
 
 // Map health check endpoints
 app.MapHealthChecks("/api/health", new HealthCheckOptions

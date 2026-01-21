@@ -22,7 +22,8 @@ public static class CurrencyEndpoints
             return Results.Ok(currencies);
         })
         .WithName("GetSupportedCurrencies")
-        .Produces<List<CurrencyResponse>>(200);
+        .Produces<List<CurrencyResponse>>(200)
+        .CacheOutput("ExchangeRates");
 
         // Get exchange rates (public)
         group.MapGet("/rates", async (IExchangeRateService exchangeRateService) =>
@@ -31,7 +32,8 @@ public static class CurrencyEndpoints
             return Results.Ok(rates);
         })
         .WithName("GetExchangeRates")
-        .Produces<ExchangeRateResponse>(200);
+        .Produces<ExchangeRateResponse>(200)
+        .CacheOutput("ExchangeRates");
 
         // Force refresh exchange rates (authenticated)
         group.MapPost("/rates/refresh", async (ClaimsPrincipal user, IExchangeRateService exchangeRateService) =>

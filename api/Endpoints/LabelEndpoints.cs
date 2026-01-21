@@ -27,7 +27,8 @@ public static class LabelEndpoints
             return Results.Ok(labels);
         })
         .WithName("GetLabels")
-        .Produces<List<LabelResponse>>(200);
+        .Produces<List<LabelResponse>>(200)
+        .CacheOutput("StaticData");
 
         // Get labels as tree structure
         group.MapGet("/tree", async (ClaimsPrincipal user, ILabelService labelService) =>
@@ -42,7 +43,8 @@ public static class LabelEndpoints
             return Results.Ok(tree);
         })
         .WithName("GetLabelsTree")
-        .Produces<List<LabelTreeResponse>>(200);
+        .Produces<List<LabelTreeResponse>>(200)
+        .CacheOutput("StaticData");
 
         // Get single label
         group.MapGet("/{id}", async (string id, ClaimsPrincipal user, ILabelService labelService) =>
