@@ -1,6 +1,5 @@
 using DigiTransac.Api.Models;
-using DigiTransac.Api.Settings;
-using Microsoft.Extensions.Options;
+using DigiTransac.Api.Services;
 using MongoDB.Driver;
 
 namespace DigiTransac.Api.Repositories;
@@ -15,11 +14,9 @@ public class ExchangeRateRepository : IExchangeRateRepository
 {
     private readonly IMongoCollection<ExchangeRate> _exchangeRates;
 
-    public ExchangeRateRepository(IOptions<MongoDbSettings> settings)
+    public ExchangeRateRepository(IMongoDbService mongoDbService)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
-        var database = client.GetDatabase(settings.Value.DatabaseName);
-        _exchangeRates = database.GetCollection<ExchangeRate>("exchangeRates");
+        _exchangeRates = mongoDbService.GetCollection<ExchangeRate>("exchangeRates");
     }
 
     public async Task<ExchangeRate?> GetLatestAsync()

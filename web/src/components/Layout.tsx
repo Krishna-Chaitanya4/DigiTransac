@@ -111,15 +111,16 @@ export default function Layout() {
           <button 
             onClick={() => setMobileMenuOpen(false)}
             className="lg:hidden ml-auto p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            aria-label="Close menu"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1" role="navigation" aria-label="Main navigation">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -127,6 +128,7 @@ export default function Layout() {
                 key={item.name}
                 to={item.href}
                 title={sidebarCollapsed ? item.name : undefined}
+                aria-current={isActive ? 'page' : undefined}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                   ${sidebarCollapsed ? 'lg:justify-center' : ''}
@@ -157,6 +159,8 @@ export default function Layout() {
               ${sidebarCollapsed ? 'justify-center' : ''}
             `}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!sidebarCollapsed}
           >
             <svg 
               className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${sidebarCollapsed ? 'rotate-180' : ''}`} 
@@ -207,8 +211,9 @@ export default function Layout() {
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="lg:hidden p-2 -ml-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              aria-label="Open menu"
             >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>
             </button>
@@ -222,6 +227,9 @@ export default function Layout() {
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-3 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="true"
+                  aria-label="User menu"
                 >
                   <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
                     <span className="text-sm font-medium text-indigo-600">

@@ -1,5 +1,4 @@
-using DigiTransac.Api.Settings;
-using Microsoft.Extensions.Options;
+using DigiTransac.Api.Services;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Tag = DigiTransac.Api.Models.Tag;
@@ -22,11 +21,9 @@ public class TagRepository : ITagRepository
 {
     private readonly IMongoCollection<Tag> _tags;
 
-    public TagRepository(IOptions<MongoDbSettings> settings)
+    public TagRepository(IMongoDbService mongoDbService)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
-        var database = client.GetDatabase(settings.Value.DatabaseName);
-        _tags = database.GetCollection<Tag>("tags");
+        _tags = mongoDbService.GetCollection<Tag>("tags");
 
         // Create indexes
         var userIdIndex = Builders<Tag>.IndexKeys.Ascending(t => t.UserId);

@@ -1,6 +1,5 @@
 using DigiTransac.Api.Models;
-using DigiTransac.Api.Settings;
-using Microsoft.Extensions.Options;
+using DigiTransac.Api.Services;
 using MongoDB.Driver;
 
 namespace DigiTransac.Api.Repositories;
@@ -18,11 +17,9 @@ public class TwoFactorTokenRepository : ITwoFactorTokenRepository
 {
     private readonly IMongoCollection<TwoFactorToken> _tokens;
 
-    public TwoFactorTokenRepository(IOptions<MongoDbSettings> settings)
+    public TwoFactorTokenRepository(IMongoDbService mongoDbService)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
-        var database = client.GetDatabase(settings.Value.DatabaseName);
-        _tokens = database.GetCollection<TwoFactorToken>("two_factor_tokens");
+        _tokens = mongoDbService.GetCollection<TwoFactorToken>("two_factor_tokens");
 
         // Create index on token
         var tokenIndex = Builders<TwoFactorToken>.IndexKeys.Ascending(t => t.Token);

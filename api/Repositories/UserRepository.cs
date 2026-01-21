@@ -1,6 +1,5 @@
 using DigiTransac.Api.Models;
-using DigiTransac.Api.Settings;
-using Microsoft.Extensions.Options;
+using DigiTransac.Api.Services;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
@@ -19,11 +18,9 @@ public class UserRepository : IUserRepository
 {
     private readonly IMongoCollection<User> _users;
 
-    public UserRepository(IOptions<MongoDbSettings> settings)
+    public UserRepository(IMongoDbService mongoDbService)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
-        var database = client.GetDatabase(settings.Value.DatabaseName);
-        _users = database.GetCollection<User>("users");
+        _users = mongoDbService.GetCollection<User>("users");
 
         // Create unique index on email
         var indexKeys = Builders<User>.IndexKeys.Ascending(u => u.Email);

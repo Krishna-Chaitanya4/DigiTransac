@@ -67,6 +67,9 @@ builder.Services.Configure<RateLimitSettings>(builder.Configuration.GetSection("
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>()!;
 builder.Services.AddSingleton(emailSettings);
 
+// Add MongoDB singleton service (shared client for all repositories)
+builder.Services.AddSingleton<IMongoDbService, MongoDbService>();
+
 // Add repositories
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<IEmailVerificationRepository, EmailVerificationRepository>();

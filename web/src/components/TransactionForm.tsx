@@ -471,11 +471,16 @@ export function TransactionForm({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="transaction-form-title"
+    >
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/30 dark:bg-black/50" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/30 dark:bg-black/50" onClick={onClose} aria-hidden="true" />
         <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          <h3 id="transaction-form-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {editingTransaction ? 'Edit Transaction' : 'New Transaction'}
           </h3>
 

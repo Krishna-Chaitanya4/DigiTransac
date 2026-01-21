@@ -1,6 +1,5 @@
 using DigiTransac.Api.Models;
-using DigiTransac.Api.Settings;
-using Microsoft.Extensions.Options;
+using DigiTransac.Api.Services;
 using MongoDB.Driver;
 
 namespace DigiTransac.Api.Repositories;
@@ -21,11 +20,9 @@ public class AccountRepository : IAccountRepository
 {
     private readonly IMongoCollection<Account> _accounts;
 
-    public AccountRepository(IOptions<MongoDbSettings> settings)
+    public AccountRepository(IMongoDbService mongoDbService)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
-        var database = client.GetDatabase(settings.Value.DatabaseName);
-        _accounts = database.GetCollection<Account>("accounts");
+        _accounts = mongoDbService.GetCollection<Account>("accounts");
 
         // Create indexes
         var userIdIndex = Builders<Account>.IndexKeys.Ascending(a => a.UserId);

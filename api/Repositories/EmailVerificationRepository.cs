@@ -1,6 +1,5 @@
 using DigiTransac.Api.Models;
-using DigiTransac.Api.Settings;
-using Microsoft.Extensions.Options;
+using DigiTransac.Api.Services;
 using MongoDB.Driver;
 
 namespace DigiTransac.Api.Repositories;
@@ -20,11 +19,9 @@ public class EmailVerificationRepository : IEmailVerificationRepository
 {
     private readonly IMongoCollection<EmailVerification> _verifications;
 
-    public EmailVerificationRepository(IOptions<MongoDbSettings> settings)
+    public EmailVerificationRepository(IMongoDbService mongoDbService)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
-        var database = client.GetDatabase(settings.Value.DatabaseName);
-        _verifications = database.GetCollection<EmailVerification>("email_verifications");
+        _verifications = mongoDbService.GetCollection<EmailVerification>("email_verifications");
 
         // Create index on email
         var emailIndex = Builders<EmailVerification>.IndexKeys.Ascending(v => v.Email);

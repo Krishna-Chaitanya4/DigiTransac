@@ -1,7 +1,6 @@
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
-using DigiTransac.Api.Settings;
-using Microsoft.Extensions.Options;
+using DigiTransac.Api.Services;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
@@ -40,11 +39,9 @@ public class TransactionRepository : ITransactionRepository
 {
     private readonly IMongoCollection<Transaction> _transactions;
 
-    public TransactionRepository(IOptions<MongoDbSettings> settings)
+    public TransactionRepository(IMongoDbService mongoDbService)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
-        var database = client.GetDatabase(settings.Value.DatabaseName);
-        _transactions = database.GetCollection<Transaction>("transactions");
+        _transactions = mongoDbService.GetCollection<Transaction>("transactions");
 
         // Create indexes for efficient queries
         var indexModels = new List<CreateIndexModel<Transaction>>
