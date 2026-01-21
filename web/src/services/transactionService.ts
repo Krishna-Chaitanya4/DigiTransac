@@ -99,6 +99,109 @@ export async function toggleCleared(id: string, isCleared: boolean): Promise<Tra
   return updateTransaction(id, { isCleared });
 }
 
+// Batch Operations
+export interface BatchOperationResponse {
+  successCount: number;
+  failedCount: number;
+  failedIds: string[];
+  message: string;
+}
+
+export async function batchDelete(ids: string[]): Promise<BatchOperationResponse> {
+  return apiClient.post<BatchOperationResponse>('/transactions/batch', {
+    ids,
+    action: 'delete',
+  });
+}
+
+export async function batchMarkCleared(ids: string[]): Promise<BatchOperationResponse> {
+  return apiClient.post<BatchOperationResponse>('/transactions/batch', {
+    ids,
+    action: 'markCleared',
+  });
+}
+
+export async function batchMarkPending(ids: string[]): Promise<BatchOperationResponse> {
+  return apiClient.post<BatchOperationResponse>('/transactions/batch', {
+    ids,
+    action: 'markPending',
+  });
+}
+
+// Analytics
+export interface CategoryBreakdown {
+  labelId: string;
+  labelName: string;
+  labelIcon?: string;
+  labelColor?: string;
+  amount: number;
+  transactionCount: number;
+  percentage: number;
+}
+
+export interface SpendingTrend {
+  period: string;
+  credits: number;
+  debits: number;
+  net: number;
+  transactionCount: number;
+}
+
+export interface AveragesByType {
+  averageCredit: number;
+  averageDebit: number;
+  averageTransfer: number;
+}
+
+export interface TransactionAnalytics {
+  topCategories: CategoryBreakdown[];
+  spendingTrend: SpendingTrend[];
+  averagesByType: AveragesByType;
+  dailyAverage: number;
+  monthlyAverage: number;
+}
+
+export async function getAnalytics(
+  startDate?: string,
+  endDate?: string,
+  accountId?: string
+): Promise<TransactionAnalytics> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  if (accountId) params.append('accountId', accountId);
+  
+  const query = params.toString();
+  return apiClient.get<TransactionAnalytics>(`/transactions/analytics${query ? `?${query}` : ''}`);
+}
+
+// Export
+export async function exportTransactions(
+  filter: TransactionFilter,
+  format: 'csv' | 'json' = 'json'
+): Promise<Transaction[] | string> {
+  const params = new URLSearchParams();
+  if (filter.startDate) params.append('startDate', filter.startDate);
+  if (filter.endDate) params.append('endDate', filter.endDate);
+  if (filter.accountIds?.length) params.append('accountIds', filter.accountIds.join(','));
+  if (filter.types?.length) params.append('types', filter.types.join(','));
+  if (filter.labelIds?.length) params.append('labelIds', filter.labelIds.join(','));
+  if (filter.tagIds?.length) params.append('tagIds', filter.tagIds.join(','));
+  params.append('format', format);
+  
+  const query = params.toString();
+  
+  if (format === 'csv') {
+    // For CSV, we need to get the raw text response
+    const response = await fetch(`/api/transactions/export?${query}`, {
+      credentials: 'include',
+    });
+    return response.text();
+  }
+  
+  return apiClient.get<Transaction[]>(`/transactions/export?${query}`);
+}
+
 // Helper functions for inclusive date range handling
 const formatDateToStartOfDay = (date: Date): string => {
   const year = date.getFullYear();

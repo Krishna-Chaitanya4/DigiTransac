@@ -209,5 +209,111 @@ public static class TransactionEndpoints
         .WithName("DeleteRecurringTransaction")
         .Produces(204)
         .Produces<ErrorResponse>(404);
+
+        // Batch operations
+        group.MapPost("/batch", async (
+            BatchOperationRequest request,
+            ClaimsPrincipal user,
+            ITransactionService transactionService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            if (request.Ids == null || request.Ids.Count == 0)
+                return Results.BadRequest(new ErrorResponse("No transaction IDs provided"));
+
+            BatchOperationResponse result;
+            switch (request.Action.ToLowerInvariant())
+            {
+                case "delete":
+                    result = await transactionService.BatchDeleteAsync(userId, request.Ids);
+                    break;
+                case "markcleared":
+                    result = await transactionService.BatchMarkClearedAsync(userId, request.Ids, true);
+                    break;
+                case "markpending":
+                    result = await transactionService.BatchMarkClearedAsync(userId, request.Ids, false);
+                    break;
+                default:
+                    return Results.BadRequest(new ErrorResponse($"Unknown action: {request.Action}"));
+            }
+
+            return Results.Ok(result);
+        })
+        .WithName("BatchTransactionOperation")
+        .Produces<BatchOperationResponse>(200)
+        .Produces<ErrorResponse>(400);
+
+        // Get analytics
+        group.MapGet("/analytics", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            string? accountId,
+            ClaimsPrincipal user,
+            ITransactionService transactionService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var analytics = await transactionService.GetAnalyticsAsync(userId, startDate, endDate, accountId);
+            return Results.Ok(analytics);
+        })
+        .WithName("GetTransactionAnalytics")
+        .Produces<TransactionAnalyticsResponse>(200);
+
+        // Export transactions
+        group.MapGet("/export", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            string? accountIds,
+            string? types,
+            string? labelIds,
+            string? tagIds,
+            string? format,
+            ClaimsPrincipal user,
+            ITransactionService transactionService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var filter = new TransactionFilterRequest(
+                startDate, endDate,
+                accountIds?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
+                types?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
+                labelIds?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
+                tagIds?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
+                null, null, null, null, null, null, null);
+
+            var transactions = await transactionService.GetAllForExportAsync(userId, filter);
+
+            var exportFormat = format?.ToLowerInvariant() ?? "json";
+            
+            if (exportFormat == "csv")
+            {
+                var csv = new System.Text.StringBuilder();
+                csv.AppendLine("Date,Type,Amount,Currency,Title,Payee,Account,Category,Tags,Status,Notes");
+                
+                foreach (var t in transactions)
+                {
+                    var categoryName = t.Splits.FirstOrDefault()?.LabelName ?? "";
+                    var tags = string.Join(";", t.TagIds);
+                    var status = t.IsCleared ? "Cleared" : "Pending";
+                    var notes = (t.Notes ?? "").Replace("\"", "\"\"");
+                    var title = (t.Title ?? "").Replace("\"", "\"\"");
+                    var payee = (t.Payee ?? "").Replace("\"", "\"\"");
+                    
+                    csv.AppendLine($"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tags}\",{status},\"{notes}\"");
+                }
+                
+                return Results.Text(csv.ToString(), "text/csv");
+            }
+
+            return Results.Ok(transactions);
+        })
+        .WithName("ExportTransactions")
+        .Produces<List<TransactionResponse>>(200);
     }
 }

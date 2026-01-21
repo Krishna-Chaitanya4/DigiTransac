@@ -150,3 +150,61 @@ public record RecurringTransactionResponse(
     RecurringRuleResponse RecurringRule,
     DateTime CreatedAt
 );
+
+// Batch operation DTOs
+public record BatchOperationRequest(
+    List<string> Ids,
+    string Action,  // delete, markCleared, markPending, updateCategory
+    string? LabelId  // For updateCategory action
+);
+
+public record BatchOperationResponse(
+    int SuccessCount,
+    int FailedCount,
+    List<string> FailedIds,
+    string Message
+);
+
+// Export DTOs
+public record ExportRequest(
+    DateTime? StartDate,
+    DateTime? EndDate,
+    List<string>? AccountIds,
+    List<string>? Types,
+    List<string>? LabelIds,
+    List<string>? TagIds,
+    string Format  // csv, json
+);
+
+// Analytics DTOs
+public record TransactionAnalyticsResponse(
+    List<CategoryBreakdown> TopCategories,
+    List<SpendingTrend> SpendingTrend,
+    AveragesByType AveragesByType,
+    decimal DailyAverage,
+    decimal MonthlyAverage
+);
+
+public record CategoryBreakdown(
+    string LabelId,
+    string LabelName,
+    string? LabelIcon,
+    string? LabelColor,
+    decimal Amount,
+    int TransactionCount,
+    decimal Percentage
+);
+
+public record SpendingTrend(
+    string Period,  // YYYY-MM-DD or YYYY-MM or YYYY-Wxx
+    decimal Credits,
+    decimal Debits,
+    decimal Net,
+    int TransactionCount
+);
+
+public record AveragesByType(
+    decimal AverageCredit,
+    decimal AverageDebit,
+    decimal AverageTransfer
+);

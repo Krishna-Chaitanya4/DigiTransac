@@ -3,6 +3,8 @@ import type { Transaction, TransactionType } from '../types/transactions';
 import type { Account } from '../services/accountService';
 import type { Label, Tag } from '../types/labels';
 import { getCurrencySymbol } from '../services/currencyService';
+import { formatAmount } from '../utils/formatters';
+import { SwipeableRow, SwipeActionIcon } from './SwipeableRow';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -13,6 +15,10 @@ interface TransactionListProps {
   onDelete: (id: string) => void;
   onToggleCleared: (id: string, isCleared: boolean) => void;
   isLoading?: boolean;
+  /** Selection mode props */
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelection?: (id: string) => void;
 }
 
 // Get type color
@@ -93,6 +99,9 @@ export function TransactionList({
   onDelete,
   onToggleCleared,
   isLoading = false,
+  selectionMode = false,
+  selectedIds = new Set(),
+  onToggleSelection,
 }: TransactionListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -156,7 +165,7 @@ export function TransactionList({
                 {displayDate}
               </h3>
               <span className={`text-sm font-medium ${dailyTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {dailyTotal >= 0 ? '+' : ''}{dailyTotal.toFixed(2)}
+                {dailyTotal >= 0 ? '+' : '-'}{formatAmount(Math.abs(dailyTotal))}
               </span>
             </div>
             
@@ -169,19 +178,70 @@ export function TransactionList({
                 const isExpanded = expandedId === transaction.id;
                 
                 return (
-                  <div
+                  <SwipeableRow
                     key={transaction.id}
+                    onSwipeRight={() => onToggleCleared(transaction.id, !transaction.isCleared)}
+                    onSwipeLeft={() => {
+                      if (confirm('Delete this transaction?')) {
+                        onDelete(transaction.id);
+                      }
+                    }}
+                    rightContent={
+                      <SwipeActionIcon
+                        icon={transaction.isCleared ? '↩' : '✓'}
+                        label={transaction.isCleared ? 'Pending' : 'Clear'}
+                      />
+                    }
+                    leftContent={
+                      <SwipeActionIcon icon="🗑" label="Delete" />
+                    }
+                    rightBgColor={transaction.isCleared ? 'bg-yellow-500' : 'bg-green-500'}
+                    leftBgColor="bg-red-500"
+                  >
+                  <div
                     className={`bg-white dark:bg-gray-800 rounded-lg border 
                       ${transaction.isCleared 
                         ? 'border-gray-200 dark:border-gray-700' 
-                        : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
-                      } overflow-hidden transition-all`}
+                        : 'border-l-4 border-l-yellow-400 border-gray-200 dark:border-gray-700 dark:border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10'
+                      } ${selectionMode && selectedIds.has(transaction.id) ? 'ring-2 ring-blue-500 ring-inset' : ''} overflow-hidden transition-all`}
                   >
                     {/* Main Row */}
                     <div
                       className="flex items-center p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      onClick={() => setExpandedId(isExpanded ? null : transaction.id)}
+                      onClick={() => {
+                        if (selectionMode && onToggleSelection) {
+                          onToggleSelection(transaction.id);
+                        } else {
+                          setExpandedId(isExpanded ? null : transaction.id);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        // Long-press on mobile triggers context menu, use for selection
+                        if (onToggleSelection && !selectionMode) {
+                          e.preventDefault();
+                          onToggleSelection(transaction.id);
+                        }
+                      }}
                     >
+                      {/* Selection Checkbox (shown in selection mode) */}
+                      {selectionMode && (
+                        <div className="mr-3 flex-shrink-0">
+                          <div 
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                              selectedIds.has(transaction.id)
+                                ? 'bg-blue-600 border-blue-600'
+                                : 'border-gray-300 dark:border-gray-600'
+                            }`}
+                          >
+                            {selectedIds.has(transaction.id) && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Category Icon */}
                       <div 
                         className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
@@ -217,7 +277,7 @@ export function TransactionList({
                       <div className={`text-right flex-shrink-0 ${getTypeColor(transaction.type)}`}>
                         <span className="font-semibold">
                           {transaction.type === 'Credit' ? '+' : transaction.type === 'Debit' ? '-' : ''}
-                          {currencySymbol}{transaction.amount.toFixed(2)}
+                          {currencySymbol}{formatAmount(transaction.amount, transaction.currency)}
                         </span>
                         <div className="text-xs opacity-70">
                           {getTypeIcon(transaction.type)} {transaction.type}
@@ -253,7 +313,7 @@ export function TransactionList({
                                       {label?.icon} {label?.name || 'Unknown'}
                                     </span>
                                     <span className="text-gray-900 dark:text-gray-100">
-                                      {currencySymbol}{split.amount.toFixed(2)}
+                                      {currencySymbol}{formatAmount(split.amount, transaction.currency)}
                                     </span>
                                   </div>
                                 );
@@ -343,6 +403,7 @@ export function TransactionList({
                       </div>
                     )}
                   </div>
+                  </SwipeableRow>
                 );
               })}
             </div>

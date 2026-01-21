@@ -15,6 +15,16 @@ public interface ITransactionService
     Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
     Task<(bool Success, string Message)> DeleteRecurringAsync(string id, string userId, bool deleteFutureInstances);
     Task ProcessRecurringTransactionsAsync();
+    
+    // Batch operations
+    Task<BatchOperationResponse> BatchDeleteAsync(string userId, List<string> ids);
+    Task<BatchOperationResponse> BatchMarkClearedAsync(string userId, List<string> ids, bool isCleared);
+    
+    // Analytics
+    Task<TransactionAnalyticsResponse> GetAnalyticsAsync(string userId, DateTime? startDate, DateTime? endDate, string? accountId);
+    
+    // Export
+    Task<List<TransactionResponse>> GetAllForExportAsync(string userId, TransactionFilterRequest filter);
 }
 
 public class TransactionService : ITransactionService
@@ -709,5 +719,176 @@ public class TransactionService : ITransactionService
                 t.RecurringRule.EndDate,
                 t.RecurringRule.NextOccurrence),
             t.CreatedAt);
+    }
+
+    // Batch Operations
+    public async Task<BatchOperationResponse> BatchDeleteAsync(string userId, List<string> ids)
+    {
+        var successCount = 0;
+        var failedIds = new List<string>();
+
+        foreach (var id in ids)
+        {
+            var result = await DeleteAsync(id, userId);
+            if (result.Success)
+            {
+                successCount++;
+            }
+            else
+            {
+                failedIds.Add(id);
+            }
+        }
+
+        return new BatchOperationResponse(
+            successCount,
+            failedIds.Count,
+            failedIds,
+            $"Deleted {successCount} of {ids.Count} transactions"
+        );
+    }
+
+    public async Task<BatchOperationResponse> BatchMarkClearedAsync(string userId, List<string> ids, bool isCleared)
+    {
+        var successCount = 0;
+        var failedIds = new List<string>();
+
+        foreach (var id in ids)
+        {
+            var transaction = await _transactionRepository.GetByIdAsync(id);
+            if (transaction == null || transaction.UserId != userId)
+            {
+                failedIds.Add(id);
+                continue;
+            }
+
+            transaction.IsCleared = isCleared;
+            transaction.UpdatedAt = DateTime.UtcNow;
+            await _transactionRepository.UpdateAsync(transaction);
+            successCount++;
+        }
+
+        var action = isCleared ? "marked as cleared" : "marked as pending";
+        return new BatchOperationResponse(
+            successCount,
+            failedIds.Count,
+            failedIds,
+            $"{successCount} of {ids.Count} transactions {action}"
+        );
+    }
+
+    public async Task<TransactionAnalyticsResponse> GetAnalyticsAsync(
+        string userId, 
+        DateTime? startDate, 
+        DateTime? endDate, 
+        string? accountId)
+    {
+        var dek = await GetUserDekAsync(userId);
+        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
+            .ToDictionary(a => a.Id);
+        var labels = (await _labelRepository.GetByUserIdAsync(userId))
+            .ToDictionary(l => l.Id);
+
+        // Get all transactions for the period
+        var filter = new TransactionFilterRequest(
+            startDate, endDate, 
+            accountId != null ? new List<string> { accountId } : null,
+            null, null, null, null, null, null, null, null, null, null);
+        
+        var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
+
+        // Calculate category breakdown
+        var categoryTotals = new Dictionary<string, (decimal amount, int count)>();
+        foreach (var t in transactions.Where(t => !t.IsRecurringTemplate))
+        {
+            foreach (var split in t.Splits)
+            {
+                if (!categoryTotals.ContainsKey(split.LabelId))
+                {
+                    categoryTotals[split.LabelId] = (0, 0);
+                }
+                var current = categoryTotals[split.LabelId];
+                categoryTotals[split.LabelId] = (current.amount + split.Amount, current.count + 1);
+            }
+        }
+
+        var totalSpending = categoryTotals.Values.Sum(v => v.amount);
+        var topCategories = categoryTotals
+            .OrderByDescending(kv => kv.Value.amount)
+            .Take(10)
+            .Select(kv =>
+            {
+                labels.TryGetValue(kv.Key, out var label);
+                return new CategoryBreakdown(
+                    kv.Key,
+                    label?.Name ?? "Unknown",
+                    label?.Icon,
+                    label?.Color,
+                    kv.Value.amount,
+                    kv.Value.count,
+                    totalSpending > 0 ? Math.Round(kv.Value.amount / totalSpending * 100, 1) : 0
+                );
+            })
+            .ToList();
+
+        // Calculate spending trends (by month)
+        var trends = transactions
+            .Where(t => !t.IsRecurringTemplate)
+            .GroupBy(t => t.Date.ToString("yyyy-MM"))
+            .OrderBy(g => g.Key)
+            .Select(g => new SpendingTrend(
+                g.Key,
+                g.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount),
+                g.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount),
+                g.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount) -
+                g.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount),
+                g.Count()
+            ))
+            .ToList();
+
+        // Calculate averages by type
+        var actualTransactions = transactions.Where(t => !t.IsRecurringTemplate).ToList();
+        var credits = actualTransactions.Where(t => t.Type == TransactionType.Credit).ToList();
+        var debits = actualTransactions.Where(t => t.Type == TransactionType.Debit).ToList();
+        var transfers = actualTransactions.Where(t => t.Type == TransactionType.Transfer).ToList();
+
+        var averagesByType = new AveragesByType(
+            credits.Any() ? Math.Round(credits.Average(t => t.Amount), 2) : 0,
+            debits.Any() ? Math.Round(debits.Average(t => t.Amount), 2) : 0,
+            transfers.Any() ? Math.Round(transfers.Average(t => t.Amount), 2) : 0
+        );
+
+        // Calculate daily and monthly averages
+        var dateRange = (endDate ?? DateTime.UtcNow) - (startDate ?? actualTransactions.Min(t => t.Date));
+        var days = Math.Max(1, dateRange.Days);
+        var months = Math.Max(1, days / 30.0);
+        var totalDebits = debits.Sum(t => t.Amount);
+
+        return new TransactionAnalyticsResponse(
+            topCategories,
+            trends,
+            averagesByType,
+            Math.Round(totalDebits / days, 2),
+            Math.Round(totalDebits / (decimal)months, 2)
+        );
+    }
+
+    public async Task<List<TransactionResponse>> GetAllForExportAsync(string userId, TransactionFilterRequest filter)
+    {
+        // Get unlimited transactions for export (no pagination)
+        var exportFilter = filter with { Page = null, PageSize = null };
+        
+        var dek = await GetUserDekAsync(userId);
+        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
+            .ToDictionary(a => a.Id);
+        var labels = (await _labelRepository.GetByUserIdAsync(userId))
+            .ToDictionary(l => l.Id);
+
+        var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, exportFilter);
+
+        return transactions
+            .Where(t => !t.IsRecurringTemplate)
+            .Select(t => MapToResponse(t, dek, accounts, labels))
+            .ToList();
     }
 }
