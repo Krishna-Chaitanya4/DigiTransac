@@ -1,0 +1,34 @@
+import type { TransactionType } from '../types/transactions';
+
+interface TransactionTypeSelectorProps {
+  value: TransactionType;
+  onChange: (type: TransactionType) => void;
+}
+
+export function TransactionTypeSelector({ value, onChange }: TransactionTypeSelectorProps) {
+  const types: TransactionType[] = ['Debit', 'Credit', 'Transfer'];
+
+  return (
+    <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
+      {types.map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onChange(t)}
+          aria-pressed={value === t}
+          className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+            value === t
+              ? t === 'Debit' 
+                ? 'bg-red-500 text-white'
+                : t === 'Credit'
+                ? 'bg-green-500 text-white'
+                : 'bg-blue-500 text-white'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+          }`}
+        >
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+}
