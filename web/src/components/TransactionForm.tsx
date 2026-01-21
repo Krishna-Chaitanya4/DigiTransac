@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
+import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
 import type {
   Transaction,
   TransactionType,
@@ -295,7 +296,10 @@ export function TransactionForm({
   // Add new split
   const addSplit = () => {
     const remaining = amount - splits.reduce((sum, s) => sum + s.amount, 0);
-    setSplits([...splits, { labelId: categories[0]?.id || '', amount: Math.max(0, remaining), notes: undefined }]);
+    // Find categories not already used in other splits
+    const usedCategoryIds = new Set(splits.map(s => s.labelId));
+    const availableCategory = categories.find(c => !usedCategoryIds.has(c.id));
+    setSplits([...splits, { labelId: availableCategory?.id || '', amount: Math.max(0, remaining), notes: undefined }]);
   };
 
   // Update split
@@ -735,24 +739,26 @@ export function TransactionForm({
                   </div>
                   
                   <div className="space-y-2">
-                    {splits.map((split, index) => (
+                    {splits.map((split, index) => {
+                      // Get categories already used in other splits
+                      const usedCategoryIds = splits
+                        .filter((_, i) => i !== index)
+                        .map(s => s.labelId)
+                        .filter(id => id);
+                      
+                      return (
                       <div key={index} className="flex gap-2 items-start">
-                        <select
+                        <SearchableCategoryDropdown
                           value={split.labelId}
-                          onChange={(e) => updateSplit(index, 'labelId', e.target.value)}
-                          className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded 
-                            bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
-                        >
-                          <option value="">Category...</option>
-                          {categories.map((label) => (
-                            <option key={label.id} value={label.id}>
-                              {label.icon} {label.name}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(value) => updateSplit(index, 'labelId', value)}
+                          categories={categories}
+                          excludeIds={usedCategoryIds}
+                          placeholder="Category..."
+                          className="flex-1"
+                        />
                         <input
                           type="number"
-                          value={split.amount}
+                          value={split.amount || ''}
                           onChange={(e) => updateSplit(index, 'amount', parseFloat(e.target.value) || 0)}
                           className="w-24 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded 
                             bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
@@ -770,7 +776,8 @@ export function TransactionForm({
                           </button>
                         )}
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                   
                   <div className="flex justify-between items-center mt-2">
