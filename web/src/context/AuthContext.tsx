@@ -18,6 +18,7 @@ interface AuthContextType {
   logoutAll: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   updateName: (fullName: string) => Promise<void>;
+  updatePrimaryCurrency: (currency: string) => void;
   sendEmailChangeCode: (newEmail: string) => Promise<void>;
   verifyEmailChange: (newEmail: string, code: string) => Promise<void>;
   getValidAccessToken: () => Promise<string | null>;
@@ -218,6 +219,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updatePrimaryCurrency = (currency: string) => {
+    // Update local user state (API call is already made by SettingsPage)
+    if (user) {
+      const updatedUser = { ...user, primaryCurrency: currency };
+      setUser(updatedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+    }
+  };
+
   const sendEmailChangeCode = async (newEmail: string) => {
     const validToken = await getValidAccessToken();
     if (!validToken) {
@@ -259,6 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logoutAll, 
       deleteAccount,
       updateName,
+      updatePrimaryCurrency,
       sendEmailChangeCode,
       verifyEmailChange,
       getValidAccessToken 

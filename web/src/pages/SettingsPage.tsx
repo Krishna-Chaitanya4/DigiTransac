@@ -11,7 +11,7 @@ import {
 } from '../services/currencyService';
 
 export default function SettingsPage() {
-  const { user, logoutAll, deleteAccount, updateName, sendEmailChangeCode, verifyEmailChange } = useAuth();
+  const { user, logoutAll, deleteAccount, updateName, updatePrimaryCurrency, sendEmailChangeCode, verifyEmailChange } = useAuth();
   
   // Currency preference state
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -77,6 +77,7 @@ export default function SettingsPage() {
     try {
       await updateCurrencyPreference(currency);
       setPrimaryCurrency(currency);
+      updatePrimaryCurrency(currency); // Update AuthContext so CurrencyContext gets the new value
       setIsCurrencyDropdownOpen(false);
       setCurrencySearch('');
     } catch (err) {
