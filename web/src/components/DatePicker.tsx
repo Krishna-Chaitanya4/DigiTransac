@@ -348,7 +348,7 @@ export function DatePicker({
                     onClick={() => handleYearSelect(year)}
                     className={`p-2 text-sm rounded-lg transition-colors
                       ${year === viewDate.getFullYear()
-                        ? 'bg-blue-500 text-white font-semibold'
+                        ? 'bg-blue-500 dark:bg-blue-950 text-white font-semibold'
                         : year === currentYear
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
@@ -393,7 +393,7 @@ export function DatePicker({
                   disabled={isDisabled}
                   className={`p-2 text-sm rounded-lg transition-all duration-150 relative
                     ${isSelected
-                      ? 'bg-blue-500 text-white font-semibold shadow-sm'
+                      ? 'bg-blue-500 dark:bg-blue-950 text-white font-semibold shadow-sm'
                       : isToday
                       ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold ring-1 ring-blue-200 dark:ring-blue-800'
                       : isDisabled

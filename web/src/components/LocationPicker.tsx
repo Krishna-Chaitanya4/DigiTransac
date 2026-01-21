@@ -277,7 +277,7 @@ export function LocationPicker({ location, onChange, onLoadingChange }: Location
                 onChange(null);
                 setManualLocationMode(true);
               }}
-              className="text-gray-400 hover:text-blue-500"
+              className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
               title="Edit location"
               aria-label="Edit location"
             >
@@ -288,7 +288,7 @@ export function LocationPicker({ location, onChange, onLoadingChange }: Location
             <button
               type="button"
               onClick={() => onChange(null)}
-              className="text-gray-400 hover:text-red-500"
+              className="text-gray-400 hover:text-red-500 dark:hover:text-red-400"
               title="Remove location"
               aria-label="Remove location"
             >

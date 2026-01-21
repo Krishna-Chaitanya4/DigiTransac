@@ -2,6 +2,7 @@ import { ReactElement, ReactNode } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 
 interface WrapperOptions {
   initialEntries?: string[];
@@ -13,9 +14,11 @@ export function createWrapper(options: WrapperOptions = {}) {
   
   return function Wrapper({ children }: { children: ReactNode }) {
     const content = (
-      <MemoryRouter initialEntries={initialEntries}>
-        {children}
-      </MemoryRouter>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={initialEntries}>
+          {children}
+        </MemoryRouter>
+      </ThemeProvider>
     );
 
     if (withAuth) {

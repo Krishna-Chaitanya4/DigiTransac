@@ -128,8 +128,8 @@ export default function TwoFactorSettings() {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-2">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-        <span className="text-sm text-gray-500">Loading...</span>
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-400"></div>
+        <span className="text-sm text-gray-500 dark:text-gray-400">Loading...</span>
       </div>
     );
   }
@@ -138,9 +138,9 @@ export default function TwoFactorSettings() {
     <>
       {/* Success/Error messages */}
       {success && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm flex items-center justify-between">
+        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg text-sm flex items-center justify-between">
           {success}
-          <button onClick={() => setSuccess('')} className="text-green-500 hover:text-green-700">
+          <button onClick={() => setSuccess('')} className="text-green-500 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
@@ -148,9 +148,9 @@ export default function TwoFactorSettings() {
         </div>
       )}
       {error && !showSetupModal && !showDisableModal && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center justify-between">
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm flex items-center justify-between">
           {error}
-          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700">
+          <button onClick={() => setError('')} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
@@ -162,14 +162,14 @@ export default function TwoFactorSettings() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-gray-900">Two-Factor Authentication</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Two-Factor Authentication</p>
             {is2FAEnabled && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400">
                 Enabled
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {is2FAEnabled 
               ? 'Your account is protected with an authenticator app'
               : 'Add an extra layer of security using an authenticator app'}
@@ -178,7 +178,7 @@ export default function TwoFactorSettings() {
         {is2FAEnabled ? (
           <button
             onClick={() => setShowDisableModal(true)}
-            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50"
+            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
           >
             Disable
           </button>
@@ -186,7 +186,7 @@ export default function TwoFactorSettings() {
           <button
             onClick={handleStartSetup}
             disabled={isSettingUp}
-            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-900 dark:to-indigo-950 rounded-lg hover:from-indigo-700 hover:to-indigo-800 dark:hover:from-indigo-800 dark:hover:to-indigo-900 disabled:opacity-50"
           >
             {isSettingUp ? 'Setting up...' : 'Enable'}
           </button>
@@ -197,15 +197,15 @@ export default function TwoFactorSettings() {
       {showSetupModal && setupData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={handleCloseSetupModal} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Set Up Two-Factor Authentication</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Set Up Two-Factor Authentication</h3>
               
               <div className="space-y-4">
                 {/* Step 1: Scan QR */}
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">1. Scan this QR code with your authenticator app</p>
-                  <div className="flex justify-center p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">1. Scan this QR code with your authenticator app</p>
+                  <div className="flex justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <img 
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupData.qrCodeUri)}`}
                       alt="2FA QR Code"
@@ -216,22 +216,22 @@ export default function TwoFactorSettings() {
 
                 {/* Manual entry key */}
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-1">Or enter this key manually:</p>
-                  <div className="bg-gray-100 p-3 rounded-lg font-mono text-sm text-center break-all select-all">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Or enter this key manually:</p>
+                  <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg font-mono text-sm text-center break-all select-all text-gray-900 dark:text-gray-100">
                     {setupData.manualEntryKey}
                   </div>
                 </div>
 
                 {/* Step 2: Enter code */}
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">2. Enter the 6-digit code from your app</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">2. Enter the 6-digit code from your app</p>
                   <input
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={6}
                     autoComplete="one-time-code"
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     placeholder="000000"
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -240,7 +240,7 @@ export default function TwoFactorSettings() {
                 </div>
 
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
                     {error}
                   </div>
                 )}
@@ -248,14 +248,14 @@ export default function TwoFactorSettings() {
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={handleCloseSetupModal}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleEnable2FA}
                     disabled={isEnabling || verificationCode.length !== 6}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-900 dark:to-indigo-950 rounded-lg hover:from-indigo-700 hover:to-indigo-800 dark:hover:from-indigo-800 dark:hover:to-indigo-900 disabled:opacity-50"
                   >
                     {isEnabling ? 'Verifying...' : 'Enable 2FA'}
                   </button>
@@ -270,10 +270,10 @@ export default function TwoFactorSettings() {
       {showDisableModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={handleCloseDisableModal} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Disable Two-Factor Authentication</h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Disable Two-Factor Authentication</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 This will make your account less secure. Enter your password to confirm.
               </p>
               
@@ -281,7 +281,7 @@ export default function TwoFactorSettings() {
                 <div className="relative">
                   <input
                     type={showDisablePassword ? 'text' : 'password'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     placeholder="Enter your password"
                     value={disablePassword}
                     onChange={(e) => setDisablePassword(e.target.value)}
@@ -290,7 +290,7 @@ export default function TwoFactorSettings() {
                   <button
                     type="button"
                     onClick={() => setShowDisablePassword(!showDisablePassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     {showDisablePassword ? (
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -306,7 +306,7 @@ export default function TwoFactorSettings() {
                 </div>
 
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
                     {error}
                   </div>
                 )}
@@ -314,7 +314,7 @@ export default function TwoFactorSettings() {
                 <div className="flex gap-3">
                   <button
                     onClick={handleCloseDisableModal}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
                   >
                     Cancel
                   </button>

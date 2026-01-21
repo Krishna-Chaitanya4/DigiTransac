@@ -272,23 +272,23 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Settings</h1>
       
       <div className="space-y-6">
         {/* Profile Section */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Profile</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Profile</h2>
           <div className="space-y-4">
             {/* Name Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Full Name</label>
               {isEditingName ? (
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={editedName}
                     onChange={(e) => setEditedName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Your full name"
                     autoFocus
                   />
@@ -296,14 +296,14 @@ export default function SettingsPage() {
                     <button
                       onClick={handleSaveName}
                       disabled={isSavingName}
-                      className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      className="px-3 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 disabled:opacity-50"
                     >
                       {isSavingName ? 'Saving...' : 'Save'}
                     </button>
                     <button
                       onClick={handleCancelEditName}
                       disabled={isSavingName}
-                      className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -311,28 +311,28 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-900">{user?.fullName}</p>
+                  <p className="text-sm text-gray-900 dark:text-gray-100">{user?.fullName}</p>
                   <button
                     onClick={handleEditName}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
                   >
                     Edit
                   </button>
                 </div>
               )}
               {nameError && (
-                <p className="mt-1 text-sm text-red-600">{nameError}</p>
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{nameError}</p>
               )}
             </div>
             
             {/* Email Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Email</label>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-900">{user?.email}</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">{user?.email}</p>
                 <button
                   onClick={handleOpenEmailModal}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
                 >
                   Change
                 </button>
@@ -342,13 +342,13 @@ export default function SettingsPage() {
         </div>
 
         {/* Preferences Section */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Preferences</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Preferences</h2>
           <div className="space-y-4">
             {/* Primary Currency */}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">Primary Currency</label>
-              <p className="text-xs text-gray-400 mb-2">Your primary currency for displaying net worth and totals</p>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Primary Currency</label>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Your primary currency for displaying net worth and totals</p>
               {isCurrencyLoading ? (
                 <div className="animate-pulse h-10 bg-gray-100 rounded-lg"></div>
               ) : (
@@ -357,7 +357,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
                     disabled={isSavingCurrency}
-                    className="w-full sm:w-64 flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                    className="w-full sm:w-64 flex items-center justify-between px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
                   >
                     <span className="flex items-center gap-2">
                       <span className="text-lg">{getCurrencySymbol(primaryCurrency)}</span>
@@ -412,30 +412,30 @@ export default function SettingsPage() {
                 </div>
               )}
               {currencyError && (
-                <p className="mt-1 text-sm text-red-600">{currencyError}</p>
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{currencyError}</p>
               )}
               {isSavingCurrency && (
-                <p className="mt-1 text-sm text-blue-600">Saving...</p>
+                <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">Saving...</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Appearance Section */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Appearance</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Appearance</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">Theme</label>
-              <p className="text-xs text-gray-400 mb-3">Choose how DigiTransac looks to you</p>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Theme</label>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Choose how DigiTransac looks to you</p>
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
                   onClick={() => setTheme('light')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors ${
                     theme === 'light'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                   }`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -448,8 +448,8 @@ export default function SettingsPage() {
                   onClick={() => setTheme('dark')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors ${
                     theme === 'dark'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                   }`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -462,8 +462,8 @@ export default function SettingsPage() {
                   onClick={() => setTheme('system')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors ${
                     theme === 'system'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                   }`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -477,23 +477,23 @@ export default function SettingsPage() {
         </div>
 
         {/* Security Section */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Security</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Security</h2>
           
           {/* Two-Factor Authentication */}
           <TwoFactorSettings />
           
-          <hr className="my-4 border-gray-200" />
+          <hr className="my-4 border-gray-200 dark:border-gray-700" />
           
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-gray-900">Sign out from all devices</p>
-              <p className="text-sm text-gray-500">This will sign you out everywhere including this device</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Sign out from all devices</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">This will sign you out everywhere including this device</p>
             </div>
             <button
               onClick={handleLogoutAll}
               disabled={isLoggingOutAll}
-              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
             >
               {isLoggingOutAll ? 'Signing out...' : 'Sign out everywhere'}
             </button>
@@ -501,16 +501,16 @@ export default function SettingsPage() {
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-white rounded-lg border border-red-200 p-6">
-          <h2 className="text-lg font-medium text-red-600 mb-4">Danger Zone</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-900 p-6">
+          <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-4">Danger Zone</h2>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-gray-900">Delete Account</p>
-              <p className="text-sm text-gray-500">Permanently delete your account and all data</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Delete Account</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Permanently delete your account and all data</p>
             </div>
             <button
               onClick={() => setShowDeleteModal(true)}
-              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50"
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
             >
               Delete Account
             </button>
@@ -538,16 +538,16 @@ export default function SettingsPage() {
           />
           
           {/* Modal */}
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-6">
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                  <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <svg className="h-5 w-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 id="delete-modal-title" className="text-lg font-semibold text-gray-900">
+                  <h3 id="delete-modal-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     Delete Account
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
@@ -587,7 +587,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 {deleteError && (
-                  <p className="mt-2 text-sm text-red-600">{deleteError}</p>
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{deleteError}</p>
                 )}
               </div>
             </div>
@@ -633,19 +633,19 @@ export default function SettingsPage() {
           />
           
           {/* Modal */}
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-6">
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                  <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 id="email-modal-title" className="text-lg font-semibold text-gray-900">
+                  <h3 id="email-modal-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {emailStep === 'enter' ? 'Change Email' : 'Verify Email'}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {emailStep === 'enter' 
                       ? 'Enter your new email address. We will send a verification code to confirm.'
                       : `We sent a 6-digit code to ${newEmail}. Enter it below to complete the change.`
@@ -657,7 +657,7 @@ export default function SettingsPage() {
               <div className="mt-5">
                 {emailStep === 'enter' ? (
                   <>
-                    <label htmlFor="new-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="new-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                       New Email Address
                     </label>
                     <input
@@ -665,14 +665,14 @@ export default function SettingsPage() {
                       id="new-email"
                       value={newEmail}
                       onChange={(e) => setNewEmail(e.target.value)}
-                      className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="new@example.com"
                       autoFocus
                     />
                   </>
                 ) : (
                   <>
-                    <label htmlFor="email-code" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="email-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                       Verification Code
                     </label>
                     <input
@@ -680,7 +680,7 @@ export default function SettingsPage() {
                       id="email-code"
                       value={emailCode}
                       onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center tracking-widest font-mono text-lg"
+                      className="block w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center tracking-widest font-mono text-lg"
                       placeholder="000000"
                       maxLength={6}
                       autoFocus
@@ -692,23 +692,23 @@ export default function SettingsPage() {
                         setEmailCode('');
                         setEmailError('');
                       }}
-                      className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                      className="mt-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     >
                       ← Use a different email
                     </button>
                   </>
                 )}
                 {emailError && (
-                  <p className="mt-2 text-sm text-red-600">{emailError}</p>
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{emailError}</p>
                 )}
               </div>
             </div>
             
-            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl border-t border-gray-100">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-900 rounded-b-xl border-t border-gray-100 dark:border-gray-700">
               <button
                 type="button"
                 onClick={handleCloseEmailModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
@@ -716,7 +716,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={emailStep === 'enter' ? handleSendEmailCode : handleVerifyEmailChange}
                 disabled={isEmailLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 disabled:opacity-50"
               >
                 {isEmailLoading 
                   ? (emailStep === 'enter' ? 'Sending...' : 'Verifying...') 

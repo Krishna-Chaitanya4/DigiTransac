@@ -167,7 +167,7 @@ export function TransactionList({
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
                 {displayDate}
               </h3>
-              <span className={`text-sm font-medium ${dailyTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <span className={`text-sm font-medium ${dailyTotal >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                 {dailyTotal >= 0 ? '+' : '-'}{formatCurrency(Math.abs(dailyTotal), primaryCurrency)}
               </span>
             </div>
@@ -294,7 +294,7 @@ export function TransactionList({
                       </div>
                       
                       {/* Expand indicator */}
-                      <div className="ml-2 text-gray-400">
+                      <div className="ml-2 text-gray-400 dark:text-gray-500">
                         <svg 
                           className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
                           fill="none" 
@@ -308,7 +308,7 @@ export function TransactionList({
                     
                     {/* Expanded Details */}
                     {isExpanded && (
-                      <div className="px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-700">
+                      <div className="px-3 pb-3 pt-1 border-t border-gray-200 dark:border-gray-700">
                         {/* Splits */}
                         {transaction.splits.length > 1 && (
                           <div className="mb-3">

@@ -80,35 +80,35 @@ function SearchableFolderDropdown({ value, onChange, folders, allLabels, disable
         disabled={disabled}
         className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-left flex items-center gap-2 ${
           disabled 
-            ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500' 
-            : 'border-gray-300 bg-white'
+            ? 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-700 cursor-not-allowed text-gray-500 dark:text-gray-400' 
+            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'
         }`}
       >
         {selectedFolder ? (
           <>
             <span>{selectedFolder.icon || '📁'}</span>
             <div className="flex-1 min-w-0">
-              <span className="text-gray-900">{selectedFolder.name}</span>
+              <span className="text-gray-900 dark:text-gray-100">{selectedFolder.name}</span>
               {selectedPath && selectedPath !== selectedFolder.name && (
-                <span className="text-xs text-gray-400 ml-2 truncate">({selectedPath})</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-2 truncate">({selectedPath})</span>
               )}
             </div>
           </>
         ) : (
-          <span className="text-gray-500">None (Root level)</span>
+          <span className="text-gray-500 dark:text-gray-400">None (Root level)</span>
         )}
-        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
       </button>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
           {/* Search input */}
-          <div className="p-2 border-b border-gray-100">
+          <div className="p-2 border-b border-gray-100 dark:border-gray-700">
             <div className="relative">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
               </svg>
               <input
@@ -117,7 +117,7 @@ function SearchableFolderDropdown({ value, onChange, folders, allLabels, disable
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search folders..."
-                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               />
             </div>
           </div>
@@ -128,11 +128,11 @@ function SearchableFolderDropdown({ value, onChange, folders, allLabels, disable
             <button
               type="button"
               onClick={() => handleSelect(null)}
-              className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 ${
-                value === null ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+              className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                value === null ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
               }`}
             >
-              <span className="text-gray-400">—</span>
+              <span className="text-gray-400 dark:text-gray-500">—</span>
               <span>None (Root level)</span>
             </button>
 
@@ -146,19 +146,19 @@ function SearchableFolderDropdown({ value, onChange, folders, allLabels, disable
                     key={folder.id}
                     type="button"
                     onClick={() => handleSelect(folder.id)}
-                    className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 ${
-                      isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                      isSelected ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
                     }`}
                   >
                     <span>{folder.icon || '📁'}</span>
                     <div className="flex-1 min-w-0">
                       <span className={isSelected ? 'font-medium' : ''}>{folder.name}</span>
                       {path !== folder.name && (
-                        <p className="text-xs text-gray-400 truncate">{path}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{path}</p>
                       )}
                     </div>
                     {isSelected && (
-                      <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                       </svg>
                     )}
@@ -166,7 +166,7 @@ function SearchableFolderDropdown({ value, onChange, folders, allLabels, disable
                 );
               })
             ) : (
-              <div className="px-3 py-4 text-center text-sm text-gray-500">
+              <div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                 No folders found matching "{search}"
               </div>
             )}
@@ -190,19 +190,19 @@ function SearchResultItem({ label, path, onEdit, onDelete }: SearchResultItemPro
   const isSystem = label.isSystem;
   
   return (
-    <div className="flex items-center gap-2 py-2 px-3 hover:bg-gray-50 rounded-lg group">
+    <div className="flex items-center gap-2 py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg group">
       <span className="text-lg">
         {label.icon || (isFolder ? '📁' : '🏷️')}
       </span>
       <div className="flex-1 min-w-0">
-        <span className={`text-sm ${isFolder ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+        <span className={`text-sm ${isFolder ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
           {label.name}
         </span>
-        <p className="text-xs text-gray-400 truncate">{path}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{path}</p>
       </div>
       {/* System label lock indicator */}
       {isSystem && (
-        <span className="text-gray-400" title="System label - cannot be deleted or renamed">
+        <span className="text-gray-400 dark:text-gray-500" title="System label - cannot be deleted or renamed">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
           </svg>
@@ -219,7 +219,7 @@ function SearchResultItem({ label, path, onEdit, onDelete }: SearchResultItemPro
         <div className="hidden group-hover:flex items-center gap-1">
           <button
             onClick={() => onEdit(label as unknown as Label)}
-            className="p-1 text-gray-400 hover:text-blue-600"
+            className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
             title="Edit"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -228,7 +228,7 @@ function SearchResultItem({ label, path, onEdit, onDelete }: SearchResultItemPro
           </button>
           <button
             onClick={() => onDelete(label as unknown as Label)}
-            className="p-1 text-gray-400 hover:text-red-600"
+            className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
             title="Delete"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -260,14 +260,14 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
   return (
     <div>
       <div 
-        className={`flex items-center gap-2 py-2 px-3 hover:bg-gray-50 rounded-lg group ${level > 0 ? 'ml-6' : ''}`}
+        className={`flex items-center gap-2 py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg group ${level > 0 ? 'ml-6' : ''}`}
         style={{ marginLeft: level * 24 }}
       >
         {/* Expand/Collapse button for folders */}
         {isFolder ? (
           <button
             onClick={() => toggleExpand(label.id)}
-            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600"
+            className="w-5 h-5 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <svg 
               className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
@@ -289,13 +289,13 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
         </span>
 
         {/* Name */}
-        <span className={`flex-1 text-sm ${isFolder ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+        <span className={`flex-1 text-sm ${isFolder ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
           {label.name}
         </span>
 
         {/* System label lock indicator */}
         {isSystem && (
-          <span className="text-gray-400" title="System label - cannot be deleted or renamed">
+          <span className="text-gray-400 dark:text-gray-500" title="System label - cannot be deleted or renamed">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
             </svg>
@@ -316,7 +316,7 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
             <>
               <button
                 onClick={() => onAddChild(label.id, 'Folder')}
-                className="p-1 text-gray-400 hover:text-blue-600"
+                className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                 title="Add sub-folder"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -325,7 +325,7 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
               </button>
               <button
                 onClick={() => onAddChild(label.id, 'Category')}
-                className="p-1 text-gray-400 hover:text-green-600"
+                className="p-1 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400"
                 title="Add category"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -339,7 +339,7 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
             <>
               <button
                 onClick={() => onEdit(label)}
-                className="p-1 text-gray-400 hover:text-blue-600"
+                className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                 title="Edit"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -348,7 +348,7 @@ function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds
               </button>
               <button
                 onClick={() => onDelete(label)}
-                className="p-1 text-gray-400 hover:text-red-600"
+                className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
                 title="Delete"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -471,11 +471,11 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{title}</h3>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -483,7 +483,7 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Name
                 </label>
                 <input
@@ -493,8 +493,8 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
                   onChange={(e) => setName(e.target.value)}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                     isSystemLabel 
-                      ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500' 
-                      : 'border-gray-300'
+                      ? 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-700 cursor-not-allowed text-gray-500 dark:text-gray-400' 
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                   }`}
                   placeholder={`Enter ${labelType.toLowerCase()} name`}
                   required
@@ -509,7 +509,7 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
               </div>
 
               <div>
-                <label htmlFor="parent" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="parent" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Parent Folder
                 </label>
                 <SearchableFolderDropdown
@@ -524,7 +524,7 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
                     🔒 System labels cannot be moved
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {labelType === 'Category' 
                       ? 'Categories can be placed in folders or at root level'
                       : 'Folders can be nested inside other folders'}
@@ -543,7 +543,7 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
               </div>
 
               <div>
-                <label htmlFor="color" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="color" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Color
                 </label>
                 <div className="flex items-center gap-2">
@@ -552,20 +552,20 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
                     id="color"
                     value={color || '#6b7280'}
                     onChange={(e) => setColor(e.target.value)}
-                    className="w-10 h-10 p-1 border border-gray-300 rounded cursor-pointer"
+                    className="w-10 h-10 p-1 border border-gray-300 dark:border-gray-600 rounded cursor-pointer"
                   />
                   <input
                     type="text"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     placeholder="#6b7280"
                   />
                   {color && (
                     <button
                       type="button"
                       onClick={() => setColor('')}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                     >
                       Clear
                     </button>
@@ -578,14 +578,14 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                 disabled={isLoading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 disabled:opacity-50"
                 disabled={isLoading || !name.trim()}
               >
                 {isLoading ? 'Saving...' : editingLabel ? 'Update' : 'Create'}
@@ -655,13 +655,13 @@ function DeleteConfirmModal({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
             Delete {labelType}
           </h3>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -679,13 +679,13 @@ function DeleteConfirmModal({
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reassign transactions to: <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Reassign transactions to: <span className="text-red-500 dark:text-red-400">*</span>
                 </label>
                 <select
                   value={reassignToId}
                   onChange={(e) => setReassignToId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
                   <option value="">-- Select a category --</option>
                   {reassignableLabels.map(l => (
@@ -694,13 +694,13 @@ function DeleteConfirmModal({
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Transactions will be moved to the selected category before deletion.
                 </p>
               </div>
             </div>
           ) : (
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               Are you sure you want to delete "{labelName}"? This action cannot be undone.
             </p>
           )}
@@ -708,14 +708,14 @@ function DeleteConfirmModal({
           <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
               disabled={isLoading}
             >
               Cancel
             </button>
             <button
               onClick={() => onConfirm(reassignToId || undefined)}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 dark:bg-red-700 rounded-lg hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50"
               disabled={isLoading || (hasTransactions && !reassignToId)}
             >
               {isLoading ? 'Deleting...' : hasTransactions ? 'Delete & Reassign' : 'Delete'}
@@ -907,21 +907,21 @@ export default function CategoriesTab() {
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">×</button>
+          <button onClick={() => setError(null)} className="ml-2 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">×</button>
         </div>
       )}
 
       {/* Header with buttons */}
       <div className="flex justify-between items-center mb-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Organize your transactions with folders and categories
         </p>
         <div className="flex items-center gap-2">
           <button
             onClick={handleAddRootCategory}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -930,7 +930,7 @@ export default function CategoriesTab() {
           </button>
           <button
             onClick={handleAddRootFolder}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -945,7 +945,7 @@ export default function CategoriesTab() {
         <div className="flex items-center gap-3 mb-4">
           {/* Search */}
           <div className="relative flex-1 max-w-sm">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
             <input
@@ -953,12 +953,12 @@ export default function CategoriesTab() {
               placeholder="Search categories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -971,7 +971,7 @@ export default function CategoriesTab() {
           {!searchQuery && allFolderIds.length > 0 && (
             <button
               onClick={expandedIds.size === allFolderIds.length ? collapseAll : expandAll}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg"
               title={expandedIds.size === allFolderIds.length ? "Collapse All" : "Expand All"}
             >
               {expandedIds.size === allFolderIds.length ? (
@@ -990,14 +990,14 @@ export default function CategoriesTab() {
 
       {/* Search Results */}
       {searchQuery && (
-        <div className="bg-white rounded-lg border border-gray-200 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4">
           {searchResults.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 text-sm">
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
               No results found for "{searchQuery}"
             </div>
           ) : (
             <div className="py-2">
-              <div className="px-3 py-1 text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <div className="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
               </div>
               {searchResults.map(({ label, path }) => (
@@ -1016,23 +1016,23 @@ export default function CategoriesTab() {
 
       {/* Tree View (hidden during search) */}
       {!searchQuery && (
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
           {labels.length === 0 ? (
             <div className="p-8 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                 <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
                 </svg>
               </div>
-              <h2 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h2>
-              <p className="text-gray-500 mb-4">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No categories yet</h2>
+              <p className="text-gray-500 dark:text-gray-400 mb-4">
                 Create categories to organize your transactions, or use folders to group related categories.
               </p>
               <div className="flex items-center justify-center gap-3">
                 <button
                   onClick={handleAddRootCategory}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -1041,7 +1041,7 @@ export default function CategoriesTab() {
                 </button>
                 <button
                   onClick={handleAddRootFolder}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

@@ -80,13 +80,13 @@ export interface AdjustBalanceRequest {
 }
 
 // Account type configuration
-export const accountTypeConfig: Record<AccountType, { label: string; icon: string; defaultColor: string; isLiability: boolean }> = {
-  Bank: { label: 'Bank Account', icon: '🏦', defaultColor: '#3B82F6', isLiability: false },
-  CreditCard: { label: 'Credit Card', icon: '💳', defaultColor: '#EF4444', isLiability: true },
-  Cash: { label: 'Cash', icon: '💵', defaultColor: '#10B981', isLiability: false },
-  DigitalWallet: { label: 'Digital Wallet', icon: '📱', defaultColor: '#8B5CF6', isLiability: false },
-  Investment: { label: 'Investment', icon: '📈', defaultColor: '#F59E0B', isLiability: false },
-  Loan: { label: 'Loan', icon: '🏠', defaultColor: '#DC2626', isLiability: true },
+export const accountTypeConfig: Record<AccountType, { label: string; icon: string; defaultColor: string; darkColor: string; isLiability: boolean }> = {
+  Bank: { label: 'Bank Account', icon: '🏦', defaultColor: '#3B82F6', darkColor: '#1e3a5f', isLiability: false },
+  CreditCard: { label: 'Credit Card', icon: '💳', defaultColor: '#EF4444', darkColor: '#7f1d1d', isLiability: true },
+  Cash: { label: 'Cash', icon: '💵', defaultColor: '#10B981', darkColor: '#064e3b', isLiability: false },
+  DigitalWallet: { label: 'Digital Wallet', icon: '📱', defaultColor: '#8B5CF6', darkColor: '#4c1d95', isLiability: false },
+  Investment: { label: 'Investment', icon: '📈', defaultColor: '#F59E0B', darkColor: '#78350f', isLiability: false },
+  Loan: { label: 'Loan', icon: '🏠', defaultColor: '#DC2626', darkColor: '#7f1d1d', isLiability: true },
 };
 
 // Get all accounts

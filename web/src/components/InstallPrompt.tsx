@@ -86,26 +86,26 @@ export default function InstallPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-white rounded-xl shadow-2xl border border-gray-200 p-4">
+    <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0">
           <img src="/icons/icon-72x72.png" alt="DigiTransac" className="w-12 h-12 rounded-lg" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900">Install DigiTransac</h3>
-          <p className="text-xs text-gray-500 mt-1">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Install DigiTransac</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Install our app for quick access and offline support
           </p>
           <div className="flex gap-2 mt-3">
             <button
               onClick={handleInstall}
-              className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+              className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-900 dark:to-indigo-950 rounded-lg hover:from-indigo-700 hover:to-indigo-800 dark:hover:from-indigo-800 dark:hover:to-indigo-900"
             >
               Install
             </button>
             <button
               onClick={handleDismiss}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+              className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
             >
               Not now
             </button>
@@ -113,7 +113,7 @@ export default function InstallPrompt() {
         </div>
         <button
           onClick={handleDismiss}
-          className="flex-shrink-0 text-gray-400 hover:text-gray-600"
+          className="flex-shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />

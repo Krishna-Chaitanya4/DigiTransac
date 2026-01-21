@@ -19,10 +19,10 @@ export function TransactionTypeSelector({ value, onChange }: TransactionTypeSele
           className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
             value === t
               ? t === 'Debit' 
-                ? 'bg-red-500 text-white'
+                ? 'bg-red-500 dark:bg-red-950 text-white'
                 : t === 'Credit'
-                ? 'bg-green-500 text-white'
-                : 'bg-blue-500 text-white'
+                ? 'bg-green-500 dark:bg-green-950 text-white'
+                : 'bg-blue-500 dark:bg-blue-950 text-white'
               : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
           }`}
         >

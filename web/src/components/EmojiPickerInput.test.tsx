@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EmojiPickerInput } from './EmojiPickerInput';
+import { ThemeProvider } from '../context/ThemeContext';
 
 // Mock emoji-picker-react
 vi.mock('emoji-picker-react', () => ({
@@ -20,8 +21,13 @@ vi.mock('emoji-picker-react', () => ({
       </button>
     </div>
   ),
-  Theme: { LIGHT: 'light' },
+  Theme: { LIGHT: 'light', DARK: 'dark' },
 }));
+
+// Helper to render with ThemeProvider
+const renderWithTheme = (ui: React.ReactElement) => {
+  return render(<ThemeProvider>{ui}</ThemeProvider>);
+};
 
 describe('EmojiPickerInput', () => {
   const defaultProps = {
@@ -35,34 +41,34 @@ describe('EmojiPickerInput', () => {
 
   describe('Rendering', () => {
     it('should render with placeholder when no value', () => {
-      render(<EmojiPickerInput {...defaultProps} placeholder="Select an emoji" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select an emoji" />);
       expect(screen.getByText('Select an emoji')).toBeInTheDocument();
     });
 
     it('should render with label when provided', () => {
-      render(<EmojiPickerInput {...defaultProps} label="Icon" id="icon-input" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} label="Icon" id="icon-input" />);
       expect(screen.getByText('Icon')).toBeInTheDocument();
     });
 
     it('should display the selected emoji value', () => {
-      render(<EmojiPickerInput {...defaultProps} value="🍕" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} value="🍕" />);
       expect(screen.getByText('🍕')).toBeInTheDocument();
     });
 
     it('should show clear button when value is set', () => {
-      render(<EmojiPickerInput {...defaultProps} value="🍕" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} value="🍕" />);
       expect(screen.getByTitle('Clear')).toBeInTheDocument();
     });
 
     it('should not show clear button when value is empty', () => {
-      render(<EmojiPickerInput {...defaultProps} value="" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} value="" />);
       expect(screen.queryByTitle('Clear')).not.toBeInTheDocument();
     });
   });
 
   describe('Picker Interaction', () => {
     it('should open emoji picker when button is clicked', async () => {
-      render(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
       const button = screen.getByRole('button', { name: /select/i });
       fireEvent.click(button);
@@ -73,7 +79,7 @@ describe('EmojiPickerInput', () => {
     });
 
     it('should close emoji picker when clicking again', async () => {
-      render(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
       const button = screen.getByRole('button', { name: /select/i });
       
@@ -92,7 +98,7 @@ describe('EmojiPickerInput', () => {
 
     it('should call onChange when emoji is selected', async () => {
       const onChange = vi.fn();
-      render(<EmojiPickerInput {...defaultProps} onChange={onChange} placeholder="Select" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} onChange={onChange} placeholder="Select" />);
       
       // Open picker
       const button = screen.getByRole('button', { name: /select/i });
@@ -108,7 +114,7 @@ describe('EmojiPickerInput', () => {
     });
 
     it('should close picker after emoji selection', async () => {
-      render(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
       // Open picker
       const button = screen.getByRole('button', { name: /select/i });
@@ -131,7 +137,7 @@ describe('EmojiPickerInput', () => {
   describe('Clear Functionality', () => {
     it('should call onChange with empty string when clear is clicked', async () => {
       const onChange = vi.fn();
-      render(<EmojiPickerInput {...defaultProps} value="🍕" onChange={onChange} />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} value="🍕" onChange={onChange} />);
       
       const clearButton = screen.getByTitle('Clear');
       fireEvent.click(clearButton);
@@ -140,7 +146,7 @@ describe('EmojiPickerInput', () => {
     });
 
     it('should not open picker when clear is clicked', async () => {
-      render(<EmojiPickerInput {...defaultProps} value="🍕" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} value="🍕" />);
       
       const clearButton = screen.getByTitle('Clear');
       fireEvent.click(clearButton);
@@ -152,7 +158,7 @@ describe('EmojiPickerInput', () => {
 
   describe('Keyboard Navigation', () => {
     it('should close picker on Escape key', async () => {
-      render(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
       // Open picker
       const button = screen.getByRole('button', { name: /select/i });
@@ -173,7 +179,7 @@ describe('EmojiPickerInput', () => {
 
   describe('Click Outside', () => {
     it('should close picker when clicking outside', async () => {
-      render(
+      renderWithTheme(
         <div>
           <EmojiPickerInput {...defaultProps} placeholder="Select" />
           <div data-testid="outside">Outside element</div>
@@ -201,7 +207,7 @@ describe('EmojiPickerInput', () => {
   describe('Different Emoji Selection', () => {
     it('should handle selecting different emojis', async () => {
       const onChange = vi.fn();
-      render(<EmojiPickerInput {...defaultProps} onChange={onChange} placeholder="Select" />);
+      renderWithTheme(<EmojiPickerInput {...defaultProps} onChange={onChange} placeholder="Select" />);
       
       // Open picker
       const button = screen.getByRole('button', { name: /select/i });

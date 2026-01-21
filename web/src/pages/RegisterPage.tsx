@@ -2,6 +2,7 @@ import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logger } from '../services/logger';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from '../components/ThemeToggle';
 import * as authService from '../services/authService';
 import PasswordInput from '../components/PasswordInput';
 import { 
@@ -202,30 +203,33 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="max-w-md w-full space-y-8">
         {/* Progress indicator */}
         <div className="flex items-center justify-center space-x-4">
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'email' ? 'bg-indigo-600 text-white' : 'bg-indigo-200 text-indigo-600'}`}>
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'email' ? 'bg-indigo-600 dark:bg-indigo-700 text-white' : 'bg-indigo-200 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400'}`}>
             1
           </div>
-          <div className={`w-12 h-1 ${step !== 'email' ? 'bg-indigo-600' : 'bg-gray-300'}`} />
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'verify' ? 'bg-indigo-600 text-white' : step === 'complete' ? 'bg-indigo-200 text-indigo-600' : 'bg-gray-300 text-gray-500'}`}>
+          <div className={`w-12 h-1 ${step !== 'email' ? 'bg-indigo-600 dark:bg-indigo-700' : 'bg-gray-300 dark:bg-gray-700'}`} />
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'verify' ? 'bg-indigo-600 dark:bg-indigo-700 text-white' : step === 'complete' ? 'bg-indigo-200 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400' : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
             2
           </div>
-          <div className={`w-12 h-1 ${step === 'complete' ? 'bg-indigo-600' : 'bg-gray-300'}`} />
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'complete' ? 'bg-indigo-600 text-white' : 'bg-gray-300 text-gray-500'}`}>
+          <div className={`w-12 h-1 ${step === 'complete' ? 'bg-indigo-600 dark:bg-indigo-700' : 'bg-gray-300 dark:bg-gray-700'}`} />
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'complete' ? 'bg-indigo-600 dark:bg-indigo-700 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
             3
           </div>
         </div>
 
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
             {step === 'email' && 'Create your account'}
             {step === 'verify' && 'Verify your email'}
             {step === 'complete' && 'Complete registration'}
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             {step === 'email' && (
               <>
                 Already have an account?{' '}
@@ -240,13 +244,13 @@ export default function RegisterPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-sm relative">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-sm relative">
             {error}
           </div>
         )}
 
         {message && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-sm relative">
+          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 px-4 py-3 rounded-sm relative">
             {message}
           </div>
         )}
@@ -255,7 +259,7 @@ export default function RegisterPage() {
         {step === 'email' && (
           <form className="mt-8 space-y-6" onSubmit={handleSendCode}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Email address
               </label>
               <input
@@ -264,7 +268,7 @@ export default function RegisterPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -274,7 +278,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Sending...' : 'Send verification code'}
             </button>
@@ -285,7 +289,7 @@ export default function RegisterPage() {
         {step === 'verify' && (
           <form className="mt-8 space-y-6" onSubmit={handleVerifyCode}>
             <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Verification code
               </label>
               <input
@@ -296,7 +300,7 @@ export default function RegisterPage() {
                 pattern="[0-9]*"
                 maxLength={6}
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-center text-2xl tracking-widest"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-center text-2xl tracking-widest"
                 placeholder="000000"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -306,7 +310,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting || code.length !== 6}
-              className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Verifying...' : 'Verify code'}
             </button>
@@ -326,7 +330,7 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() => { setStep('email'); setCode(''); setError(''); setMessage(''); }}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               >
                 ← Use a different email
               </button>
@@ -339,7 +343,7 @@ export default function RegisterPage() {
           <form className="mt-8 space-y-6" onSubmit={handleCompleteRegistration}>
             <div className="space-y-4">
               <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Full name
                 </label>
                 <input
@@ -348,7 +352,7 @@ export default function RegisterPage() {
                   type="text"
                   autoComplete="name"
                   required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   placeholder="John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -357,13 +361,13 @@ export default function RegisterPage() {
 
               {/* Primary Currency Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Primary Currency
                 </label>
                 
                 {/* Location detection status */}
                 {locationStatus === 'requesting' && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
                     <svg className="animate-spin h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -373,7 +377,7 @@ export default function RegisterPage() {
                 )}
                 
                 {locationStatus === 'detected' && detectedCountry && (
-                  <div className="flex items-center gap-2 text-sm text-green-600 mb-2">
+                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 mb-2">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -383,7 +387,7 @@ export default function RegisterPage() {
                 )}
                 
                 {(locationStatus === 'denied' || locationStatus === 'manual') && (
-                  <p className="text-xs text-gray-500 mb-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     Select your preferred currency for displaying totals
                   </p>
                 )}
@@ -394,40 +398,40 @@ export default function RegisterPage() {
                     type="button"
                     onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
                     disabled={locationStatus === 'requesting'}
-                    className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
+                    className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
                   >
                     <span className="flex items-center gap-2">
                       {primaryCurrency ? (
                         <>
                           <span className="text-lg">{getCurrencySymbol(primaryCurrency)}</span>
                           <span>{currencies.find(c => c.code === primaryCurrency)?.name || primaryCurrency}</span>
-                          <span className="text-gray-400">({primaryCurrency})</span>
+                          <span className="text-gray-400 dark:text-gray-500">({primaryCurrency})</span>
                         </>
                       ) : (
-                        <span className="text-gray-400">Select currency...</span>
+                        <span className="text-gray-400 dark:text-gray-500">Select currency...</span>
                       )}
                     </span>
-                    <svg className={`h-4 w-4 text-gray-400 transition-transform ${isCurrencyDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className={`h-4 w-4 text-gray-400 dark:text-gray-500 transition-transform ${isCurrencyDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
                   
                   {isCurrencyDropdownOpen && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
-                      <div className="p-2 border-b border-gray-100">
+                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                      <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                         <input
                           type="text"
                           value={currencySearch}
                           onChange={(e) => setCurrencySearch(e.target.value)}
                           placeholder="Search currencies..."
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                           autoFocus
                         />
                       </div>
                       <div className="max-h-48 overflow-y-auto">
                         {/* Common currencies first */}
                         {currencySearch === '' && (
-                          <div className="px-3 py-1 text-xs text-gray-400 bg-gray-50">Common Currencies</div>
+                          <div className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900">Common Currencies</div>
                         )}
                         {currencies
                           .filter(c => 
@@ -446,13 +450,13 @@ export default function RegisterPage() {
                                 setCurrencySearch('');
                                 setLocationStatus('manual');
                               }}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 ${
-                                c.code === primaryCurrency ? 'bg-indigo-50 text-indigo-700' : ''
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                                c.code === primaryCurrency ? 'bg-indigo-50 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-gray-100'
                               }`}
                             >
                               <span className="w-6">{c.symbol}</span>
                               <span className="flex-1">{c.name}</span>
-                              <span className="text-gray-400">{c.code}</span>
+                              <span className="text-gray-400 dark:text-gray-500">{c.code}</span>
                             </button>
                           ))
                         }
@@ -460,7 +464,7 @@ export default function RegisterPage() {
                           c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
                           c.name.toLowerCase().includes(currencySearch.toLowerCase())
                         ).length === 0 && (
-                          <p className="px-3 py-2 text-sm text-gray-500">No currencies found</p>
+                          <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No currencies found</p>
                         )}
                       </div>
                     </div>

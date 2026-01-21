@@ -27,7 +27,7 @@ export default function PasswordInput({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
         {label}
       </label>
       <div className="mt-1 relative">
@@ -37,14 +37,14 @@ export default function PasswordInput({
           type={showPassword ? 'text' : 'password'}
           autoComplete={autoComplete}
           required={required}
-          className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
         <button
           type="button"
-          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           onClick={() => setShowPassword(!showPassword)}
           tabIndex={-1}
         >
@@ -63,7 +63,7 @@ export default function PasswordInput({
         </button>
       </div>
       {hint && (
-        <p className="mt-1 text-xs text-gray-500">{hint}</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</p>
       )}
     </div>
   );

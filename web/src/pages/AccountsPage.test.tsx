@@ -4,6 +4,7 @@ import AccountsPage from './AccountsPage';
 import * as accountService from '../services/accountService';
 import { CurrencyProvider } from '../context/CurrencyContext';
 import { AuthProvider } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import { BrowserRouter } from 'react-router-dom';
 
 // Mock the account service
@@ -41,11 +42,13 @@ vi.mock('../services/currencyService', async () => {
 // Wrapper with all required providers
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <BrowserRouter>
-    <AuthProvider>
-      <CurrencyProvider>
-        {children}
-      </CurrencyProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <CurrencyProvider>
+          {children}
+        </CurrencyProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </BrowserRouter>
 );
 

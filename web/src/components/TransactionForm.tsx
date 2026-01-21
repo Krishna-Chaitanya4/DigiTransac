@@ -496,10 +496,10 @@ export function TransactionForm({
                     className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
                       type === t
                         ? t === 'Debit' 
-                          ? 'bg-red-500 text-white'
+                          ? 'bg-red-500 dark:bg-red-950 text-white'
                           : t === 'Credit'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-blue-500 text-white'
+                          ? 'bg-green-500 dark:bg-green-950 text-white'
+                          : 'bg-blue-500 dark:bg-blue-950 text-white'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -520,7 +520,7 @@ export function TransactionForm({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
                     focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                    disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                    disabled:bg-gray-100 dark:disabled:bg-gray-700"
                   required
                 >
                   <option value="">Select account...</option>
@@ -622,7 +622,7 @@ export function TransactionForm({
                         </span>
                         <button
                           type="button"
-                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedLabelId('');
@@ -775,7 +775,7 @@ export function TransactionForm({
                           <button
                             type="button"
                             onClick={() => removeSplit(index)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                            className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                           >
                             ✕
                           </button>
@@ -793,13 +793,13 @@ export function TransactionForm({
                     >
                       + Add split
                     </button>
-                    <span className={`text-sm ${splitsValid ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`text-sm ${splitsValid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       Total: {currencySymbol}{splitsSum.toFixed(2)} / {currencySymbol}{amount.toFixed(2)}
                     </span>
                   </div>
                   
                   {!splitsValid && (
-                    <p className="text-xs text-red-500 mt-1">
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">
                       Split amounts must equal the transaction amount
                     </p>
                   )}
@@ -857,7 +857,7 @@ export function TransactionForm({
                       return (
                         <span
                           key={tag.id}
-                          className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-sm font-medium rounded-full bg-blue-500 text-white"
+                          className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-sm font-medium rounded-full bg-blue-500 dark:bg-blue-950 text-white"
                           style={tag.color ? { backgroundColor: tag.color } : undefined}
                         >
                           {tag.name}
@@ -1101,7 +1101,7 @@ export function TransactionForm({
                           setManualPlaceName('');
                           setPlaceSearchResults([]);
                         }}
-                        className="px-3 py-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-sm"
+                        className="px-3 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-sm"
                       >
                         Cancel
                       </button>
@@ -1122,7 +1122,7 @@ export function TransactionForm({
                             }`}
                           >
                             <div className="flex items-start gap-2">
-                              <span className="text-gray-400 mt-0.5">📍</span>
+                              <span className="text-gray-400 dark:text-gray-500 mt-0.5">📍</span>
                               <div className="flex-1 min-w-0">
                                 <div className="text-gray-900 dark:text-white truncate">
                                   {place.city || place.displayName.split(',')[0]}
@@ -1148,7 +1148,7 @@ export function TransactionForm({
                 
                 {/* Location error */}
                 {locationError && !location && !manualLocationMode && (
-                  <p className="mt-1 text-sm text-red-500">{locationError}</p>
+                  <p className="mt-1 text-sm text-red-500 dark:text-red-400">{locationError}</p>
                 )}
                 
                 {/* Location display */}
@@ -1171,7 +1171,7 @@ export function TransactionForm({
                           setIncludeLocation(false);
                           setManualLocationMode(true);
                         }}
-                        className="text-gray-400 hover:text-blue-500"
+                        className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
                         title="Edit location"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1184,7 +1184,7 @@ export function TransactionForm({
                           setLocation(null);
                           setIncludeLocation(false);
                         }}
-                        className="text-gray-400 hover:text-red-500"
+                        className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
                         title="Remove location"
                       >
                         ✕
@@ -1294,7 +1294,7 @@ export function TransactionForm({
               <button
                 type="submit"
                 disabled={isLoading || amount <= 0 || !accountId || (!showSplits && !selectedLabelId) || (showSplits && !splitsValid)}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
+                className="flex-1 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 
                   font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Saving...' : editingTransaction ? 'Update' : 'Add Transaction'}

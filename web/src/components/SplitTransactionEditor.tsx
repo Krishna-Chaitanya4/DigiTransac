@@ -109,13 +109,13 @@ export function SplitTransactionEditor({
         >
           + Add split
         </button>
-        <span className={`text-sm ${splitsValid ? 'text-green-600' : 'text-red-600'}`}>
+        <span className={`text-sm ${splitsValid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
           Total: {currencySymbol}{splitsSum.toFixed(2)} / {currencySymbol}{totalAmount.toFixed(2)}
         </span>
       </div>
       
       {!splitsValid && (
-        <p className="text-xs text-red-500 mt-1" role="alert">
+        <p className="text-xs text-red-500 dark:text-red-400 mt-1" role="alert">
           Split amounts must equal the transaction amount
         </p>
       )}

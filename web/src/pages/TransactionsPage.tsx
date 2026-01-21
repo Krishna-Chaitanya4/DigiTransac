@@ -491,8 +491,8 @@ export default function TransactionsPage() {
           
           <button
             onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg 
-              hover:bg-blue-700 transition-colors font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg 
+              hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 transition-colors font-medium"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -519,8 +519,8 @@ export default function TransactionsPage() {
             onClick={() => handleDatePresetChange(preset)}
             className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               datePreset === preset
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                ? 'bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white border-blue-600 dark:border-blue-900'
+                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-500 hover:border-blue-400 dark:hover:border-blue-400'
             }`}
           >
             {preset === 'today' && 'Today'}
@@ -624,7 +624,7 @@ export default function TransactionsPage() {
           </svg>
           <span className="hidden sm:inline">Filters</span>
           {activeFilterCount > 0 && (
-            <span className="bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+            <span className="bg-blue-600 dark:bg-blue-700 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}
@@ -690,8 +690,8 @@ export default function TransactionsPage() {
       {!hasSelection && (
         <button
           onClick={() => setIsFormOpen(true)}
-          className="sm:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full 
-            shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center z-40"
+          className="sm:hidden fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-full 
+            shadow-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 transition-colors flex items-center justify-center z-40"
         >
           <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

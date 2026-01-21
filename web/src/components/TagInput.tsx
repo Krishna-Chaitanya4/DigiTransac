@@ -131,7 +131,7 @@ export function TagInput({
             return (
               <span
                 key={tag.id}
-                className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-sm font-medium rounded-full bg-blue-500 text-white"
+                className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-sm font-medium rounded-full bg-blue-500 dark:bg-blue-950 text-white"
                 style={tag.color ? { backgroundColor: tag.color } : undefined}
               >
                 {tag.name}
