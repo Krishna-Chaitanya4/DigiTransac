@@ -389,9 +389,10 @@ interface LabelModalProps {
   labelType: 'Folder' | 'Category';
   isLoading: boolean;
   allLabels: Label[];  // For parent dropdown
+  error: string | null;
 }
 
-function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelType, isLoading, allLabels }: LabelModalProps) {
+function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelType, isLoading, allLabels, error }: LabelModalProps) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
@@ -471,6 +472,12 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
         <div className="fixed inset-0 bg-black/30" onClick={onClose} />
         <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
           
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
@@ -604,6 +611,7 @@ interface DeleteConfirmModalProps {
   allLabels: Label[];
   labelToDeleteId: string;
   isLoading: boolean;
+  error: string | null;
 }
 
 function DeleteConfirmModal({ 
@@ -615,7 +623,8 @@ function DeleteConfirmModal({
   transactionCount,
   allLabels,
   labelToDeleteId,
-  isLoading 
+  isLoading,
+  error
 }: DeleteConfirmModalProps) {
   const [reassignToId, setReassignToId] = useState<string>('');
   const hasTransactions = transactionCount > 0;
@@ -654,6 +663,12 @@ function DeleteConfirmModal({
             Delete {labelType}
           </h3>
           
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+          
           {hasTransactions ? (
             <div className="space-y-4">
               <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -662,20 +677,20 @@ function DeleteConfirmModal({
                 </svg>
                 <p className="text-sm text-amber-800">
                   This category is used in <strong>{transactionCount}</strong> transaction split{transactionCount === 1 ? '' : 's'}.
-                  Please choose what to do with these transactions.
+                  Please select a category to reassign them to.
                 </p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reassign transactions to:
+                  Reassign transactions to: <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={reassignToId}
                   onChange={(e) => setReassignToId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="">-- Leave without category --</option>
+                  <option value="">-- Select a category --</option>
                   {reassignableLabels.map(l => (
                     <option key={l.id} value={l.id}>
                       {l.icon && `${l.icon} `}{l.name}
@@ -683,9 +698,7 @@ function DeleteConfirmModal({
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  {reassignToId 
-                    ? 'Transactions will be moved to the selected category before deletion.'
-                    : 'Transaction splits will have their category cleared.'}
+                  Transactions will be moved to the selected category before deletion.
                 </p>
               </div>
             </div>
@@ -706,7 +719,7 @@ function DeleteConfirmModal({
             <button
               onClick={() => onConfirm(reassignToId || undefined)}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
-              disabled={isLoading}
+              disabled={isLoading || (hasTransactions && !reassignToId)}
             >
               {isLoading ? 'Deleting...' : hasTransactions ? 'Delete & Reassign' : 'Delete'}
             </button>
@@ -731,12 +744,14 @@ export default function CategoriesTab() {
   const [newLabelParentId, setNewLabelParentId] = useState<string | null>(null);
   const [newLabelType, setNewLabelType] = useState<'Folder' | 'Category'>('Folder');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [labelToDelete, setLabelToDelete] = useState<LabelTree | null>(null);
   const [labelTransactionCount, setLabelTransactionCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Search results
   const searchResults = useMemo(() => {
@@ -847,6 +862,7 @@ export default function CategoriesTab() {
   const handleModalSubmit = async (data: CreateLabelRequest | UpdateLabelRequest) => {
     try {
       setIsSaving(true);
+      setSaveError(null);
       if (editingLabel) {
         await updateLabel(editingLabel.id, data as UpdateLabelRequest);
       } else {
@@ -855,7 +871,7 @@ export default function CategoriesTab() {
       await loadLabels();
       setIsModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save label');
+      setSaveError(err instanceof Error ? err.message : 'Failed to save label');
     } finally {
       setIsSaving(false);
     }
@@ -866,6 +882,7 @@ export default function CategoriesTab() {
     
     try {
       setIsDeleting(true);
+      setDeleteError(null);
       // Use reassignment delete if there are transactions
       if (labelTransactionCount > 0) {
         await deleteLabelWithReassignment(labelToDelete.id, reassignToId);
@@ -876,7 +893,7 @@ export default function CategoriesTab() {
       setDeleteModalOpen(false);
       setLabelToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete label');
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete label');
     } finally {
       setIsDeleting(false);
     }
@@ -1057,18 +1074,19 @@ export default function CategoriesTab() {
 
       <LabelModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setSaveError(null); }}
         onSubmit={handleModalSubmit}
         editingLabel={editingLabel}
         parentId={newLabelParentId}
         labelType={newLabelType}
         isLoading={isSaving}
         allLabels={allLabels}
+        error={saveError}
       />
 
       <DeleteConfirmModal
         isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
+        onClose={() => { setDeleteModalOpen(false); setDeleteError(null); }}
         onConfirm={handleDeleteConfirm}
         labelName={labelToDelete?.name || ''}
         labelType={labelToDelete?.type || 'Category'}
@@ -1076,6 +1094,7 @@ export default function CategoriesTab() {
         allLabels={allLabels}
         labelToDeleteId={labelToDelete?.id || ''}
         isLoading={isDeleting}
+        error={deleteError}
       />
     </div>
   );

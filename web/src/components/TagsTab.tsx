@@ -24,9 +24,10 @@ interface TagModalProps {
   onSubmit: (data: CreateTagRequest | UpdateTagRequest) => void;
   editingTag: Tag | null;
   isLoading: boolean;
+  error: string | null;
 }
 
-function TagModal({ isOpen, onClose, onSubmit, editingTag, isLoading }: TagModalProps) {
+function TagModal({ isOpen, onClose, onSubmit, editingTag, isLoading, error }: TagModalProps) {
   const [name, setName] = useState('');
   const [color, setColor] = useState('');
 
@@ -58,6 +59,12 @@ function TagModal({ isOpen, onClose, onSubmit, editingTag, isLoading }: TagModal
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             {editingTag ? 'Edit Tag' : 'New Tag'}
           </h3>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
           
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
@@ -150,9 +157,10 @@ interface DeleteConfirmModalProps {
   tagName: string;
   transactionCount: number;
   isLoading: boolean;
+  error: string | null;
 }
 
-function DeleteConfirmModal({ isOpen, onClose, onConfirm, tagName, transactionCount, isLoading }: DeleteConfirmModalProps) {
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, tagName, transactionCount, isLoading, error }: DeleteConfirmModalProps) {
   if (!isOpen) return null;
 
   const hasTransactions = transactionCount > 0;
@@ -163,6 +171,13 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, tagName, transactionCo
         <div className="fixed inset-0 bg-black/30" onClick={onClose} />
         <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Tag</h3>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+          
           {hasTransactions ? (
             <div className="mb-6">
               <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-3">
@@ -215,12 +230,14 @@ export default function TagsTab() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
   const [tagTransactionCount, setTagTransactionCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadTags = useCallback(async () => {
     try {
@@ -274,6 +291,7 @@ export default function TagsTab() {
   const handleModalSubmit = async (data: CreateTagRequest | UpdateTagRequest) => {
     try {
       setIsSaving(true);
+      setSaveError(null);
       if (editingTag) {
         await updateTag(editingTag.id, data as UpdateTagRequest);
       } else {
@@ -282,7 +300,7 @@ export default function TagsTab() {
       await loadTags();
       setIsModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save tag');
+      setSaveError(err instanceof Error ? err.message : 'Failed to save tag');
     } finally {
       setIsSaving(false);
     }
@@ -293,6 +311,7 @@ export default function TagsTab() {
     
     try {
       setIsDeleting(true);
+      setDeleteError(null);
       // Use confirmed delete if there are transactions
       if (tagTransactionCount > 0) {
         await deleteTagConfirmed(tagToDelete.id);
@@ -303,7 +322,7 @@ export default function TagsTab() {
       setDeleteModalOpen(false);
       setTagToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete tag');
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete tag');
     } finally {
       setIsDeleting(false);
     }
@@ -438,19 +457,21 @@ export default function TagsTab() {
 
       <TagModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setSaveError(null); }}
         onSubmit={handleModalSubmit}
         editingTag={editingTag}
         isLoading={isSaving}
+        error={saveError}
       />
 
       <DeleteConfirmModal
         isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
+        onClose={() => { setDeleteModalOpen(false); setDeleteError(null); }}
         onConfirm={handleDeleteConfirm}
         tagName={tagToDelete?.name || ''}
         transactionCount={tagTransactionCount}
         isLoading={isDeleting}
+        error={deleteError}
       />
     </div>
   );

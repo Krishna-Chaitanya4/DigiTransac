@@ -559,12 +559,120 @@ public class LabelServiceTests
         // Root folders (no parent) should be system labels
         var rootFolders = capturedLabels!.Where(l => l.ParentId == null).ToList();
         rootFolders.Should().AllSatisfy(l => l.IsSystem.Should().BeTrue());
-        rootFolders.Select(l => l.Name).Should().Contain(new[] { "Expenses", "Income", "Investments", "Gifts", "Transfers" });
+        rootFolders.Select(l => l.Name).Should().Contain(new[] { "Expenses", "Income", "Investments", "Gifts", "Transfers", "Adjustments" });
         
-        // Non-root items (have a parent) should NOT be system labels
+        // Non-root items (have a parent) should NOT be system labels, except for the "Balance Adjustment" category
         var nestedItems = capturedLabels!.Where(l => l.ParentId != null).ToList();
         nestedItems.Should().NotBeEmpty();
-        nestedItems.Should().AllSatisfy(l => l.IsSystem.Should().BeFalse());
+        
+        // Only "Balance Adjustment" category is a system label (for balance adjustments)
+        var systemNestedItems = nestedItems.Where(l => l.IsSystem).ToList();
+        systemNestedItems.Should().ContainSingle()
+            .Which.Name.Should().Be("Balance Adjustment");
+        
+        var nonSystemNestedItems = nestedItems.Where(l => !l.IsSystem).ToList();
+        nonSystemNestedItems.Should().NotBeEmpty();
+        nonSystemNestedItems.Should().AllSatisfy(l => l.IsSystem.Should().BeFalse());
+    }
+
+    #endregion
+
+    #region GetOrCreateAdjustmentsCategoryAsync Tests
+
+    [Fact]
+    public async Task GetOrCreateAdjustmentsCategoryAsync_WithExistingCategory_ShouldReturnExisting()
+    {
+        // Arrange
+        var existingCategory = new Label
+        {
+            Id = "existing-adjustment-id",
+            UserId = TestUserId,
+            Name = "Balance Adjustment",
+            Type = LabelType.Category,
+            IsSystem = true
+        };
+        
+        _labelRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId))
+            .ReturnsAsync(new List<Label> { existingCategory });
+
+        // Act
+        var result = await _labelService.GetOrCreateAdjustmentsCategoryAsync(TestUserId);
+
+        // Assert
+        result.Id.Should().Be("existing-adjustment-id");
+        result.Name.Should().Be("Balance Adjustment");
+        _labelRepositoryMock.Verify(x => x.CreateAsync(It.IsAny<Label>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetOrCreateAdjustmentsCategoryAsync_WithNoExistingLabels_ShouldCreateFolderAndCategory()
+    {
+        // Arrange
+        _labelRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId))
+            .ReturnsAsync(new List<Label>());
+        
+        Label? createdFolder = null;
+        Label? createdCategory = null;
+        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>()))
+            .Callback<Label>(label =>
+            {
+                if (label.Type == LabelType.Folder)
+                    createdFolder = label;
+                else if (label.Type == LabelType.Category)
+                    createdCategory = label;
+            })
+            .ReturnsAsync((Label l) => l);
+
+        // Act
+        var result = await _labelService.GetOrCreateAdjustmentsCategoryAsync(TestUserId);
+
+        // Assert
+        createdFolder.Should().NotBeNull();
+        createdFolder!.Name.Should().Be("Adjustments");
+        createdFolder.Type.Should().Be(LabelType.Folder);
+        createdFolder.IsSystem.Should().BeTrue();
+        
+        createdCategory.Should().NotBeNull();
+        createdCategory!.Name.Should().Be("Balance Adjustment");
+        createdCategory.Type.Should().Be(LabelType.Category);
+        createdCategory.IsSystem.Should().BeTrue();
+        createdCategory.ParentId.Should().Be(createdFolder.Id);
+        
+        result.Name.Should().Be("Balance Adjustment");
+    }
+
+    [Fact]
+    public async Task GetOrCreateAdjustmentsCategoryAsync_WithExistingFolder_ShouldOnlyCreateCategory()
+    {
+        // Arrange
+        var existingFolder = new Label
+        {
+            Id = "existing-folder-id",
+            UserId = TestUserId,
+            Name = "Adjustments",
+            Type = LabelType.Folder,
+            IsSystem = true
+        };
+        
+        _labelRepositoryMock.Setup(x => x.GetByUserIdAsync(TestUserId))
+            .ReturnsAsync(new List<Label> { existingFolder });
+        
+        Label? createdLabel = null;
+        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>()))
+            .Callback<Label>(label => createdLabel = label)
+            .ReturnsAsync((Label l) => l);
+
+        // Act
+        var result = await _labelService.GetOrCreateAdjustmentsCategoryAsync(TestUserId);
+
+        // Assert
+        // Should only create category, not folder
+        _labelRepositoryMock.Verify(x => x.CreateAsync(It.IsAny<Label>()), Times.Once);
+        
+        createdLabel.Should().NotBeNull();
+        createdLabel!.Name.Should().Be("Balance Adjustment");
+        createdLabel.Type.Should().Be(LabelType.Category);
+        createdLabel.ParentId.Should().Be("existing-folder-id");
     }
 
     #endregion

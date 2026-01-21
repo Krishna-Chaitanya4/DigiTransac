@@ -60,6 +60,7 @@ export default function TransactionsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -292,7 +293,7 @@ export default function TransactionsPage() {
   // Handle transaction form submit
   const handleFormSubmit = async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
     setIsSubmitting(true);
-    setError(null);
+    setFormError(null);
     try {
       if (editingTransaction) {
         await updateTransaction(editingTransaction.id, data as UpdateTransactionRequest);
@@ -305,7 +306,7 @@ export default function TransactionsPage() {
     } catch (err) {
       logger.error('Failed to save transaction:', err);
       const message = err instanceof Error ? err.message : 'Failed to save transaction. Please try again.';
-      setError(message);
+      setFormError(message);
       // Don't close the form on error so user can fix and retry
     } finally {
       setIsSubmitting(false);
@@ -434,6 +435,7 @@ export default function TransactionsPage() {
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setEditingTransaction(null);
+    setFormError(null);
   };
 
   // Get active filter count (excluding date range and search)
@@ -708,6 +710,7 @@ export default function TransactionsPage() {
         tags={tags}
         isLoading={isSubmitting}
         autoLocationEnabled={true}
+        error={formError}
         onCreateTag={async (name) => {
           try {
             const newTag = await createTag({ name });

@@ -16,6 +16,7 @@ public class AccountServiceTests
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
     private readonly Mock<IDekCacheService> _dekCacheServiceMock;
     private readonly Mock<IEncryptionService> _encryptionServiceMock;
+    private readonly Mock<ILabelService> _labelServiceMock;
     private readonly AccountService _accountService;
     private const string TestUserId = "test-user-id";
     private readonly byte[] _testDek = new byte[32];
@@ -29,6 +30,7 @@ public class AccountServiceTests
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
         _dekCacheServiceMock = new Mock<IDekCacheService>();
         _encryptionServiceMock = new Mock<IEncryptionService>();
+        _labelServiceMock = new Mock<ILabelService>();
         
         // Setup encryption service to pass through values (no-op for tests)
         _encryptionServiceMock.Setup(x => x.Encrypt(It.IsAny<string>(), It.IsAny<byte[]>()))
@@ -69,6 +71,16 @@ public class AccountServiceTests
         _transactionRepositoryMock.Setup(x => x.GetCountByAccountIdAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(0);
         
+        // Setup default adjustment category for balance adjustments
+        _labelServiceMock.Setup(x => x.GetOrCreateAdjustmentsCategoryAsync(It.IsAny<string>()))
+            .ReturnsAsync(new Label
+            {
+                Id = "adjustment-category-id",
+                Name = "Balance Adjustment",
+                Type = LabelType.Category,
+                IsSystem = true
+            });
+        
         _accountService = new AccountService(
             _accountRepositoryMock.Object,
             _transactionRepositoryMock.Object,
@@ -76,7 +88,8 @@ public class AccountServiceTests
             _exchangeRateServiceMock.Object,
             _keyManagementServiceMock.Object,
             _dekCacheServiceMock.Object,
-            _encryptionServiceMock.Object);
+            _encryptionServiceMock.Object,
+            _labelServiceMock.Object);
     }
 
     #region GetAllAsync Tests
@@ -564,7 +577,92 @@ public class AccountServiceTests
     #region AdjustBalanceAsync Tests
 
     [Fact]
-    public async Task AdjustBalanceAsync_WithValidRequest_ShouldUpdateBalance()
+    public async Task AdjustBalanceAsync_WithValidRequest_ShouldCreateTransactionAndUpdateBalance()
+    {
+        // Arrange
+        var existingAccount = new Account
+        {
+            Id = "1",
+            UserId = TestUserId,
+            Name = "Savings",
+            Type = AccountType.Bank,
+            Currency = "INR",
+            CurrentBalance = 5000
+        };
+
+        _accountRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(existingAccount);
+        _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
+            .ReturnsAsync((Transaction t) => t);
+
+        var request = new AdjustBalanceRequest(NewBalance: 7500, Notes: "Adjustment note");
+
+        // Act
+        var result = await _accountService.AdjustBalanceAsync("1", TestUserId, request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        existingAccount.CurrentBalance.Should().Be(7500);
+        _accountRepositoryMock.Verify(x => x.UpdateAsync(existingAccount), Times.Once);
+        
+        // Verify transaction was created with correct values
+        _transactionRepositoryMock.Verify(x => x.CreateAsync(It.Is<Transaction>(t =>
+            t.UserId == TestUserId &&
+            t.AccountId == "1" &&
+            t.Type == TransactionType.Credit && // Positive adjustment = Credit
+            t.Amount == 2500 && // Difference: 7500 - 5000
+            t.Currency == "INR" &&
+            t.Title == "Balance Adjustment" &&
+            t.Splits != null &&
+            t.Splits.Count == 1 &&
+            t.Splits[0].LabelId == "adjustment-category-id" &&
+            t.Splits[0].Amount == 2500
+        )), Times.Once);
+        
+        // Verify label service was called to get the adjustment category
+        _labelServiceMock.Verify(x => x.GetOrCreateAdjustmentsCategoryAsync(TestUserId), Times.Once);
+    }
+
+    [Fact]
+    public async Task AdjustBalanceAsync_WithNegativeAdjustment_ShouldCreateDebitTransaction()
+    {
+        // Arrange
+        var existingAccount = new Account
+        {
+            Id = "1",
+            UserId = TestUserId,
+            Name = "Savings",
+            Type = AccountType.Bank,
+            Currency = "INR",
+            CurrentBalance = 5000
+        };
+
+        _accountRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
+            .ReturnsAsync(existingAccount);
+        _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
+            .ReturnsAsync((Transaction t) => t);
+
+        var request = new AdjustBalanceRequest(NewBalance: 3000, Notes: null);
+
+        // Act
+        var result = await _accountService.AdjustBalanceAsync("1", TestUserId, request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        existingAccount.CurrentBalance.Should().Be(3000);
+        
+        // Verify transaction was created as Debit for negative adjustment with category
+        _transactionRepositoryMock.Verify(x => x.CreateAsync(It.Is<Transaction>(t =>
+            t.Type == TransactionType.Debit &&
+            t.Amount == 2000 && // Abs difference: |3000 - 5000|
+            t.Splits != null &&
+            t.Splits.Count == 1 &&
+            t.Splits[0].LabelId == "adjustment-category-id"
+        )), Times.Once);
+    }
+
+    [Fact]
+    public async Task AdjustBalanceAsync_WithNoChange_ShouldNotCreateTransaction()
     {
         // Arrange
         var existingAccount = new Account
@@ -580,16 +678,16 @@ public class AccountServiceTests
         _accountRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
             .ReturnsAsync(existingAccount);
 
-        var request = new AdjustBalanceRequest(NewBalance: 7500, Notes: "Adjustment note");
+        var request = new AdjustBalanceRequest(NewBalance: 5000, Notes: null);
 
         // Act
         var result = await _accountService.AdjustBalanceAsync("1", TestUserId, request);
 
         // Assert
         result.Success.Should().BeTrue();
-        existingAccount.CurrentBalance.Should().Be(7500);
-        existingAccount.Notes.Should().Be("Adjustment note");
-        _accountRepositoryMock.Verify(x => x.UpdateAsync(existingAccount), Times.Once);
+        result.Message.Should().Contain("already");
+        _transactionRepositoryMock.Verify(x => x.CreateAsync(It.IsAny<Transaction>()), Times.Never);
+        _accountRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Account>()), Times.Never);
     }
 
     [Fact]
@@ -607,34 +705,6 @@ public class AccountServiceTests
         // Assert
         result.Success.Should().BeFalse();
         result.Message.Should().Contain("not found");
-    }
-
-    [Fact]
-    public async Task AdjustBalanceAsync_WithoutNotes_ShouldNotUpdateNotes()
-    {
-        // Arrange
-        var existingAccount = new Account
-        {
-            Id = "1",
-            UserId = TestUserId,
-            Name = "Savings",
-            Type = AccountType.Bank,
-            Currency = "INR",
-            CurrentBalance = 5000,
-            Notes = "Original notes"
-        };
-
-        _accountRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId))
-            .ReturnsAsync(existingAccount);
-
-        var request = new AdjustBalanceRequest(NewBalance: 7500, Notes: null);
-
-        // Act
-        var result = await _accountService.AdjustBalanceAsync("1", TestUserId, request);
-
-        // Assert
-        result.Success.Should().BeTrue();
-        existingAccount.Notes.Should().Be("Original notes");
     }
 
     #endregion

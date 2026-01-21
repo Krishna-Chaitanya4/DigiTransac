@@ -25,6 +25,7 @@ public class AccountService : IAccountService
     private readonly IKeyManagementService _keyManagementService;
     private readonly IDekCacheService _dekCacheService;
     private readonly IEncryptionService _encryptionService;
+    private readonly ILabelService _labelService;
 
     public AccountService(
         IAccountRepository accountRepository,
@@ -33,7 +34,8 @@ public class AccountService : IAccountService
         IExchangeRateService exchangeRateService,
         IKeyManagementService keyManagementService,
         IDekCacheService dekCacheService,
-        IEncryptionService encryptionService)
+        IEncryptionService encryptionService,
+        ILabelService labelService)
     {
         _accountRepository = accountRepository;
         _transactionRepository = transactionRepository;
@@ -42,6 +44,7 @@ public class AccountService : IAccountService
         _keyManagementService = keyManagementService;
         _dekCacheService = dekCacheService;
         _encryptionService = encryptionService;
+        _labelService = labelService;
     }
 
     private async Task<byte[]?> GetUserDekAsync(string userId)
@@ -334,16 +337,53 @@ public class AccountService : IAccountService
             return (false, "Account not found");
         }
 
-        account.CurrentBalance = request.NewBalance;
-        if (request.Notes != null)
+        var difference = request.NewBalance - account.CurrentBalance;
+        
+        // If there's no change, just return success
+        if (difference == 0)
         {
-            var dek = await GetUserDekAsync(userId);
-            account.Notes = dek != null
-                ? EncryptIfNotEmpty(request.Notes, dek)
-                : request.Notes;
+            return (true, "Balance is already at the requested value");
         }
 
+        // Get or create the "Balance Adjustment" system category
+        var adjustmentCategory = await _labelService.GetOrCreateAdjustmentsCategoryAsync(userId);
+
+        // Create an adjustment transaction to maintain data integrity
+        var dek = await GetUserDekAsync(userId);
+        var adjustmentNotes = string.IsNullOrWhiteSpace(request.Notes)
+            ? "Balance adjustment"
+            : $"Balance adjustment: {request.Notes}";
+
+        var transaction = new Transaction
+        {
+            UserId = userId,
+            AccountId = id,
+            Type = difference > 0 ? TransactionType.Credit : TransactionType.Debit,
+            Amount = Math.Abs(difference),
+            Currency = account.Currency,
+            Date = DateTime.UtcNow,
+            Title = "Balance Adjustment",
+            EncryptedNotes = dek != null ? EncryptIfNotEmpty(adjustmentNotes, dek) : adjustmentNotes,
+            IsCleared = true,
+            Splits = new List<TransactionSplit>
+            {
+                new TransactionSplit
+                {
+                    LabelId = adjustmentCategory.Id,
+                    Amount = Math.Abs(difference)
+                }
+            },
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _transactionRepository.CreateAsync(transaction);
+
+        // Update account balance
+        account.CurrentBalance = request.NewBalance;
+        account.UpdatedAt = DateTime.UtcNow;
         await _accountRepository.UpdateAsync(account);
+
         return (true, "Balance adjusted successfully");
     }
 

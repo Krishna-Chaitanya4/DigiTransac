@@ -48,6 +48,7 @@ interface TransactionFormProps {
   defaultAccountId?: string;
   isLoading: boolean;
   autoLocationEnabled?: boolean;
+  error?: string | null;
 }
 
 export function TransactionForm({
@@ -62,6 +63,7 @@ export function TransactionForm({
   defaultAccountId,
   isLoading,
   autoLocationEnabled = true,
+  error,
 }: TransactionFormProps) {
   const [type, setType] = useState<TransactionType>('Debit');
   const [accountId, setAccountId] = useState(defaultAccountId || '');
@@ -1258,6 +1260,14 @@ export function TransactionForm({
                 />
               </div>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 
+                rounded-lg text-red-600 dark:text-red-400 text-sm mt-4">
+                {error}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3 mt-6">

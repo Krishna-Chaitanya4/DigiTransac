@@ -16,6 +16,7 @@ public interface ILabelService
     Task<int> GetTransactionCountAsync(string id, string userId);
     Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderLabelsRequest request);
     Task CreateDefaultLabelsAsync(string userId);
+    Task<Label> GetOrCreateAdjustmentsCategoryAsync(string userId);
 }
 
 public class LabelService : ILabelService
@@ -308,8 +309,8 @@ public class LabelService : ILabelService
             return folder;
         }
 
-        // Helper to create category (categories are never system labels)
-        void CreateCategory(string name, string parentId, string? icon = null, string? color = null)
+        // Helper to create category
+        void CreateCategory(string name, string parentId, string? icon = null, string? color = null, bool isSystem = false)
         {
             labels.Add(new Label
             {
@@ -321,7 +322,7 @@ public class LabelService : ILabelService
                 Icon = icon,
                 Color = color,
                 Order = order++,
-                IsSystem = false
+                IsSystem = isSystem
             });
         }
 
@@ -399,6 +400,12 @@ public class LabelService : ILabelService
             CreateCategory("Account Transfer", transfers.Id, "🔁");
         }
 
+        // Adjustments (system category for balance adjustments)
+        var adjustments = CreateFolder("Adjustments", null, "⚖️", "#6b7280");
+        {
+            CreateCategory("Balance Adjustment", adjustments.Id, "⚖️", isSystem: true);
+        }
+
         await _labelRepository.CreateManyAsync(labels);
         _logger.LogInformation("Created {Count} default labels for user {UserId}", labels.Count, userId);
     }
@@ -451,5 +458,69 @@ public class LabelService : ILabelService
             label.IsSystem,
             label.CreatedAt
         );
+    }
+
+    public async Task<Label> GetOrCreateAdjustmentsCategoryAsync(string userId)
+    {
+        // First, try to find existing "Balance Adjustment" category
+        var existingLabels = await _labelRepository.GetByUserIdAsync(userId);
+        var existingCategory = existingLabels.FirstOrDefault(l => 
+            l.Name == "Balance Adjustment" && l.Type == LabelType.Category && l.IsSystem);
+        
+        if (existingCategory != null)
+        {
+            return existingCategory;
+        }
+
+        // Find or create the "Adjustments" system folder
+        var adjustmentsFolder = existingLabels.FirstOrDefault(l => 
+            l.Name == "Adjustments" && l.Type == LabelType.Folder && l.IsSystem);
+        
+        if (adjustmentsFolder == null)
+        {
+            // Create the "Adjustments" system folder
+            var folderOrder = existingLabels
+                .Where(l => l.ParentId == null)
+                .Select(l => l.Order)
+                .DefaultIfEmpty(-1)
+                .Max() + 1;
+
+            adjustmentsFolder = new Label
+            {
+                UserId = userId,
+                Name = "Adjustments",
+                Type = LabelType.Folder,
+                Icon = "⚖️",
+                Color = "#6B7280", // Gray color
+                ParentId = null,
+                Order = folderOrder,
+                IsSystem = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _labelRepository.CreateAsync(adjustmentsFolder);
+        }
+
+        // Create the "Balance Adjustment" system category
+        var categoryOrder = existingLabels
+            .Where(l => l.ParentId == adjustmentsFolder.Id)
+            .Select(l => l.Order)
+            .DefaultIfEmpty(-1)
+            .Max() + 1;
+
+        var adjustmentCategory = new Label
+        {
+            UserId = userId,
+            Name = "Balance Adjustment",
+            Type = LabelType.Category,
+            Icon = "⚖️",
+            Color = "#6B7280", // Gray color
+            ParentId = adjustmentsFolder.Id,
+            Order = categoryOrder,
+            IsSystem = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _labelRepository.CreateAsync(adjustmentCategory);
+
+        return adjustmentCategory;
     }
 }
