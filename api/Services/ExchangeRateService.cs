@@ -75,7 +75,12 @@ public class ExchangeRateService : IExchangeRateService
         }
 
         var response = MapToResponse(stored, baseCurrency);
-        _cache.Set(cacheKey, response, MemoryCacheDuration);
+        var cacheOptions = new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = MemoryCacheDuration,
+            Size = 1 // Each exchange rate response counts as 1 unit
+        };
+        _cache.Set(cacheKey, response, cacheOptions);
         return response;
     }
 
@@ -118,7 +123,12 @@ public class ExchangeRateService : IExchangeRateService
             _logger.LogInformation("Successfully updated exchange rates with {Count} currencies", exchangeRate.Rates.Count);
             
             var result = MapToResponse(exchangeRate, null);
-            _cache.Set($"{RatesCacheKey}_USD", result, MemoryCacheDuration);
+            var cacheOptions = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = MemoryCacheDuration,
+                Size = 1 // Each exchange rate response counts as 1 unit
+            };
+            _cache.Set($"{RatesCacheKey}_USD", result, cacheOptions);
             return result;
         }
         catch (Exception ex)
