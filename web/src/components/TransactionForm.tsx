@@ -145,6 +145,7 @@ export function TransactionForm({
         setRecurrenceEndDate('');
       } else {
         // Reset to defaults for new transaction
+        const categoryLabels = labels.filter(l => l.type === 'Category');
         setType('Debit');
         setAccountId(defaultAccountId || accounts[0]?.id || '');
         setAmount(0);
@@ -152,7 +153,7 @@ export function TransactionForm({
         setTitle('');
         setPayee('');
         setNotes('');
-        setSelectedLabelId(categories[0]?.id || '');
+        setSelectedLabelId(categoryLabels[0]?.id || '');
         setSplits([]);
         setSelectedTagIds([]);
         setTransferToAccountId('');
@@ -165,7 +166,7 @@ export function TransactionForm({
         setShowSplits(false);
       }
     }
-  }, [isOpen, editingTransaction, defaultAccountId, accounts, categories]);
+  }, [isOpen, editingTransaction, defaultAccountId, accounts, labels]);
 
   // Update single split when amount or label changes (non-split mode)
   useEffect(() => {
