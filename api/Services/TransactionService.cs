@@ -274,6 +274,9 @@ public class TransactionService : ITransactionService
 
         // Validate transfer
         Account? transferToAccount = null;
+        decimal convertedAmount = request.Amount;
+        Label? accountTransferLabel = null;
+        
         if (type == TransactionType.Transfer)
         {
             if (string.IsNullOrEmpty(request.TransferToAccountId))
@@ -285,11 +288,31 @@ public class TransactionService : ITransactionService
 
             if (request.TransferToAccountId == request.AccountId)
                 return (false, "Cannot transfer to the same account", null);
+                
+            // Convert amount if currencies differ
+            if (!account.Currency.Equals(transferToAccount.Currency, StringComparison.OrdinalIgnoreCase))
+            {
+                var ratesResponse = await _exchangeRateService.GetRatesAsync();
+                convertedAmount = _exchangeRateService.Convert(request.Amount, account.Currency, transferToAccount.Currency, ratesResponse.Rates);
+            }
+            
+            // Find the "Account Transfer" category - transfers are locked to this category
+            accountTransferLabel = labels.FirstOrDefault(l => l.Type == LabelType.Category && l.Name == "Account Transfer");
         }
 
         var dek = await GetUserDekAsync(userId);
         if (dek == null)
             return (false, "Encryption key not available", null);
+
+        // For transfers, use the Account Transfer category
+        var splits = type == TransactionType.Transfer && accountTransferLabel != null
+            ? new List<TransactionSplit> { new() { LabelId = accountTransferLabel.Id, Amount = request.Amount, Notes = null } }
+            : request.Splits.Select(s => new TransactionSplit
+              {
+                  LabelId = s.LabelId,
+                  Amount = s.Amount,
+                  Notes = s.Notes
+              }).ToList();
 
         // Build transaction
         var transaction = new Transaction
@@ -303,12 +326,7 @@ public class TransactionService : ITransactionService
             Title = request.Title,
             EncryptedPayee = EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = EncryptIfNotEmpty(request.Notes, dek),
-            Splits = request.Splits.Select(s => new TransactionSplit
-            {
-                LabelId = s.LabelId,
-                Amount = s.Amount,
-                Notes = s.Notes
-            }).ToList(),
+            Splits = splits,
             TagIds = request.TagIds ?? new List<string>(),
             TransferToAccountId = request.TransferToAccountId,
             IsCleared = true // Default to cleared since users enter transactions after completion
@@ -375,27 +393,32 @@ public class TransactionService : ITransactionService
             // Handle transfer for the first instance
             if (type == TransactionType.Transfer && transferToAccount != null)
             {
+                // Create splits with converted amount for destination account
+                var linkedSplits = accountTransferLabel != null
+                    ? new List<TransactionSplit> { new() { LabelId = accountTransferLabel.Id, Amount = convertedAmount, Notes = null } }
+                    : transaction.Splits.Select(s => new TransactionSplit { LabelId = s.LabelId, Amount = convertedAmount, Notes = s.Notes }).ToList();
+                
                 var linkedFirstInstance = new Transaction
                 {
                     UserId = userId,
                     AccountId = transferToAccount.Id,
                     Type = TransactionType.Credit,
-                    Amount = request.Amount,
+                    Amount = convertedAmount,  // Use converted amount
                     Currency = transferToAccount.Currency,
                     Date = request.Date,
                     Title = request.Title,
                     EncryptedPayee = transaction.EncryptedPayee,
                     EncryptedNotes = transaction.EncryptedNotes,
-                    Splits = transaction.Splits,
+                    Splits = linkedSplits,
                     TagIds = transaction.TagIds,
                     LinkedTransactionId = firstInstance.Id,
-                    IsCleared = true // First instance is auto-cleared
+                    IsCleared = firstInstance.IsCleared  // Sync cleared status
                 };
                 
                 await _transactionRepository.CreateAsync(linkedFirstInstance);
                 firstInstance.LinkedTransactionId = linkedFirstInstance.Id;
                 await _transactionRepository.UpdateAsync(firstInstance);
-                await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, request.Amount, true);
+                await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, convertedAmount, true);  // Use converted amount
             }
             
             // Update NextOccurrence to the next date
@@ -412,20 +435,26 @@ public class TransactionService : ITransactionService
         // Handle transfer - create linked transaction
         if (type == TransactionType.Transfer && transferToAccount != null && !transaction.IsRecurringTemplate)
         {
+            // Create splits with converted amount for the destination account
+            var linkedSplits = accountTransferLabel != null
+                ? new List<TransactionSplit> { new() { LabelId = accountTransferLabel.Id, Amount = convertedAmount, Notes = null } }
+                : transaction.Splits.Select(s => new TransactionSplit { LabelId = s.LabelId, Amount = convertedAmount, Notes = s.Notes }).ToList();
+            
             var linkedTransaction = new Transaction
             {
                 UserId = userId,
                 AccountId = transferToAccount.Id,
                 Type = TransactionType.Credit,
-                Amount = request.Amount,
+                Amount = convertedAmount,  // Use converted amount
                 Currency = transferToAccount.Currency,
                 Date = request.Date,
                 Title = request.Title,
                 EncryptedPayee = EncryptIfNotEmpty(request.Payee, dek),
                 EncryptedNotes = EncryptIfNotEmpty(request.Notes, dek),
-                Splits = transaction.Splits,
+                Splits = linkedSplits,
                 TagIds = transaction.TagIds,
-                LinkedTransactionId = transaction.Id
+                LinkedTransactionId = transaction.Id,
+                IsCleared = transaction.IsCleared  // Sync cleared status
             };
 
             await _transactionRepository.CreateAsync(linkedTransaction);
@@ -433,7 +462,7 @@ public class TransactionService : ITransactionService
             transaction.LinkedTransactionId = linkedTransaction.Id;
             await _transactionRepository.UpdateAsync(transaction);
 
-            await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, request.Amount, true);
+            await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, convertedAmount, true);  // Use converted amount
         }
 
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
@@ -470,6 +499,22 @@ public class TransactionService : ITransactionService
         // Store old values for balance adjustment
         var oldType = transaction.Type;
         var oldAmount = transaction.Amount;
+        var oldAccountId = transaction.AccountId;
+        var oldAccount = account;
+
+        // Handle account change
+        Account? newAccount = null;
+        if (!string.IsNullOrEmpty(request.AccountId) && request.AccountId != transaction.AccountId)
+        {
+            newAccount = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId);
+            if (newAccount == null)
+                return (false, "New account not found", null);
+            if (newAccount.IsArchived)
+                return (false, "Cannot move transaction to an archived account", null);
+            
+            transaction.AccountId = request.AccountId;
+            transaction.Currency = newAccount.Currency;  // Update currency to match new account
+        }
 
         // Update fields
         if (request.Type != null && Enum.TryParse<TransactionType>(request.Type, true, out var newType))
@@ -533,9 +578,108 @@ public class TransactionService : ITransactionService
 
         await _transactionRepository.UpdateAsync(transaction);
 
-        // Adjust balance if amount or type changed
-        if (oldType != transaction.Type || oldAmount != transaction.Amount)
+        // Sync linked transfer transaction
+        if (!string.IsNullOrEmpty(transaction.LinkedTransactionId))
         {
+            var linkedTransaction = await _transactionRepository.GetByIdAndUserIdAsync(transaction.LinkedTransactionId, userId);
+            if (linkedTransaction != null)
+            {
+                var linkedNeedsUpdate = false;
+                var linkedOldAmount = linkedTransaction.Amount;
+                
+                // Always sync these fields
+                if (request.Date.HasValue && linkedTransaction.Date != transaction.Date)
+                {
+                    linkedTransaction.Date = transaction.Date;
+                    linkedNeedsUpdate = true;
+                }
+                if (request.Title != null && linkedTransaction.Title != transaction.Title)
+                {
+                    linkedTransaction.Title = transaction.Title;
+                    linkedNeedsUpdate = true;
+                }
+                if (request.Payee != null)
+                {
+                    linkedTransaction.EncryptedPayee = transaction.EncryptedPayee;
+                    linkedNeedsUpdate = true;
+                }
+                if (request.Notes != null)
+                {
+                    linkedTransaction.EncryptedNotes = transaction.EncryptedNotes;
+                    linkedNeedsUpdate = true;
+                }
+                if (request.TagIds != null)
+                {
+                    linkedTransaction.TagIds = transaction.TagIds;
+                    linkedNeedsUpdate = true;
+                }
+                if (request.IsCleared.HasValue && linkedTransaction.IsCleared != transaction.IsCleared)
+                {
+                    linkedTransaction.IsCleared = transaction.IsCleared;
+                    linkedNeedsUpdate = true;
+                }
+                
+                // Handle amount sync based on currency and which side is being edited
+                if (request.Amount.HasValue && oldAmount != transaction.Amount)
+                {
+                    var isSameCurrency = transaction.Currency.Equals(linkedTransaction.Currency, StringComparison.OrdinalIgnoreCase);
+                    var isSourceSide = transaction.Type == TransactionType.Debit || transaction.Type == TransactionType.Transfer;
+                    
+                    if (isSameCurrency)
+                    {
+                        // Same currency: always sync amount
+                        linkedTransaction.Amount = transaction.Amount;
+                        // Update splits amount too
+                        if (linkedTransaction.Splits.Count > 0)
+                        {
+                            linkedTransaction.Splits[0].Amount = transaction.Amount;
+                        }
+                        linkedNeedsUpdate = true;
+                    }
+                    else if (isSourceSide)
+                    {
+                        // Different currencies AND editing source: recalculate destination with exchange rate
+                        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+                        var convertedAmount = _exchangeRateService.Convert(transaction.Amount, transaction.Currency, linkedTransaction.Currency, ratesResponse.Rates);
+                        linkedTransaction.Amount = convertedAmount;
+                        // Update splits amount too
+                        if (linkedTransaction.Splits.Count > 0)
+                        {
+                            linkedTransaction.Splits[0].Amount = convertedAmount;
+                        }
+                        linkedNeedsUpdate = true;
+                    }
+                    // If editing destination side with different currencies: DON'T update source (allow manual correction)
+                }
+                
+                if (linkedNeedsUpdate)
+                {
+                    await _transactionRepository.UpdateAsync(linkedTransaction);
+                    
+                    // Update linked account balance if amount changed
+                    if (linkedTransaction.Amount != linkedOldAmount)
+                    {
+                        var linkedAccount = await _accountRepository.GetByIdAndUserIdAsync(linkedTransaction.AccountId, userId);
+                        if (linkedAccount != null)
+                        {
+                            await UpdateAccountBalanceAsync(linkedAccount, linkedTransaction.Type, linkedOldAmount, false);
+                            await UpdateAccountBalanceAsync(linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, true);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Adjust balances
+        if (newAccount != null)
+        {
+            // Account changed - reverse from old account, apply to new account
+            await UpdateAccountBalanceAsync(oldAccount, oldType, oldAmount, false);
+            await UpdateAccountBalanceAsync(newAccount, transaction.Type, transaction.Amount, true);
+        }
+        else if (oldType != transaction.Type || oldAmount != transaction.Amount)
+        {
+            // Same account but amount or type changed
             await UpdateAccountBalanceAsync(account, oldType, oldAmount, false);
             await UpdateAccountBalanceAsync(account, transaction.Type, transaction.Amount, true);
         }

@@ -74,6 +74,9 @@ export default function TransactionsPage() {
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState<TransactionFilter>({});
   
+  // Linked transaction navigation
+  const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null);
+  
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -343,6 +346,29 @@ export default function TransactionsPage() {
       setError('Failed to update transaction. Please try again.');
     }
   };
+
+  // Handle view linked transaction
+  const handleViewLinkedTransaction = useCallback((linkedTransactionId: string, _linkedAccountId: string) => {
+    // Clear account filter to show all accounts (linked transaction might be in different account)
+    setFilter(prev => ({ ...prev, accountIds: undefined }));
+    
+    // Set the transaction to highlight
+    setHighlightedTransactionId(linkedTransactionId);
+    
+    // Clear highlight after animation
+    setTimeout(() => setHighlightedTransactionId(null), 3000);
+    
+    // Reload transactions to include all accounts, then scroll to the linked one
+    loadTransactions(1, false).then(() => {
+      // Small delay to let the DOM update
+      setTimeout(() => {
+        const element = document.querySelector(`[data-transaction-id="${linkedTransactionId}"]`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    });
+  }, []);
 
   // Batch operations
   const handleBatchDelete = async () => {
@@ -656,6 +682,8 @@ export default function TransactionsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onToggleCleared={handleToggleCleared}
+          onViewLinkedTransaction={handleViewLinkedTransaction}
+          highlightedTransactionId={highlightedTransactionId}
           isLoading={showLoadingSkeleton}
           selectionMode={hasSelection}
           selectedIds={selectedIds}

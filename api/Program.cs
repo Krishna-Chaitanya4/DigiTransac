@@ -108,6 +108,18 @@ builder.Services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>()
 builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
 
 // Add HttpClient for external API calls
+builder.Services.AddHttpClient("ExchangeRates", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);  // Standard timeout for user-facing requests
+    client.DefaultRequestHeaders.Add("User-Agent", "DigiTransac/1.0");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AutomaticDecompression = System.Net.DecompressionMethods.All,
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+});
+
+// Also add default HttpClient
 builder.Services.AddHttpClient();
 
 // Add memory cache for DEK caching

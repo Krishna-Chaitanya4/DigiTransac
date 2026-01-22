@@ -49,6 +49,10 @@ public static class CurrencyEndpoints
                 var rates = await exchangeRateService.RefreshRatesAsync();
                 return Results.Ok(rates);
             }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: 503);  // Service Unavailable
+            }
             catch (Exception)
             {
                 return Results.Problem("Failed to refresh exchange rates. Please try again later.");

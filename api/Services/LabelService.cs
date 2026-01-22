@@ -290,8 +290,7 @@ public class LabelService : ILabelService
         var order = 0;
 
         // Helper to create folder
-        // Only root folders (parentId = null) are marked as system labels
-        Label CreateFolder(string name, string? parentId = null, string? icon = null, string? color = null)
+        Label CreateFolder(string name, string? parentId = null, string? icon = null, string? color = null, bool isSystem = false)
         {
             var folder = new Label
             {
@@ -303,7 +302,7 @@ public class LabelService : ILabelService
                 Icon = icon,
                 Color = color,
                 Order = order++,
-                IsSystem = parentId == null  // Only root folders are system labels
+                IsSystem = isSystem || parentId == null  // Root folders are system by default
             };
             labels.Add(folder);
             return folder;
@@ -394,14 +393,14 @@ public class LabelService : ILabelService
             CreateCategory("Gift Received", gifts.Id, "🎊");
         }
 
-        // Transfers
-        var transfers = CreateFolder("Transfers", null, "🔄", "#6b7280");
+        // Transfers (system category - used automatically for account transfers)
+        var transfers = CreateFolder("Transfers", null, "🔄", "#6b7280", isSystem: true);
         {
-            CreateCategory("Account Transfer", transfers.Id, "🔁");
+            CreateCategory("Account Transfer", transfers.Id, "🔁", isSystem: true);
         }
 
         // Adjustments (system category for balance adjustments)
-        var adjustments = CreateFolder("Adjustments", null, "⚖️", "#6b7280");
+        var adjustments = CreateFolder("Adjustments", null, "⚖️", "#6b7280", isSystem: true);
         {
             CreateCategory("Balance Adjustment", adjustments.Id, "⚖️", isSystem: true);
         }

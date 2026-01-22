@@ -862,7 +862,8 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             IsCleared: true,
-            TransferToAccountId: null);
+            TransferToAccountId: null,
+            AccountId: null);
 
         // Act
         var (success, message, transaction) = await _transactionService.UpdateAsync("trans-1", TestUserId, updateRequest);
@@ -887,7 +888,7 @@ public class TransactionServiceTests
         var updateRequest = new UpdateTransactionRequest(
             Type: null, Amount: null, Date: null, Title: "New Title",
             Payee: null, Notes: null, Splits: null, TagIds: null,
-            Location: null, IsCleared: null, TransferToAccountId: null);
+            Location: null, IsCleared: null, TransferToAccountId: null, AccountId: null);
 
         // Act
         var (success, message, _) = await _transactionService.UpdateAsync("invalid-id", TestUserId, updateRequest);
@@ -921,7 +922,7 @@ public class TransactionServiceTests
         var updateRequest = new UpdateTransactionRequest(
             Type: null, Amount: 100m, Date: null, Title: null,
             Payee: null, Notes: null, Splits: null, TagIds: null,
-            Location: null, IsCleared: null, TransferToAccountId: null);
+            Location: null, IsCleared: null, TransferToAccountId: null, AccountId: null);
 
         // Act
         var (success, message, _) = await _transactionService.UpdateAsync("template-1", TestUserId, updateRequest);

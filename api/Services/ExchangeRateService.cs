@@ -88,15 +88,37 @@ public class ExchangeRateService : IExchangeRateService
     {
         _logger.LogInformation("Fetching fresh exchange rates from API");
         
+        string? json = null;
+        
+        // Try HttpClient first (standard approach)
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(10);
-            
+            var httpClient = _httpClientFactory.CreateClient("ExchangeRates");
             var response = await httpClient.GetAsync(ExchangeRateApiUrl);
             response.EnsureSuccessStatusCode();
-            
-            var json = await response.Content.ReadAsStringAsync();
+            json = await response.Content.ReadAsStringAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "HttpClient failed, falling back to curl");
+        }
+        
+        // Fallback to curl if HttpClient fails (handles proxy/firewall issues on some systems)
+        if (string.IsNullOrEmpty(json))
+        {
+            try
+            {
+                json = await FetchWithCurlAsync(ExchangeRateApiUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Curl fallback also failed");
+                throw new InvalidOperationException("Unable to fetch exchange rates. Please check your internet connection.", ex);
+            }
+        }
+        
+        try
+        {
             var apiResponse = JsonSerializer.Deserialize<ExchangeRateApiResponse>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -131,11 +153,37 @@ public class ExchangeRateService : IExchangeRateService
             _cache.Set($"{RatesCacheKey}_USD", result, cacheOptions);
             return result;
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to fetch exchange rates from API");
-            throw;
+            _logger.LogError(ex, "Failed to parse exchange rate API response");
+            throw new InvalidOperationException("Invalid response from exchange rate service.", ex);
         }
+    }
+    
+    private async Task<string> FetchWithCurlAsync(string url)
+    {
+        using var process = new System.Diagnostics.Process();
+        process.StartInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "curl",
+            Arguments = $"-s \"{url}\" -m 15",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        
+        process.Start();
+        var output = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        
+        if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
+        {
+            var error = await process.StandardError.ReadToEndAsync();
+            throw new InvalidOperationException($"Curl failed with exit code {process.ExitCode}: {error}");
+        }
+        
+        return output;
     }
 
     public decimal Convert(decimal amount, string fromCurrency, string toCurrency, Dictionary<string, decimal> rates)

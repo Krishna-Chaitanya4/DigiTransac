@@ -687,14 +687,14 @@ public class LabelServiceTests
         rootFolders.Should().AllSatisfy(l => l.IsSystem.Should().BeTrue());
         rootFolders.Select(l => l.Name).Should().Contain(new[] { "Expenses", "Income", "Investments", "Gifts", "Transfers", "Adjustments" });
         
-        // Non-root items (have a parent) should NOT be system labels, except for the "Balance Adjustment" category
+        // Non-root items (have a parent) should NOT be system labels, except for special system categories
         var nestedItems = capturedLabels!.Where(l => l.ParentId != null).ToList();
         nestedItems.Should().NotBeEmpty();
         
-        // Only "Balance Adjustment" category is a system label (for balance adjustments)
+        // "Account Transfer" and "Balance Adjustment" categories are system labels
         var systemNestedItems = nestedItems.Where(l => l.IsSystem).ToList();
-        systemNestedItems.Should().ContainSingle()
-            .Which.Name.Should().Be("Balance Adjustment");
+        systemNestedItems.Should().HaveCount(2);
+        systemNestedItems.Select(l => l.Name).Should().Contain(new[] { "Account Transfer", "Balance Adjustment" });
         
         var nonSystemNestedItems = nestedItems.Where(l => !l.IsSystem).ToList();
         nonSystemNestedItems.Should().NotBeEmpty();

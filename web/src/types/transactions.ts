@@ -146,6 +146,7 @@ export interface UpdateTransactionRequest {
   location?: TransactionLocationRequest;
   isCleared?: boolean;
   transferToAccountId?: string;
+  accountId?: string;
 }
 
 export interface TransactionFilter {

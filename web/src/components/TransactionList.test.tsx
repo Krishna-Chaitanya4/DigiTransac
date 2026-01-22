@@ -720,6 +720,7 @@ describe('TransactionList', () => {
         type: 'Transfer',
         accountId: 'acc-1',
         transferToAccountId: 'acc-2',
+        linkedTransactionId: 'linked-tx-1',
       });
       
       render(
@@ -736,6 +737,38 @@ describe('TransactionList', () => {
       fireEvent.click(row!);
       
       expect(screen.getByText('→ Savings')).toBeInTheDocument();
+    });
+
+    it('should call onViewLinkedTransaction when View linked button is clicked', () => {
+      const fromAccount = createAccount({ id: 'acc-1', name: 'Checking' });
+      const toAccount = createAccount({ id: 'acc-2', name: 'Savings' });
+      const transaction = createTransaction({
+        type: 'Transfer',
+        accountId: 'acc-1',
+        transferToAccountId: 'acc-2',
+        linkedTransactionId: 'linked-tx-1',
+      });
+      const onViewLinkedTransaction = vi.fn();
+      
+      render(
+        <TransactionList
+          {...defaultProps}
+          transactions={[transaction]}
+          accounts={[fromAccount, toAccount]}
+          labels={[createLabel()]}
+          onViewLinkedTransaction={onViewLinkedTransaction}
+        />
+      );
+      
+      // Expand
+      const row = screen.getByText('Test Transaction').closest('.cursor-pointer');
+      fireEvent.click(row!);
+      
+      // Click View linked button
+      const viewLinkedButton = screen.getByText('View linked');
+      fireEvent.click(viewLinkedButton);
+      
+      expect(onViewLinkedTransaction).toHaveBeenCalledWith('linked-tx-1', 'acc-2');
     });
   });
 

@@ -47,7 +47,8 @@ public record UpdateTransactionRequest(
     List<string>? TagIds,
     TransactionLocationRequest? Location,
     bool? IsCleared,
-    string? TransferToAccountId
+    string? TransferToAccountId,
+    string? AccountId  // Allow changing the account
 );
 
 public record TransactionFilterRequest(

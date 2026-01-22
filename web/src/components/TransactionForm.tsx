@@ -168,6 +168,20 @@ export function TransactionForm({
     }
   }, [isOpen, editingTransaction, defaultAccountId, accounts, labels]);
 
+  // Auto-select "To Account" for transfers
+  useEffect(() => {
+    if (type === 'Transfer' && !editingTransaction) {
+      // Find first non-archived account that's different from the selected account
+      const availableAccounts = accounts.filter(a => !a.isArchived && a.id !== accountId);
+      if (availableAccounts.length > 0 && !transferToAccountId) {
+        setTransferToAccountId(availableAccounts[0].id);
+      } else if (transferToAccountId === accountId) {
+        // If current "To" account matches "From", select a different one
+        setTransferToAccountId(availableAccounts[0]?.id || '');
+      }
+    }
+  }, [type, accountId, accounts, editingTransaction, transferToAccountId]);
+
   // Update single split when amount or label changes (non-split mode)
   useEffect(() => {
     if (!showSplits && selectedLabelId && amount > 0) {
@@ -218,6 +232,7 @@ export function TransactionForm({
         tagIds: selectedTagIds,
         location: includeLocation && location ? location : undefined,
         transferToAccountId: type === 'Transfer' ? transferToAccountId : undefined,
+        accountId,
       };
       onSubmit(updateData);
     } else {
@@ -288,11 +303,9 @@ export function TransactionForm({
                 <select
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
-                  disabled={!!editingTransaction}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                    focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                    disabled:bg-gray-100 dark:disabled:bg-gray-700"
+                    focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 >
                   <option value="">Select account...</option>
@@ -325,6 +338,22 @@ export function TransactionForm({
                       </option>
                     ))}
                   </select>
+                  {/* Currency conversion info */}
+                  {transferToAccountId && (() => {
+                    const destAccount = accounts.find(a => a.id === transferToAccountId);
+                    const sourceAccount = accounts.find(a => a.id === accountId);
+                    const isCrossCurrency = destAccount && sourceAccount && destAccount.currency !== sourceAccount.currency;
+                    return isCrossCurrency ? (
+                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="inline-flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                          </svg>
+                          Amount will be converted from {sourceAccount.currency} to {destAccount.currency}
+                        </span>
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
               )}
 
@@ -355,8 +384,8 @@ export function TransactionForm({
                 maxDate={new Date()}
               />
 
-              {/* Category (Single Mode) */}
-              {!showSplits && (
+              {/* Category (Single Mode) - Hidden for transfers */}
+              {!showSplits && type !== 'Transfer' && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -379,8 +408,25 @@ export function TransactionForm({
                 </div>
               )}
 
-              {/* Split Categories */}
-              {showSplits && (
+              {/* Category (Locked for transfers) */}
+              {type === 'Transfer' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Category
+                  </label>
+                  <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg 
+                    bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                    <span>🔁</span>
+                    <span>Account Transfer</span>
+                    <svg className="w-4 h-4 ml-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+
+              {/* Split Categories - Hidden for transfers */}
+              {showSplits && type !== 'Transfer' && (
                 <SplitCategoriesSection
                   splits={splits}
                   onSplitsChange={setSplits}
@@ -489,7 +535,9 @@ export function TransactionForm({
               </button>
               <button
                 type="submit"
-                disabled={isLoading || amount <= 0 || !accountId || (!showSplits && !selectedLabelId) || (showSplits && !splitsValid)}
+                disabled={isLoading || amount <= 0 || !accountId || 
+                  (type === 'Transfer' ? !transferToAccountId : 
+                    ((!showSplits && !selectedLabelId) || (showSplits && !splitsValid)))}
                 className="flex-1 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 
                   font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >

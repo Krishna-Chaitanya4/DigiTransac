@@ -27,7 +27,7 @@ import {
 } from '../components/accounts';
 
 export default function AccountsPage() {
-  const { formatWithConversion, primaryCurrency: userPrimaryCurrency } = useCurrency();
+  const { formatWithConversion, primaryCurrency: userPrimaryCurrency, refreshRates: refreshCurrencyContext } = useCurrency();
   
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [summary, setSummary] = useState<AccountSummary | null>(null);
@@ -72,13 +72,15 @@ export default function AccountsPage() {
   const handleRefreshRates = useCallback(async () => {
     try {
       await refreshExchangeRates();
+      // Update CurrencyContext to use new rates
+      await refreshCurrencyContext();
       // Reload summary to get updated converted values
       const summaryData = await getAccountSummary();
       setSummary(summaryData);
     } catch {
       setError('Failed to refresh exchange rates');
     }
-  }, []);
+  }, [refreshCurrencyContext]);
 
   // Group accounts by type
   const groupedAccounts = useMemo(() => {

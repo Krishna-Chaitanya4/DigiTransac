@@ -13,6 +13,7 @@ interface TransactionRowProps {
   account: Account | undefined;
   primaryLabel: Label | undefined;
   isExpanded: boolean;
+  isHighlighted: boolean;
   currencySymbol: string;
   primaryCurrency: string;
   formatWithConversion: (amount: number, currency: string) => { original: string; converted: string | null };
@@ -26,6 +27,7 @@ interface TransactionRowProps {
   onToggleCleared: (id: string, cleared: boolean) => void;
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
+  onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
 }
 
 const TransactionRow = memo(function TransactionRow({
@@ -33,6 +35,7 @@ const TransactionRow = memo(function TransactionRow({
   account,
   primaryLabel,
   isExpanded,
+  isHighlighted,
   currencySymbol,
   primaryCurrency,
   formatWithConversion,
@@ -46,6 +49,7 @@ const TransactionRow = memo(function TransactionRow({
   onToggleCleared,
   onEdit,
   onDelete,
+  onViewLinkedTransaction,
 }: TransactionRowProps) {
   const handleClick = useCallback(() => {
     if (selectionMode && onToggleSelection) {
@@ -122,11 +126,13 @@ const TransactionRow = memo(function TransactionRow({
       leftBgColor="bg-red-500"
     >
       <div
+        data-transaction-id={transaction.id}
         className={`bg-white dark:bg-gray-800 rounded-lg border 
           ${transaction.isCleared 
             ? 'border-gray-200 dark:border-gray-700' 
             : 'border-l-4 border-l-yellow-400 border-gray-200 dark:border-gray-700 dark:border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10'
-          } ${selectionMode && isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''} overflow-hidden transition-all`}
+          } ${selectionMode && isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''} 
+          ${isHighlighted ? 'ring-2 ring-blue-500 ring-inset animate-pulse' : ''} overflow-hidden transition-all`}
       >
         {/* Main Row */}
         <div
@@ -279,9 +285,37 @@ const TransactionRow = memo(function TransactionRow({
             )}
             
             {/* Transfer details */}
-            {transaction.type === 'Transfer' && transaction.transferToAccountId && (
-              <div className="text-sm text-blue-600 dark:text-blue-400 mb-3">
-                → {accountMap.get(transaction.transferToAccountId)?.name || 'Unknown Account'}
+            {(transaction.type === 'Transfer' || transaction.type === 'Credit') && transaction.linkedTransactionId && (
+              <div className="text-sm mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                    </svg>
+                    {transaction.type === 'Transfer' 
+                      ? `→ ${accountMap.get(transaction.transferToAccountId!)?.name || 'Unknown Account'}`
+                      : `← From linked transfer`
+                    }
+                  </div>
+                  {onViewLinkedTransaction && (
+                    <button
+                      onClick={() => {
+                        // For Transfer (debit side), the linked is the credit in transferToAccountId
+                        // For Credit side, we need to find which account the linked transaction is in
+                        const linkedAccountId = transaction.type === 'Transfer' 
+                          ? transaction.transferToAccountId!
+                          : transaction.accountId; // The linked debit will show us to navigate there
+                        onViewLinkedTransaction(transaction.linkedTransactionId!, linkedAccountId);
+                      }}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    >
+                      View linked
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             
@@ -327,6 +361,8 @@ interface TransactionListProps {
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
   onToggleCleared: (id: string, isCleared: boolean) => void;
+  onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
+  highlightedTransactionId?: string | null;
   isLoading?: boolean;
   /** Selection mode props */
   selectionMode?: boolean;
@@ -411,6 +447,8 @@ export function TransactionList({
   onEdit,
   onDelete,
   onToggleCleared,
+  onViewLinkedTransaction,
+  highlightedTransactionId,
   isLoading = false,
   selectionMode = false,
   selectedIds = new Set(),
@@ -515,6 +553,7 @@ export function TransactionList({
                     account={account}
                     primaryLabel={primaryLabel}
                     isExpanded={isExpanded}
+                    isHighlighted={highlightedTransactionId === transaction.id}
                     currencySymbol={currencySymbol}
                     primaryCurrency={primaryCurrency}
                     formatWithConversion={formatWithConversion}
@@ -528,6 +567,7 @@ export function TransactionList({
                     onToggleCleared={onToggleCleared}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onViewLinkedTransaction={onViewLinkedTransaction}
                   />
                 );
               })}
