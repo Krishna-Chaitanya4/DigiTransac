@@ -36,6 +36,11 @@ coverage/
 # Bundle analysis
 bundle-stats.html
 
+# Playwright
+playwright-report/
+playwright/.cache/
+test-results/
+
 # Misc
 *.swp
 *.swo
