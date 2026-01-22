@@ -185,6 +185,7 @@ public class TransactionService : ITransactionService
         var rates = ratesResponse.Rates;
 
         // Convert all transaction amounts to user's primary currency before summing
+        // Transfers are included - this allows seeing currency conversion gains/losses
         decimal totalCredits = 0;
         decimal totalDebits = 0;
         
@@ -198,8 +199,8 @@ public class TransactionService : ITransactionService
             
             if (t.Type == TransactionType.Credit)
                 totalCredits += convertedAmount;
-            else if (t.Type == TransactionType.Debit)
-                totalDebits += convertedAmount;
+            else if (t.Type == TransactionType.Debit || t.Type == TransactionType.Transfer)
+                totalDebits += convertedAmount;  // Transfer = money leaving the account
         }
 
         // Get sums by label (for the filtered date range)

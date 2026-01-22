@@ -197,9 +197,10 @@ const TransactionRow = memo(function TransactionRow({
           </div>
           
           {/* Amount */}
-          <div className={`text-right flex-shrink-0 ${getTypeColor(transaction.type)}`}>
+          <div className={`text-right flex-shrink-0 ${getTypeColor(getDisplayType(transaction))}`}>
             <span className="font-semibold">
-              {transaction.type === 'Credit' ? '+' : transaction.type === 'Debit' ? '-' : ''}
+              {/* Show +/- based on money flow: Credit or receiving transfer = +, Debit or sending transfer = - */}
+              {transaction.type === 'Credit' ? '+' : transaction.type === 'Debit' || transaction.type === 'Transfer' ? '-' : ''}
               {currencySymbol}{formatAmount(transaction.amount, transaction.currency)}
             </span>
             {/* Show converted amount if currency differs from primary */}
@@ -209,7 +210,7 @@ const TransactionRow = memo(function TransactionRow({
               </div>
             )}
             <div className="text-xs opacity-70" aria-hidden="true">
-              {getTypeIcon(transaction.type)} {transaction.type}
+              {getTypeIcon(getDisplayType(transaction))} {getDisplayType(transaction)}
             </div>
           </div>
           
@@ -368,6 +369,15 @@ interface TransactionListProps {
   selectionMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelection?: (id: string) => void;
+}
+
+// Get display type - linked transactions always show as Transfer
+function getDisplayType(transaction: Transaction): TransactionType {
+  // If transaction has a linked transaction, it's part of a transfer
+  if (transaction.linkedTransactionId) {
+    return 'Transfer';
+  }
+  return transaction.type;
 }
 
 // Get type color
