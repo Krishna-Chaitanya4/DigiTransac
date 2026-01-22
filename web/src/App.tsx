@@ -1,10 +1,11 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import OfflineIndicator from './components/OfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Lazy load pages for better initial load performance
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -16,6 +17,18 @@ const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const LabelsPage = lazy(() => import('./pages/LabelsPage'));
 const InsightsPage = lazy(() => import('./pages/InsightsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+
+/**
+ * Wraps a page component with an error boundary for granular error handling.
+ * This prevents errors in one page from crashing the entire app.
+ */
+function PageBoundary({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <ErrorBoundary name={`Page:${name}`}>
+      {children}
+    </ErrorBoundary>
+  );
+}
 
 // Loading spinner for Suspense fallback
 function PageLoader() {
@@ -41,18 +54,18 @@ function App() {
     <>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
-          <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
-          <Route path="/forgot-password" element={user ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} />
+          <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <PageBoundary name="Login"><LoginPage /></PageBoundary>} />
+          <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <PageBoundary name="Register"><RegisterPage /></PageBoundary>} />
+          <Route path="/forgot-password" element={user ? <Navigate to="/dashboard" replace /> : <PageBoundary name="ForgotPassword"><ForgotPasswordPage /></PageBoundary>} />
           
           {/* Protected routes with Layout */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/transactions" element={<TransactionsPage />} />
-            <Route path="/accounts" element={<AccountsPage />} />
-            <Route path="/labels" element={<LabelsPage />} />
-            <Route path="/insights" element={<InsightsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/dashboard" element={<PageBoundary name="Dashboard"><DashboardPage /></PageBoundary>} />
+            <Route path="/transactions" element={<PageBoundary name="Transactions"><TransactionsPage /></PageBoundary>} />
+            <Route path="/accounts" element={<PageBoundary name="Accounts"><AccountsPage /></PageBoundary>} />
+            <Route path="/labels" element={<PageBoundary name="Labels"><LabelsPage /></PageBoundary>} />
+            <Route path="/insights" element={<PageBoundary name="Insights"><InsightsPage /></PageBoundary>} />
+            <Route path="/settings" element={<PageBoundary name="Settings"><SettingsPage /></PageBoundary>} />
           </Route>
 
           <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />

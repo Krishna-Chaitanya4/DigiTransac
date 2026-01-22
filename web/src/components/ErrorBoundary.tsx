@@ -1,9 +1,16 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { logger } from '../services/logger';
+import { captureException } from '../services/sentry';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  /** Optional name to identify which boundary caught the error */
+  name?: string;
+  /** Called when error is caught - useful for parent components to react */
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  /** If true, shows a compact inline error instead of full-page */
+  inline?: boolean;
 }
 
 interface State {
@@ -22,7 +29,17 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    logger.error('ErrorBoundary caught an error:', error, errorInfo);
+    const boundaryName = this.props.name || 'Unknown';
+    logger.error(`ErrorBoundary [${boundaryName}] caught an error:`, error, errorInfo);
+    
+    // Report to Sentry with context
+    captureException(error, {
+      componentStack: errorInfo.componentStack,
+      boundaryName,
+    });
+    
+    // Notify parent if callback provided
+    this.props.onError?.(error, errorInfo);
   }
 
   handleReset = () => {
@@ -34,6 +51,46 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback;
       }
+
+      // Inline error display for component-level boundaries
+      if (this.props.inline) {
+        return (
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" role="alert">
+            <div className="flex items-start gap-3">
+              <svg 
+                className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                strokeWidth={1.5} 
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" 
+                />
+              </svg>
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                  Something went wrong
+                </h3>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                  This section couldn't be loaded. 
+                  <button 
+                    onClick={this.handleReset}
+                    className="ml-2 underline hover:no-underline font-medium"
+                  >
+                    Try again
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Full page error display
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
