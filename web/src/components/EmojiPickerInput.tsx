@@ -1,6 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
-import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import type { EmojiClickData, Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
+
+// Lazy load the heavy emoji picker - only when dropdown is opened
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 interface EmojiPickerInputProps {
   value: string;
@@ -113,16 +116,22 @@ export function EmojiPickerInput({
           className="absolute z-50 mt-1 left-0"
           style={{ maxWidth: '100vw' }}
         >
-          <EmojiPicker
-            onEmojiClick={handleEmojiClick}
-            theme={resolvedTheme === 'dark' ? Theme.DARK : Theme.LIGHT}
-            searchPlaceHolder="Search emoji..."
-            width={320}
-            height={400}
-            previewConfig={{ showPreview: false }}
-            skinTonesDisabled
-            lazyLoadEmojis
-          />
+          <Suspense fallback={
+            <div className="w-80 h-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          }>
+            <EmojiPicker
+              onEmojiClick={handleEmojiClick}
+              theme={resolvedTheme === 'dark' ? 'dark' as Theme : 'light' as Theme}
+              searchPlaceHolder="Search emoji..."
+              width={320}
+              height={400}
+              previewConfig={{ showPreview: false }}
+              skinTonesDisabled
+              lazyLoadEmojis
+            />
+          </Suspense>
         </div>
       )}
     </div>

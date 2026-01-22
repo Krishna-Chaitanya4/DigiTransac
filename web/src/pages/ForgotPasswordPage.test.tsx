@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithRouter, userEvent } from '../test/test-utils';
 import ForgotPasswordPage from './ForgotPasswordPage';

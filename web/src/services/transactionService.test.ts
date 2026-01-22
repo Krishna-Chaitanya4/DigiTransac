@@ -308,6 +308,7 @@ describe('transactionService', () => {
         type: 'Debit' as const,
         accountId: 'acc-1',
         date: '2024-01-15',
+        splits: [],
       };
 
       const mockResponse = { id: 'txn-new', ...request };
