@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useMemo, useCallback } from 'react';
 import type { Transaction, TransactionType } from '../types/transactions';
 import type { Account } from '../services/accountService';
 import type { Label, Tag } from '../types/labels';
@@ -6,6 +6,300 @@ import { getCurrencySymbol, formatCurrency } from '../services/currencyService';
 import { formatAmount } from '../utils/formatters';
 import { SwipeableRow, SwipeActionIcon } from './SwipeableRow';
 import { useCurrency } from '../context/CurrencyContext';
+
+// Memoized transaction row to prevent unnecessary re-renders
+interface TransactionRowProps {
+  transaction: Transaction;
+  account: Account | undefined;
+  primaryLabel: Label | undefined;
+  isExpanded: boolean;
+  currencySymbol: string;
+  primaryCurrency: string;
+  formatWithConversion: (amount: number, currency: string) => { original: string; converted: string | null };
+  selectionMode: boolean;
+  isSelected: boolean;
+  labelMap: Map<string, Label>;
+  tagMap: Map<string, Tag>;
+  accountMap: Map<string, Account>;
+  onToggleExpand: (id: string) => void;
+  onToggleSelection?: (id: string) => void;
+  onToggleCleared: (id: string, cleared: boolean) => void;
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (id: string) => void;
+}
+
+const TransactionRow = memo(function TransactionRow({
+  transaction,
+  account,
+  primaryLabel,
+  isExpanded,
+  currencySymbol,
+  primaryCurrency,
+  formatWithConversion,
+  selectionMode,
+  isSelected,
+  labelMap,
+  tagMap,
+  accountMap,
+  onToggleExpand,
+  onToggleSelection,
+  onToggleCleared,
+  onEdit,
+  onDelete,
+}: TransactionRowProps) {
+  const handleClick = useCallback(() => {
+    if (selectionMode && onToggleSelection) {
+      onToggleSelection(transaction.id);
+    } else {
+      onToggleExpand(transaction.id);
+    }
+  }, [selectionMode, onToggleSelection, onToggleExpand, transaction.id]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (onToggleSelection && !selectionMode) {
+      e.preventDefault();
+      onToggleSelection(transaction.id);
+    }
+  }, [onToggleSelection, selectionMode, transaction.id]);
+
+  const handleToggleCleared = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleCleared(transaction.id, !transaction.isCleared);
+  }, [onToggleCleared, transaction.id, transaction.isCleared]);
+
+  const handleEdit = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(transaction);
+  }, [onEdit, transaction]);
+
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('Delete this transaction?')) {
+      onDelete(transaction.id);
+    }
+  }, [onDelete, transaction.id]);
+
+  const handleSwipeRight = useCallback(() => {
+    onToggleCleared(transaction.id, !transaction.isCleared);
+  }, [onToggleCleared, transaction.id, transaction.isCleared]);
+
+  const handleSwipeLeft = useCallback(() => {
+    if (confirm('Delete this transaction?')) {
+      onDelete(transaction.id);
+    }
+  }, [onDelete, transaction.id]);
+
+  const rightContent = useMemo(() => (
+    <SwipeActionIcon
+      icon={transaction.isCleared ? '↩' : '✓'}
+      label={transaction.isCleared ? 'Pending' : 'Clear'}
+    />
+  ), [transaction.isCleared]);
+
+  const leftContent = useMemo(() => (
+    <SwipeActionIcon icon="🗑" label="Delete" />
+  ), []);
+
+  return (
+    <SwipeableRow
+      onSwipeRight={handleSwipeRight}
+      onSwipeLeft={handleSwipeLeft}
+      rightContent={rightContent}
+      leftContent={leftContent}
+      rightBgColor={transaction.isCleared ? 'bg-yellow-500' : 'bg-green-500'}
+      leftBgColor="bg-red-500"
+    >
+      <div
+        className={`bg-white dark:bg-gray-800 rounded-lg border 
+          ${transaction.isCleared 
+            ? 'border-gray-200 dark:border-gray-700' 
+            : 'border-l-4 border-l-yellow-400 border-gray-200 dark:border-gray-700 dark:border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10'
+          } ${selectionMode && isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''} overflow-hidden transition-all`}
+      >
+        {/* Main Row */}
+        <div
+          className="flex items-center p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+          onClick={handleClick}
+          onContextMenu={handleContextMenu}
+        >
+          {/* Selection Checkbox (shown in selection mode) */}
+          {selectionMode && (
+            <div className="mr-3 flex-shrink-0">
+              <div 
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                  isSelected
+                    ? 'bg-blue-600 border-blue-600'
+                    : 'border-gray-300 dark:border-gray-600'
+                }`}
+              >
+                {isSelected && (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Category Icon */}
+          <div 
+            className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
+            style={{ backgroundColor: (primaryLabel?.color || '#6B7280') + '20' }}
+          >
+            {primaryLabel?.icon || '📝'}
+          </div>
+          
+          {/* Content */}
+          <div className="ml-3 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                {transaction.title || primaryLabel?.name || 'Transaction'}
+              </span>
+              {transaction.parentTransactionId && (
+                <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 rounded">
+                  🔄
+                </span>
+              )}
+              {!transaction.isCleared && (
+                <span className="text-xs px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400 rounded">
+                  Pending
+                </span>
+              )}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+              {account?.name}
+              {transaction.payee && ` • ${transaction.payee}`}
+            </div>
+          </div>
+          
+          {/* Amount */}
+          <div className={`text-right flex-shrink-0 ${getTypeColor(transaction.type)}`}>
+            <span className="font-semibold">
+              {transaction.type === 'Credit' ? '+' : transaction.type === 'Debit' ? '-' : ''}
+              {currencySymbol}{formatAmount(transaction.amount, transaction.currency)}
+            </span>
+            {/* Show converted amount if currency differs from primary */}
+            {transaction.currency !== primaryCurrency && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                ≈ {formatWithConversion(transaction.amount, transaction.currency).converted}
+              </div>
+            )}
+            <div className="text-xs opacity-70">
+              {getTypeIcon(transaction.type)} {transaction.type}
+            </div>
+          </div>
+          
+          {/* Expand indicator */}
+          <div className="ml-2 text-gray-400 dark:text-gray-500">
+            <svg 
+              className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+        
+        {/* Expanded Details */}
+        {isExpanded && (
+          <div className="px-3 pb-3 pt-1 border-t border-gray-200 dark:border-gray-700">
+            {/* Splits */}
+            {transaction.splits.length > 1 && (
+              <div className="mb-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Categories:</p>
+                <div className="space-y-1">
+                  {transaction.splits.map((split, idx) => {
+                    const label = labelMap.get(split.labelId);
+                    return (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-300">
+                          {label?.icon} {label?.name || 'Unknown'}
+                        </span>
+                        <span className="text-gray-900 dark:text-gray-100">
+                          {currencySymbol}{formatAmount(split.amount, transaction.currency)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Tags */}
+            {transaction.tagIds.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-3">
+                {transaction.tagIds.map(tagId => {
+                  const tag = tagMap.get(tagId);
+                  return tag ? (
+                    <span
+                      key={tagId}
+                      className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700"
+                      style={tag.color ? { backgroundColor: tag.color + '30', color: tag.color } : undefined}
+                    >
+                      {tag.name}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+            
+            {/* Location */}
+            {transaction.location && (
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                📍 {transaction.location.placeName || transaction.location.city}
+                {transaction.location.country && `, ${transaction.location.country}`}
+              </div>
+            )}
+            
+            {/* Notes */}
+            {transaction.notes && (
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded">
+                {transaction.notes}
+              </div>
+            )}
+            
+            {/* Transfer details */}
+            {transaction.type === 'Transfer' && transaction.transferToAccountId && (
+              <div className="text-sm text-blue-600 dark:text-blue-400 mb-3">
+                → {accountMap.get(transaction.transferToAccountId)?.name || 'Unknown Account'}
+              </div>
+            )}
+            
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={handleToggleCleared}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                  transaction.isCleared
+                    ? 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    : 'border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                }`}
+              >
+                {transaction.isCleared ? '↩ Mark Pending' : '✓ Mark Cleared'}
+              </button>
+              <button
+                onClick={handleEdit}
+                className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 
+                  text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              >
+                Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 
+                  text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </SwipeableRow>
+  );
+});
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -107,16 +401,39 @@ export function TransactionList({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { formatWithConversion, primaryCurrency, convert } = useCurrency();
   
-  // Create lookup maps
-  const accountMap = new Map(accounts.map(a => [a.id, a]));
-  const labelMap = new Map(labels.map(l => [l.id, l]));
-  const tagMap = new Map(tags.map(t => [t.id, t]));
+  // Memoize lookup maps to prevent recreation on every render
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
+  const labelMap = useMemo(() => new Map(labels.map(l => [l.id, l])), [labels]);
+  const tagMap = useMemo(() => new Map(tags.map(t => [t.id, t])), [tags]);
   
-  // Group transactions
-  const groupedTransactions = groupByDate(transactions);
-  const sortedDates = Object.keys(groupedTransactions).sort((a, b) => 
-    new Date(b).getTime() - new Date(a).getTime()
-  );
+  // Memoize grouped transactions
+  const { groupedTransactions, sortedDates } = useMemo(() => {
+    const grouped = groupByDate(transactions);
+    const sorted = Object.keys(grouped).sort((a, b) => 
+      new Date(b).getTime() - new Date(a).getTime()
+    );
+    return { groupedTransactions: grouped, sortedDates: sorted };
+  }, [transactions]);
+
+  // Memoize callbacks for TransactionRow
+  const handleToggleExpand = useCallback((id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  }, []);
+
+  // Calculate daily totals
+  const dailyTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const dateString of sortedDates) {
+      const dateTransactions = groupedTransactions[dateString];
+      totals[dateString] = dateTransactions.reduce((sum, t) => {
+        const convertedAmount = convert(t.amount, t.currency);
+        if (t.type === 'Credit') return sum + convertedAmount;
+        if (t.type === 'Debit') return sum - convertedAmount;
+        return sum;
+      }, 0);
+    }
+    return totals;
+  }, [sortedDates, groupedTransactions, convert]);
 
   if (isLoading) {
     return (
@@ -151,14 +468,7 @@ export function TransactionList({
       {sortedDates.map(dateString => {
         const dateTransactions = groupedTransactions[dateString];
         const displayDate = formatDate(dateTransactions[0].date);
-        
-        // Calculate daily total - convert each transaction to primary currency before summing
-        const dailyTotal = dateTransactions.reduce((sum, t) => {
-          const convertedAmount = convert(t.amount, t.currency);
-          if (t.type === 'Credit') return sum + convertedAmount;
-          if (t.type === 'Debit') return sum - convertedAmount;
-          return sum;
-        }, 0);
+        const dailyTotal = dailyTotals[dateString];
         
         return (
           <div key={dateString}>
@@ -181,238 +491,26 @@ export function TransactionList({
                 const isExpanded = expandedId === transaction.id;
                 
                 return (
-                  <SwipeableRow
+                  <TransactionRow
                     key={transaction.id}
-                    onSwipeRight={() => onToggleCleared(transaction.id, !transaction.isCleared)}
-                    onSwipeLeft={() => {
-                      if (confirm('Delete this transaction?')) {
-                        onDelete(transaction.id);
-                      }
-                    }}
-                    rightContent={
-                      <SwipeActionIcon
-                        icon={transaction.isCleared ? '↩' : '✓'}
-                        label={transaction.isCleared ? 'Pending' : 'Clear'}
-                      />
-                    }
-                    leftContent={
-                      <SwipeActionIcon icon="🗑" label="Delete" />
-                    }
-                    rightBgColor={transaction.isCleared ? 'bg-yellow-500' : 'bg-green-500'}
-                    leftBgColor="bg-red-500"
-                  >
-                  <div
-                    className={`bg-white dark:bg-gray-800 rounded-lg border 
-                      ${transaction.isCleared 
-                        ? 'border-gray-200 dark:border-gray-700' 
-                        : 'border-l-4 border-l-yellow-400 border-gray-200 dark:border-gray-700 dark:border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10'
-                      } ${selectionMode && selectedIds.has(transaction.id) ? 'ring-2 ring-blue-500 ring-inset' : ''} overflow-hidden transition-all`}
-                  >
-                    {/* Main Row */}
-                    <div
-                      className="flex items-center p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      onClick={() => {
-                        if (selectionMode && onToggleSelection) {
-                          onToggleSelection(transaction.id);
-                        } else {
-                          setExpandedId(isExpanded ? null : transaction.id);
-                        }
-                      }}
-                      onContextMenu={(e) => {
-                        // Long-press on mobile triggers context menu, use for selection
-                        if (onToggleSelection && !selectionMode) {
-                          e.preventDefault();
-                          onToggleSelection(transaction.id);
-                        }
-                      }}
-                    >
-                      {/* Selection Checkbox (shown in selection mode) */}
-                      {selectionMode && (
-                        <div className="mr-3 flex-shrink-0">
-                          <div 
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                              selectedIds.has(transaction.id)
-                                ? 'bg-blue-600 border-blue-600'
-                                : 'border-gray-300 dark:border-gray-600'
-                            }`}
-                          >
-                            {selectedIds.has(transaction.id) && (
-                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Category Icon */}
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
-                        style={{ backgroundColor: (primaryLabel?.color || '#6B7280') + '20' }}
-                      >
-                        {primaryLabel?.icon || '📝'}
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="ml-3 flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                            {transaction.title || primaryLabel?.name || 'Transaction'}
-                          </span>
-                          {transaction.parentTransactionId && (
-                            <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 rounded">
-                              🔄
-                            </span>
-                          )}
-                          {!transaction.isCleared && (
-                            <span className="text-xs px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400 rounded">
-                              Pending
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          {account?.name}
-                          {transaction.payee && ` • ${transaction.payee}`}
-                        </div>
-                      </div>
-                      
-                      {/* Amount */}
-                      <div className={`text-right flex-shrink-0 ${getTypeColor(transaction.type)}`}>
-                        <span className="font-semibold">
-                          {transaction.type === 'Credit' ? '+' : transaction.type === 'Debit' ? '-' : ''}
-                          {currencySymbol}{formatAmount(transaction.amount, transaction.currency)}
-                        </span>
-                        {/* Show converted amount if currency differs from primary */}
-                        {transaction.currency !== primaryCurrency && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            ≈ {formatWithConversion(transaction.amount, transaction.currency).converted}
-                          </div>
-                        )}
-                        <div className="text-xs opacity-70">
-                          {getTypeIcon(transaction.type)} {transaction.type}
-                        </div>
-                      </div>
-                      
-                      {/* Expand indicator */}
-                      <div className="ml-2 text-gray-400 dark:text-gray-500">
-                        <svg 
-                          className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-                          fill="none" 
-                          viewBox="0 0 24 24" 
-                          stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                    
-                    {/* Expanded Details */}
-                    {isExpanded && (
-                      <div className="px-3 pb-3 pt-1 border-t border-gray-200 dark:border-gray-700">
-                        {/* Splits */}
-                        {transaction.splits.length > 1 && (
-                          <div className="mb-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Categories:</p>
-                            <div className="space-y-1">
-                              {transaction.splits.map((split, idx) => {
-                                const label = labelMap.get(split.labelId);
-                                return (
-                                  <div key={idx} className="flex justify-between text-sm">
-                                    <span className="text-gray-600 dark:text-gray-300">
-                                      {label?.icon} {label?.name || 'Unknown'}
-                                    </span>
-                                    <span className="text-gray-900 dark:text-gray-100">
-                                      {currencySymbol}{formatAmount(split.amount, transaction.currency)}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Tags */}
-                        {transaction.tagIds.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-3">
-                            {transaction.tagIds.map(tagId => {
-                              const tag = tagMap.get(tagId);
-                              return tag ? (
-                                <span
-                                  key={tagId}
-                                  className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700"
-                                  style={tag.color ? { backgroundColor: tag.color + '30', color: tag.color } : undefined}
-                                >
-                                  {tag.name}
-                                </span>
-                              ) : null;
-                            })}
-                          </div>
-                        )}
-                        
-                        {/* Location */}
-                        {transaction.location && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                            📍 {transaction.location.placeName || transaction.location.city}
-                            {transaction.location.country && `, ${transaction.location.country}`}
-                          </div>
-                        )}
-                        
-                        {/* Notes */}
-                        {transaction.notes && (
-                          <div className="text-sm text-gray-600 dark:text-gray-300 mb-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded">
-                            {transaction.notes}
-                          </div>
-                        )}
-                        
-                        {/* Transfer details */}
-                        {transaction.type === 'Transfer' && transaction.transferToAccountId && (
-                          <div className="text-sm text-blue-600 dark:text-blue-400 mb-3">
-                            → {accountMap.get(transaction.transferToAccountId)?.name || 'Unknown Account'}
-                          </div>
-                        )}
-                        
-                        {/* Actions */}
-                        <div className="flex gap-2 pt-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onToggleCleared(transaction.id, !transaction.isCleared);
-                            }}
-                            className={`flex-1 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                              transaction.isCleared
-                                ? 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                : 'border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
-                            }`}
-                          >
-                            {transaction.isCleared ? '↩ Mark Pending' : '✓ Mark Cleared'}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEdit(transaction);
-                            }}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 
-                              text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm('Delete this transaction?')) {
-                                onDelete(transaction.id);
-                              }
-                            }}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 
-                              text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  </SwipeableRow>
+                    transaction={transaction}
+                    account={account}
+                    primaryLabel={primaryLabel}
+                    isExpanded={isExpanded}
+                    currencySymbol={currencySymbol}
+                    primaryCurrency={primaryCurrency}
+                    formatWithConversion={formatWithConversion}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(transaction.id)}
+                    labelMap={labelMap}
+                    tagMap={tagMap}
+                    accountMap={accountMap}
+                    onToggleExpand={handleToggleExpand}
+                    onToggleSelection={onToggleSelection}
+                    onToggleCleared={onToggleCleared}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
                 );
               })}
             </div>
