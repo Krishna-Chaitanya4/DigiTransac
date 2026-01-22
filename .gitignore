@@ -33,6 +33,9 @@ Thumbs.db
 # Test coverage
 coverage/
 
+# Bundle analysis
+bundle-stats.html
+
 # Misc
 *.swp
 *.swo

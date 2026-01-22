@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { TransactionList } from './TransactionList';
 import type { Transaction } from '../types/transactions';
 import type { Account } from '../services/accountService';
@@ -42,7 +42,6 @@ Object.defineProperty(window, 'confirm', { value: mockConfirm, writable: true })
 // Test data factories
 const createTransaction = (overrides: Partial<Transaction> = {}): Transaction => ({
   id: 'tx-1',
-  userId: 'user-1',
   accountId: 'acc-1',
   type: 'Debit',
   amount: 100,
@@ -53,7 +52,9 @@ const createTransaction = (overrides: Partial<Transaction> = {}): Transaction =>
   notes: '',
   splits: [{ labelId: 'label-1', amount: 100 }],
   tagIds: [],
+  tags: [],
   isCleared: true,
+  isRecurringTemplate: false,
   createdAt: '2026-01-22T12:00:00.000Z',
   updatedAt: '2026-01-22T12:00:00.000Z',
   ...overrides,
@@ -61,14 +62,20 @@ const createTransaction = (overrides: Partial<Transaction> = {}): Transaction =>
 
 const createAccount = (overrides: Partial<Account> = {}): Account => ({
   id: 'acc-1',
-  userId: 'user-1',
   name: 'Test Account',
-  type: 'Checking',
-  currency: 'USD',
-  balance: 1000,
+  type: 'Bank',
   icon: '🏦',
-  includeInTotal: true,
+  color: null,
+  currency: 'USD',
+  initialBalance: 0,
+  currentBalance: 1000,
+  institution: null,
+  accountNumber: null,
+  notes: null,
   isArchived: false,
+  includeInNetWorth: true,
+  order: 0,
+  canEditCurrency: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   ...overrides,
@@ -76,23 +83,22 @@ const createAccount = (overrides: Partial<Account> = {}): Account => ({
 
 const createLabel = (overrides: Partial<Label> = {}): Label => ({
   id: 'label-1',
-  userId: 'user-1',
   name: 'Food',
+  parentId: null,
+  type: 'Category',
   icon: '🍔',
   color: '#FF5733',
-  type: 'expense',
+  order: 0,
+  isSystem: false,
   createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
   ...overrides,
 });
 
 const createTag = (overrides: Partial<Tag> = {}): Tag => ({
   id: 'tag-1',
-  userId: 'user-1',
   name: 'Essential',
   color: '#3498db',
   createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
   ...overrides,
 });
 
@@ -381,6 +387,8 @@ describe('TransactionList', () => {
     it('should show location when expanded', () => {
       const transaction = createTransaction({
         location: {
+          latitude: 40.7829,
+          longitude: -73.9654,
           placeName: 'Central Park',
           city: 'New York',
           country: 'USA',

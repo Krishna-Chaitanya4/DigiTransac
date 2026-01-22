@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
@@ -139,12 +140,41 @@ export default defineConfig({
       devOptions: {
         enabled: true
       }
+    }),
+    // Bundle analysis - generates stats.html after build
+    visualizer({
+      filename: 'bundle-stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
     })
   ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  build: {
+    // Enable source maps for debugging (optional in prod)
+    sourcemap: false,
+    // Optimize chunk splitting
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks - split large dependencies
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-sentry': ['@sentry/react'],
+          'vendor-datepicker': ['react-datepicker', 'date-fns'],
+          'vendor-emoji': ['emoji-picker-react'],
+        },
+      },
+    },
+    // Target modern browsers for smaller bundles
+    target: 'es2020',
+    // Minification settings
+    minify: 'esbuild',
+    // Chunk size warning limit (in kB)
+    chunkSizeWarningLimit: 500,
   },
   server: {
     port: 5173,

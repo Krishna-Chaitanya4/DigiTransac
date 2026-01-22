@@ -143,7 +143,7 @@ describe('ErrorBoundary', () => {
       return <div>Child component rendered successfully</div>;
     }
 
-    const { rerender } = render(
+    render(
       <ErrorBoundary>
         <ConditionalError />
       </ErrorBoundary>
