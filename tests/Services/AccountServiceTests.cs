@@ -1,4 +1,4 @@
-using DigiTransac.Api.Models;
+﻿using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
@@ -609,7 +609,7 @@ public class AccountServiceTests
         _transactionRepositoryMock.Verify(x => x.CreateAsync(It.Is<Transaction>(t =>
             t.UserId == TestUserId &&
             t.AccountId == "1" &&
-            t.Type == TransactionType.Credit && // Positive adjustment = Credit
+            t.Type == TransactionType.Receive && // Positive adjustment = Credit
             t.Amount == 2500 && // Difference: 7500 - 5000
             t.Currency == "INR" &&
             t.Title == "Balance Adjustment" &&
@@ -653,7 +653,7 @@ public class AccountServiceTests
         
         // Verify transaction was created as Debit for negative adjustment with category
         _transactionRepositoryMock.Verify(x => x.CreateAsync(It.Is<Transaction>(t =>
-            t.Type == TransactionType.Debit &&
+            t.Type == TransactionType.Send &&
             t.Amount == 2000 && // Abs difference: |3000 - 5000|
             t.Splits != null &&
             t.Splits.Count == 1 &&

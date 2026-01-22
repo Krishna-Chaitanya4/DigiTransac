@@ -199,6 +199,12 @@ public class TransactionRepository : ITransactionRepository
             filters.Add(filterBuilder.Or(searchFilters));
         }
 
+        // Filter for linked transactions (transfers)
+        if (filter.HasLinkedTransaction.HasValue && filter.HasLinkedTransaction.Value)
+        {
+            filters.Add(filterBuilder.Ne(t => t.LinkedTransactionId, null));
+        }
+
         var combinedFilter = filterBuilder.And(filters);
 
         var page = filter.Page ?? 1;

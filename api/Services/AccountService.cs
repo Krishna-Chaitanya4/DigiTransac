@@ -358,7 +358,7 @@ public class AccountService : IAccountService
         {
             UserId = userId,
             AccountId = id,
-            Type = difference > 0 ? TransactionType.Credit : TransactionType.Debit,
+            Type = difference > 0 ? TransactionType.Receive : TransactionType.Send,
             Amount = Math.Abs(difference),
             Currency = account.Currency,
             Date = DateTime.UtcNow,

@@ -14,6 +14,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import type {
   Transaction,
   TransactionType,
+  TransactionUIType,
   RecurrenceFrequency,
   CreateTransactionRequest,
   UpdateTransactionRequest,
@@ -69,7 +70,8 @@ export function TransactionForm({
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   
   // Core transaction state
-  const [type, setType] = useState<TransactionType>('Debit');
+  // Note: type uses TransactionUIType (includes Transfer for UI) but converts to TransactionType for API
+  const [type, setType] = useState<TransactionUIType>('Send');
   const [accountId, setAccountId] = useState(defaultAccountId || '');
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState(toDateString(new Date()));
@@ -79,6 +81,10 @@ export function TransactionForm({
   const [selectedLabelId, setSelectedLabelId] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [transferToAccountId, setTransferToAccountId] = useState('');
+  
+  // P2P state (optional for Send/Receive)
+  const [counterpartyEmail, setCounterpartyEmail] = useState('');
+  const [counterpartyAmount, setCounterpartyAmount] = useState<number | undefined>(undefined);
   
   // Recurring state
   const [isRecurring, setIsRecurring] = useState(false);
@@ -106,7 +112,10 @@ export function TransactionForm({
     if (isOpen) {
       if (editingTransaction) {
         // Populate form with existing transaction data
-        setType(editingTransaction.type);
+        // Detect if this is a transfer: has transferToAccountId (means it was created as transfer)
+        const isTransfer = !!editingTransaction.transferToAccountId;
+        const uiType: TransactionUIType = isTransfer ? 'Transfer' : editingTransaction.type;
+        setType(uiType);
         setAccountId(editingTransaction.accountId);
         setAmount(editingTransaction.amount);
         setDate(toDateString(editingTransaction.date));
@@ -115,6 +124,10 @@ export function TransactionForm({
         setNotes(editingTransaction.notes || '');
         setSelectedTagIds(editingTransaction.tagIds || []);
         setTransferToAccountId(editingTransaction.transferToAccountId || '');
+        
+        // Set P2P fields from editing transaction
+        setCounterpartyEmail(editingTransaction.counterpartyEmail || '');
+        setCounterpartyAmount(undefined); // Don't pre-fill, user can edit if needed
         
         if (editingTransaction.splits.length > 0) {
           setSplits(editingTransaction.splits.map(s => ({
@@ -146,7 +159,7 @@ export function TransactionForm({
       } else {
         // Reset to defaults for new transaction
         const categoryLabels = labels.filter(l => l.type === 'Category');
-        setType('Debit');
+        setType('Send');
         setAccountId(defaultAccountId || accounts[0]?.id || '');
         setAmount(0);
         setDate(toDateString(new Date()));
@@ -157,6 +170,8 @@ export function TransactionForm({
         setSplits([]);
         setSelectedTagIds([]);
         setTransferToAccountId('');
+        setCounterpartyEmail('');
+        setCounterpartyAmount(undefined);
         setIsRecurring(false);
         setRecurrenceFrequency('Monthly');
         setRecurrenceInterval(1);
@@ -219,10 +234,15 @@ export function TransactionForm({
     e.preventDefault();
     
     const finalSplits = showSplits ? splits : [{ labelId: selectedLabelId, amount, notes: undefined }];
+    const isP2P = (type === 'Send' || type === 'Receive') && counterpartyEmail.trim();
+    
+    // Convert UI type to API type: Transfer -> Send (backend creates linked Send+Receive)
+    const apiType: TransactionType = type === 'Transfer' ? 'Send' : type;
+    const isTransfer = type === 'Transfer';
     
     if (editingTransaction) {
       const updateData: UpdateTransactionRequest = {
-        type,
+        type: apiType,
         amount,
         date: toNoonUTC(date),
         title: title.trim() || undefined,
@@ -231,14 +251,14 @@ export function TransactionForm({
         splits: finalSplits,
         tagIds: selectedTagIds,
         location: includeLocation && location ? location : undefined,
-        transferToAccountId: type === 'Transfer' ? transferToAccountId : undefined,
+        transferToAccountId: isTransfer ? transferToAccountId : undefined,
         accountId,
       };
       onSubmit(updateData);
     } else {
       const createData: CreateTransactionRequest = {
         accountId,
-        type,
+        type: apiType,
         amount,
         date: toNoonUTC(date),
         title: title.trim() || undefined,
@@ -247,12 +267,15 @@ export function TransactionForm({
         splits: finalSplits,
         tagIds: selectedTagIds,
         location: includeLocation && location ? location : undefined,
-        transferToAccountId: type === 'Transfer' ? transferToAccountId : undefined,
+        transferToAccountId: isTransfer ? transferToAccountId : undefined,
         recurringRule: isRecurring ? {
           frequency: recurrenceFrequency,
           interval: recurrenceInterval,
           endDate: recurrenceEndDate || undefined,
         } : undefined,
+        // P2P fields (only for Send/Receive with counterparty email)
+        counterpartyEmail: isP2P ? counterpartyEmail.trim() : undefined,
+        counterpartyAmount: isP2P && counterpartyAmount ? counterpartyAmount : undefined,
       };
       onSubmit(createData);
     }
@@ -317,43 +340,100 @@ export function TransactionForm({
                 </select>
               </div>
 
-              {/* Transfer To Account */}
+              {/* Transfer: To Account selector */}
               {type === 'Transfer' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     To Account *
                   </label>
-                  <select
-                    value={transferToAccountId}
-                    onChange={(e) => setTransferToAccountId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select destination...</option>
-                    {accounts.filter(a => !a.isArchived && a.id !== accountId).map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name} ({account.currency})
-                      </option>
-                    ))}
-                  </select>
-                  {/* Currency conversion info */}
-                  {transferToAccountId && (() => {
-                    const destAccount = accounts.find(a => a.id === transferToAccountId);
-                    const sourceAccount = accounts.find(a => a.id === accountId);
-                    const isCrossCurrency = destAccount && sourceAccount && destAccount.currency !== sourceAccount.currency;
-                    return isCrossCurrency ? (
-                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="inline-flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                          </svg>
-                          Amount will be converted from {sourceAccount.currency} to {destAccount.currency}
-                        </span>
+                  {accounts.filter(a => !a.isArchived && a.id !== accountId).length === 0 ? (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                        You need at least two accounts to transfer between them. 
+                        Create another account first.
                       </p>
-                    ) : null;
-                  })()}
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={transferToAccountId}
+                        onChange={(e) => setTransferToAccountId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Select destination...</option>
+                        {accounts.filter(a => !a.isArchived && a.id !== accountId).map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} ({account.currency})
+                          </option>
+                        ))}
+                      </select>
+                      {/* Currency conversion info */}
+                      {transferToAccountId && (() => {
+                        const destAccount = accounts.find(a => a.id === transferToAccountId);
+                        const sourceAccount = accounts.find(a => a.id === accountId);
+                        const isCrossCurrency = destAccount && sourceAccount && destAccount.currency !== sourceAccount.currency;
+                        return isCrossCurrency ? (
+                          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            <span className="inline-flex items-center gap-1">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                              </svg>
+                              Amount will be converted from {sourceAccount.currency} to {destAccount.currency}
+                            </span>
+                          </p>
+                        ) : null;
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* P2P: Counterparty email (optional for Send/Receive) */}
+              {(type === 'Send' || type === 'Receive') && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {type === 'Send' ? "Recipient's" : "Sender's"} Email (optional)
+                    </label>
+                    <input
+                      type="email"
+                      value={counterpartyEmail}
+                      onChange={(e) => setCounterpartyEmail(e.target.value)}
+                      placeholder="friend@example.com"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                        focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      If they're on DigiTransac, they'll see this transaction too
+                    </p>
+                  </div>
+
+                  {/* Counterparty amount (optional, only show if email is provided) */}
+                  {counterpartyEmail && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {type === 'Send' ? 'Amount They Received' : 'Amount They Sent'} (optional)
+                      </label>
+                      <input
+                        type="number"
+                        value={counterpartyAmount || ''}
+                        onChange={(e) => setCounterpartyAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder={`Same as your amount: ${currencySymbol}${amount.toFixed(2)}`}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        min="0"
+                        step="0.01"
+                      />
+                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        If different currency or fees apply, enter the actual amount
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -384,7 +464,7 @@ export function TransactionForm({
                 maxDate={new Date()}
               />
 
-              {/* Category (Single Mode) - Hidden for transfers */}
+              {/* Category (Single Mode) - Hidden for self-transfers */}
               {!showSplits && type !== 'Transfer' && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -408,7 +488,7 @@ export function TransactionForm({
                 </div>
               )}
 
-              {/* Category (Locked for transfers) */}
+              {/* Category (Locked for self-transfers only) */}
               {type === 'Transfer' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -453,21 +533,23 @@ export function TransactionForm({
                 />
               </div>
 
-              {/* Payee */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Payee
-                </label>
-                <input
-                  type="text"
-                  value={payee}
-                  onChange={(e) => setPayee(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                    bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                    focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Supermarket"
-                />
-              </div>
+              {/* Payee/Payer - hidden for transfers */}
+              {type !== 'Transfer' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {type === 'Send' ? 'Payee' : 'Payer'}
+                  </label>
+                  <input
+                    type="text"
+                    value={payee}
+                    onChange={(e) => setPayee(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                      bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={type === 'Send' ? 'e.g., Supermarket' : 'e.g., Employer'}
+                  />
+                </div>
+              )}
 
               {/* Tags */}
               <TagTokenInput
@@ -536,8 +618,9 @@ export function TransactionForm({
               <button
                 type="submit"
                 disabled={isLoading || amount <= 0 || !accountId || 
-                  (type === 'Transfer' ? !transferToAccountId : 
-                    ((!showSplits && !selectedLabelId) || (showSplits && !splitsValid)))}
+                  (type === 'Transfer' 
+                    ? !transferToAccountId 
+                    : ((!showSplits && !selectedLabelId) || (showSplits && !splitsValid)))}
                 className="flex-1 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 
                   font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >

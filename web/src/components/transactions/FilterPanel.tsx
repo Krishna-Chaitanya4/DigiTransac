@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Account } from '../../services/accountService';
 import type { Label, Tag } from '../../types/labels';
-import type { TransactionFilter, TransactionType } from '../../types/transactions';
+import type { TransactionFilter, TransactionUIType } from '../../types/transactions';
 
 interface FilterPanelProps {
   isOpen: boolean;
@@ -170,7 +170,7 @@ export function FilterPanel({
   };
 
   // Toggle type selection
-  const toggleType = (type: TransactionType) => {
+  const toggleType = (type: TransactionUIType) => {
     const currentTypes = filter.types || [];
     const isSelected = currentTypes.includes(type);
     const newTypes = isSelected
@@ -360,15 +360,15 @@ export function FilterPanel({
             Type
           </label>
           <div className="flex flex-wrap gap-2">
-            {(['Credit', 'Debit', 'Transfer'] as TransactionType[]).map((type) => {
+            {(['Receive', 'Send', 'Transfer'] as TransactionUIType[]).map((type) => {
               const isSelected = filter.types?.includes(type) ?? false;
               const colors = {
-                Credit: { bg: 'bg-green-500', hover: 'hover:bg-green-600', unselected: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50' },
-                Debit: { bg: 'bg-red-500', hover: 'hover:bg-red-600', unselected: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50' },
+                Receive: { bg: 'bg-green-500', hover: 'hover:bg-green-600', unselected: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50' },
+                Send: { bg: 'bg-red-500', hover: 'hover:bg-red-600', unselected: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50' },
                 Transfer: { bg: 'bg-blue-500', hover: 'hover:bg-blue-600', unselected: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50' },
               };
-              const icons = { Credit: '↓', Debit: '↑', Transfer: '↔' };
-              const labels = { Credit: 'Credit', Debit: 'Debit', Transfer: 'Transfer' };
+              const icons = { Receive: '↓', Send: '↑', Transfer: '↔' };
+              const labels = { Receive: 'Receive', Send: 'Send', Transfer: 'Transfer' };
               
               return (
                 <button

@@ -23,7 +23,7 @@ public record RecurringRuleRequest(
 
 public record CreateTransactionRequest(
     string AccountId,
-    string Type,           // Credit, Debit, Transfer
+    string Type,           // Receive, Send, Transfer
     decimal Amount,
     DateTime Date,
     string? Title,
@@ -32,8 +32,11 @@ public record CreateTransactionRequest(
     List<TransactionSplitRequest> Splits,
     List<string>? TagIds,
     TransactionLocationRequest? Location,
-    string? TransferToAccountId,  // Required for Transfer type
-    RecurringRuleRequest? RecurringRule
+    string? TransferToAccountId,  // Required for Transfer type (between own accounts)
+    RecurringRuleRequest? RecurringRule,
+    // P2P fields (optional for Send/Receive)
+    string? CounterpartyEmail,    // If provided, creates P2P transaction
+    decimal? CounterpartyAmount   // Optional: if different currency
 );
 
 public record UpdateTransactionRequest(
@@ -65,6 +68,7 @@ public record TransactionFilterRequest(
     bool? IsRecurring,
     int? Page,
     int? PageSize,
+    bool? HasLinkedTransaction = null,  // Filter for transfers (transactions with linkedTransactionId)
     List<string>? SearchLabelIds = null,
     List<string>? SearchTagIds = null,
     List<string>? SearchAccountIds = null
@@ -124,7 +128,12 @@ public record TransactionResponse(
     bool IsRecurringTemplate,
     bool IsCleared,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    // P2P fields
+    Guid? TransactionLinkId,
+    string? CounterpartyEmail,
+    string? CounterpartyUserId,
+    string? Role  // "Sender" or "Receiver"
 );
 
 public record TransactionListResponse(

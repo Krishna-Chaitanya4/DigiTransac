@@ -197,10 +197,10 @@ public class TransactionService : ITransactionService
             
             var convertedAmount = _exchangeRateService.Convert(t.Amount, transactionCurrency, primaryCurrency, rates);
             
-            if (t.Type == TransactionType.Credit)
+            if (t.Type == TransactionType.Receive)
                 totalCredits += convertedAmount;
-            else if (t.Type == TransactionType.Debit || t.Type == TransactionType.Transfer)
-                totalDebits += convertedAmount;  // Transfer = money leaving the account
+            else if (t.Type == TransactionType.Send)
+                totalDebits += convertedAmount;  // Send = money leaving the account
         }
 
         // Get sums by label (for the filtered date range)
@@ -241,7 +241,7 @@ public class TransactionService : ITransactionService
 
         // Validate type
         if (!Enum.TryParse<TransactionType>(request.Type, true, out var type))
-            return (false, "Invalid transaction type. Use Credit, Debit, or Transfer", null);
+            return (false, "Invalid transaction type. Use Receive or Send", null);
 
         // Validate amount
         if (request.Amount <= 0)
@@ -273,17 +273,26 @@ public class TransactionService : ITransactionService
         // Fetch tags for response mapping
         var tags = await _tagRepository.GetByUserIdAsync(userId);
 
-        // Validate transfer
+        // Validate based on transaction type
         Account? transferToAccount = null;
         decimal convertedAmount = request.Amount;
+        decimal counterpartyAmount = request.CounterpartyAmount ?? request.Amount;
         Label? accountTransferLabel = null;
+        User? counterpartyUser = null;
+        bool isP2P = !string.IsNullOrEmpty(request.CounterpartyEmail);
+        // Transfer = Send type with TransferToAccountId (creates linked Receive in destination)
+        bool isSelfTransfer = !string.IsNullOrEmpty(request.TransferToAccountId);
         
-        if (type == TransactionType.Transfer)
+        // Self-transfer: must be Send type with destination account
+        if (isSelfTransfer)
         {
-            if (string.IsNullOrEmpty(request.TransferToAccountId))
-                return (false, "Transfer requires a destination account", null);
+            if (type != TransactionType.Send)
+                return (false, "Transfer must use Send type (money leaves source account)", null);
+            
+            if (isP2P)
+                return (false, "Cannot combine transfer with P2P. Use either transfer or counterparty email.", null);
 
-            transferToAccount = await _accountRepository.GetByIdAndUserIdAsync(request.TransferToAccountId, userId);
+            transferToAccount = await _accountRepository.GetByIdAndUserIdAsync(request.TransferToAccountId!, userId);
             if (transferToAccount == null)
                 return (false, "Destination account not found", null);
 
@@ -300,13 +309,35 @@ public class TransactionService : ITransactionService
             // Find the "Account Transfer" category - transfers are locked to this category
             accountTransferLabel = labels.FirstOrDefault(l => l.Type == LabelType.Category && l.Name == "Account Transfer");
         }
+        
+        // For Send/Receive with counterparty email - this is P2P
+        if (isP2P)
+        {
+            // Check if counterparty exists on the platform
+            counterpartyUser = await _userRepository.GetByEmailAsync(request.CounterpartyEmail!);
+            
+            if (request.CounterpartyAmount.HasValue)
+            {
+                counterpartyAmount = request.CounterpartyAmount.Value;
+            }
+        }
+        
+        // Determine roles for P2P: Send = Sender, Receive = Receiver
+        TransactionRole? userRole = null;
+        TransactionRole? counterpartyRole = null;
+        if (isP2P)
+        {
+            userRole = type == TransactionType.Send ? TransactionRole.Sender : TransactionRole.Receiver;
+            counterpartyRole = type == TransactionType.Send ? TransactionRole.Receiver : TransactionRole.Sender;
+        }
 
         var dek = await GetUserDekAsync(userId);
         if (dek == null)
             return (false, "Encryption key not available", null);
 
-        // For transfers, use the Account Transfer category
-        var splits = type == TransactionType.Transfer && accountTransferLabel != null
+        // For self-transfers, use the Account Transfer category
+        // For Send/Receive (including P2P), allow user-specified categories
+        var splits = isSelfTransfer && accountTransferLabel != null
             ? new List<TransactionSplit> { new() { LabelId = accountTransferLabel.Id, Amount = request.Amount, Notes = null } }
             : request.Splits.Select(s => new TransactionSplit
               {
@@ -315,12 +346,15 @@ public class TransactionService : ITransactionService
                   Notes = s.Notes
               }).ToList();
 
+        // Generate TransactionLinkId for transfers and P2P
+        var transactionLinkId = (isSelfTransfer || isP2P) ? Guid.NewGuid() : (Guid?)null;
+
         // Build transaction
         var transaction = new Transaction
         {
             UserId = userId,
             AccountId = request.AccountId,
-            Type = type,
+            Type = type,  // Always Send or Receive
             Amount = request.Amount,
             Currency = account.Currency,
             Date = request.Date,
@@ -329,8 +363,13 @@ public class TransactionService : ITransactionService
             EncryptedNotes = EncryptIfNotEmpty(request.Notes, dek),
             Splits = splits,
             TagIds = request.TagIds ?? new List<string>(),
-            TransferToAccountId = request.TransferToAccountId,
-            IsCleared = true // Default to cleared since users enter transactions after completion
+            TransferToAccountId = isSelfTransfer ? request.TransferToAccountId : null,
+            IsCleared = true, // Default to cleared since users enter transactions after completion
+            // P2P fields
+            TransactionLinkId = transactionLinkId,
+            CounterpartyEmail = isP2P ? request.CounterpartyEmail : null,
+            CounterpartyUserId = isP2P ? counterpartyUser?.Id : (isSelfTransfer ? userId : null),
+            Role = isP2P ? userRole : (isSelfTransfer ? TransactionRole.Sender : null)
         };
 
         // Handle location
@@ -369,11 +408,14 @@ public class TransactionService : ITransactionService
         // For recurring templates, create the first transaction instance immediately
         if (transaction.IsRecurringTemplate)
         {
+            // Generate a unique link ID for this first instance if it's a transfer
+            var firstInstanceLinkId = isSelfTransfer ? Guid.NewGuid() : (Guid?)null;
+            
             firstInstance = new Transaction
             {
                 UserId = userId,
                 AccountId = account.Id,
-                Type = type,
+                Type = type,  // Send or Receive
                 Amount = request.Amount,
                 Currency = account.Currency,
                 Date = request.Date,
@@ -385,14 +427,18 @@ public class TransactionService : ITransactionService
                 Location = transaction.Location,
                 ParentTransactionId = transaction.Id,
                 IsRecurringTemplate = false,
-                IsCleared = true // First instance is auto-cleared since user is actively creating it
+                IsCleared = true, // First instance is auto-cleared since user is actively creating it
+                // P2P fields for recurring (only self-transfers supported)
+                TransactionLinkId = firstInstanceLinkId,
+                CounterpartyUserId = isSelfTransfer ? userId : null,
+                Role = isSelfTransfer ? TransactionRole.Sender : null
             };
             
             await _transactionRepository.CreateAsync(firstInstance);
             await UpdateAccountBalanceAsync(account, type, request.Amount, true);
             
-            // Handle transfer for the first instance
-            if (type == TransactionType.Transfer && transferToAccount != null)
+            // Handle self-transfer for the first instance (P2P not supported for recurring)
+            if (isSelfTransfer && transferToAccount != null)
             {
                 // Create splits with converted amount for destination account
                 var linkedSplits = accountTransferLabel != null
@@ -403,7 +449,7 @@ public class TransactionService : ITransactionService
                 {
                     UserId = userId,
                     AccountId = transferToAccount.Id,
-                    Type = TransactionType.Credit,
+                    Type = TransactionType.Receive, // Linked side is Receive (money coming in)
                     Amount = convertedAmount,  // Use converted amount
                     Currency = transferToAccount.Currency,
                     Date = request.Date,
@@ -413,13 +459,18 @@ public class TransactionService : ITransactionService
                     Splits = linkedSplits,
                     TagIds = transaction.TagIds,
                     LinkedTransactionId = firstInstance.Id,
-                    IsCleared = firstInstance.IsCleared  // Sync cleared status
+                    TransferToAccountId = account.Id, // Reference back to source account
+                    IsCleared = firstInstance.IsCleared,
+                    // P2P fields
+                    TransactionLinkId = firstInstanceLinkId,
+                    CounterpartyUserId = userId,
+                    Role = TransactionRole.Receiver
                 };
                 
                 await _transactionRepository.CreateAsync(linkedFirstInstance);
                 firstInstance.LinkedTransactionId = linkedFirstInstance.Id;
                 await _transactionRepository.UpdateAsync(firstInstance);
-                await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, convertedAmount, true);  // Use converted amount
+                await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Receive, convertedAmount, true);
             }
             
             // Update NextOccurrence to the next date
@@ -433,8 +484,8 @@ public class TransactionService : ITransactionService
             await UpdateAccountBalanceAsync(account, type, request.Amount, true);
         }
 
-        // Handle transfer - create linked transaction
-        if (type == TransactionType.Transfer && transferToAccount != null && !transaction.IsRecurringTemplate)
+        // Handle self-transfer - create linked Receive transaction for destination account
+        if (isSelfTransfer && transferToAccount != null && !transaction.IsRecurringTemplate)
         {
             // Create splits with converted amount for the destination account
             var linkedSplits = accountTransferLabel != null
@@ -445,7 +496,7 @@ public class TransactionService : ITransactionService
             {
                 UserId = userId,
                 AccountId = transferToAccount.Id,
-                Type = TransactionType.Credit,
+                Type = TransactionType.Receive, // Linked side is Receive (money coming in)
                 Amount = convertedAmount,  // Use converted amount
                 Currency = transferToAccount.Currency,
                 Date = request.Date,
@@ -455,7 +506,12 @@ public class TransactionService : ITransactionService
                 Splits = linkedSplits,
                 TagIds = transaction.TagIds,
                 LinkedTransactionId = transaction.Id,
-                IsCleared = transaction.IsCleared  // Sync cleared status
+                TransferToAccountId = account.Id, // Reference back to source account
+                IsCleared = transaction.IsCleared,
+                // P2P fields for self-transfer
+                TransactionLinkId = transactionLinkId,
+                CounterpartyUserId = userId,  // Self-transfer, same user
+                Role = TransactionRole.Receiver
             };
 
             await _transactionRepository.CreateAsync(linkedTransaction);
@@ -463,7 +519,45 @@ public class TransactionService : ITransactionService
             transaction.LinkedTransactionId = linkedTransaction.Id;
             await _transactionRepository.UpdateAsync(transaction);
 
-            await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, convertedAmount, true);  // Use converted amount
+            await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Receive, convertedAmount, true);
+        }
+        
+        // Handle P2P (Send/Receive with counterparty email) - create pending transaction for counterparty
+        if (isP2P && !transaction.IsRecurringTemplate)
+        {
+            // For P2P, we create a pending transaction for the counterparty
+            // They will assign their account/categories/tags later
+            
+            // Determine counterparty's transaction type (opposite of user's)
+            var counterpartyType = type == TransactionType.Send ? TransactionType.Receive : TransactionType.Send;
+            
+            var receiverTransaction = new Transaction
+            {
+                UserId = counterpartyUser?.Id ?? string.Empty, // Empty if external user
+                AccountId = string.Empty, // Counterparty will assign their account later
+                Type = counterpartyType,
+                Amount = counterpartyAmount,
+                Currency = account.Currency, // Initially same as user's currency
+                Date = request.Date,
+                Title = request.Title,
+                EncryptedNotes = null, // Counterparty can add their own notes
+                Splits = new List<TransactionSplit>(), // They'll fill in their own categories
+                TagIds = new List<string>(),
+                IsCleared = false, // Pending - counterparty needs to review
+                // P2P fields
+                TransactionLinkId = transactionLinkId,
+                CounterpartyEmail = (await _userRepository.GetByIdAsync(userId))?.Email,
+                CounterpartyUserId = userId,
+                Role = counterpartyRole
+            };
+            
+            // Only create if counterparty is on the platform
+            if (counterpartyUser != null)
+            {
+                await _transactionRepository.CreateAsync(receiverTransaction);
+                transaction.LinkedTransactionId = receiverTransaction.Id;
+                await _transactionRepository.UpdateAsync(transaction);
+            }
         }
 
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
@@ -624,7 +718,7 @@ public class TransactionService : ITransactionService
                 if (request.Amount.HasValue && oldAmount != transaction.Amount)
                 {
                     var isSameCurrency = transaction.Currency.Equals(linkedTransaction.Currency, StringComparison.OrdinalIgnoreCase);
-                    var isSourceSide = transaction.Type == TransactionType.Debit || transaction.Type == TransactionType.Transfer;
+                    var isSourceSide = transaction.Type == TransactionType.Send;
                     
                     if (isSameCurrency)
                     {
@@ -783,8 +877,8 @@ public class TransactionService : ITransactionService
                 await _transactionRepository.CreateAsync(newTransaction);
                 await UpdateAccountBalanceAsync(account, newTransaction.Type, newTransaction.Amount, true);
 
-                // Handle transfer linked transaction
-                if (template.Type == TransactionType.Transfer && !string.IsNullOrEmpty(template.TransferToAccountId))
+                // Handle transfer linked transaction (detected by TransferToAccountId, not type)
+                if (!string.IsNullOrEmpty(template.TransferToAccountId))
                 {
                     var transferToAccount = await _accountRepository.GetByIdAsync(template.TransferToAccountId);
                     if (transferToAccount != null)
@@ -793,7 +887,7 @@ public class TransactionService : ITransactionService
                         {
                             UserId = template.UserId,
                             AccountId = transferToAccount.Id,
-                            Type = TransactionType.Credit,
+                            Type = TransactionType.Receive,
                             Amount = template.Amount,
                             Currency = transferToAccount.Currency,
                             Date = template.RecurringRule.NextOccurrence,
@@ -809,7 +903,7 @@ public class TransactionService : ITransactionService
                         await _transactionRepository.CreateAsync(linkedTransaction);
                         newTransaction.LinkedTransactionId = linkedTransaction.Id;
                         await _transactionRepository.UpdateAsync(newTransaction);
-                        await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Credit, template.Amount, true);
+                        await UpdateAccountBalanceAsync(transferToAccount, TransactionType.Receive, template.Amount, true);
                     }
                 }
 
@@ -846,9 +940,8 @@ public class TransactionService : ITransactionService
     {
         var change = type switch
         {
-            TransactionType.Credit => amount,
-            TransactionType.Debit => -amount,
-            TransactionType.Transfer => -amount, // Outgoing from source account
+            TransactionType.Receive => amount,
+            TransactionType.Send => -amount,
             _ => 0m
         };
 
@@ -902,7 +995,11 @@ public class TransactionService : ITransactionService
             t.IsRecurringTemplate,
             t.IsCleared,
             t.CreatedAt,
-            t.UpdatedAt);
+            t.UpdatedAt,
+            t.TransactionLinkId,
+            t.CounterpartyEmail,
+            t.CounterpartyUserId,
+            t.Role?.ToString());
     }
 
     private TransactionSplitResponse MapSplitToResponse(TransactionSplit split, byte[]? dek, Dictionary<string, Label> labels)
@@ -1091,13 +1188,13 @@ public class TransactionService : ITransactionService
             .OrderBy(g => g.Key)
             .Select(g => new SpendingTrend(
                 g.Key,
-                g.Where(t => t.Type == TransactionType.Credit)
+                g.Where(t => t.Type == TransactionType.Receive)
                     .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
-                g.Where(t => t.Type == TransactionType.Debit)
+                g.Where(t => t.Type == TransactionType.Send)
                     .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
-                g.Where(t => t.Type == TransactionType.Credit)
+                g.Where(t => t.Type == TransactionType.Receive)
                     .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)) -
-                g.Where(t => t.Type == TransactionType.Debit)
+                g.Where(t => t.Type == TransactionType.Send)
                     .Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
                 g.Count()
             ))
@@ -1105,13 +1202,14 @@ public class TransactionService : ITransactionService
 
         // Calculate averages by type with currency conversion
         var actualTransactions = transactions.Where(t => !t.IsRecurringTemplate).ToList();
-        var credits = actualTransactions.Where(t => t.Type == TransactionType.Credit).ToList();
-        var debits = actualTransactions.Where(t => t.Type == TransactionType.Debit).ToList();
-        var transfers = actualTransactions.Where(t => t.Type == TransactionType.Transfer).ToList();
+        var receives = actualTransactions.Where(t => t.Type == TransactionType.Receive).ToList();
+        var sends = actualTransactions.Where(t => t.Type == TransactionType.Send).ToList();
+        // Transfers are now Send+Receive, detect by LinkedTransactionId for reporting
+        var transfers = actualTransactions.Where(t => !string.IsNullOrEmpty(t.LinkedTransactionId)).ToList();
 
         var averagesByType = new AveragesByType(
-            credits.Any() ? Math.Round(credits.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
-            debits.Any() ? Math.Round(debits.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
+            receives.Any() ? Math.Round(receives.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
+            sends.Any() ? Math.Round(sends.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
             transfers.Any() ? Math.Round(transfers.Average(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0
         );
 
@@ -1119,14 +1217,14 @@ public class TransactionService : ITransactionService
         var dateRange = (endDate ?? DateTime.UtcNow) - (startDate ?? actualTransactions.Min(t => t.Date));
         var days = Math.Max(1, dateRange.Days);
         var months = Math.Max(1, days / 30.0);
-        var totalDebits = debits.Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+        var totalSends = sends.Sum(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
 
         return new TransactionAnalyticsResponse(
             topCategories,
             trends,
             averagesByType,
-            Math.Round(totalDebits / days, 2),
-            Math.Round(totalDebits / (decimal)months, 2)
+            Math.Round(totalSends / days, 2),
+            Math.Round(totalSends / (decimal)months, 2)
         );
     }
 

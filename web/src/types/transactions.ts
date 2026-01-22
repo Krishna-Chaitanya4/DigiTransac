@@ -1,6 +1,13 @@
 // Transaction types
+// Note: 'Transfer' is a UI-only concept. Backend only uses Send/Receive.
+// A transfer creates a linked Send (source) + Receive (destination) pair.
 
-export type TransactionType = 'Credit' | 'Debit' | 'Transfer';
+export type TransactionType = 'Receive' | 'Send';
+
+// UI type includes Transfer for form display
+export type TransactionUIType = TransactionType | 'Transfer';
+
+export type TransactionRole = 'Sender' | 'Receiver';
 
 export type RecurrenceFrequency = 
   | 'Daily' 
@@ -64,6 +71,11 @@ export interface Transaction {
   isCleared: boolean;
   createdAt: string;
   updatedAt: string;
+  // P2P fields
+  transactionLinkId?: string;
+  counterpartyEmail?: string;
+  counterpartyUserId?: string;
+  role?: TransactionRole;
 }
 
 export interface TransactionListResponse {
@@ -132,6 +144,9 @@ export interface CreateTransactionRequest {
   location?: TransactionLocationRequest;
   transferToAccountId?: string;
   recurringRule?: RecurringRuleRequest;
+  // P2P fields (optional for Send/Receive types)
+  counterpartyEmail?: string;
+  counterpartyAmount?: number;
 }
 
 export interface UpdateTransactionRequest {
@@ -153,7 +168,7 @@ export interface TransactionFilter {
   startDate?: string;
   endDate?: string;
   accountIds?: string[];
-  types?: TransactionType[];
+  types?: TransactionUIType[];  // Uses UI types including Transfer (for detecting linked transactions)
   labelIds?: string[];
   folderIds?: string[];  // UI-only: selected folders (expanded to labelIds for API)
   tagIds?: string[];
@@ -166,10 +181,16 @@ export interface TransactionFilter {
   pageSize?: number;
 }
 
-// Transaction type configuration
+// Transaction type configuration (for API types)
 export const transactionTypeConfig: Record<TransactionType, { label: string; icon: string; color: string }> = {
-  Credit: { label: 'Credit', icon: '↓', color: '#10B981' },   // Green - money in
-  Debit: { label: 'Debit', icon: '↑', color: '#EF4444' },     // Red - money out
+  Receive: { label: 'Receive', icon: '↓', color: '#10B981' },   // Green - money in
+  Send: { label: 'Send', icon: '↑', color: '#EF4444' },     // Red - money out
+};
+
+// UI type configuration (includes Transfer for forms)
+export const transactionUITypeConfig: Record<TransactionUIType, { label: string; icon: string; color: string }> = {
+  Receive: { label: 'Receive', icon: '↓', color: '#10B981' },   // Green - money in
+  Send: { label: 'Send', icon: '↑', color: '#EF4444' },     // Red - money out
   Transfer: { label: 'Transfer', icon: '↔', color: '#3B82F6' }, // Blue - between accounts
 };
 

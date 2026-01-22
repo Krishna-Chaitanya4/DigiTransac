@@ -63,11 +63,11 @@ describe('transactionService', () => {
       });
 
       await getTransactions({
-        types: ['Debit', 'Credit'],
+        types: ['Send', 'Receive'],
       });
 
       expect(apiClient.get).toHaveBeenCalledWith(
-        expect.stringContaining('types=Debit%2CCredit')
+        expect.stringContaining('types=Send%2CReceive')
       );
     });
 
@@ -129,7 +129,7 @@ describe('transactionService', () => {
         startDate: '2024-01-01T00:00:00.000Z',
         endDate: '2024-12-31T23:59:59.999Z',
         accountIds: ['acc-1'],
-        types: ['Debit'],
+        types: ['Send'],
         labelIds: ['label-1'],
         tagIds: ['tag-1'],
         searchText: 'grocery',
@@ -142,7 +142,7 @@ describe('transactionService', () => {
       expect(callArg).toContain('startDate=');
       expect(callArg).toContain('endDate=');
       expect(callArg).toContain('accountIds=acc-1');
-      expect(callArg).toContain('types=Debit');
+      expect(callArg).toContain('types=Send');
       expect(callArg).toContain('labelIds=label-1');
       expect(callArg).toContain('tagIds=tag-1');
       expect(callArg).toContain('searchText=grocery');
@@ -241,7 +241,7 @@ describe('transactionService', () => {
         startDate: '2024-01-01T00:00:00.000Z',
         endDate: '2024-12-31T23:59:59.999Z',
         accountIds: ['acc-123'],
-        types: ['Debit'],
+        types: ['Send'],
         labelIds: ['label-1'],
       });
 
@@ -249,7 +249,7 @@ describe('transactionService', () => {
         expect.stringContaining('accountIds=acc-123')
       );
       expect(apiClient.get).toHaveBeenCalledWith(
-        expect.stringContaining('types=Debit')
+        expect.stringContaining('types=Send')
       );
       expect(apiClient.get).toHaveBeenCalledWith(
         expect.stringContaining('labelIds=label-1')
@@ -266,7 +266,7 @@ describe('transactionService', () => {
         id: 'txn-123',
         amount: 100,
         description: 'Test transaction',
-        type: 'Debit',
+        type: 'Send',
       };
 
       vi.mocked(apiClient.get).mockResolvedValue(mockTransaction);
@@ -305,7 +305,7 @@ describe('transactionService', () => {
       const request = {
         amount: 50,
         description: 'New transaction',
-        type: 'Debit' as const,
+        type: 'Send' as const,
         accountId: 'acc-1',
         date: '2024-01-15',
         splits: [],

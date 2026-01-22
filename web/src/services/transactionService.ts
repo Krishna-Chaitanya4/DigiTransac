@@ -7,6 +7,7 @@ import type {
   CreateTransactionRequest,
   UpdateTransactionRequest,
   TransactionFilter,
+  TransactionType,
 } from '../types/transactions';
 
 // Build query string from filter
@@ -19,9 +20,21 @@ function buildFilterQuery(filter: TransactionFilter): string {
   if (filter.accountIds && filter.accountIds.length > 0) {
     params.append('accountIds', filter.accountIds.join(','));
   }
-  // Multiple types - send as comma-separated string
+  // Multiple types - handle Transfer as a UI-only concept
   if (filter.types && filter.types.length > 0) {
-    params.append('types', filter.types.join(','));
+    // Filter out 'Transfer' - it's a UI concept, not an API type
+    // Transfer means transactions with linkedTransactionId
+    const hasTransferFilter = filter.types.includes('Transfer');
+    const apiTypes = filter.types.filter(t => t !== 'Transfer') as TransactionType[];
+    
+    if (apiTypes.length > 0) {
+      params.append('types', apiTypes.join(','));
+    }
+    
+    // If Transfer filter is selected, add a parameter for linked transactions
+    if (hasTransferFilter) {
+      params.append('hasLinkedTransaction', 'true');
+    }
   }
   // Multiple label IDs (categories) - send as comma-separated string
   if (filter.labelIds && filter.labelIds.length > 0) {
@@ -62,7 +75,20 @@ export async function getTransactionSummary(
   if (filter.startDate) params.append('startDate', filter.startDate);
   if (filter.endDate) params.append('endDate', filter.endDate);
   if (filter.accountIds?.length) params.append('accountIds', filter.accountIds.join(','));
-  if (filter.types?.length) params.append('types', filter.types.join(','));
+  
+  // Handle types filter - translate Transfer to hasLinkedTransaction
+  if (filter.types?.length) {
+    const hasTransferFilter = filter.types.includes('Transfer');
+    const apiTypes = filter.types.filter(t => t !== 'Transfer') as TransactionType[];
+    
+    if (apiTypes.length > 0) {
+      params.append('types', apiTypes.join(','));
+    }
+    if (hasTransferFilter) {
+      params.append('hasLinkedTransaction', 'true');
+    }
+  }
+  
   if (filter.labelIds?.length) params.append('labelIds', filter.labelIds.join(','));
   if (filter.tagIds?.length) params.append('tagIds', filter.tagIds.join(','));
   if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());

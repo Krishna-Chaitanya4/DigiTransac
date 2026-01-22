@@ -389,8 +389,49 @@ interface CurrencyDropdownProps {
 }
 
 function CurrencyDropdown({ currency, currencies, isOpen, onToggle, onSelect, search, onSearchChange }: CurrencyDropdownProps) {
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  // Reset highlighted index when search changes or dropdown opens
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [search, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        onToggle();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex(prev => Math.min(prev + 1, currencies.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex(prev => Math.max(prev - 1, 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (currencies[highlightedIndex]) {
+          onSelect(currencies[highlightedIndex].code);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        onToggle();
+        break;
+      case 'Tab':
+        onToggle();
+        break;
+    }
+  };
+
   return (
-    <div className="relative flex-shrink-0">
+    <div className="relative flex-shrink-0" onKeyDown={handleKeyDown}>
       <button
         type="button"
         onClick={onToggle}
@@ -419,13 +460,18 @@ function CurrencyDropdown({ currency, currencies, isOpen, onToggle, onSelect, se
             {search === '' && (
               <div className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-600">Common Currencies</div>
             )}
-            {currencies.map((c) => (
+            {currencies.map((c, index) => (
               <button
                 key={c.code}
                 type="button"
                 onClick={() => onSelect(c.code)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                  c.code === currency ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'
+                onMouseEnter={() => setHighlightedIndex(index)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left ${
+                  index === highlightedIndex
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    : c.code === currency
+                    ? 'bg-gray-50 dark:bg-gray-600'
+                    : 'text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
                 <span className="w-6">{c.symbol}</span>

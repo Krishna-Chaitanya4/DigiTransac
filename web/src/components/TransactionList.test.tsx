@@ -43,7 +43,7 @@ Object.defineProperty(window, 'confirm', { value: mockConfirm, writable: true })
 const createTransaction = (overrides: Partial<Transaction> = {}): Transaction => ({
   id: 'tx-1',
   accountId: 'acc-1',
-  type: 'Debit',
+  type: 'Send',
   amount: 100,
   currency: 'USD',
   date: '2026-01-22T12:00:00.000Z',
@@ -218,8 +218,8 @@ describe('TransactionList', () => {
       expect(screen.queryByText('Pending')).not.toBeInTheDocument();
     });
 
-    it('should render amount with correct formatting for debit', () => {
-      const transaction = createTransaction({ type: 'Debit', amount: 50.99 });
+    it('should render amount with correct formatting for send', () => {
+      const transaction = createTransaction({ type: 'Send', amount: 50.99 });
       
       render(
         <TransactionList
@@ -233,11 +233,11 @@ describe('TransactionList', () => {
       // Use getAllByText since amount appears in both daily total and transaction
       const amounts = screen.getAllByText(/-\$50\.99/);
       expect(amounts.length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText(/Debit/)).toBeInTheDocument();
+      expect(screen.getByText(/Send/)).toBeInTheDocument();
     });
 
-    it('should render amount with correct formatting for credit', () => {
-      const transaction = createTransaction({ type: 'Credit', amount: 100 });
+    it('should render amount with correct formatting for receive', () => {
+      const transaction = createTransaction({ type: 'Receive', amount: 100 });
       
       render(
         <TransactionList
@@ -251,11 +251,16 @@ describe('TransactionList', () => {
       // Use getAllByText since amount appears in both daily total and transaction
       const amounts = screen.getAllByText(/\+\$100\.00/);
       expect(amounts.length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText(/Credit/)).toBeInTheDocument();
+      expect(screen.getByText(/Receive/)).toBeInTheDocument();
     });
 
     it('should render transfer indicator', () => {
-      const transaction = createTransaction({ type: 'Transfer', amount: 500 });
+      // Transfers are now detected by linkedTransactionId presence
+      const transaction = createTransaction({ 
+        type: 'Send', 
+        amount: 500,
+        linkedTransactionId: 'linked-tx-1'
+      });
       
       render(
         <TransactionList
@@ -322,8 +327,8 @@ describe('TransactionList', () => {
     });
 
     it('should show daily totals for each date group', () => {
-      const tx1 = createTransaction({ id: 'tx-1', type: 'Credit', amount: 100 });
-      const tx2 = createTransaction({ id: 'tx-2', type: 'Debit', amount: 30 });
+      const tx1 = createTransaction({ id: 'tx-1', type: 'Receive', amount: 100 });
+      const tx2 = createTransaction({ id: 'tx-2', type: 'Send', amount: 30 });
       
       render(
         <TransactionList
@@ -334,7 +339,7 @@ describe('TransactionList', () => {
         />
       );
       
-      // Net should be +70 (100 credit - 30 debit)
+      // Net should be +70 (100 receive - 30 send)
       expect(screen.getByText('+$70.00')).toBeInTheDocument();
     });
   });
@@ -716,8 +721,9 @@ describe('TransactionList', () => {
     it('should show transfer destination account when expanded', () => {
       const fromAccount = createAccount({ id: 'acc-1', name: 'Checking' });
       const toAccount = createAccount({ id: 'acc-2', name: 'Savings' });
+      // Transfers are now Send type with linkedTransactionId
       const transaction = createTransaction({
-        type: 'Transfer',
+        type: 'Send',
         accountId: 'acc-1',
         transferToAccountId: 'acc-2',
         linkedTransactionId: 'linked-tx-1',
@@ -742,8 +748,9 @@ describe('TransactionList', () => {
     it('should call onViewLinkedTransaction when View linked button is clicked', () => {
       const fromAccount = createAccount({ id: 'acc-1', name: 'Checking' });
       const toAccount = createAccount({ id: 'acc-2', name: 'Savings' });
+      // Transfers are now Send type with linkedTransactionId
       const transaction = createTransaction({
-        type: 'Transfer',
+        type: 'Send',
         accountId: 'acc-1',
         transferToAccountId: 'acc-2',
         linkedTransactionId: 'linked-tx-1',

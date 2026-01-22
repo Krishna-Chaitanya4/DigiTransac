@@ -27,6 +27,7 @@ public static class TransactionEndpoints
             string? searchText,
             bool? isCleared,
             bool? isRecurring,
+            bool? hasLinkedTransaction,
             int? page,
             int? pageSize,
             ClaimsPrincipal user,
@@ -64,7 +65,7 @@ public static class TransactionEndpoints
             var filter = new TransactionFilterRequest(
                 startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
                 minAmount, maxAmount, searchText, isCleared, isRecurring,
-                page, pageSize);
+                page, pageSize, hasLinkedTransaction);
 
             var result = await transactionService.GetAllAsync(userId, filter);
             return Results.Ok(result);
@@ -83,6 +84,7 @@ public static class TransactionEndpoints
             decimal? minAmount,
             decimal? maxAmount,
             bool? isCleared,
+            bool? hasLinkedTransaction,
             ClaimsPrincipal user,
             ITransactionService transactionService) =>
         {
@@ -106,7 +108,7 @@ public static class TransactionEndpoints
 
             var filter = new TransactionFilterRequest(
                 startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
-                minAmount, maxAmount, null, isCleared, null, 1, int.MaxValue);
+                minAmount, maxAmount, null, isCleared, null, 1, int.MaxValue, hasLinkedTransaction);
 
             var summary = await transactionService.GetSummaryAsync(userId, filter);
             return Results.Ok(summary);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Account, formatCurrency } from '../../services/accountService';
+import { getCurrencySymbol } from '../../services/currencyService';
 
 interface AdjustBalanceModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export function AdjustBalanceModal({ isOpen, onClose, onSubmit, account, isLoadi
                   New Balance
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">{getCurrencySymbol(account.currency)}</span>
                   <input
                     type="number"
                     id="newBalance"

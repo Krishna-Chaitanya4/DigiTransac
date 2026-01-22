@@ -1,5 +1,5 @@
 import { useState, memo, useMemo, useCallback } from 'react';
-import type { Transaction, TransactionType } from '../types/transactions';
+import type { Transaction, TransactionUIType } from '../types/transactions';
 import type { Account } from '../services/accountService';
 import type { Label, Tag } from '../types/labels';
 import { getCurrencySymbol, formatCurrency } from '../services/currencyService';
@@ -184,6 +184,11 @@ const TransactionRow = memo(function TransactionRow({
                   🔄
                 </span>
               )}
+              {transaction.counterpartyEmail && (
+                <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 rounded" title={`${transaction.role === 'Sender' ? 'To' : 'From'}: ${transaction.counterpartyEmail}`}>
+                  👤
+                </span>
+              )}
               {!transaction.isCleared && (
                 <span className="text-xs px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400 rounded">
                   Pending
@@ -199,8 +204,8 @@ const TransactionRow = memo(function TransactionRow({
           {/* Amount */}
           <div className={`text-right flex-shrink-0 ${getTypeColor(getDisplayType(transaction))}`}>
             <span className="font-semibold">
-              {/* Show +/- based on money flow: Credit or receiving transfer = +, Debit or sending transfer = - */}
-              {transaction.type === 'Credit' ? '+' : transaction.type === 'Debit' || transaction.type === 'Transfer' ? '-' : ''}
+              {/* Show +/- based on money flow: Receive = +, Send = - */}
+              {transaction.type === 'Receive' ? '+' : '-'}
               {currencySymbol}{formatAmount(transaction.amount, transaction.currency)}
             </span>
             {/* Show converted amount if currency differs from primary */}
@@ -285,27 +290,27 @@ const TransactionRow = memo(function TransactionRow({
               </div>
             )}
             
-            {/* Transfer details */}
-            {(transaction.type === 'Transfer' || transaction.type === 'Credit') && transaction.linkedTransactionId && (
+            {/* Transfer details - shown when transaction is linked (part of a transfer) */}
+            {transaction.linkedTransactionId && (
               <div className="text-sm mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
                     </svg>
-                    {transaction.type === 'Transfer' 
-                      ? `→ ${accountMap.get(transaction.transferToAccountId!)?.name || 'Unknown Account'}`
+                    {transaction.type === 'Send' && transaction.transferToAccountId
+                      ? `→ ${accountMap.get(transaction.transferToAccountId)?.name || 'Unknown Account'}`
                       : `← From linked transfer`
                     }
                   </div>
                   {onViewLinkedTransaction && (
                     <button
                       onClick={() => {
-                        // For Transfer (debit side), the linked is the credit in transferToAccountId
-                        // For Credit side, we need to find which account the linked transaction is in
-                        const linkedAccountId = transaction.type === 'Transfer' 
-                          ? transaction.transferToAccountId!
-                          : transaction.accountId; // The linked debit will show us to navigate there
+                        // For Send side with transferToAccountId, the linked receive is in that account
+                        // For Receive side, we need to find which account the linked transaction is in
+                        const linkedAccountId = transaction.type === 'Send' && transaction.transferToAccountId
+                          ? transaction.transferToAccountId
+                          : transaction.accountId; // The linked send will show us to navigate there
                         onViewLinkedTransaction(transaction.linkedTransactionId!, linkedAccountId);
                       }}
                       className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
@@ -315,6 +320,22 @@ const TransactionRow = memo(function TransactionRow({
                         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                       </svg>
                     </button>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* P2P Transfer details */}
+            {transaction.counterpartyEmail && (
+              <div className="text-sm mb-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800/30">
+                <div className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                  </svg>
+                  {transaction.role === 'Sender' ? (
+                    <span>Sent to <span className="font-medium">{transaction.counterpartyEmail}</span></span>
+                  ) : (
+                    <span>Received from <span className="font-medium">{transaction.counterpartyEmail}</span></span>
                   )}
                 </div>
               </div>
@@ -372,7 +393,7 @@ interface TransactionListProps {
 }
 
 // Get display type - linked transactions always show as Transfer
-function getDisplayType(transaction: Transaction): TransactionType {
+function getDisplayType(transaction: Transaction): TransactionUIType {
   // If transaction has a linked transaction, it's part of a transfer
   if (transaction.linkedTransactionId) {
     return 'Transfer';
@@ -381,19 +402,19 @@ function getDisplayType(transaction: Transaction): TransactionType {
 }
 
 // Get type color
-function getTypeColor(type: TransactionType): string {
+function getTypeColor(type: TransactionUIType): string {
   switch (type) {
-    case 'Credit': return 'text-green-600 dark:text-green-400';
-    case 'Debit': return 'text-red-600 dark:text-red-400';
+    case 'Receive': return 'text-green-600 dark:text-green-400';
+    case 'Send': return 'text-red-600 dark:text-red-400';
     case 'Transfer': return 'text-blue-600 dark:text-blue-400';
   }
 }
 
 // Get type icon
-function getTypeIcon(type: TransactionType): string {
+function getTypeIcon(type: TransactionUIType): string {
   switch (type) {
-    case 'Credit': return '↓';
-    case 'Debit': return '↑';
+    case 'Receive': return '↓';
+    case 'Send': return '↑';
     case 'Transfer': return '↔';
   }
 }
@@ -493,8 +514,8 @@ export function TransactionList({
       const dateTransactions = groupedTransactions[dateString];
       totals[dateString] = dateTransactions.reduce((sum, t) => {
         const convertedAmount = convert(t.amount, t.currency);
-        if (t.type === 'Credit') return sum + convertedAmount;
-        if (t.type === 'Debit') return sum - convertedAmount;
+        if (t.type === 'Receive') return sum + convertedAmount;
+        if (t.type === 'Send') return sum - convertedAmount;
         return sum;
       }, 0);
     }

@@ -1,4 +1,4 @@
-using DigiTransac.Api.Models;
+﻿using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
@@ -93,6 +93,24 @@ public class TransactionServiceTests
             _exchangeRateServiceMock.Object);
     }
 
+    // Helper to create a transaction request with default P2P fields
+    private static CreateTransactionRequest CreateRequest(
+        string accountId,
+        string type,
+        decimal amount,
+        DateTime date,
+        string? title,
+        string? payee,
+        string? notes,
+        List<TransactionSplitRequest> splits,
+        List<string>? tagIds = null,
+        TransactionLocationRequest? location = null,
+        string? transferToAccountId = null,
+        RecurringRuleRequest? recurringRule = null,
+        string? counterpartyEmail = null,
+        decimal? counterpartyAmount = null) =>
+        new(accountId, type, amount, date, title, payee, notes, splits, tagIds, location, transferToAccountId, recurringRule, counterpartyEmail, counterpartyAmount);
+
     #region CreateAsync Tests
 
     [Fact]
@@ -101,7 +119,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
             Title: "Grocery Shopping",
@@ -114,7 +132,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
             .ReturnsAsync((Transaction t) => { t.Id = "new-transaction-id"; return t; });
@@ -126,11 +144,11 @@ public class TransactionServiceTests
         success.Should().BeTrue();
         transaction.Should().NotBeNull();
         transaction!.Amount.Should().Be(100m);
-        transaction.Type.Should().Be("Debit");
+        transaction.Type.Should().Be("Send");
 
         _transactionRepositoryMock.Verify(x => x.CreateAsync(It.Is<Transaction>(t =>
             t.Amount == 100m &&
-            t.Type == TransactionType.Debit &&
+            t.Type == TransactionType.Send &&
             t.Currency == "USD")), Times.Once);
 
         // Verify balance update
@@ -144,7 +162,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Credit",
+            Type: "Receive",
             Amount: 500m,
             Date: DateTime.UtcNow,
             Title: "Salary",
@@ -157,7 +175,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
             .ReturnsAsync((Transaction t) => { t.Id = "new-transaction-id"; return t; });
@@ -168,7 +186,7 @@ public class TransactionServiceTests
         // Assert
         success.Should().BeTrue();
         transaction.Should().NotBeNull();
-        transaction!.Type.Should().Be("Credit");
+        transaction!.Type.Should().Be("Receive");
 
         // Verify balance increased
         _accountRepositoryMock.Verify(x => x.UpdateAsync(It.Is<Account>(a =>
@@ -184,7 +202,7 @@ public class TransactionServiceTests
 
         var request = new CreateTransactionRequest(
             AccountId: "invalid-account",
-            Type: "Debit",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
             Title: null,
@@ -194,7 +212,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -220,7 +238,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -236,7 +254,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: -50m,
             Date: DateTime.UtcNow,
             Title: null,
@@ -246,7 +264,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -262,7 +280,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
             Title: null,
@@ -272,7 +290,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -288,7 +306,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
             Title: null,
@@ -302,7 +320,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -319,7 +337,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
             Title: null,
@@ -332,7 +350,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -349,7 +367,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
             Title: "Shopping",
@@ -359,7 +377,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: new TransactionLocationRequest(40.7128, -74.0060, "Times Square", "New York", "USA"),
             TransferToAccountId: null,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         Transaction? createdTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
@@ -400,9 +418,10 @@ public class TransactionServiceTests
                 toAccount
             });
 
+        // Transfers are now Send type with TransferToAccountId
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Transfer",
+            Type: "Send",
             Amount: 200m,
             Date: DateTime.UtcNow,
             Title: "Transfer to Savings",
@@ -412,7 +431,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: toAccountId,
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         var createdTransactions = new List<Transaction>();
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
@@ -423,25 +442,25 @@ public class TransactionServiceTests
 
         // Assert
         success.Should().BeTrue();
-        createdTransactions.Should().HaveCount(2); // Source and destination
+        createdTransactions.Should().HaveCount(2); // Source (Send) and destination (Receive)
         
-        // Verify source transaction is Debit from source account
+        // Verify source transaction is Send from source account
         var sourceTransaction = createdTransactions.First(t => t.AccountId == TestAccountId);
-        sourceTransaction.Type.Should().Be(TransactionType.Transfer);
+        sourceTransaction.Type.Should().Be(TransactionType.Send);
         
-        // Verify linked transaction is Credit to destination account
+        // Verify linked transaction is Receive in destination account
         var linkedTransaction = createdTransactions.First(t => t.AccountId == toAccountId);
-        linkedTransaction.Type.Should().Be(TransactionType.Credit);
-        linkedTransaction.LinkedTransactionId.Should().Be(sourceTransaction.Id);
+        linkedTransaction.Type.Should().Be(TransactionType.Receive);
+        linkedTransaction.LinkedTransactionId.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
     public async Task CreateAsync_WithTransferToSameAccount_ShouldFail()
     {
-        // Arrange
+        // Arrange - Send with TransferToAccountId pointing to same account
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Transfer",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
             Title: null,
@@ -451,7 +470,7 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: TestAccountId, // Same as source
-            RecurringRule: null);
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -462,29 +481,30 @@ public class TransactionServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_WithTransferMissingDestination_ShouldFail()
+    public async Task CreateAsync_WithSendWithoutTransferDestination_ShouldSucceed()
     {
-        // Arrange
+        // Arrange - Regular Send (not a transfer) without TransferToAccountId
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Transfer",
+            Type: "Send",
             Amount: 100m,
             Date: DateTime.UtcNow,
-            Title: null,
+            Title: "Payment",
             Payee: null,
             Notes: null,
             Splits: new List<TransactionSplitRequest> { new(TestLabelId, 100m, null) },
             TagIds: null,
             Location: null,
-            TransferToAccountId: null, // Missing!
-            RecurringRule: null);
+            TransferToAccountId: null, // Not a transfer, just a regular Send
+            RecurringRule: null, CounterpartyEmail: null, CounterpartyAmount: null);
 
         // Act
-        var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
+        var (success, message, transaction) = await _transactionService.CreateAsync(TestUserId, request);
 
-        // Assert
-        success.Should().BeFalse();
-        message.Should().Contain("Transfer requires a destination account");
+        // Assert - Regular Send should succeed
+        success.Should().BeTrue();
+        transaction.Should().NotBeNull();
+        transaction!.Type.Should().Be("Send");
     }
 
     #endregion
@@ -497,7 +517,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: 50m,
             Date: DateTime.UtcNow.AddDays(1),
             Title: "Monthly Subscription",
@@ -507,7 +527,9 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: new RecurringRuleRequest("Monthly", 1, null));
+            RecurringRule: new RecurringRuleRequest("Monthly", 1, null),
+            CounterpartyEmail: null,
+            CounterpartyAmount: null);
 
         var createdTransactions = new List<Transaction>();
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
@@ -554,7 +576,7 @@ public class TransactionServiceTests
         // Arrange
         var request = new CreateTransactionRequest(
             AccountId: TestAccountId,
-            Type: "Debit",
+            Type: "Send",
             Amount: 50m,
             Date: DateTime.UtcNow,
             Title: null,
@@ -564,7 +586,9 @@ public class TransactionServiceTests
             TagIds: null,
             Location: null,
             TransferToAccountId: null,
-            RecurringRule: new RecurringRuleRequest("InvalidFrequency", 1, null));
+            RecurringRule: new RecurringRuleRequest("InvalidFrequency", 1, null),
+            CounterpartyEmail: null,
+            CounterpartyAmount: null);
 
         // Act
         var (success, message, _) = await _transactionService.CreateAsync(TestUserId, request);
@@ -589,7 +613,7 @@ public class TransactionServiceTests
                 Id = "1",
                 UserId = TestUserId,
                 AccountId = TestAccountId,
-                Type = TransactionType.Debit,
+                Type = TransactionType.Send,
                 Amount = 100m,
                 Currency = "USD",
                 Date = DateTime.UtcNow,
@@ -679,7 +703,7 @@ public class TransactionServiceTests
             StartDate: null,
             EndDate: null,
             AccountIds: null,
-            Types: new List<string> { "Debit", "Credit" },
+            Types: new List<string> { "Send", "Receive" },
             LabelIds: null,
             TagIds: null,
             MinAmount: null,
@@ -699,8 +723,8 @@ public class TransactionServiceTests
             It.Is<TransactionFilterRequest>(f => 
                 f.Types != null && 
                 f.Types.Count == 2 &&
-                f.Types.Contains("Debit") &&
-                f.Types.Contains("Credit"))),
+                f.Types.Contains("Send") &&
+                f.Types.Contains("Receive"))),
             Times.Once);
     }
 
@@ -839,7 +863,7 @@ public class TransactionServiceTests
             Id = "trans-1",
             UserId = TestUserId,
             AccountId = TestAccountId,
-            Type = TransactionType.Debit,
+            Type = TransactionType.Send,
             Amount = 100m,
             Currency = "USD",
             Date = DateTime.UtcNow,
@@ -908,7 +932,7 @@ public class TransactionServiceTests
             UserId = TestUserId,
             AccountId = TestAccountId,
             IsRecurringTemplate = true,
-            Type = TransactionType.Debit,
+            Type = TransactionType.Send,
             Amount = 50m,
             Currency = "USD",
             Splits = new List<TransactionSplit> { new() { LabelId = TestLabelId, Amount = 50m } },
@@ -945,7 +969,7 @@ public class TransactionServiceTests
             Id = "trans-1",
             UserId = TestUserId,
             AccountId = TestAccountId,
-            Type = TransactionType.Debit,
+            Type = TransactionType.Send,
             Amount = 100m,
             Currency = "USD",
             Date = DateTime.UtcNow,
@@ -994,9 +1018,9 @@ public class TransactionServiceTests
         // Arrange
         var transactions = new List<Transaction>
         {
-            new() { Id = "1", UserId = TestUserId, AccountId = TestAccountId, Type = TransactionType.Credit, Amount = 1000m, Currency = "USD", Splits = new(), TagIds = new() },
-            new() { Id = "2", UserId = TestUserId, AccountId = TestAccountId, Type = TransactionType.Credit, Amount = 500m, Currency = "USD", Splits = new(), TagIds = new() },
-            new() { Id = "3", UserId = TestUserId, AccountId = TestAccountId, Type = TransactionType.Debit, Amount = 300m, Currency = "USD", Splits = new(), TagIds = new() }
+            new() { Id = "1", UserId = TestUserId, AccountId = TestAccountId, Type = TransactionType.Receive, Amount = 1000m, Currency = "USD", Splits = new(), TagIds = new() },
+            new() { Id = "2", UserId = TestUserId, AccountId = TestAccountId, Type = TransactionType.Receive, Amount = 500m, Currency = "USD", Splits = new(), TagIds = new() },
+            new() { Id = "3", UserId = TestUserId, AccountId = TestAccountId, Type = TransactionType.Send, Amount = 300m, Currency = "USD", Splits = new(), TagIds = new() }
         };
 
         _transactionRepositoryMock.Setup(x => x.GetFilteredAsync(TestUserId, It.IsAny<TransactionFilterRequest>()))

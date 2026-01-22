@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { TransactionFilter, TransactionType } from '../types/transactions';
+import type { TransactionFilter, TransactionUIType } from '../types/transactions';
 
 // Date preset types
 export type DatePreset = 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'custom';
@@ -121,7 +121,7 @@ export function useTransactionFilters(
     }
 
     const preset = (searchParams.get('preset') as DatePreset) || defaultPreset;
-    const types = searchParams.get('types')?.split(',').filter(Boolean) as TransactionType[] | undefined;
+    const types = searchParams.get('types')?.split(',').filter(Boolean) as TransactionUIType[] | undefined;
     
     return {
       datePreset: preset,
