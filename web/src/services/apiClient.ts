@@ -1,4 +1,5 @@
 // Global API client with session expiration handling
+import { getStoredAccessToken } from './tokenStorage';
 
 const API_BASE_URL = '/api';
 
@@ -14,9 +15,8 @@ export interface ApiError {
   status: number;
 }
 
-export function getStoredAccessToken(): string | null {
-  return localStorage.getItem('digitransac_access_token');
-}
+// Re-export for backward compatibility
+export { getStoredAccessToken } from './tokenStorage';
 
 function getAuthHeaders(): HeadersInit {
   const token = getStoredAccessToken();

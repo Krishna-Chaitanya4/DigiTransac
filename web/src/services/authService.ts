@@ -1,12 +1,9 @@
 import { AuthResponse, ApiError, VerificationResponse } from '../types/auth';
 
 const API_BASE_URL = '/api';
-const ACCESS_TOKEN_KEY = 'digitransac_access_token';
 
-// Helper to get stored access token (refresh token is now in HttpOnly cookie)
-export function getStoredAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
+// Re-export for backward compatibility
+export { getStoredAccessToken } from './tokenStorage';
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
