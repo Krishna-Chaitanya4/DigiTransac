@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
 import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel, getLabelTransactionCount, deleteLabelWithReassignment } from '../services/labelService';
 import { EmojiPickerInput } from './EmojiPickerInput';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 // Helper to get path for a label
 function getLabelPath(labelId: string, allLabels: Label[]): string {
@@ -398,6 +399,7 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
 
   // Check if editing a system label
   const isSystemLabel = editingLabel?.isSystem ?? false;
@@ -468,14 +470,28 @@ function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelTy
     : `New ${labelType}`;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="label-modal-title"
+    >
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{title}</h3>
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
+        <div 
+          ref={modalRef}
+          className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+        >
+          <h3 id="label-modal-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{title}</h3>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm" role="alert">
               {error}
             </div>
           )}
@@ -625,6 +641,7 @@ function DeleteConfirmModal({
 }: DeleteConfirmModalProps) {
   const [reassignToId, setReassignToId] = useState<string>('');
   const hasTransactions = transactionCount > 0;
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   
   // Reset reassignment selection when modal opens
   useEffect(() => {
@@ -652,16 +669,31 @@ function DeleteConfirmModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="delete-confirm-title"
+      aria-describedby="delete-confirm-description"
+    >
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <div className="fixed inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
+        <div 
+          ref={modalRef}
+          className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+        >
+          <h3 id="delete-confirm-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
             Delete {labelType}
           </h3>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm" role="alert">
               {error}
             </div>
           )}
@@ -700,7 +732,7 @@ function DeleteConfirmModal({
               </div>
             </div>
           ) : (
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p id="delete-confirm-description" className="text-gray-600 dark:text-gray-400 mb-6">
               Are you sure you want to delete "{labelName}"? This action cannot be undone.
             </p>
           )}

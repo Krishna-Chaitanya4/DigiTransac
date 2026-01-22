@@ -28,7 +28,7 @@ describe('LoginPage', () => {
     
     expect(screen.getByRole('heading', { name: /sign in to digitransac/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i, { selector: 'input' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
@@ -51,7 +51,7 @@ describe('LoginPage', () => {
     renderWithRouter(<LoginPage />);
 
     const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/password/i);
+    const passwordInput = screen.getByLabelText(/^password$/i, { selector: 'input' });
 
     await user.type(emailInput, 'test@example.com');
     await user.type(passwordInput, 'password123');
@@ -74,7 +74,7 @@ describe('LoginPage', () => {
     renderWithRouter(<LoginPage />);
 
     await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
@@ -93,7 +93,7 @@ describe('LoginPage', () => {
     renderWithRouter(<LoginPage />);
 
     await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
+    await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'wrongpassword');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
@@ -113,7 +113,7 @@ describe('LoginPage', () => {
     renderWithRouter(<LoginPage />);
 
     await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
     
     const submitButton = screen.getByRole('button', { name: /sign in/i });
     await user.click(submitButton);
@@ -137,7 +137,7 @@ describe('LoginPage', () => {
     renderWithRouter(<LoginPage />);
 
     const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/password/i);
+    const passwordInput = screen.getByLabelText(/^password$/i, { selector: 'input' });
 
     expect(emailInput).toBeRequired();
     expect(passwordInput).toBeRequired();
@@ -154,7 +154,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -172,7 +172,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -191,7 +191,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -209,7 +209,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -233,7 +233,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -256,7 +256,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -278,7 +278,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -308,7 +308,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -338,7 +338,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -363,7 +363,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -381,7 +381,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -409,7 +409,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -439,7 +439,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -481,7 +481,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -514,7 +514,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
@@ -543,7 +543,7 @@ describe('LoginPage', () => {
       renderWithRouter(<LoginPage />);
 
       await user.type(screen.getByLabelText(/email address/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/password/i), 'password123');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {

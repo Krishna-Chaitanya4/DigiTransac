@@ -8,6 +8,10 @@ interface CalculatorInputProps {
   className?: string;
   disabled?: boolean;
   autoFocus?: boolean;
+  /** Accessible label for the input */
+  ariaLabel?: string;
+  /** ID for label association */
+  id?: string;
 }
 
 // Simple math expression evaluator (supports +, -, *, /)
@@ -47,6 +51,8 @@ export function CalculatorInput({
   className = '',
   disabled = false,
   autoFocus = false,
+  ariaLabel,
+  id,
 }: CalculatorInputProps) {
   const [inputValue, setInputValue] = useState(value > 0 ? value.toString() : '');
   const [isExpression, setIsExpression] = useState(false);
@@ -132,13 +138,19 @@ export function CalculatorInput({
     }
   };
 
+  const inputId = id || 'calculator-input';
+  const errorId = `${inputId}-error`;
+  const previewId = `${inputId}-preview`;
+  const hasError = isExpression && evaluatedValue === null && inputValue.length > 1;
+
   return (
     <div className={`relative ${className}`}>
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" aria-hidden="true">
         <span className="text-gray-500 dark:text-gray-400">{currency}</span>
       </div>
       <input
         ref={inputRef}
+        id={inputId}
         type="text"
         inputMode="decimal"
         value={inputValue}
@@ -147,6 +159,9 @@ export function CalculatorInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
+        aria-label={ariaLabel || 'Amount'}
+        aria-invalid={hasError}
+        aria-describedby={isExpression ? (hasError ? errorId : previewId) : undefined}
         className={`block w-full pl-8 pr-4 py-2 border rounded-lg 
           ${isExpression ? 'border-blue-500 dark:border-blue-400' : 'border-gray-300 dark:border-gray-600'}
           bg-white dark:bg-gray-700 
@@ -158,18 +173,26 @@ export function CalculatorInput({
       
       {/* Expression result preview */}
       {isExpression && evaluatedValue !== null && (
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 
+        <div 
+          id={previewId}
+          className="absolute right-2 top-1/2 -translate-y-1/2 
           bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 
-          px-2 py-0.5 rounded text-sm font-medium">
+          px-2 py-0.5 rounded text-sm font-medium"
+          aria-live="polite"
+        >
           = {currency}{evaluatedValue.toFixed(2)}
         </div>
       )}
       
       {/* Expression error indicator */}
-      {isExpression && evaluatedValue === null && inputValue.length > 1 && (
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 
-          text-red-500 dark:text-red-400 text-sm">
-          Invalid
+      {hasError && (
+        <div 
+          id={errorId}
+          className="absolute right-2 top-1/2 -translate-y-1/2 
+          text-red-500 dark:text-red-400 text-sm"
+          role="alert"
+        >
+          Invalid expression
         </div>
       )}
     </div>

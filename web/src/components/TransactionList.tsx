@@ -55,6 +55,18 @@ const TransactionRow = memo(function TransactionRow({
     }
   }, [selectionMode, onToggleSelection, onToggleExpand, transaction.id]);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    } else if (e.key === 'Delete' && !selectionMode) {
+      e.preventDefault();
+      if (confirm('Delete this transaction?')) {
+        onDelete(transaction.id);
+      }
+    }
+  }, [handleClick, selectionMode, onDelete, transaction.id]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (onToggleSelection && !selectionMode) {
       e.preventDefault();
@@ -118,13 +130,18 @@ const TransactionRow = memo(function TransactionRow({
       >
         {/* Main Row */}
         <div
-          className="flex items-center p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+          role="button"
+          tabIndex={0}
+          aria-expanded={isExpanded}
+          aria-label={`${transaction.title || primaryLabel?.name || 'Transaction'}, ${currencySymbol}${formatAmount(transaction.amount, transaction.currency)}, ${transaction.type}${!transaction.isCleared ? ', pending' : ''}`}
+          className="flex items-center p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
           onClick={handleClick}
+          onKeyDown={handleKeyDown}
           onContextMenu={handleContextMenu}
         >
           {/* Selection Checkbox (shown in selection mode) */}
           {selectionMode && (
-            <div className="mr-3 flex-shrink-0">
+            <div className="mr-3 flex-shrink-0" aria-hidden="true">
               <div 
                 className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                   isSelected
@@ -133,7 +150,7 @@ const TransactionRow = memo(function TransactionRow({
                 }`}
               >
                 {isSelected && (
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -145,6 +162,7 @@ const TransactionRow = memo(function TransactionRow({
           <div 
             className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
             style={{ backgroundColor: (primaryLabel?.color || '#6B7280') + '20' }}
+            aria-hidden="true"
           >
             {primaryLabel?.icon || '📝'}
           </div>
@@ -184,13 +202,13 @@ const TransactionRow = memo(function TransactionRow({
                 ≈ {formatWithConversion(transaction.amount, transaction.currency).converted}
               </div>
             )}
-            <div className="text-xs opacity-70">
+            <div className="text-xs opacity-70" aria-hidden="true">
               {getTypeIcon(transaction.type)} {transaction.type}
             </div>
           </div>
           
           {/* Expand indicator */}
-          <div className="ml-2 text-gray-400 dark:text-gray-500">
+          <div className="ml-2 text-gray-400 dark:text-gray-500" aria-hidden="true">
             <svg 
               className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
               fill="none" 
@@ -204,7 +222,7 @@ const TransactionRow = memo(function TransactionRow({
         
         {/* Expanded Details */}
         {isExpanded && (
-          <div className="px-3 pb-3 pt-1 border-t border-gray-200 dark:border-gray-700">
+          <div className="px-3 pb-3 pt-1 border-t border-gray-200 dark:border-gray-700" role="region" aria-label="Transaction details">
             {/* Splits */}
             {transaction.splits.length > 1 && (
               <div className="mb-3">

@@ -3,6 +3,7 @@ import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
 import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
 import { TransactionTypeSelector, TagTokenInput, RecurringSection } from './transaction-form';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import type {
   Transaction,
   TransactionType,
@@ -66,6 +67,9 @@ export function TransactionForm({
   autoLocationEnabled = true,
   error,
 }: TransactionFormProps) {
+  // Focus trap for modal accessibility
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
+  
   const [type, setType] = useState<TransactionType>('Debit');
   const [accountId, setAccountId] = useState(defaultAccountId || '');
   const [amount, setAmount] = useState(0);
@@ -429,7 +433,28 @@ export function TransactionForm({
     >
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/30 dark:bg-black/50" onClick={onClose} aria-hidden="true" />
-        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div 
+          ref={modalRef}
+          className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+        >
+          {/* Close button for keyboard accessibility */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+            aria-label="Close dialog"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          
           <h3 id="transaction-form-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {editingTransaction ? 'Edit Transaction' : 'New Transaction'}
           </h3>
