@@ -4,14 +4,14 @@ import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
 import type { Label } from '../types/labels';
 
 const sampleCategories: Label[] = [
-  { id: '1', name: 'Groceries', icon: '🛒', color: '#22c55e' },
-  { id: '2', name: 'Transportation', icon: '🚗', color: '#3b82f6' },
-  { id: '3', name: 'Entertainment', icon: '🎬', color: '#a855f7' },
-  { id: '4', name: 'Utilities', icon: '💡', color: '#f59e0b' },
-  { id: '5', name: 'Healthcare', icon: '🏥', color: '#ef4444' },
-  { id: '6', name: 'Dining Out', icon: '🍽️', color: '#ec4899' },
-  { id: '7', name: 'Shopping', icon: '🛍️', color: '#06b6d4' },
-  { id: '8', name: 'Subscriptions', icon: '📱', color: '#8b5cf6' },
+  { id: '1', name: 'Groceries', icon: '🛒', color: '#22c55e', parentId: null, type: 'Category', order: 0, isSystem: false, createdAt: new Date().toISOString() },
+  { id: '2', name: 'Transportation', icon: '🚗', color: '#3b82f6', parentId: null, type: 'Category', order: 1, isSystem: false, createdAt: new Date().toISOString() },
+  { id: '3', name: 'Entertainment', icon: '🎬', color: '#a855f7', parentId: null, type: 'Category', order: 2, isSystem: false, createdAt: new Date().toISOString() },
+  { id: '4', name: 'Utilities', icon: '💡', color: '#f59e0b', parentId: null, type: 'Category', order: 3, isSystem: false, createdAt: new Date().toISOString() },
+  { id: '5', name: 'Healthcare', icon: '🏥', color: '#ef4444', parentId: null, type: 'Category', order: 4, isSystem: false, createdAt: new Date().toISOString() },
+  { id: '6', name: 'Dining Out', icon: '🍽️', color: '#ec4899', parentId: null, type: 'Category', order: 5, isSystem: false, createdAt: new Date().toISOString() },
+  { id: '7', name: 'Shopping', icon: '🛍️', color: '#06b6d4', parentId: null, type: 'Category', order: 6, isSystem: false, createdAt: new Date().toISOString() },
+  { id: '8', name: 'Subscriptions', icon: '📱', color: '#8b5cf6', parentId: null, type: 'Category', order: 7, isSystem: false, createdAt: new Date().toISOString() },
 ];
 
 const meta: Meta<typeof SearchableCategoryDropdown> = {

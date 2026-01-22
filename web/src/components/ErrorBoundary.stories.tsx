@@ -86,7 +86,7 @@ export const FullPageError: Story = {
 };
 
 export const InlineError: Story = {
-  render: (args) => (
+  render: (_args) => (
     <div className="p-8">
       <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">
         Page Content

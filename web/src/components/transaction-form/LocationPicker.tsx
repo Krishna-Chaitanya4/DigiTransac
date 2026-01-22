@@ -7,9 +7,10 @@ interface LocationPickerProps {
   location: TransactionLocationRequest | null;
   onChange: (location: TransactionLocationRequest | null, includeLocation: boolean) => void;
   isLoading?: boolean;
+  autoCapture?: boolean;  // Auto-capture location on mount
 }
 
-export function LocationPicker({ location, onChange, isLoading: externalLoading }: LocationPickerProps) {
+export function LocationPicker({ location, onChange, isLoading: externalLoading, autoCapture = false }: LocationPickerProps) {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [manualLocationMode, setManualLocationMode] = useState(false);
   const [manualPlaceName, setManualPlaceName] = useState('');
@@ -17,12 +18,44 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading 
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const [highlightedPlaceIndex, setHighlightedPlaceIndex] = useState(-1);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [autoCaptureAttempted, setAutoCaptureAttempted] = useState(false);
   
   const placeSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const placeInputRef = useRef<HTMLInputElement>(null);
   const placeDropdownRef = useRef<HTMLDivElement>(null);
 
   const isLoading = externalLoading || isLoadingLocation;
+
+  // Auto-capture location on mount if enabled
+  useEffect(() => {
+    if (autoCapture && !location && !autoCaptureAttempted) {
+      setAutoCaptureAttempted(true);
+      captureLocationSilent();
+    }
+  }, [autoCapture, location, autoCaptureAttempted]);
+
+  // Silent auto-capture (no error shown)
+  const captureLocationSilent = async () => {
+    setIsLoadingLocation(true);
+    try {
+      const coords = await getCurrentPosition();
+      if (coords) {
+        const geoInfo = await reverseGeocode(coords);
+        onChange({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          placeName: geoInfo?.city || undefined,
+          city: geoInfo?.city,
+          country: geoInfo?.country,
+        }, true);
+      }
+    } catch (error) {
+      // Silent fail for auto-capture
+      logger.info('Auto location capture failed:', error);
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
 
   // Debounced place search
   useEffect(() => {
