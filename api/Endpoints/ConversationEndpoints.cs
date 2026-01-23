@@ -124,5 +124,64 @@ public static class ConversationEndpoints
         })
         .WithName("MarkConversationAsRead")
         .Produces<object>(200);
+
+        // Edit message
+        group.MapPut("/messages/{messageId}", async (
+            string messageId,
+            EditMessageRequest request,
+            ClaimsPrincipal user,
+            IConversationService conversationService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var (success, message) = await conversationService.EditMessageAsync(userId, messageId, request);
+            
+            if (!success)
+                return Results.BadRequest(new ErrorResponse(message));
+
+            return Results.Ok(new { message = "Message updated" });
+        })
+        .WithName("EditMessage")
+        .Produces<object>(200)
+        .Produces<ErrorResponse>(400);
+
+        // Delete message
+        group.MapDelete("/messages/{messageId}", async (
+            string messageId,
+            ClaimsPrincipal user,
+            IConversationService conversationService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var (success, message) = await conversationService.DeleteMessageAsync(userId, messageId);
+            
+            if (!success)
+                return Results.BadRequest(new ErrorResponse(message));
+
+            return Results.Ok(new { message = "Message deleted" });
+        })
+        .WithName("DeleteMessage")
+        .Produces<object>(200)
+        .Produces<ErrorResponse>(400);
+
+        // Search user by email (for starting new conversations)
+        group.MapGet("/search-user", async (
+            string email,
+            ClaimsPrincipal user,
+            IConversationService conversationService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await conversationService.SearchUserByEmailAsync(userId, email);
+            return Results.Ok(result);
+        })
+        .WithName("SearchUserByEmail")
+        .Produces<UserSearchResponse>(200);
     }
 }

@@ -5,6 +5,8 @@ import type {
   ConversationMessage,
   SendMessageRequest,
   SendMoneyRequest,
+  EditMessageRequest,
+  UserSearchResponse,
 } from '../types/conversations';
 
 // Get all conversations
@@ -60,6 +62,24 @@ export async function markAsRead(counterpartyUserId: string): Promise<void> {
   await apiClient.post(`/conversations/${counterpartyUserId}/mark-read`, {});
 }
 
+// Edit a message
+export async function editMessage(
+  messageId: string,
+  request: EditMessageRequest
+): Promise<void> {
+  await apiClient.put(`/conversations/messages/${messageId}`, request);
+}
+
+// Delete a message
+export async function deleteMessage(messageId: string): Promise<void> {
+  await apiClient.delete(`/conversations/messages/${messageId}`);
+}
+
+// Search for a user by email
+export async function searchUserByEmail(email: string): Promise<UserSearchResponse> {
+  return apiClient.get<UserSearchResponse>(`/conversations/search-user?email=${encodeURIComponent(email)}`);
+}
+
 // Helper: Get display name from conversation summary
 export function getDisplayName(
   counterpartyName: string | null,
@@ -94,7 +114,14 @@ export function formatRelativeTime(dateString: string): string {
 }
 
 // Helper: Format currency for chat
-export function formatChatCurrency(amount: number, currency: string): string {
+export function formatChatCurrency(amount: number, currency: string | null | undefined): string {
+  if (!currency) {
+    // Fallback to plain number if no currency
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  }
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: currency,

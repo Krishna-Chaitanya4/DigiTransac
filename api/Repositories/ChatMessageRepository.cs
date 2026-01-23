@@ -37,6 +37,21 @@ public interface IChatMessageRepository
     Task MarkConversationAsReadAsync(string userId, string counterpartyUserId);
     
     /// <summary>
+    /// Mark messages as delivered
+    /// </summary>
+    Task MarkAsDeliveredAsync(string userId, string counterpartyUserId);
+    
+    /// <summary>
+    /// Edit a message's content
+    /// </summary>
+    Task<bool> EditMessageAsync(string messageId, string senderUserId, string newContent);
+    
+    /// <summary>
+    /// Soft delete a message
+    /// </summary>
+    Task<bool> DeleteMessageAsync(string messageId, string senderUserId);
+    
+    /// <summary>
     /// Create transaction message entries for both sender and recipient
     /// </summary>
     Task CreateTransactionMessagesAsync(string senderUserId, string recipientUserId, string senderTransactionId, string recipientTransactionId, Guid transactionLinkId);
@@ -62,11 +77,11 @@ public class ChatMessageRepository : IChatMessageRepository
             )
         ));
         
-        // Index for unread count
+        // Index for unread count (using Status)
         _chatMessages.Indexes.CreateOne(new CreateIndexModel<ChatMessage>(
             indexKeysBuilder.Combine(
                 indexKeysBuilder.Ascending(m => m.RecipientUserId),
-                indexKeysBuilder.Ascending(m => m.IsRead)
+                indexKeysBuilder.Ascending(m => m.Status)
             )
         ));
     }
@@ -150,6 +165,9 @@ public class ChatMessageRepository : IChatMessageRepository
             // Replace root with the message document
             new BsonDocument("$replaceRoot", new BsonDocument("newRoot", "$message")),
             
+            // Remove the temporary counterpartyId field
+            new BsonDocument("$unset", "counterpartyId"),
+            
             // Sort by date descending for final output
             new BsonDocument("$sort", new BsonDocument("createdAt", -1))
         };
@@ -163,7 +181,8 @@ public class ChatMessageRepository : IChatMessageRepository
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, counterpartyUserId),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsRead, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
         );
 
         return (int)await _chatMessages.CountDocumentsAsync(filter);
@@ -173,7 +192,8 @@ public class ChatMessageRepository : IChatMessageRepository
     {
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsRead, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
         );
 
         return (int)await _chatMessages.CountDocumentsAsync(filter);
@@ -182,6 +202,7 @@ public class ChatMessageRepository : IChatMessageRepository
     public async Task<ChatMessage> CreateAsync(ChatMessage message)
     {
         message.CreatedAt = DateTime.UtcNow;
+        message.Status = MessageStatus.Sent;
         await _chatMessages.InsertOneAsync(message);
         return message;
     }
@@ -191,11 +212,61 @@ public class ChatMessageRepository : IChatMessageRepository
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, counterpartyUserId),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsRead, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read)
         );
 
-        var update = Builders<ChatMessage>.Update.Set(m => m.IsRead, true);
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.Status, MessageStatus.Read)
+            .Set(m => m.ReadAt, DateTime.UtcNow);
         await _chatMessages.UpdateManyAsync(filter, update);
+    }
+
+    public async Task MarkAsDeliveredAsync(string userId, string counterpartyUserId)
+    {
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, counterpartyUserId),
+            Builders<ChatMessage>.Filter.Eq(m => m.Status, MessageStatus.Sent)
+        );
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.Status, MessageStatus.Delivered)
+            .Set(m => m.DeliveredAt, DateTime.UtcNow);
+        await _chatMessages.UpdateManyAsync(filter, update);
+    }
+
+    public async Task<bool> EditMessageAsync(string messageId, string senderUserId, string newContent)
+    {
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
+            Builders<ChatMessage>.Filter.Eq(m => m.Type, ChatMessageType.Text),
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+        );
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.Content, newContent)
+            .Set(m => m.IsEdited, true)
+            .Set(m => m.EditedAt, DateTime.UtcNow);
+        
+        var result = await _chatMessages.UpdateOneAsync(filter, update);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> DeleteMessageAsync(string messageId, string senderUserId)
+    {
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+        );
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.IsDeleted, true)
+            .Set(m => m.DeletedAt, DateTime.UtcNow);
+        
+        var result = await _chatMessages.UpdateOneAsync(filter, update);
+        return result.ModifiedCount > 0;
     }
 
     public async Task CreateTransactionMessagesAsync(
@@ -214,7 +285,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Type = ChatMessageType.Transaction,
             TransactionId = senderTransactionId, // Reference to sender's transaction
             TransactionLinkId = transactionLinkId,
-            IsRead = false,
+            Status = MessageStatus.Sent,
             CreatedAt = DateTime.UtcNow
         };
 

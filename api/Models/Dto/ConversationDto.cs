@@ -33,8 +33,26 @@ public record ConversationMessage(
     bool IsFromMe,            // Convenience field for UI
     string? Content,          // Text content for text messages
     TransactionMessageData? Transaction,  // Transaction details if type is Transaction
-    bool IsRead,
-    DateTime CreatedAt
+    string Status,            // "Sent", "Delivered", "Read"
+    DateTime CreatedAt,
+    DateTime? DeliveredAt,
+    DateTime? ReadAt,
+    bool IsEdited,
+    DateTime? EditedAt,
+    bool IsDeleted,
+    string? ReplyToMessageId,
+    ReplyPreview? ReplyTo     // Preview of the replied message
+);
+
+/// <summary>
+/// Preview of a replied message
+/// </summary>
+public record ReplyPreview(
+    string MessageId,
+    string SenderUserId,
+    string? SenderName,
+    string Type,
+    string? ContentPreview    // Truncated content or "📷 Photo" / "💰 Transaction" etc.
 );
 
 /// <summary>
@@ -68,6 +86,11 @@ public record ConversationDetailResponse(
 // Request DTOs
 
 public record SendMessageRequest(
+    string Content,
+    string? ReplyToMessageId = null
+);
+
+public record EditMessageRequest(
     string Content
 );
 
@@ -77,4 +100,17 @@ public record SendMoneyRequest(
     string? Title,
     string? Notes,
     List<TransactionSplitRequest> Splits
+);
+
+// User search for starting new conversations
+
+public record UserSearchResult(
+    string UserId,
+    string Email,
+    string? Name
+);
+
+public record UserSearchResponse(
+    UserSearchResult? User,
+    bool Found
 );

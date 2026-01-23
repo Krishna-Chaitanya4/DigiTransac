@@ -22,6 +22,16 @@ public interface IConversationService
     Task<(bool Success, string Message, ConversationMessage? ChatMessage)> SendMessageAsync(string userId, string counterpartyUserId, SendMessageRequest request);
     
     /// <summary>
+    /// Edit a message
+    /// </summary>
+    Task<(bool Success, string Message)> EditMessageAsync(string userId, string messageId, EditMessageRequest request);
+    
+    /// <summary>
+    /// Delete a message
+    /// </summary>
+    Task<(bool Success, string Message)> DeleteMessageAsync(string userId, string messageId);
+    
+    /// <summary>
     /// Send money to another user (creates P2P transaction + chat message)
     /// </summary>
     Task<(bool Success, string Message, ConversationMessage? ChatMessage)> SendMoneyAsync(string userId, string counterpartyUserId, SendMoneyRequest request);
@@ -35,6 +45,11 @@ public interface IConversationService
     /// Get total unread message count
     /// </summary>
     Task<int> GetUnreadCountAsync(string userId);
+    
+    /// <summary>
+    /// Search for a user by email to start a new conversation
+    /// </summary>
+    Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email);
 }
 
 public class ConversationService : IConversationService
@@ -252,11 +267,68 @@ public class ConversationService : IConversationService
                 Type: msg.Type.ToString(),
                 SenderUserId: msg.SenderUserId,
                 IsFromMe: msg.SenderUserId == userId,
-                Content: msg.Content,
+                Content: msg.IsDeleted ? null : msg.Content,
                 Transaction: txData,
-                IsRead: msg.IsRead,
-                CreatedAt: msg.CreatedAt
+                Status: msg.Status.ToString(),
+                CreatedAt: msg.CreatedAt,
+                DeliveredAt: msg.DeliveredAt,
+                ReadAt: msg.ReadAt,
+                IsEdited: msg.IsEdited,
+                EditedAt: msg.EditedAt,
+                IsDeleted: msg.IsDeleted,
+                ReplyToMessageId: msg.ReplyToMessageId,
+                ReplyTo: null // Will be populated below if needed
             ));
+        }
+        
+        // Build reply previews for messages that have ReplyToMessageId
+        var messagesWithReplies = messages.Where(m => !string.IsNullOrEmpty(m.ReplyToMessageId)).ToList();
+        if (messagesWithReplies.Any())
+        {
+            var replyMessageIds = messagesWithReplies.Select(m => m.ReplyToMessageId!).Distinct().ToList();
+            
+            // Fetch the original messages being replied to
+            var replyMessages = new Dictionary<string, ChatMessage>();
+            foreach (var replyId in replyMessageIds)
+            {
+                var replyMsg = await _chatMessageRepository.GetByIdAsync(replyId);
+                if (replyMsg != null)
+                {
+                    replyMessages[replyId] = replyMsg;
+                }
+            }
+            
+            // Create new list with reply previews populated
+            var messagesWithReplyPreviews = new List<ConversationMessage>();
+            foreach (var msg in messages)
+            {
+                if (!string.IsNullOrEmpty(msg.ReplyToMessageId) && replyMessages.TryGetValue(msg.ReplyToMessageId, out var replyMsg))
+                {
+                    var replySenderName = replyMsg.SenderUserId == userId ? "You" : counterparty.FullName ?? counterparty.Email;
+                    var contentPreview = replyMsg.Type switch
+                    {
+                        ChatMessageType.Text => TruncateString(replyMsg.Content, 30),
+                        ChatMessageType.Transaction => "💰 Transaction",
+                        ChatMessageType.Request => "💸 Request",
+                        _ => null
+                    };
+                    
+                    var replyPreview = new ReplyPreview(
+                        MessageId: replyMsg.Id,
+                        SenderUserId: replyMsg.SenderUserId,
+                        SenderName: replySenderName,
+                        Type: replyMsg.Type.ToString(),
+                        ContentPreview: replyMsg.IsDeleted ? "Deleted message" : contentPreview
+                    );
+                    
+                    messagesWithReplyPreviews.Add(msg with { ReplyTo = replyPreview });
+                }
+                else
+                {
+                    messagesWithReplyPreviews.Add(msg);
+                }
+            }
+            messages = messagesWithReplyPreviews;
         }
         
         // Add transactions that don't have chat messages yet (for backward compatibility)
@@ -292,15 +364,22 @@ public class ConversationService : IConversationService
                 IsFromMe: isFromMe,
                 Content: null,
                 Transaction: txData,
-                IsRead: true, // Legacy transactions are considered read
-                CreatedAt: tx.Date
+                Status: "Read", // Legacy transactions are considered read
+                CreatedAt: tx.Date,
+                DeliveredAt: tx.Date,
+                ReadAt: tx.Date,
+                IsEdited: false,
+                EditedAt: null,
+                IsDeleted: false,
+                ReplyToMessageId: null,
+                ReplyTo: null
             ));
         }
         
-        // Sort by date descending and limit
+        // Sort by date ascending (oldest first, newest at bottom) and limit
         messages = messages
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(limit)
+            .OrderBy(m => m.CreatedAt)
+            .TakeLast(limit)
             .ToList();
         
         // Calculate totals
@@ -360,11 +439,39 @@ public class ConversationService : IConversationService
             RecipientUserId = counterpartyUserId,
             Type = ChatMessageType.Text,
             Content = request.Content,
-            IsRead = false,
+            ReplyToMessageId = request.ReplyToMessageId,
+            Status = MessageStatus.Sent,
             CreatedAt = DateTime.UtcNow
         };
         
         await _chatMessageRepository.CreateAsync(chatMessage);
+        
+        // Build reply preview if this is a reply
+        ReplyPreview? replyPreview = null;
+        if (!string.IsNullOrEmpty(request.ReplyToMessageId))
+        {
+            var replyMsg = await _chatMessageRepository.GetByIdAsync(request.ReplyToMessageId);
+            if (replyMsg != null)
+            {
+                var replySender = await _userRepository.GetByIdAsync(replyMsg.SenderUserId);
+                var replySenderName = replyMsg.SenderUserId == userId ? "You" : replySender?.FullName ?? replySender?.Email;
+                var contentPreview = replyMsg.Type switch
+                {
+                    ChatMessageType.Text => TruncateString(replyMsg.Content, 30),
+                    ChatMessageType.Transaction => "💰 Transaction",
+                    ChatMessageType.Request => "💸 Request",
+                    _ => null
+                };
+                
+                replyPreview = new ReplyPreview(
+                    MessageId: replyMsg.Id,
+                    SenderUserId: replyMsg.SenderUserId,
+                    SenderName: replySenderName,
+                    Type: replyMsg.Type.ToString(),
+                    ContentPreview: replyMsg.IsDeleted ? "Deleted message" : contentPreview
+                );
+            }
+        }
         
         var response = new ConversationMessage(
             Id: chatMessage.Id,
@@ -373,8 +480,15 @@ public class ConversationService : IConversationService
             IsFromMe: true,
             Content: request.Content,
             Transaction: null,
-            IsRead: false,
-            CreatedAt: chatMessage.CreatedAt
+            Status: "Sent",
+            CreatedAt: chatMessage.CreatedAt,
+            DeliveredAt: null,
+            ReadAt: null,
+            IsEdited: false,
+            EditedAt: null,
+            IsDeleted: false,
+            ReplyToMessageId: request.ReplyToMessageId,
+            ReplyTo: replyPreview
         );
         
         return (true, "Message sent", response);
@@ -459,8 +573,15 @@ public class ConversationService : IConversationService
             IsFromMe: true,
             Content: null,
             Transaction: txData,
-            IsRead: false,
-            CreatedAt: transaction.Date
+            Status: "Sent",
+            CreatedAt: transaction.Date,
+            DeliveredAt: null,
+            ReadAt: null,
+            IsEdited: false,
+            EditedAt: null,
+            IsDeleted: false,
+            ReplyToMessageId: null,
+            ReplyTo: null
         );
         
         return (true, "Money sent", response);
@@ -474,6 +595,69 @@ public class ConversationService : IConversationService
     public async Task<int> GetUnreadCountAsync(string userId)
     {
         return await _chatMessageRepository.GetTotalUnreadCountAsync(userId);
+    }
+
+    public async Task<(bool Success, string Message)> EditMessageAsync(
+        string userId, 
+        string messageId, 
+        EditMessageRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Content))
+        {
+            return (false, "Message content is required");
+        }
+        
+        if (request.Content.Length > 1000)
+        {
+            return (false, "Message cannot exceed 1000 characters");
+        }
+        
+        var success = await _chatMessageRepository.EditMessageAsync(messageId, userId, request.Content);
+        
+        if (!success)
+        {
+            return (false, "Message not found or you don't have permission to edit it");
+        }
+        
+        return (true, "Message updated");
+    }
+
+    public async Task<(bool Success, string Message)> DeleteMessageAsync(string userId, string messageId)
+    {
+        var success = await _chatMessageRepository.DeleteMessageAsync(messageId, userId);
+        
+        if (!success)
+        {
+            return (false, "Message not found or you don't have permission to delete it");
+        }
+        
+        return (true, "Message deleted");
+    }
+
+    public async Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return new UserSearchResponse(null, false);
+        }
+        
+        var user = await _userRepository.GetByEmailAsync(email.Trim().ToLowerInvariant());
+        
+        if (user == null)
+        {
+            return new UserSearchResponse(null, false);
+        }
+        
+        // Don't return the current user
+        if (user.Id == currentUserId)
+        {
+            return new UserSearchResponse(null, false);
+        }
+        
+        return new UserSearchResponse(
+            new UserSearchResult(user.Id, user.Email, user.FullName),
+            true
+        );
     }
 
     private static string? TruncateString(string? str, int maxLength)

@@ -1,5 +1,8 @@
 // Chat/Conversation types
 
+export type MessageStatus = 'Sent' | 'Delivered' | 'Read';
+export type MessageType = 'Text' | 'Transaction' | 'Request';
+
 export interface ConversationSummary {
   counterpartyUserId: string;
   counterpartyEmail: string;
@@ -32,15 +35,30 @@ export interface TransactionMessageData {
   accountName: string | null;
 }
 
+export interface ReplyPreview {
+  messageId: string;
+  senderUserId: string;
+  senderName: string | null;
+  type: MessageType;
+  contentPreview: string | null;
+}
+
 export interface ConversationMessage {
   id: string;
-  type: 'Text' | 'Transaction' | 'Request';
+  type: MessageType;
   senderUserId: string;
   isFromMe: boolean;
   content: string | null;
   transaction: TransactionMessageData | null;
-  isRead: boolean;
+  status: MessageStatus;
   createdAt: string;
+  deliveredAt: string | null;
+  readAt: string | null;
+  isEdited: boolean;
+  editedAt: string | null;
+  isDeleted: boolean;
+  replyToMessageId: string | null;
+  replyTo: ReplyPreview | null;
 }
 
 export interface ConversationDetailResponse {
@@ -57,6 +75,11 @@ export interface ConversationDetailResponse {
 // Request types
 export interface SendMessageRequest {
   content: string;
+  replyToMessageId?: string;
+}
+
+export interface EditMessageRequest {
+  content: string;
 }
 
 export interface SendMoneyRequest {
@@ -69,4 +92,16 @@ export interface SendMoneyRequest {
     amount: number;
     notes?: string;
   }[];
+}
+
+// User search types
+export interface UserSearchResult {
+  userId: string;
+  email: string;
+  name: string | null;
+}
+
+export interface UserSearchResponse {
+  user: UserSearchResult | null;
+  found: boolean;
 }

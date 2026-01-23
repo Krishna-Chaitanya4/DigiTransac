@@ -10,6 +10,14 @@ public enum ChatMessageType
     Request         // Money request (future feature)
 }
 
+public enum MessageStatus
+{
+    Sent,       // Message sent but not yet delivered
+    Delivered,  // Message delivered to recipient's device
+    Read        // Message read by recipient
+}
+
+[BsonIgnoreExtraElements]
 public class ChatMessage
 {
     [BsonId]
@@ -59,10 +67,54 @@ public class ChatMessage
     public Guid? TransactionLinkId { get; set; }
 
     /// <summary>
-    /// Whether the recipient has read this message
+    /// ID of message this is replying to (for threaded replies)
     /// </summary>
-    [BsonElement("isRead")]
-    public bool IsRead { get; set; } = false;
+    [BsonElement("replyToMessageId")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? ReplyToMessageId { get; set; }
+
+    /// <summary>
+    /// Message delivery/read status
+    /// </summary>
+    [BsonElement("status")]
+    [BsonRepresentation(BsonType.String)]
+    public MessageStatus Status { get; set; } = MessageStatus.Sent;
+
+    /// <summary>
+    /// When the message was delivered to recipient
+    /// </summary>
+    [BsonElement("deliveredAt")]
+    public DateTime? DeliveredAt { get; set; }
+
+    /// <summary>
+    /// When the message was read by recipient
+    /// </summary>
+    [BsonElement("readAt")]
+    public DateTime? ReadAt { get; set; }
+
+    /// <summary>
+    /// Whether the message has been edited
+    /// </summary>
+    [BsonElement("isEdited")]
+    public bool IsEdited { get; set; } = false;
+
+    /// <summary>
+    /// When the message was last edited
+    /// </summary>
+    [BsonElement("editedAt")]
+    public DateTime? EditedAt { get; set; }
+
+    /// <summary>
+    /// Whether the message has been deleted (soft delete)
+    /// </summary>
+    [BsonElement("isDeleted")]
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// When the message was deleted
+    /// </summary>
+    [BsonElement("deletedAt")]
+    public DateTime? DeletedAt { get; set; }
 
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
