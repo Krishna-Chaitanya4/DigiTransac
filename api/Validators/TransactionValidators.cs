@@ -209,3 +209,28 @@ public class AcceptP2PRequestValidator : AbstractValidator<AcceptP2PRequest>
             .WithMessage("At least one category split is required");
     }
 }
+
+public class SendMoneyRequestValidator : AbstractValidator<SendMoneyRequest>
+{
+    public SendMoneyRequestValidator()
+    {
+        RuleFor(x => x.AccountId)
+            .NotEmpty().WithMessage("Account ID is required");
+        
+        RuleFor(x => x.Amount)
+            .GreaterThan(0).WithMessage("Amount must be greater than zero");
+        
+        RuleFor(x => x.Splits)
+            .NotEmpty().WithMessage("At least one category split is required");
+        
+        RuleForEach(x => x.Splits).SetValidator(new TransactionSplitRequestValidator());
+        
+        RuleFor(x => x.Title)
+            .MaximumLength(200).When(x => !string.IsNullOrEmpty(x.Title))
+            .WithMessage("Title cannot exceed 200 characters");
+        
+        RuleFor(x => x.Notes)
+            .MaximumLength(1000).When(x => !string.IsNullOrEmpty(x.Notes))
+            .WithMessage("Notes cannot exceed 1000 characters");
+    }
+}

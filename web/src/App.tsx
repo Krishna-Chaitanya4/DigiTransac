@@ -13,6 +13,7 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
+const ChatsPage = lazy(() => import('./pages/ChatsPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const LabelsPage = lazy(() => import('./pages/LabelsPage'));
 const InsightsPage = lazy(() => import('./pages/InsightsPage'));
@@ -62,6 +63,7 @@ function App() {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<PageBoundary name="Dashboard"><DashboardPage /></PageBoundary>} />
             <Route path="/transactions" element={<PageBoundary name="Transactions"><TransactionsPage /></PageBoundary>} />
+            <Route path="/chats" element={<PageBoundary name="Chats"><ChatsPage /></PageBoundary>} />
             <Route path="/accounts" element={<PageBoundary name="Accounts"><AccountsPage /></PageBoundary>} />
             <Route path="/labels" element={<PageBoundary name="Labels"><LabelsPage /></PageBoundary>} />
             <Route path="/insights" element={<PageBoundary name="Insights"><InsightsPage /></PageBoundary>} />

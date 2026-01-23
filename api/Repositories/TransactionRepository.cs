@@ -37,6 +37,10 @@ public interface ITransactionRepository
     // P2P pending transactions
     Task<List<Transaction>> GetPendingP2PAsync(string userId);
     Task<int> GetPendingP2PCountAsync(string userId);
+    
+    // P2P conversation queries
+    Task<List<Transaction>> GetP2PTransactionsAsync(string userId);
+    Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId);
 }
 
 public class TransactionRepository : ITransactionRepository
@@ -527,5 +531,33 @@ public class TransactionRepository : ITransactionRepository
         );
         
         return (int)await _transactions.CountDocumentsAsync(filter);
+    }
+
+    public async Task<List<Transaction>> GetP2PTransactionsAsync(string userId)
+    {
+        // Get all P2P transactions (those with CounterpartyUserId set)
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Ne(t => t.CounterpartyUserId, null),
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+        );
+        
+        return await _transactions.Find(filter)
+            .SortByDescending(t => t.Date)
+            .ToListAsync();
+    }
+
+    public async Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId)
+    {
+        // Get all P2P transactions with a specific counterparty
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.CounterpartyUserId, counterpartyUserId),
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+        );
+        
+        return await _transactions.Find(filter)
+            .SortByDescending(t => t.Date)
+            .ToListAsync();
     }
 }

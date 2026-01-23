@@ -106,6 +106,7 @@ builder.Services.AddSingleton<ITagRepository, TagRepository>();
 builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
 builder.Services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>();
 builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
+builder.Services.AddSingleton<IChatMessageRepository, ChatMessageRepository>();
 
 // Add HttpClient for external API calls
 builder.Services.AddHttpClient("ExchangeRates", client =>
@@ -156,6 +157,7 @@ builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<IConversationService, ConversationService>();
 
 // Background services
 builder.Services.AddHostedService<RecurringTransactionBackgroundService>();
@@ -416,6 +418,7 @@ app.MapTagEndpoints();
 app.MapAccountEndpoints();
 app.MapCurrencyEndpoints();
 app.MapTransactionEndpoints();
+app.MapConversationEndpoints();
 
 Log.Information("DigiTransac API starting...");
 app.Run();
