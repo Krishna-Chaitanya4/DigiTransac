@@ -348,7 +348,7 @@ export default function ChatsPage() {
                 className={`px-3 py-2 rounded-2xl cursor-pointer hover:opacity-90 transition-opacity ${
                   isMine 
                     ? 'bg-blue-300 text-blue-900 dark:bg-blue-400/50 dark:text-white' 
-                    : 'bg-gray-300 dark:bg-gray-500 text-gray-700 dark:text-gray-200'
+                    : 'bg-indigo-100 dark:bg-indigo-800/40 text-indigo-700 dark:text-indigo-200'
                 }`}
               >
                 <p className="text-sm line-clamp-2">
@@ -364,7 +364,7 @@ export default function ChatsPage() {
               className={`px-4 py-2 rounded-2xl ${
                 isMine 
                   ? 'bg-blue-500 text-white rounded-br-md' 
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-md'
+                  : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-100 rounded-bl-md'
               }`}
             >
               {/* Menu trigger - top right corner */}
