@@ -19,6 +19,26 @@ import type {
   UserSearchResult,
 } from '../types/conversations';
 
+// Time limits for message actions (in minutes)
+const EDIT_TIME_LIMIT_MINUTES = 15;
+const DELETE_TIME_LIMIT_MINUTES = 60;
+
+// Helper to check if a message can still be edited
+const canEditMessage = (msg: ConversationMessage): boolean => {
+  if (!msg.isFromMe || msg.type !== 'Text' || msg.isDeleted) return false;
+  const createdAt = new Date(msg.createdAt);
+  const minutesElapsed = (Date.now() - createdAt.getTime()) / (1000 * 60);
+  return minutesElapsed <= EDIT_TIME_LIMIT_MINUTES;
+};
+
+// Helper to check if a message can still be deleted
+const canDeleteMessage = (msg: ConversationMessage): boolean => {
+  if (!msg.isFromMe || msg.isDeleted) return false;
+  const createdAt = new Date(msg.createdAt);
+  const minutesElapsed = (Date.now() - createdAt.getTime()) / (1000 * 60);
+  return minutesElapsed <= DELETE_TIME_LIMIT_MINUTES;
+};
+
 export default function ChatsPage() {
   // State
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -1198,8 +1218,8 @@ export default function ChatsPage() {
               </button>
             )}
             
-            {/* Edit - only for own text messages */}
-            {menuMessage.isFromMe && menuMessage.type === 'Text' && (
+            {/* Edit - only for own text messages within 15 minutes */}
+            {canEditMessage(menuMessage) && (
               <button
                 onClick={() => startEditing(menuMessage)}
                 className="w-full px-4 py-2.5 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
@@ -1211,8 +1231,8 @@ export default function ChatsPage() {
               </button>
             )}
             
-            {/* Delete - only for own messages */}
-            {menuMessage.isFromMe && (
+            {/* Delete - only for own messages within 1 hour */}
+            {canDeleteMessage(menuMessage) && (
               <button
                 onClick={() => {
                   handleDeleteMessage(menuMessage.id);

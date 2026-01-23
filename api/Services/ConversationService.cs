@@ -420,17 +420,11 @@ public class ConversationService : IConversationService
             return (false, "Message cannot exceed 1000 characters", null);
         }
         
-        // Verify counterparty exists
+        // Verify counterparty exists (for self-chat, user is their own counterparty)
         var counterparty = await _userRepository.GetByIdAsync(counterpartyUserId);
         if (counterparty == null)
         {
             return (false, "User not found", null);
-        }
-        
-        // Prevent messaging yourself
-        if (counterpartyUserId == userId)
-        {
-            return (false, "Cannot send message to yourself", null);
         }
         
         var chatMessage = new ChatMessage
@@ -612,11 +606,24 @@ public class ConversationService : IConversationService
             return (false, "Message cannot exceed 1000 characters");
         }
         
+        // Check time limit - 15 minutes for editing
+        var message = await _chatMessageRepository.GetByIdAsync(messageId);
+        if (message == null || message.SenderUserId != userId)
+        {
+            return (false, "Message not found or you don't have permission to edit it");
+        }
+        
+        var editWindowMinutes = 15;
+        if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(editWindowMinutes))
+        {
+            return (false, $"Messages can only be edited within {editWindowMinutes} minutes of sending");
+        }
+        
         var success = await _chatMessageRepository.EditMessageAsync(messageId, userId, request.Content);
         
         if (!success)
         {
-            return (false, "Message not found or you don't have permission to edit it");
+            return (false, "Failed to update message");
         }
         
         return (true, "Message updated");
@@ -624,11 +631,24 @@ public class ConversationService : IConversationService
 
     public async Task<(bool Success, string Message)> DeleteMessageAsync(string userId, string messageId)
     {
+        // Check time limit - 1 hour for deleting
+        var message = await _chatMessageRepository.GetByIdAsync(messageId);
+        if (message == null || message.SenderUserId != userId)
+        {
+            return (false, "Message not found or you don't have permission to delete it");
+        }
+        
+        var deleteWindowMinutes = 60; // 1 hour
+        if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(deleteWindowMinutes))
+        {
+            return (false, "Messages can only be deleted within 1 hour of sending");
+        }
+        
         var success = await _chatMessageRepository.DeleteMessageAsync(messageId, userId);
         
         if (!success)
         {
-            return (false, "Message not found or you don't have permission to delete it");
+            return (false, "Failed to delete message");
         }
         
         return (true, "Message deleted");
