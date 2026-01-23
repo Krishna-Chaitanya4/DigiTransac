@@ -14,6 +14,7 @@ export interface Account {
   accountNumber: string | null;
   notes: string | null;
   isArchived: boolean;
+  isDefault: boolean;
   includeInNetWorth: boolean;
   order: number;
   canEditCurrency: boolean;
@@ -127,6 +128,11 @@ export async function reorderAccounts(items: { id: string; order: number }[]): P
 // Delete account
 export async function deleteAccount(id: string): Promise<void> {
   return apiClient.delete<void>(`/accounts/${id}`);
+}
+
+// Set default account
+export async function setDefaultAccount(id: string): Promise<void> {
+  return apiClient.post<void>(`/accounts/${id}/set-default`, {});
 }
 
 // Format currency

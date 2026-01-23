@@ -203,3 +203,33 @@ export const recurrenceFrequencyConfig: Record<RecurrenceFrequency, { label: str
   Quarterly: { label: 'Quarterly', description: 'Every 3 months' },
   Yearly: { label: 'Yearly', description: 'Every year' },
 };
+
+// P2P Pending Transaction types
+export interface PendingP2PTransaction {
+  id: string;
+  type: TransactionType;
+  amount: number;
+  currency: string;
+  date: string;
+  title?: string;
+  counterpartyEmail?: string;
+  role?: TransactionRole;
+  transactionLinkId?: string;
+}
+
+export interface PendingP2PListResponse {
+  transactions: PendingP2PTransaction[];
+  totalCount: number;
+}
+
+export interface AcceptP2PRequest {
+  accountId: string;
+  amount: number; // The actual amount received (may differ from sender's amount due to currency conversion)
+  splits: TransactionSplitRequest[];
+  tagIds?: string[];
+  notes?: string;
+}
+
+export interface RejectP2PRequest {
+  reason?: string;
+}

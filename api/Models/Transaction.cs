@@ -88,7 +88,8 @@ public class Transaction
 
     [BsonElement("accountId")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string AccountId { get; set; } = null!;
+    [BsonIgnoreIfNull]
+    public string? AccountId { get; set; }  // Null for pending P2P transactions
 
     [BsonElement("type")]
     [BsonRepresentation(BsonType.String)]

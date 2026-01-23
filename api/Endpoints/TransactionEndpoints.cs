@@ -352,5 +352,79 @@ public static class TransactionEndpoints
         })
         .WithName("ExportTransactions")
         .Produces<List<TransactionResponse>>(200);
+
+        // P2P Pending Transactions
+        group.MapGet("/pending-p2p", async (
+            ClaimsPrincipal user,
+            ITransactionService transactionService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await transactionService.GetPendingP2PAsync(userId);
+            return Results.Ok(result);
+        })
+        .WithName("GetPendingP2P")
+        .Produces<PendingP2PListResponse>(200);
+
+        group.MapGet("/pending-p2p/count", async (
+            ClaimsPrincipal user,
+            ITransactionService transactionService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var count = await transactionService.GetPendingP2PCountAsync(userId);
+            return Results.Ok(new { count });
+        })
+        .WithName("GetPendingP2PCount")
+        .Produces<object>(200);
+
+        group.MapPost("/{id}/accept", async (
+            string id,
+            AcceptP2PRequest request,
+            ClaimsPrincipal user,
+            ITransactionService transactionService,
+            IValidator<AcceptP2PRequest> validator) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+                return Results.BadRequest(new { error = validationResult.Errors.First().ErrorMessage });
+
+            var (success, message, transaction) = await transactionService.AcceptP2PAsync(userId, id, request);
+            if (!success)
+                return Results.BadRequest(new { error = message });
+
+            return Results.Ok(transaction);
+        })
+        .WithName("AcceptP2P")
+        .Produces<TransactionResponse>(200)
+        .ProducesProblem(400);
+
+        group.MapPost("/{id}/reject", async (
+            string id,
+            RejectP2PRequest? request,
+            ClaimsPrincipal user,
+            ITransactionService transactionService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var (success, message) = await transactionService.RejectP2PAsync(userId, id, request);
+            if (!success)
+                return Results.BadRequest(new { error = message });
+
+            return Results.Ok(new { message });
+        })
+        .WithName("RejectP2P")
+        .Produces<object>(200)
+        .ProducesProblem(400);
     }
 }

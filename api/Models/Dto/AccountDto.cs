@@ -55,6 +55,7 @@ public record AccountResponse(
     string? AccountNumber,
     string? Notes,
     bool IsArchived,
+    bool IsDefault,  // Default account for P2P transactions
     bool IncludeInNetWorth,
     int Order,
     bool CanEditCurrency,

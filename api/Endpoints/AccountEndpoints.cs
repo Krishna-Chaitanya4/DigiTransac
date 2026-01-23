@@ -177,6 +177,27 @@ public static class AccountEndpoints
         .Produces(200)
         .Produces<ErrorResponse>(400);
 
+        // Set default account
+        group.MapPost("/{id}/set-default", async (string id, ClaimsPrincipal user, IAccountService accountService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var (success, message) = await accountService.SetDefaultAsync(id, userId);
+            if (!success)
+            {
+                return Results.BadRequest(new ErrorResponse(message));
+            }
+
+            return Results.Ok(new { message });
+        })
+        .WithName("SetDefaultAccount")
+        .Produces(200)
+        .Produces<ErrorResponse>(400);
+
         // Delete account
         group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, IAccountService accountService) =>
         {

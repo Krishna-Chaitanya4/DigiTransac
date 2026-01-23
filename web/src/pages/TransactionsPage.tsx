@@ -3,6 +3,8 @@ import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
 import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
+import { PendingP2PIndicator } from '../components/PendingP2PIndicator';
+import { PendingP2PModal } from '../components/PendingP2PModal';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
@@ -56,6 +58,7 @@ export default function TransactionsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isPendingP2POpen, setIsPendingP2POpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
@@ -516,6 +519,8 @@ export default function TransactionsPage() {
             </div>
           </div>
           
+          <PendingP2PIndicator onClick={() => setIsPendingP2POpen(true)} />
+          
           <button
             onClick={() => setIsFormOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg 
@@ -750,6 +755,16 @@ export default function TransactionsPage() {
             logger.error('Failed to create tag:', error);
             return null;
           }
+        }}
+      />
+
+      {/* Pending P2P Modal */}
+      <PendingP2PModal
+        isOpen={isPendingP2POpen}
+        onClose={() => setIsPendingP2POpen(false)}
+        onTransactionAccepted={() => {
+          // Refresh the transaction list after accepting a P2P transaction
+          loadTransactions(1);
         }}
       />
     </div>

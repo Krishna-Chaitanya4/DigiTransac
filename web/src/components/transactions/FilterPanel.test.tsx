@@ -8,8 +8,8 @@ import type { TransactionFilter } from '../../types/transactions';
 
 // Sample test data
 const mockAccounts: Account[] = [
-  { id: 'acc1', name: 'Checking', type: 'Bank', icon: '🏦', color: null, currency: 'USD', initialBalance: 0, currentBalance: 1000, institution: 'Bank A', accountNumber: null, notes: null, isArchived: false, includeInNetWorth: true, order: 0, canEditCurrency: true, createdAt: '2025-01-01', updatedAt: '2025-01-01' },
-  { id: 'acc2', name: 'Savings', type: 'Bank', icon: '🏦', color: null, currency: 'USD', initialBalance: 0, currentBalance: 5000, institution: 'Bank A', accountNumber: null, notes: null, isArchived: false, includeInNetWorth: true, order: 1, canEditCurrency: true, createdAt: '2025-01-01', updatedAt: '2025-01-01' },
+  { id: 'acc1', name: 'Checking', type: 'Bank', icon: '🏦', color: null, currency: 'USD', initialBalance: 0, currentBalance: 1000, institution: 'Bank A', accountNumber: null, notes: null, isArchived: false, isDefault: false, includeInNetWorth: true, order: 0, canEditCurrency: true, createdAt: '2025-01-01', updatedAt: '2025-01-01' },
+  { id: 'acc2', name: 'Savings', type: 'Bank', icon: '🏦', color: null, currency: 'USD', initialBalance: 0, currentBalance: 5000, institution: 'Bank A', accountNumber: null, notes: null, isArchived: false, isDefault: false, includeInNetWorth: true, order: 1, canEditCurrency: true, createdAt: '2025-01-01', updatedAt: '2025-01-01' },
 ];
 
 // Hierarchical labels: Expenses > Food & Dining > (Restaurants, Groceries), Transport > (Fuel, Cab)

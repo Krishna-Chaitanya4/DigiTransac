@@ -57,6 +57,9 @@ public class Account
     [BsonElement("isArchived")]
     public bool IsArchived { get; set; } = false;
 
+    [BsonElement("isDefault")]
+    public bool IsDefault { get; set; } = false;  // Default account for P2P transactions
+
     [BsonElement("includeInNetWorth")]
     public bool IncludeInNetWorth { get; set; } = true;
 

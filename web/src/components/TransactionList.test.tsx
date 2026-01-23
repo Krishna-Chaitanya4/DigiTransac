@@ -73,6 +73,7 @@ const createAccount = (overrides: Partial<Account> = {}): Account => ({
   accountNumber: null,
   notes: null,
   isArchived: false,
+  isDefault: false,
   includeInNetWorth: true,
   order: 0,
   canEditCurrency: true,
@@ -255,10 +256,11 @@ describe('TransactionList', () => {
     });
 
     it('should render transfer indicator', () => {
-      // Transfers are now detected by linkedTransactionId presence
+      // Transfers are now detected by transferToAccountId presence (self-transfer)
       const transaction = createTransaction({ 
         type: 'Send', 
         amount: 500,
+        transferToAccountId: 'acc-2',
         linkedTransactionId: 'linked-tx-1'
       });
       

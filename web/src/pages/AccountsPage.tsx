@@ -13,6 +13,7 @@ import {
   updateAccount,
   deleteAccount,
   adjustBalance,
+  setDefaultAccount,
 } from '../services/accountService';
 import { 
   formatCurrency as formatCurrencyWithCode, 
@@ -146,6 +147,15 @@ export default function AccountsPage() {
       await loadData();
     } catch {
       setError('Failed to update account');
+    }
+  };
+
+  const handleSetDefault = async (account: Account) => {
+    try {
+      await setDefaultAccount(account.id);
+      await loadData();
+    } catch {
+      setError('Failed to set default account');
     }
   };
 
@@ -317,6 +327,7 @@ export default function AccountsPage() {
                       onDelete={() => handleDelete(account)}
                       onAdjustBalance={() => handleAdjustBalance(account)}
                       onArchiveToggle={() => handleArchiveToggle(account)}
+                      onSetDefault={() => handleSetDefault(account)}
                       formatWithConversion={formatWithConversion}
                       primaryCurrency={userPrimaryCurrency}
                     />

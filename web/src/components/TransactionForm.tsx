@@ -84,7 +84,6 @@ export function TransactionForm({
   
   // P2P state (optional for Send/Receive)
   const [counterpartyEmail, setCounterpartyEmail] = useState('');
-  const [counterpartyAmount, setCounterpartyAmount] = useState<number | undefined>(undefined);
   
   // Recurring state
   const [isRecurring, setIsRecurring] = useState(false);
@@ -127,7 +126,6 @@ export function TransactionForm({
         
         // Set P2P fields from editing transaction
         setCounterpartyEmail(editingTransaction.counterpartyEmail || '');
-        setCounterpartyAmount(undefined); // Don't pre-fill, user can edit if needed
         
         if (editingTransaction.splits.length > 0) {
           setSplits(editingTransaction.splits.map(s => ({
@@ -171,7 +169,6 @@ export function TransactionForm({
         setSelectedTagIds([]);
         setTransferToAccountId('');
         setCounterpartyEmail('');
-        setCounterpartyAmount(undefined);
         setIsRecurring(false);
         setRecurrenceFrequency('Monthly');
         setRecurrenceInterval(1);
@@ -234,7 +231,8 @@ export function TransactionForm({
     e.preventDefault();
     
     const finalSplits = showSplits ? splits : [{ labelId: selectedLabelId, amount, notes: undefined }];
-    const isP2P = (type === 'Send' || type === 'Receive') && counterpartyEmail.trim();
+    // P2P only applies to Send transactions (sender initiates)
+    const isP2P = type === 'Send' && counterpartyEmail.trim();
     
     // Convert UI type to API type: Transfer -> Send (backend creates linked Send+Receive)
     const apiType: TransactionType = type === 'Transfer' ? 'Send' : type;
@@ -275,7 +273,6 @@ export function TransactionForm({
         } : undefined,
         // P2P fields (only for Send/Receive with counterparty email)
         counterpartyEmail: isP2P ? counterpartyEmail.trim() : undefined,
-        counterpartyAmount: isP2P && counterpartyAmount ? counterpartyAmount : undefined,
       };
       onSubmit(createData);
     }
@@ -391,49 +388,24 @@ export function TransactionForm({
                 </div>
               )}
 
-              {/* P2P: Counterparty email (optional for Send/Receive) */}
-              {(type === 'Send' || type === 'Receive') && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {type === 'Send' ? "Recipient's" : "Sender's"} Email (optional)
-                    </label>
-                    <input
-                      type="email"
-                      value={counterpartyEmail}
-                      onChange={(e) => setCounterpartyEmail(e.target.value)}
-                      placeholder="friend@example.com"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                      If they're on DigiTransac, they'll see this transaction too
-                    </p>
-                  </div>
-
-                  {/* Counterparty amount (optional, only show if email is provided) */}
-                  {counterpartyEmail && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        {type === 'Send' ? 'Amount They Received' : 'Amount They Sent'} (optional)
-                      </label>
-                      <input
-                        type="number"
-                        value={counterpartyAmount || ''}
-                        onChange={(e) => setCounterpartyAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
-                        placeholder={`Same as your amount: ${currencySymbol}${amount.toFixed(2)}`}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        min="0"
-                        step="0.01"
-                      />
-                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        If different currency or fees apply, enter the actual amount
-                      </p>
-                    </div>
-                  )}
+              {/* P2P: Counterparty email (only for Send - sender initiates P2P) */}
+              {type === 'Send' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Recipient's Email (optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={counterpartyEmail}
+                    onChange={(e) => setCounterpartyEmail(e.target.value)}
+                    placeholder="friend@example.com"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                      bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    If they're on DigiTransac, they'll see this transaction too
+                  </p>
                 </div>
               )}
 

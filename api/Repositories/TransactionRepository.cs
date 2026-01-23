@@ -33,6 +33,10 @@ public interface ITransactionRepository
     // Reassignment methods
     Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId);
     Task RemoveTagFromAllAsync(string tagId, string userId);
+    
+    // P2P pending transactions
+    Task<List<Transaction>> GetPendingP2PAsync(string userId);
+    Task<int> GetPendingP2PCountAsync(string userId);
 }
 
 public class TransactionRepository : ITransactionRepository
@@ -91,7 +95,8 @@ public class TransactionRepository : ITransactionRepository
         var filters = new List<FilterDefinition<Transaction>>
         {
             filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false) // Exclude templates from normal listings
+            filterBuilder.Eq(t => t.IsRecurringTemplate, false), // Exclude templates from normal listings
+            filterBuilder.Ne(t => t.AccountId, null) // Exclude pending P2P transactions (handled separately)
         };
 
         if (filter.StartDate.HasValue)
@@ -495,5 +500,32 @@ public class TransactionRepository : ITransactionRepository
         
         var update = Builders<Transaction>.Update.Pull(t => t.TagIds, tagId);
         await _transactions.UpdateManyAsync(filter, update);
+    }
+
+    public async Task<List<Transaction>> GetPendingP2PAsync(string userId)
+    {
+        // Pending P2P transactions: belong to user, have null AccountId (not yet assigned), and are uncleared
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.AccountId, null),
+            Builders<Transaction>.Filter.Eq(t => t.IsCleared, false),
+            Builders<Transaction>.Filter.Ne(t => t.TransactionLinkId, null)
+        );
+        
+        return await _transactions.Find(filter)
+            .SortByDescending(t => t.Date)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetPendingP2PCountAsync(string userId)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.AccountId, null),
+            Builders<Transaction>.Filter.Eq(t => t.IsCleared, false),
+            Builders<Transaction>.Filter.Ne(t => t.TransactionLinkId, null)
+        );
+        
+        return (int)await _transactions.CountDocumentsAsync(filter);
     }
 }

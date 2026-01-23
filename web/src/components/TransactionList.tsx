@@ -290,8 +290,8 @@ const TransactionRow = memo(function TransactionRow({
               </div>
             )}
             
-            {/* Transfer details - shown when transaction is linked (part of a transfer) */}
-            {transaction.linkedTransactionId && (
+            {/* Transfer details - shown only for self-transfers (between your own accounts) */}
+            {transaction.transferToAccountId && transaction.linkedTransactionId && (
               <div className="text-sm mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
@@ -392,12 +392,13 @@ interface TransactionListProps {
   onToggleSelection?: (id: string) => void;
 }
 
-// Get display type - linked transactions always show as Transfer
+// Get display type - only self-transfers (with transferToAccountId) show as Transfer
 function getDisplayType(transaction: Transaction): TransactionUIType {
-  // If transaction has a linked transaction, it's part of a transfer
-  if (transaction.linkedTransactionId) {
+  // Self-transfer: has transferToAccountId set (transfer between your own accounts)
+  if (transaction.transferToAccountId) {
     return 'Transfer';
   }
+  // P2P or regular transaction: show as Send/Receive
   return transaction.type;
 }
 

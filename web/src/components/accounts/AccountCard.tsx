@@ -8,11 +8,12 @@ interface AccountCardProps {
   onDelete: () => void;
   onAdjustBalance: () => void;
   onArchiveToggle: () => void;
+  onSetDefault?: () => void;
   formatWithConversion: (amount: number, fromCurrency: string) => { original: string; converted: string | null };
   primaryCurrency: string;
 }
 
-export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveToggle, formatWithConversion, primaryCurrency }: AccountCardProps) {
+export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveToggle, onSetDefault, formatWithConversion, primaryCurrency }: AccountCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const { resolvedTheme } = useTheme();
   const config = accountTypeConfig[account.type];
@@ -37,7 +38,14 @@ export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArch
             {config.icon}
           </div>
           <div>
-            <h3 className="font-medium text-gray-900 dark:text-gray-100">{account.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium text-gray-900 dark:text-gray-100">{account.name}</h3>
+              {account.isDefault && (
+                <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-0.5 rounded-full">
+                  Default
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {config.label}
               {account.institution && ` • ${account.institution}`}
@@ -78,6 +86,17 @@ export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArch
                 >
                   Edit
                 </button>
+                {onSetDefault && !account.isDefault && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onSetDefault();
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+                  >
+                    Set as Default
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setShowMenu(false);

@@ -13,6 +13,7 @@ public interface IAccountService
     Task<(bool Success, string Message, AccountResponse? Account)> UpdateAsync(string id, string userId, UpdateAccountRequest request);
     Task<(bool Success, string Message)> AdjustBalanceAsync(string id, string userId, AdjustBalanceRequest request);
     Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderAccountsRequest request);
+    Task<(bool Success, string Message)> SetDefaultAsync(string id, string userId);
     Task<(bool Success, string Message, string ErrorType)> DeleteAsync(string id, string userId);
 }
 
@@ -402,6 +403,36 @@ public class AccountService : IAccountService
         return (true, "Accounts reordered successfully");
     }
 
+    public async Task<(bool Success, string Message)> SetDefaultAsync(string id, string userId)
+    {
+        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
+        if (account == null)
+        {
+            return (false, "Account not found");
+        }
+
+        if (account.IsArchived)
+        {
+            return (false, "Cannot set archived account as default");
+        }
+
+        // Clear existing default
+        var allAccounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: false);
+        foreach (var acc in allAccounts.Where(a => a.IsDefault))
+        {
+            acc.IsDefault = false;
+            acc.UpdatedAt = DateTime.UtcNow;
+            await _accountRepository.UpdateAsync(acc);
+        }
+
+        // Set new default
+        account.IsDefault = true;
+        account.UpdatedAt = DateTime.UtcNow;
+        await _accountRepository.UpdateAsync(account);
+
+        return (true, "Default account set successfully");
+    }
+
     public async Task<(bool Success, string Message, string ErrorType)> DeleteAsync(string id, string userId)
     {
         var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
@@ -447,6 +478,7 @@ public class AccountService : IAccountService
             AccountNumber: accountNumber,
             Notes: notes,
             IsArchived: account.IsArchived,
+            IsDefault: account.IsDefault,
             IncludeInNetWorth: account.IncludeInNetWorth,
             Order: account.Order,
             CanEditCurrency: canEditCurrency,

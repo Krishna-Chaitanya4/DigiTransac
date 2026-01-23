@@ -188,3 +188,24 @@ public class BatchOperationRequestValidator : AbstractValidator<BatchOperationRe
             .WithMessage("Label ID is required for updateCategory action");
     }
 }
+
+public class AcceptP2PRequestValidator : AbstractValidator<AcceptP2PRequest>
+{
+    public AcceptP2PRequestValidator()
+    {
+        RuleFor(x => x.AccountId)
+            .NotEmpty().WithMessage("Account ID is required");
+        
+        RuleFor(x => x.Amount)
+            .GreaterThan(0).WithMessage("Amount must be greater than zero");
+        
+        RuleFor(x => x.Splits)
+            .NotEmpty().WithMessage("At least one category split is required");
+        
+        RuleForEach(x => x.Splits).SetValidator(new TransactionSplitRequestValidator());
+        
+        RuleFor(x => x)
+            .Must(x => x.Splits == null || x.Splits.Count > 0)
+            .WithMessage("At least one category split is required");
+    }
+}

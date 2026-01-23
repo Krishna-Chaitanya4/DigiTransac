@@ -107,7 +107,7 @@ public record TagInfo(
 
 public record TransactionResponse(
     string Id,
-    string AccountId,
+    string? AccountId,  // Null for pending P2P transactions
     string? AccountName,
     string Type,
     decimal Amount,
@@ -156,7 +156,7 @@ public record TransactionSummaryResponse(
 
 public record RecurringTransactionResponse(
     string Id,
-    string AccountId,
+    string? AccountId,  // Null for pending P2P transactions
     string? AccountName,
     string Type,
     decimal Amount,
@@ -224,4 +224,40 @@ public record AveragesByType(
     decimal AverageCredit,
     decimal AverageDebit,
     decimal AverageTransfer
+);
+
+// P2P Pending Transaction DTOs
+public record PendingP2PResponse(
+    string Id,
+    string Type,
+    decimal Amount,
+    string Currency,
+    DateTime Date,
+    string? Title,
+    string? CounterpartyEmail,
+    string? Role,
+    Guid? TransactionLinkId
+);
+
+public record PendingP2PListResponse(
+    List<PendingP2PResponse> Transactions,
+    int TotalCount
+);
+
+public record AssignP2PRequest(
+    string AccountId,
+    List<TransactionSplitRequest> Splits,
+    List<string>? TagIds
+);
+
+public record AcceptP2PRequest(
+    string AccountId,
+    decimal Amount,  // The actual amount received (may differ from sender's amount due to currency conversion)
+    List<TransactionSplitRequest> Splits,
+    List<string>? TagIds,
+    string? Notes
+);
+
+public record RejectP2PRequest(
+    string? Reason
 );
