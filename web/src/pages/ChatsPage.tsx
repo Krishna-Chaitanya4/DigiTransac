@@ -485,7 +485,7 @@ export default function ChatsPage() {
           setTimeout(() => {
             element.classList.remove('rounded-2xl', 'transition-colors', 'duration-500');
           }, 500);
-        }, 1500);
+        }, 1000);
       }
     };
     
@@ -926,9 +926,8 @@ export default function ChatsPage() {
                       disabled={!messageInput.trim() || isSending}
                       className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                       </svg>
                     </button>
                   </>
