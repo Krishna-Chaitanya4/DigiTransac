@@ -476,10 +476,15 @@ export default function ChatsPage() {
       const element = document.getElementById(`msg-${messageId}`);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Highlight the message briefly
-        element.classList.add('bg-yellow-100', 'dark:bg-yellow-900/30');
+        // Highlight the message briefly with rounded gray tint and smooth fade
+        element.classList.add('rounded-2xl', 'transition-colors', 'duration-500');
+        element.classList.add('bg-gray-200', 'dark:bg-gray-700');
         setTimeout(() => {
-          element.classList.remove('bg-yellow-100', 'dark:bg-yellow-900/30');
+          element.classList.remove('bg-gray-200', 'dark:bg-gray-700');
+          // Remove transition classes after fade completes
+          setTimeout(() => {
+            element.classList.remove('rounded-2xl', 'transition-colors', 'duration-500');
+          }, 500);
         }, 1500);
       }
     };
@@ -580,31 +585,13 @@ export default function ChatsPage() {
                 ) : msg.content}
               </p>
               {showTime && (
-                <div className={`flex items-center justify-end gap-1 mt-1 ${
+                <div className={`flex items-center justify-end gap-1.5 mt-1 ${
                   isMine ? 'text-blue-100' : 'text-gray-400 dark:text-gray-500'
                 }`}>
                   {msg.isEdited && <span className="text-xs">edited</span>}
                   <span className="text-xs">
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
-                  {/* Status indicator for my messages */}
-                  {isMine && (
-                    <span className={`text-xs ${msg.status === 'Read' ? 'text-blue-300' : ''}`}>
-                      {msg.status === 'Read' ? (
-                        <svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M2 12l5 5L12 9M12 12l5 5 5-8" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      ) : msg.status === 'Delivered' ? (
-                        <svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M2 12l5 5L12 9M12 12l5 5 5-8" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </span>
-                  )}
                 </div>
               )}
             </div>
@@ -820,6 +807,18 @@ export default function ChatsPage() {
                       </div>
                     );
                   })}
+                  {/* Seen indicator - Instagram style, only shows once below last message if it's mine and read */}
+                  {(() => {
+                    const lastMsg = selectedConversation.messages[selectedConversation.messages.length - 1];
+                    if (lastMsg?.isFromMe && lastMsg?.status === 'Read') {
+                      return (
+                        <div className="flex justify-end pr-2 mt-1">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Seen</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div ref={messagesEndRef} />
                 </>
               )}
