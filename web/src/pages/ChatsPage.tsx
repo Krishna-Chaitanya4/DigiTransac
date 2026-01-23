@@ -51,6 +51,46 @@ export default function ChatsPage() {
   // Conversation list filter
   const [conversationFilter, setConversationFilter] = useState('');
   
+  // Sidebar resize state
+  const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const minWidth = 280;
+  const maxWidth = 500;
+  
+  // Handle sidebar resize
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !sidebarRef.current) return;
+      
+      // Get the sidebar's left position to calculate proper width
+      const sidebarRect = sidebarRef.current.getBoundingClientRect();
+      const newWidth = e.clientX - sidebarRect.left;
+      
+      // Clamp to min/max
+      const clampedWidth = Math.min(maxWidth, Math.max(minWidth, newWidth));
+      setSidebarWidth(clampedWidth);
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    
+    if (isResizing) {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+  
   // New conversation modal
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [searchEmail, setSearchEmail] = useState('');
@@ -620,9 +660,13 @@ export default function ChatsPage() {
   return (
     <div className="-m-4 sm:-m-6 lg:-m-8 flex h-[calc(100vh-4rem)] bg-white dark:bg-gray-900">
       {/* Conversations list */}
-      <div className={`w-full md:w-80 lg:w-96 border-r border-gray-200 dark:border-gray-700 flex flex-col ${
-        selectedUserId ? 'hidden md:flex' : 'flex'
-      }`}>
+      <div 
+        ref={sidebarRef}
+        className={`flex flex-col border-r border-gray-200 dark:border-gray-700 ${
+          selectedUserId ? 'hidden md:flex' : 'flex'
+        }`}
+        style={{ width: `${sidebarWidth}px`, minWidth: `${minWidth}px`, maxWidth: `${maxWidth}px` }}
+      >
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Chats</h1>
@@ -696,6 +740,20 @@ export default function ChatsPage() {
             </div>
           )}
         </div>
+      </div>
+      
+      {/* Resize handle */}
+      <div
+        className={`hidden md:flex w-3 items-center justify-center cursor-col-resize flex-shrink-0 group hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors ${isResizing ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-transparent'}`}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsResizing(true);
+        }}
+        onDoubleClick={() => setSidebarWidth(320)} // Reset to default on double-click
+        title="Drag to resize, double-click to reset"
+      >
+        <div className={`w-1 h-10 rounded-full transition-colors ${isResizing ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600 group-hover:bg-blue-400'}`} />
       </div>
       
       {/* Chat area */}
