@@ -3,6 +3,8 @@ import {
   getConversations,
   getConversation,
   sendMessage,
+  editMessage,
+  deleteMessage,
   markAsRead,
   getDisplayName,
   formatRelativeTime,
@@ -33,6 +35,19 @@ export default function ChatsPage() {
   const [menuMessage, setMenuMessage] = useState<ConversationMessage | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; buttonTop: number } | null>(null);
   
+  // Edit mode state
+  const [editingMessage, setEditingMessage] = useState<ConversationMessage | null>(null);
+  const [editInput, setEditInput] = useState('');
+  
+  // Scroll state
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  
+  // Search in conversation state
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<string[]>([]); // message IDs
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  
   // New conversation modal
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [searchEmail, setSearchEmail] = useState('');
@@ -41,6 +56,21 @@ export default function ChatsPage() {
   const [searchError, setSearchError] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Handle scroll to detect if user scrolled up
+  const handleScroll = useCallback(() => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isNearBottom);
+    }
+  }, []);
+
+  // Scroll to bottom function
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   // Load initial data
   useEffect(() => {
@@ -120,6 +150,99 @@ export default function ChatsPage() {
     }
   };
 
+  // Edit message handler
+  const handleEditMessage = async () => {
+    if (!editingMessage || !editInput.trim() || !selectedUserId) return;
+    
+    try {
+      await editMessage(editingMessage.id, { content: editInput.trim() });
+      setEditingMessage(null);
+      setEditInput('');
+      // Reload conversation
+      await loadConversation(selectedUserId);
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+    }
+  };
+
+  // Delete message handler
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!selectedUserId) return;
+    
+    try {
+      await deleteMessage(messageId);
+      // Reload conversation
+      await loadConversation(selectedUserId);
+      // Reload conversations list (last message preview might change)
+      const convosResponse = await getConversations();
+      setConversations(convosResponse.conversations);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+    }
+  };
+
+  // Start editing a message
+  const startEditing = (msg: ConversationMessage) => {
+    setEditingMessage(msg);
+    setEditInput(msg.content || '');
+    setMenuMessage(null);
+    setMenuPosition(null);
+  };
+
+  // Cancel editing
+  const cancelEditing = () => {
+    setEditingMessage(null);
+    setEditInput('');
+  };
+
+  // Search within conversation
+  const handleSearchInConversation = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (!query.trim() || !selectedConversation) {
+      setSearchResults([]);
+      setCurrentSearchIndex(0);
+      return;
+    }
+    
+    const lowerQuery = query.toLowerCase();
+    const matchingIds = selectedConversation.messages
+      .filter(msg => msg.content?.toLowerCase().includes(lowerQuery))
+      .map(msg => msg.id);
+    
+    setSearchResults(matchingIds);
+    setCurrentSearchIndex(0);
+    
+    // Scroll to first result
+    if (matchingIds.length > 0) {
+      const element = document.getElementById(`msg-${matchingIds[0]}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedConversation]);
+
+  // Navigate search results
+  const navigateSearchResult = (direction: 'prev' | 'next') => {
+    if (searchResults.length === 0) return;
+    
+    let newIndex = currentSearchIndex;
+    if (direction === 'next') {
+      newIndex = (currentSearchIndex + 1) % searchResults.length;
+    } else {
+      newIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+    }
+    
+    setCurrentSearchIndex(newIndex);
+    const element = document.getElementById(`msg-${searchResults[newIndex]}`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  // Close search bar
+  const closeSearchBar = () => {
+    setShowSearchBar(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setCurrentSearchIndex(0);
+  };
+
   // Search user handler
   const handleSearchUser = async () => {
     if (!searchEmail.trim()) return;
@@ -176,6 +299,34 @@ export default function ChatsPage() {
     return account?.name || 'Unknown Account';
   };
   void getAccountName; // Suppress unused warning - available for future use
+
+  // Format date for date separator
+  const formatDateSeparator = (dateString: string): string => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const isToday = date.toDateString() === today.toDateString();
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+    
+    if (isToday) return 'Today';
+    if (isYesterday) return 'Yesterday';
+    
+    return date.toLocaleDateString(undefined, { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  // Check if two dates are on different days
+  const isDifferentDay = (date1: string, date2: string): boolean => {
+    const d1 = new Date(date1).toDateString();
+    const d2 = new Date(date2).toDateString();
+    return d1 !== d2;
+  };
 
   // Render conversation list item
   const renderConversationItem = (convo: ConversationSummary) => {
@@ -238,7 +389,7 @@ export default function ChatsPage() {
   };
 
   // Render message
-  const renderMessage = (msg: ConversationMessage) => {
+  const renderMessage = (msg: ConversationMessage, showTime: boolean = true) => {
     const isMine = msg.isFromMe;
     
     // Transaction message
@@ -295,9 +446,11 @@ export default function ChatsPage() {
                     "{tx.notes}"
                   </div>
                 )}
-                <div className="text-xs opacity-60 mt-2">
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
+                {showTime && (
+                  <div className="text-xs opacity-60 mt-2">
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -326,6 +479,31 @@ export default function ChatsPage() {
         setTimeout(() => {
           element.classList.remove('bg-yellow-100', 'dark:bg-yellow-900/30');
         }, 1500);
+      }
+    };
+    
+    // Long press handlers for mobile
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    
+    const handleTouchStart = (e: React.TouchEvent) => {
+      longPressTimer = setTimeout(() => {
+        const rect = (e.target as HTMLElement).getBoundingClientRect();
+        setMenuPosition({ x: rect.left, y: rect.bottom, buttonTop: rect.top });
+        setMenuMessage(msg);
+      }, 500); // 500ms for long press
+    };
+    
+    const handleTouchEnd = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+    
+    const handleTouchMove = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
       }
     };
     
@@ -361,11 +539,14 @@ export default function ChatsPage() {
           {/* Message bubble with dropdown */}
           <div className="relative">
             <div 
-              className={`px-4 py-2 rounded-2xl ${
+              className={`px-4 py-2 rounded-2xl select-none touch-none ${
                 isMine 
                   ? 'bg-blue-500 text-white rounded-br-md' 
                   : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-100 rounded-bl-md'
               }`}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onTouchMove={handleTouchMove}
             >
               {/* Menu trigger - top right corner */}
               <button
@@ -386,21 +567,44 @@ export default function ChatsPage() {
                 </svg>
               </button>
               
-              <p className="text-sm whitespace-pre-wrap break-words pr-6">{msg.content}</p>
-              <div className={`flex items-center justify-end gap-1 mt-1 ${
-                isMine ? 'text-blue-100' : 'text-gray-400 dark:text-gray-500'
-              }`}>
-                {msg.isEdited && <span className="text-xs">edited</span>}
-                <span className="text-xs">
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {/* Status indicator for my messages */}
-                {isMine && (
+              <p className="text-sm whitespace-pre-wrap break-words pr-6">
+                {searchQuery && msg.content?.toLowerCase().includes(searchQuery.toLowerCase()) ? (
+                  // Highlight search matches
+                  msg.content.split(new RegExp(`(${searchQuery})`, 'gi')).map((part, i) => 
+                    part.toLowerCase() === searchQuery.toLowerCase() ? (
+                      <mark key={i} className="bg-yellow-300 dark:bg-yellow-600 text-inherit rounded px-0.5">{part}</mark>
+                    ) : part
+                  )
+                ) : msg.content}
+              </p>
+              {showTime && (
+                <div className={`flex items-center justify-end gap-1 mt-1 ${
+                  isMine ? 'text-blue-100' : 'text-gray-400 dark:text-gray-500'
+                }`}>
+                  {msg.isEdited && <span className="text-xs">edited</span>}
                   <span className="text-xs">
-                    {msg.status === 'Read' ? '✓✓' : msg.status === 'Delivered' ? '✓✓' : '✓'}
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
-                )}
-              </div>
+                  {/* Status indicator for my messages */}
+                  {isMine && (
+                    <span className={`text-xs ${msg.status === 'Read' ? 'text-blue-300' : ''}`}>
+                      {msg.status === 'Read' ? (
+                        <svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M2 12l5 5L12 9M12 12l5 5 5-8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : msg.status === 'Delivered' ? (
+                        <svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M2 12l5 5L12 9M12 12l5 5 5-8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -502,10 +706,75 @@ export default function ChatsPage() {
                   </div>
                 </div>
               </div>
+              
+              {/* Search button */}
+              <button
+                onClick={() => setShowSearchBar(!showSearchBar)}
+                className={`p-2 rounded-full transition-colors ${
+                  showSearchBar 
+                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' 
+                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                title="Search messages"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
             </div>
             
+            {/* Search bar */}
+            {showSearchBar && (
+              <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center gap-2">
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchInConversation(e.target.value)}
+                  placeholder="Search in conversation..."
+                  autoFocus
+                  className="flex-1 px-2 py-1 bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none"
+                />
+                {searchResults.length > 0 && (
+                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <span>{currentSearchIndex + 1}/{searchResults.length}</span>
+                    <button
+                      onClick={() => navigateSearchResult('prev')}
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => navigateSearchResult('next')}
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={closeSearchBar}
+                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800/50">
+            <div 
+              ref={messagesContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800/50 relative"
+            >
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
@@ -516,9 +785,51 @@ export default function ChatsPage() {
                 </div>
               ) : (
                 <>
-                  {selectedConversation.messages.map(renderMessage)}
+                  {selectedConversation.messages.map((msg, index) => {
+                    const prevMsg = index > 0 ? selectedConversation.messages[index - 1] : null;
+                    const nextMsg = index < selectedConversation.messages.length - 1 
+                      ? selectedConversation.messages[index + 1] : null;
+                    
+                    const showDateSeparator = index === 0 || 
+                      isDifferentDay(prevMsg!.createdAt, msg.createdAt);
+                    
+                    // Show time if:
+                    // - Last message in the conversation
+                    // - Next message is from different sender
+                    // - More than 5 minutes gap with next message
+                    // - Different day than next message
+                    const showTime = !nextMsg || 
+                      nextMsg.isFromMe !== msg.isFromMe ||
+                      isDifferentDay(msg.createdAt, nextMsg.createdAt) ||
+                      (new Date(nextMsg.createdAt).getTime() - new Date(msg.createdAt).getTime()) > 5 * 60 * 1000;
+                    
+                    return (
+                      <div key={msg.id}>
+                        {showDateSeparator && (
+                          <div className="flex items-center justify-center my-4">
+                            <div className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-xs text-gray-600 dark:text-gray-300 font-medium">
+                              {formatDateSeparator(msg.createdAt)}
+                            </div>
+                          </div>
+                        )}
+                        {renderMessage(msg, showTime)}
+                      </div>
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </>
+              )}
+              
+              {/* Scroll to bottom button */}
+              {showScrollButton && (
+                <button
+                  onClick={scrollToBottom}
+                  className="absolute bottom-4 right-4 p-3 bg-white dark:bg-gray-700 rounded-full shadow-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </button>
               )}
             </div>
             
@@ -551,25 +862,73 @@ export default function ChatsPage() {
                 </div>
               )}
               
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!messageInput.trim() || isSending}
-                  className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              {/* Edit mode indicator */}
+              {editingMessage && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500 mb-2 rounded-r">
+                  <svg className="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                </button>
+                  <span className="flex-1 text-sm text-yellow-800 dark:text-yellow-200 truncate">
+                    Editing: {editingMessage.content?.substring(0, 50)}...
+                  </span>
+                  <button
+                    onClick={cancelEditing}
+                    className="p-1.5 text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-800/30 rounded-full transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2">
+                {editingMessage ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editInput}
+                      onChange={(e) => setEditInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) handleEditMessage();
+                        if (e.key === 'Escape') cancelEditing();
+                      }}
+                      autoFocus
+                      placeholder="Edit message..."
+                      className="flex-1 px-4 py-2 border border-yellow-400 dark:border-yellow-600 rounded-full bg-yellow-50 dark:bg-yellow-900/20 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={handleEditMessage}
+                      disabled={!editInput.trim()}
+                      className="p-2 bg-yellow-500 text-white rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                      placeholder="Type a message..."
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!messageInput.trim() || isSending}
+                      className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </>
@@ -729,11 +1088,7 @@ export default function ChatsPage() {
             {/* Edit - only for own text messages */}
             {menuMessage.isFromMe && menuMessage.type === 'Text' && (
               <button
-                onClick={() => {
-                  // TODO: Implement edit
-                  setMenuMessage(null);
-                  setMenuPosition(null);
-                }}
+                onClick={() => startEditing(menuMessage)}
                 className="w-full px-4 py-2.5 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
               >
                 <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -747,7 +1102,7 @@ export default function ChatsPage() {
             {menuMessage.isFromMe && (
               <button
                 onClick={() => {
-                  // TODO: Implement delete
+                  handleDeleteMessage(menuMessage.id);
                   setMenuMessage(null);
                   setMenuPosition(null);
                 }}
