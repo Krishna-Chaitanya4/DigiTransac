@@ -48,6 +48,9 @@ export default function ChatsPage() {
   const [searchResults, setSearchResults] = useState<string[]>([]); // message IDs
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   
+  // Conversation list filter
+  const [conversationFilter, setConversationFilter] = useState('');
+  
   // New conversation modal
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [searchEmail, setSearchEmail] = useState('');
@@ -544,6 +547,11 @@ export default function ChatsPage() {
             </div>
           )}
           
+          {/* Edited indicator - above message */}
+          {msg.isEdited && (
+            <span className="text-xs text-gray-500 dark:text-gray-400 mb-1">Edited</span>
+          )}
+          
           {/* Message bubble with dropdown */}
           <div className="relative">
             <div 
@@ -589,7 +597,6 @@ export default function ChatsPage() {
                 <div className={`flex items-center justify-end gap-1.5 mt-1 ${
                   isMine ? 'text-blue-100' : 'text-gray-400 dark:text-gray-500'
                 }`}>
-                  {msg.isEdited && <span className="text-xs">edited</span>}
                   <span className="text-xs">
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -630,6 +637,32 @@ export default function ChatsPage() {
           </button>
         </div>
         
+        {/* Search conversations */}
+        <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={conversationFilter}
+              onChange={(e) => setConversationFilter(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            {conversationFilter && (
+              <button
+                onClick={() => setConversationFilter('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+        
         {/* Conversations */}
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
@@ -642,7 +675,25 @@ export default function ChatsPage() {
               <p className="text-sm mt-1">Start a new chat or make a transaction</p>
             </div>
           ) : (
-            conversations.map(renderConversationItem)
+            conversations
+              .filter(conv => {
+                if (!conversationFilter.trim()) return true;
+                const filter = conversationFilter.toLowerCase();
+                const name = (conv.counterpartyName || '').toLowerCase();
+                const email = (conv.counterpartyEmail || '').toLowerCase();
+                return name.includes(filter) || email.includes(filter);
+              })
+              .map(renderConversationItem)
+          )}
+          {conversationFilter && conversations.filter(conv => {
+            const filter = conversationFilter.toLowerCase();
+            const name = (conv.counterpartyName || '').toLowerCase();
+            const email = (conv.counterpartyEmail || '').toLowerCase();
+            return name.includes(filter) || email.includes(filter);
+          }).length === 0 && (
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+              No conversations match "{conversationFilter}"
+            </div>
           )}
         </div>
       </div>
@@ -869,16 +920,16 @@ export default function ChatsPage() {
               
               {/* Edit mode indicator */}
               {editingMessage && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500 mb-2 rounded-r">
-                  <svg className="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 mb-2 rounded-r">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  <span className="flex-1 text-sm text-yellow-800 dark:text-yellow-200 truncate">
+                  <span className="flex-1 text-sm text-blue-800 dark:text-blue-200 truncate">
                     Editing: {editingMessage.content?.substring(0, 50)}...
                   </span>
                   <button
                     onClick={cancelEditing}
-                    className="p-1.5 text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-800/30 rounded-full transition-colors"
+                    className="p-1.5 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-800/30 rounded-full transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -900,12 +951,12 @@ export default function ChatsPage() {
                       }}
                       autoFocus
                       placeholder="Edit message..."
-                      className="flex-1 px-4 py-2 border border-yellow-400 dark:border-yellow-600 rounded-full bg-yellow-50 dark:bg-yellow-900/20 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                      className="flex-1 px-4 py-2 border border-blue-400 dark:border-blue-600 rounded-full bg-blue-50 dark:bg-blue-900/20 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <button
                       onClick={handleEditMessage}
                       disabled={!editInput.trim()}
-                      className="p-2 bg-yellow-500 text-white rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
