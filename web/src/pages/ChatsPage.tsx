@@ -393,6 +393,7 @@ export default function ChatsPage() {
   // Render message
   const renderMessage = (msg: ConversationMessage, showTime: boolean = true) => {
     const isMine = msg.isFromMe;
+    const isCurrentSearchResult = searchResults.length > 0 && searchResults[currentSearchIndex] === msg.id;
     
     // Transaction message
     if (msg.type === 'Transaction' && msg.transaction) {
@@ -400,7 +401,7 @@ export default function ChatsPage() {
       const isSent = tx.transactionType === 'Send';
       
       return (
-        <div key={msg.id} id={`msg-${msg.id}`} className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-3 group transition-colors duration-500`}>
+        <div key={msg.id} id={`msg-${msg.id}`} className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-3 group transition-all duration-300`}>
           <div className="relative">
             <div 
               className={`max-w-xs rounded-2xl p-4 ${
@@ -516,7 +517,7 @@ export default function ChatsPage() {
     
     // Text message
     return (
-      <div key={msg.id} id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-3 group transition-colors duration-500`}>
+      <div key={msg.id} id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-3 group transition-all duration-300`}>
         <div className={`flex flex-col max-w-xs ${isMine ? 'items-end' : 'items-start'}`}>
           {/* Reply reference - Instagram style */}
           {msg.replyTo && (
@@ -576,10 +577,10 @@ export default function ChatsPage() {
               
               <p className="text-sm whitespace-pre-wrap break-words pr-6">
                 {searchQuery && msg.content?.toLowerCase().includes(searchQuery.toLowerCase()) ? (
-                  // Highlight search matches
+                  // Highlight search matches - orange for current, yellow for others
                   msg.content.split(new RegExp(`(${searchQuery})`, 'gi')).map((part, i) => 
                     part.toLowerCase() === searchQuery.toLowerCase() ? (
-                      <mark key={i} className="bg-yellow-300 dark:bg-yellow-600 text-inherit rounded px-0.5">{part}</mark>
+                      <mark key={i} className={`${isCurrentSearchResult ? 'bg-orange-400 dark:bg-orange-500' : 'bg-yellow-300 dark:bg-yellow-600'} text-inherit rounded px-0.5`}>{part}</mark>
                     ) : part
                   )
                 ) : msg.content}
