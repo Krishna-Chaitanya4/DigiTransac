@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FluentValidation;
+using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -268,13 +269,13 @@ public static class TransactionEndpoints
                     break;
                 case "markconfirmed":
                 case "markcleared": // Legacy support
-                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, "Confirmed");
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Confirmed));
                     break;
                 case "markpending":
-                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, "Pending");
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Pending));
                     break;
                 case "markdeclined":
-                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, "Declined");
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Declined));
                     break;
                 default:
                     return Results.BadRequest(new ErrorResponse($"Unknown action: {request.Action}"));

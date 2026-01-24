@@ -1,11 +1,12 @@
 using FluentValidation;
+using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 
 namespace DigiTransac.Api.Validators;
 
 public class CreateTransactionRequestValidator : AbstractValidator<CreateTransactionRequest>
 {
-    private static readonly string[] ValidTypes = { "Receive", "Send" };
+    private static readonly string[] ValidTypes = { nameof(TransactionType.Receive), nameof(TransactionType.Send) };
     private static readonly string[] ValidFrequencies = { "Daily", "Weekly", "Biweekly", "Monthly", "Quarterly", "Yearly" };
     
     public CreateTransactionRequestValidator()
@@ -37,11 +38,11 @@ public class CreateTransactionRequestValidator : AbstractValidator<CreateTransac
             .WithMessage("Notes cannot exceed 1000 characters");
         
         RuleFor(x => x.TransferToAccountId)
-            .NotEmpty().When(x => x.Type == "Send" && !string.IsNullOrEmpty(x.TransferToAccountId))
+            .NotEmpty().When(x => x.Type == nameof(TransactionType.Send) && !string.IsNullOrEmpty(x.TransferToAccountId))
             .WithMessage("Transfer destination account is required for transfers");
         
         RuleFor(x => x.TransferToAccountId)
-            .NotEqual(x => x.AccountId).When(x => x.Type == "Send" && !string.IsNullOrEmpty(x.TransferToAccountId))
+            .NotEqual(x => x.AccountId).When(x => x.Type == nameof(TransactionType.Send) && !string.IsNullOrEmpty(x.TransferToAccountId))
             .WithMessage("Cannot transfer to the same account");
         
         RuleFor(x => x.Splits)
@@ -95,7 +96,7 @@ public class TransactionSplitRequestValidator : AbstractValidator<TransactionSpl
 
 public class UpdateTransactionRequestValidator : AbstractValidator<UpdateTransactionRequest>
 {
-    private static readonly string[] ValidTypes = { "Receive", "Send" };
+    private static readonly string[] ValidTypes = { nameof(TransactionType.Receive), nameof(TransactionType.Send) };
     
     public UpdateTransactionRequestValidator()
     {
@@ -137,7 +138,7 @@ public class UpdateTransactionRequestValidator : AbstractValidator<UpdateTransac
 
 public class TransactionFilterRequestValidator : AbstractValidator<TransactionFilterRequest>
 {
-    private static readonly string[] ValidTypes = { "Receive", "Send" };
+    private static readonly string[] ValidTypes = { nameof(TransactionType.Receive), nameof(TransactionType.Send) };
     
     public TransactionFilterRequestValidator()
     {

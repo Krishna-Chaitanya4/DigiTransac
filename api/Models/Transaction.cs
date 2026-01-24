@@ -10,12 +10,6 @@ public enum TransactionType
     // Note: "Transfer" is a UI concept - it creates linked Send + Receive transactions
 }
 
-public enum TransactionRole
-{
-    Sender,   // User is the sender in this transaction
-    Receiver  // User is the receiver in this transaction
-}
-
 public enum RecurrenceFrequency
 {
     Daily,
@@ -150,10 +144,6 @@ public class Transaction
     [BsonElement("counterpartyUserId")]
     [BsonRepresentation(BsonType.ObjectId)]
     public string? CounterpartyUserId { get; set; } // Resolved once they're on the platform
-
-    [BsonElement("role")]
-    [BsonRepresentation(BsonType.String)]
-    public TransactionRole? Role { get; set; } // Sender or Receiver in this transaction
 
     // Recurring transaction support
     [BsonElement("recurringRule")]

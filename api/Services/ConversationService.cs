@@ -507,7 +507,7 @@ public class ConversationService : IConversationService
         // Create transaction through TransactionService
         var createRequest = new CreateTransactionRequest(
             AccountId: request.AccountId,
-            Type: "Send",
+            Type: nameof(TransactionType.Send),
             Amount: request.Amount,
             Date: DateTime.UtcNow,
             Title: request.Title,
@@ -547,7 +547,7 @@ public class ConversationService : IConversationService
         var txData = new TransactionMessageData(
             TransactionId: transaction.Id,
             TransactionLinkId: transaction.TransactionLinkId ?? Guid.Empty,
-            TransactionType: "Send",
+            TransactionType: nameof(TransactionType.Send),
             Amount: transaction.Amount,
             Currency: transaction.Currency,
             Date: transaction.Date,

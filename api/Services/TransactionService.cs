@@ -335,15 +335,6 @@ public class TransactionService : ITransactionService
                 counterpartyAmount = request.CounterpartyAmount.Value;
             }
         }
-        
-        // Determine roles for P2P: Send = Sender, Receive = Receiver
-        TransactionRole? userRole = null;
-        TransactionRole? counterpartyRole = null;
-        if (isP2P)
-        {
-            userRole = type == TransactionType.Send ? TransactionRole.Sender : TransactionRole.Receiver;
-            counterpartyRole = type == TransactionType.Send ? TransactionRole.Receiver : TransactionRole.Sender;
-        }
 
         var dek = await GetUserDekAsync(userId);
         if (dek == null)
@@ -382,8 +373,7 @@ public class TransactionService : ITransactionService
             // P2P fields
             TransactionLinkId = transactionLinkId,
             CounterpartyEmail = isP2P ? request.CounterpartyEmail : null,
-            CounterpartyUserId = isP2P ? counterpartyUser?.Id : (isSelfTransfer ? userId : null),
-            Role = isP2P ? userRole : (isSelfTransfer ? TransactionRole.Sender : null)
+            CounterpartyUserId = isP2P ? counterpartyUser?.Id : (isSelfTransfer ? userId : null)
         };
 
         // Handle location
@@ -444,8 +434,7 @@ public class TransactionService : ITransactionService
                 Status = TransactionStatus.Confirmed, // First instance is auto-confirmed since user is actively creating it
                 // P2P fields for recurring (only self-transfers supported)
                 TransactionLinkId = firstInstanceLinkId,
-                CounterpartyUserId = isSelfTransfer ? userId : null,
-                Role = isSelfTransfer ? TransactionRole.Sender : null
+                CounterpartyUserId = isSelfTransfer ? userId : null
             };
             
             await _transactionRepository.CreateAsync(firstInstance);
@@ -477,8 +466,7 @@ public class TransactionService : ITransactionService
                     Status = firstInstance.Status,
                     // P2P fields
                     TransactionLinkId = firstInstanceLinkId,
-                    CounterpartyUserId = userId,
-                    Role = TransactionRole.Receiver
+                    CounterpartyUserId = userId
                 };
                 
                 await _transactionRepository.CreateAsync(linkedFirstInstance);
@@ -524,8 +512,7 @@ public class TransactionService : ITransactionService
                 Status = transaction.Status,
                 // P2P fields for self-transfer
                 TransactionLinkId = transactionLinkId,
-                CounterpartyUserId = userId,  // Self-transfer, same user
-                Role = TransactionRole.Receiver
+                CounterpartyUserId = userId  // Self-transfer, same user
             };
 
             await _transactionRepository.CreateAsync(linkedTransaction);
@@ -561,8 +548,7 @@ public class TransactionService : ITransactionService
                 // P2P fields
                 TransactionLinkId = transactionLinkId,
                 CounterpartyEmail = (await _userRepository.GetByIdAsync(userId))?.Email,
-                CounterpartyUserId = userId,
-                Role = counterpartyRole
+                CounterpartyUserId = userId
             };
             
             // Only create if counterparty is on the platform
@@ -1015,7 +1001,10 @@ public class TransactionService : ITransactionService
             t.TransactionLinkId,
             t.CounterpartyEmail,
             t.CounterpartyUserId,
-            t.Role?.ToString());
+            // Derive role from type for P2P/transfer transactions (has counterparty)
+            t.CounterpartyUserId != null || t.CounterpartyEmail != null
+                ? (t.Type == TransactionType.Send ? "Sender" : "Receiver")
+                : null);
     }
 
     private TransactionSplitResponse MapSplitToResponse(TransactionSplit split, byte[]? dek, Dictionary<string, Label> labels)
@@ -1287,7 +1276,8 @@ public class TransactionService : ITransactionService
             Date: t.Date,
             Title: t.Title,
             CounterpartyEmail: t.CounterpartyEmail,
-            Role: t.Role?.ToString(),
+            // Derive role from type
+            Role: t.Type == TransactionType.Send ? "Sender" : "Receiver",
             TransactionLinkId: t.TransactionLinkId
         )).ToList();
 
