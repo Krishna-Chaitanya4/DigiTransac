@@ -49,7 +49,7 @@ public record UpdateTransactionRequest(
     List<TransactionSplitRequest>? Splits,
     List<string>? TagIds,
     TransactionLocationRequest? Location,
-    bool? IsCleared,
+    string? Status,  // "Pending", "Confirmed", "Declined"
     string? TransferToAccountId,
     string? AccountId  // Allow changing the account
 );
@@ -64,7 +64,7 @@ public record TransactionFilterRequest(
     decimal? MinAmount,
     decimal? MaxAmount,
     string? SearchText,
-    bool? IsCleared,
+    string? Status,  // "Pending", "Confirmed", "Declined"
     bool? IsRecurring,
     int? Page,
     int? PageSize,
@@ -126,7 +126,7 @@ public record TransactionResponse(
     RecurringRuleResponse? RecurringRule,
     string? ParentTransactionId,
     bool IsRecurringTemplate,
-    bool IsCleared,
+    string Status,  // "Pending", "Confirmed", "Declined"
     DateTime CreatedAt,
     DateTime UpdatedAt,
     // P2P fields

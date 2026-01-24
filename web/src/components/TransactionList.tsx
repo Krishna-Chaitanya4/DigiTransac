@@ -24,7 +24,7 @@ interface TransactionRowProps {
   accountMap: Map<string, Account>;
   onToggleExpand: (id: string) => void;
   onToggleSelection?: (id: string) => void;
-  onToggleCleared: (id: string, cleared: boolean) => void;
+  onUpdateStatus: (id: string, status: 'Pending' | 'Confirmed') => void;
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
   onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
@@ -46,7 +46,7 @@ const TransactionRow = memo(function TransactionRow({
   accountMap,
   onToggleExpand,
   onToggleSelection,
-  onToggleCleared,
+  onUpdateStatus,
   onEdit,
   onDelete,
   onViewLinkedTransaction,
@@ -78,10 +78,11 @@ const TransactionRow = memo(function TransactionRow({
     }
   }, [onToggleSelection, selectionMode, transaction.id]);
 
-  const handleToggleCleared = useCallback((e: React.MouseEvent) => {
+  const handleUpdateStatus = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggleCleared(transaction.id, !transaction.isCleared);
-  }, [onToggleCleared, transaction.id, transaction.isCleared]);
+    const newStatus = transaction.status === 'Confirmed' ? 'Pending' : 'Confirmed';
+    onUpdateStatus(transaction.id, newStatus);
+  }, [onUpdateStatus, transaction.id, transaction.status]);
 
   const handleEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -96,8 +97,9 @@ const TransactionRow = memo(function TransactionRow({
   }, [onDelete, transaction.id]);
 
   const handleSwipeRight = useCallback(() => {
-    onToggleCleared(transaction.id, !transaction.isCleared);
-  }, [onToggleCleared, transaction.id, transaction.isCleared]);
+    const newStatus = transaction.status === 'Confirmed' ? 'Pending' : 'Confirmed';
+    onUpdateStatus(transaction.id, newStatus);
+  }, [onUpdateStatus, transaction.id, transaction.status]);
 
   const handleSwipeLeft = useCallback(() => {
     if (confirm('Delete this transaction?')) {
@@ -105,12 +107,14 @@ const TransactionRow = memo(function TransactionRow({
     }
   }, [onDelete, transaction.id]);
 
+  const isConfirmed = transaction.status === 'Confirmed';
+  
   const rightContent = useMemo(() => (
     <SwipeActionIcon
-      icon={transaction.isCleared ? '↩' : '✓'}
-      label={transaction.isCleared ? 'Pending' : 'Clear'}
+      icon={isConfirmed ? '↩' : '✓'}
+      label={isConfirmed ? 'Pending' : 'Confirm'}
     />
-  ), [transaction.isCleared]);
+  ), [isConfirmed]);
 
   const leftContent = useMemo(() => (
     <SwipeActionIcon icon="🗑" label="Delete" />
@@ -122,13 +126,13 @@ const TransactionRow = memo(function TransactionRow({
       onSwipeLeft={handleSwipeLeft}
       rightContent={rightContent}
       leftContent={leftContent}
-      rightBgColor={transaction.isCleared ? 'bg-yellow-500' : 'bg-green-500'}
+      rightBgColor={isConfirmed ? 'bg-yellow-500' : 'bg-green-500'}
       leftBgColor="bg-red-500"
     >
       <div
         data-transaction-id={transaction.id}
         className={`bg-white dark:bg-gray-800 rounded-lg border 
-          ${transaction.isCleared 
+          ${isConfirmed 
             ? 'border-gray-200 dark:border-gray-700' 
             : 'border-l-4 border-l-yellow-400 border-gray-200 dark:border-gray-700 dark:border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10'
           } ${selectionMode && isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''} 
@@ -139,7 +143,7 @@ const TransactionRow = memo(function TransactionRow({
           role="button"
           tabIndex={0}
           aria-expanded={isExpanded}
-          aria-label={`${transaction.title || primaryLabel?.name || 'Transaction'}, ${currencySymbol}${formatAmount(transaction.amount, transaction.currency)}, ${transaction.type}${!transaction.isCleared ? ', pending' : ''}`}
+          aria-label={`${transaction.title || primaryLabel?.name || 'Transaction'}, ${currencySymbol}${formatAmount(transaction.amount, transaction.currency)}, ${transaction.type}${!isConfirmed ? ', pending' : ''}`}
           className="flex items-center p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
           onClick={handleClick}
           onKeyDown={handleKeyDown}
@@ -189,9 +193,9 @@ const TransactionRow = memo(function TransactionRow({
                   👤
                 </span>
               )}
-              {!transaction.isCleared && (
+              {!isConfirmed && (
                 <span className="text-xs px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400 rounded">
-                  Pending
+                  {transaction.status}
                 </span>
               )}
             </div>
@@ -344,14 +348,14 @@ const TransactionRow = memo(function TransactionRow({
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <button
-                onClick={handleToggleCleared}
+                onClick={handleUpdateStatus}
                 className={`flex-1 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                  transaction.isCleared
+                  isConfirmed
                     ? 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                     : 'border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
                 }`}
               >
-                {transaction.isCleared ? '↩ Mark Pending' : '✓ Mark Cleared'}
+                {isConfirmed ? '↩ Mark Pending' : '✓ Confirm'}
               </button>
               <button
                 onClick={handleEdit}
@@ -382,7 +386,7 @@ interface TransactionListProps {
   tags: Tag[];
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
-  onToggleCleared: (id: string, isCleared: boolean) => void;
+  onUpdateStatus: (id: string, status: 'Pending' | 'Confirmed') => void;
   onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
   highlightedTransactionId?: string | null;
   isLoading?: boolean;
@@ -478,7 +482,7 @@ export function TransactionList({
   tags,
   onEdit,
   onDelete,
-  onToggleCleared,
+  onUpdateStatus,
   onViewLinkedTransaction,
   highlightedTransactionId,
   isLoading = false,
@@ -596,7 +600,7 @@ export function TransactionList({
                     accountMap={accountMap}
                     onToggleExpand={handleToggleExpand}
                     onToggleSelection={onToggleSelection}
-                    onToggleCleared={onToggleCleared}
+                    onUpdateStatus={onUpdateStatus}
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onViewLinkedTransaction={onViewLinkedTransaction}

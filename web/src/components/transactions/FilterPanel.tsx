@@ -673,24 +673,25 @@ export function FilterPanel({
           )}
         </div>
 
-        {/* Cleared Status Filter */}
+        {/* Status Filter */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Status
           </label>
           <select
-            value={filter.isCleared === undefined ? '' : filter.isCleared.toString()}
+            value={filter.status ?? ''}
             onChange={(e) => onFilterChange({ 
               ...filter, 
-              isCleared: e.target.value === '' ? undefined : e.target.value === 'true' 
+              status: e.target.value === '' ? undefined : e.target.value as 'Pending' | 'Confirmed' | 'Declined'
             })}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
               bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
               focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All</option>
-            <option value="true">Cleared</option>
-            <option value="false">Pending</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="Pending">Pending</option>
+            <option value="Declined">Declined</option>
           </select>
         </div>
 

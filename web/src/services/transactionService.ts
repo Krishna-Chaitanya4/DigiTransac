@@ -47,7 +47,7 @@ function buildFilterQuery(filter: TransactionFilter): string {
   if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());
   if (filter.maxAmount !== undefined) params.append('maxAmount', filter.maxAmount.toString());
   if (filter.searchText) params.append('searchText', filter.searchText);
-  if (filter.isCleared !== undefined) params.append('isCleared', filter.isCleared.toString());
+  if (filter.status) params.append('status', filter.status);
   if (filter.isRecurring !== undefined) params.append('isRecurring', filter.isRecurring.toString());
   if (filter.page !== undefined) params.append('page', filter.page.toString());
   if (filter.pageSize !== undefined) params.append('pageSize', filter.pageSize.toString());
@@ -93,7 +93,7 @@ export async function getTransactionSummary(
   if (filter.tagIds?.length) params.append('tagIds', filter.tagIds.join(','));
   if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());
   if (filter.maxAmount !== undefined) params.append('maxAmount', filter.maxAmount.toString());
-  if (filter.isCleared !== undefined) params.append('isCleared', filter.isCleared.toString());
+  if (filter.status) params.append('status', filter.status);
   
   const query = params.toString();
   return apiClient.get<TransactionSummary>(`/transactions/summary${query ? `?${query}` : ''}`);
@@ -124,9 +124,9 @@ export async function deleteRecurringTransaction(id: string, deleteFutureInstanc
   return apiClient.delete(`/transactions/recurring/${id}?deleteFutureInstances=${deleteFutureInstances}`);
 }
 
-// Toggle transaction cleared status
-export async function toggleCleared(id: string, isCleared: boolean): Promise<Transaction> {
-  return updateTransaction(id, { isCleared });
+// Update transaction status
+export async function updateStatus(id: string, status: 'Pending' | 'Confirmed' | 'Declined'): Promise<Transaction> {
+  return updateTransaction(id, { status });
 }
 
 // Batch Operations
@@ -144,17 +144,17 @@ export async function batchDelete(ids: string[]): Promise<BatchOperationResponse
   });
 }
 
-export async function batchMarkCleared(ids: string[]): Promise<BatchOperationResponse> {
+export async function batchMarkConfirmed(ids: string[]): Promise<BatchOperationResponse> {
   return apiClient.post<BatchOperationResponse>('/transactions/batch', {
     ids,
-    action: 'markCleared',
+    action: 'markconfirmed',
   });
 }
 
 export async function batchMarkPending(ids: string[]): Promise<BatchOperationResponse> {
   return apiClient.post<BatchOperationResponse>('/transactions/batch', {
     ids,
-    action: 'markPending',
+    action: 'markpending',
   });
 }
 

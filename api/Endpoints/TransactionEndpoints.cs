@@ -25,7 +25,7 @@ public static class TransactionEndpoints
             decimal? minAmount,
             decimal? maxAmount,
             string? searchText,
-            bool? isCleared,
+            string? status,
             bool? isRecurring,
             bool? hasLinkedTransaction,
             int? page,
@@ -64,7 +64,7 @@ public static class TransactionEndpoints
 
             var filter = new TransactionFilterRequest(
                 startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
-                minAmount, maxAmount, searchText, isCleared, isRecurring,
+                minAmount, maxAmount, searchText, status, isRecurring,
                 page, pageSize, hasLinkedTransaction);
 
             var result = await transactionService.GetAllAsync(userId, filter);
@@ -83,7 +83,7 @@ public static class TransactionEndpoints
             string? tagIds,
             decimal? minAmount,
             decimal? maxAmount,
-            bool? isCleared,
+            string? status,
             bool? hasLinkedTransaction,
             ClaimsPrincipal user,
             ITransactionService transactionService) =>
@@ -108,7 +108,7 @@ public static class TransactionEndpoints
 
             var filter = new TransactionFilterRequest(
                 startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
-                minAmount, maxAmount, null, isCleared, null, 1, int.MaxValue, hasLinkedTransaction);
+                minAmount, maxAmount, null, status, null, 1, int.MaxValue, hasLinkedTransaction);
 
             var summary = await transactionService.GetSummaryAsync(userId, filter);
             return Results.Ok(summary);
@@ -266,11 +266,15 @@ public static class TransactionEndpoints
                 case "delete":
                     result = await transactionService.BatchDeleteAsync(userId, request.Ids);
                     break;
-                case "markcleared":
-                    result = await transactionService.BatchMarkClearedAsync(userId, request.Ids, true);
+                case "markconfirmed":
+                case "markcleared": // Legacy support
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, "Confirmed");
                     break;
                 case "markpending":
-                    result = await transactionService.BatchMarkClearedAsync(userId, request.Ids, false);
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, "Pending");
+                    break;
+                case "markdeclined":
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, "Declined");
                     break;
                 default:
                     return Results.BadRequest(new ErrorResponse($"Unknown action: {request.Action}"));
@@ -337,12 +341,11 @@ public static class TransactionEndpoints
                 {
                     var categoryName = t.Splits.FirstOrDefault()?.LabelName ?? "";
                     var tagNames = string.Join(";", t.Tags.Select(tag => tag.Name));
-                    var status = t.IsCleared ? "Cleared" : "Pending";
                     var notes = (t.Notes ?? "").Replace("\"", "\"\"");
                     var title = (t.Title ?? "").Replace("\"", "\"\"");
                     var payee = (t.Payee ?? "").Replace("\"", "\"\"");
                     
-                    csv.AppendLine($"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tagNames}\",{status},\"{notes}\"");
+                    csv.AppendLine($"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tagNames}\",{t.Status},\"{notes}\"");
                 }
                 
                 return Results.Text(csv.ToString(), "text/csv");

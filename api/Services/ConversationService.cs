@@ -255,8 +255,7 @@ public class ConversationService : IConversationService
                         Date: tx.Date,
                         Title: tx.Title,
                         Notes: null, // Don't expose notes in preview
-                        IsPending: string.IsNullOrEmpty(tx.AccountId),
-                        IsCleared: tx.IsCleared,
+                        Status: tx.Status.ToString(),
                         AccountName: account?.Name
                     );
                 }
@@ -349,8 +348,7 @@ public class ConversationService : IConversationService
                 Date: tx.Date,
                 Title: tx.Title,
                 Notes: null,
-                IsPending: string.IsNullOrEmpty(tx.AccountId),
-                IsCleared: tx.IsCleared,
+                Status: tx.Status.ToString(),
                 AccountName: account?.Name
             );
             
@@ -555,8 +553,7 @@ public class ConversationService : IConversationService
             Date: transaction.Date,
             Title: transaction.Title,
             Notes: null,
-            IsPending: false,
-            IsCleared: transaction.IsCleared,
+            Status: transaction.Status.ToString(),
             AccountName: account?.Name
         );
         

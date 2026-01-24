@@ -30,8 +30,7 @@ export interface TransactionMessageData {
   date: string;
   title: string | null;
   notes: string | null;
-  isPending: boolean;
-  isCleared: boolean;
+  status: 'Pending' | 'Confirmed' | 'Declined';
   accountName: string | null;
 }
 

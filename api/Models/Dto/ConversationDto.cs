@@ -67,8 +67,7 @@ public record TransactionMessageData(
     DateTime Date,
     string? Title,
     string? Notes,
-    bool IsPending,           // True if AccountId is null (needs acceptance)
-    bool IsCleared,
+    string Status,            // "Pending", "Confirmed", "Declined"
     string? AccountName       // The account used (null if pending)
 );
 

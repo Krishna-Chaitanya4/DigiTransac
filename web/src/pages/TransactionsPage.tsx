@@ -26,9 +26,9 @@ import {
   createTransaction,
   updateTransaction,
   deleteTransaction,
-  toggleCleared,
+  updateStatus,
   batchDelete,
-  batchMarkCleared,
+  batchMarkConfirmed,
   batchMarkPending,
   exportTransactions,
 } from '../services/transactionService';
@@ -337,12 +337,12 @@ export default function TransactionsPage() {
     }
   };
 
-  // Handle toggle cleared
-  const handleToggleCleared = async (id: string, isCleared: boolean) => {
+  // Handle update status
+  const handleUpdateStatus = async (id: string, status: 'Pending' | 'Confirmed') => {
     try {
-      await toggleCleared(id, isCleared);
+      await updateStatus(id, status);
       setTransactions(prev => prev.map(t => 
-        t.id === id ? { ...t, isCleared } : t
+        t.id === id ? { ...t, status } : t
       ));
     } catch (err) {
       logger.error('Failed to update transaction:', err);
@@ -395,16 +395,16 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleBatchMarkCleared = async () => {
+  const handleBatchMarkConfirmed = async () => {
     setIsBatchProcessing(true);
     try {
-      await batchMarkCleared(Array.from(selectedIds));
+      await batchMarkConfirmed(Array.from(selectedIds));
       setTransactions(prev => prev.map(t => 
-        selectedIds.has(t.id) ? { ...t, isCleared: true } : t
+        selectedIds.has(t.id) ? { ...t, status: 'Confirmed' as const } : t
       ));
       clearSelection();
     } catch (err) {
-      logger.error('Failed to batch mark cleared:', err);
+      logger.error('Failed to batch mark confirmed:', err);
       setError('Failed to update transactions. Please try again.');
     } finally {
       setIsBatchProcessing(false);
@@ -416,7 +416,7 @@ export default function TransactionsPage() {
     try {
       await batchMarkPending(Array.from(selectedIds));
       setTransactions(prev => prev.map(t => 
-        selectedIds.has(t.id) ? { ...t, isCleared: false } : t
+        selectedIds.has(t.id) ? { ...t, status: 'Pending' as const } : t
       ));
       clearSelection();
     } catch (err) {
@@ -474,7 +474,7 @@ export default function TransactionsPage() {
     filter.types && filter.types.length > 0,
     (filter.labelIds && filter.labelIds.length > 0) || (filter.folderIds && filter.folderIds.length > 0),
     filter.tagIds && filter.tagIds.length > 0,
-    filter.isCleared !== undefined,
+    filter.status !== undefined,
     filter.minAmount !== undefined,
     filter.maxAmount !== undefined,
   ].filter(Boolean).length;
@@ -686,7 +686,7 @@ export default function TransactionsPage() {
           tags={tags}
           onEdit={handleEdit}
           onDelete={handleDelete}
-          onToggleCleared={handleToggleCleared}
+          onUpdateStatus={handleUpdateStatus}
           onViewLinkedTransaction={handleViewLinkedTransaction}
           highlightedTransactionId={highlightedTransactionId}
           isLoading={showLoadingSkeleton}
@@ -715,7 +715,7 @@ export default function TransactionsPage() {
         selectedCount={selectionCount}
         onClearSelection={clearSelection}
         onDelete={handleBatchDelete}
-        onMarkCleared={handleBatchMarkCleared}
+        onMarkConfirmed={handleBatchMarkConfirmed}
         onMarkPending={handleBatchMarkPending}
         isProcessing={isBatchProcessing}
       />

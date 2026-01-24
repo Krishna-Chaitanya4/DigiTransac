@@ -18,7 +18,7 @@ public interface ITransactionService
     
     // Batch operations
     Task<BatchOperationResponse> BatchDeleteAsync(string userId, List<string> ids);
-    Task<BatchOperationResponse> BatchMarkClearedAsync(string userId, List<string> ids, bool isCleared);
+    Task<BatchOperationResponse> BatchUpdateStatusAsync(string userId, List<string> ids, string status);
     
     // Analytics
     Task<TransactionAnalyticsResponse> GetAnalyticsAsync(string userId, DateTime? startDate, DateTime? endDate, string? accountId);
@@ -378,7 +378,7 @@ public class TransactionService : ITransactionService
             Splits = splits,
             TagIds = request.TagIds ?? new List<string>(),
             TransferToAccountId = isSelfTransfer ? request.TransferToAccountId : null,
-            IsCleared = true, // Default to cleared since users enter transactions after completion
+            Status = TransactionStatus.Confirmed, // Default to confirmed since users enter transactions after completion
             // P2P fields
             TransactionLinkId = transactionLinkId,
             CounterpartyEmail = isP2P ? request.CounterpartyEmail : null,
@@ -441,7 +441,7 @@ public class TransactionService : ITransactionService
                 Location = transaction.Location,
                 ParentTransactionId = transaction.Id,
                 IsRecurringTemplate = false,
-                IsCleared = true, // First instance is auto-cleared since user is actively creating it
+                Status = TransactionStatus.Confirmed, // First instance is auto-confirmed since user is actively creating it
                 // P2P fields for recurring (only self-transfers supported)
                 TransactionLinkId = firstInstanceLinkId,
                 CounterpartyUserId = isSelfTransfer ? userId : null,
@@ -474,7 +474,7 @@ public class TransactionService : ITransactionService
                     TagIds = transaction.TagIds,
                     LinkedTransactionId = firstInstance.Id,
                     TransferToAccountId = account.Id, // Reference back to source account
-                    IsCleared = firstInstance.IsCleared,
+                    Status = firstInstance.Status,
                     // P2P fields
                     TransactionLinkId = firstInstanceLinkId,
                     CounterpartyUserId = userId,
@@ -521,7 +521,7 @@ public class TransactionService : ITransactionService
                 TagIds = transaction.TagIds,
                 LinkedTransactionId = transaction.Id,
                 TransferToAccountId = account.Id, // Reference back to source account
-                IsCleared = transaction.IsCleared,
+                Status = transaction.Status,
                 // P2P fields for self-transfer
                 TransactionLinkId = transactionLinkId,
                 CounterpartyUserId = userId,  // Self-transfer, same user
@@ -557,7 +557,7 @@ public class TransactionService : ITransactionService
                 EncryptedNotes = null, // Counterparty can add their own notes
                 Splits = new List<TransactionSplit>(), // They'll fill in their own categories
                 TagIds = new List<string>(),
-                IsCleared = false, // Pending - counterparty needs to review
+                Status = TransactionStatus.Pending, // Pending - counterparty needs to review
                 // P2P fields
                 TransactionLinkId = transactionLinkId,
                 CounterpartyEmail = (await _userRepository.GetByIdAsync(userId))?.Email,
@@ -650,8 +650,8 @@ public class TransactionService : ITransactionService
         if (request.Notes != null)
             transaction.EncryptedNotes = EncryptIfNotEmpty(request.Notes, dek);
 
-        if (request.IsCleared.HasValue)
-            transaction.IsCleared = request.IsCleared.Value;
+        if (!string.IsNullOrEmpty(request.Status) && Enum.TryParse<TransactionStatus>(request.Status, true, out var status))
+            transaction.Status = status;
 
         if (request.TagIds != null)
             transaction.TagIds = request.TagIds;
@@ -722,9 +722,9 @@ public class TransactionService : ITransactionService
                     linkedTransaction.TagIds = transaction.TagIds;
                     linkedNeedsUpdate = true;
                 }
-                if (request.IsCleared.HasValue && linkedTransaction.IsCleared != transaction.IsCleared)
+                if (!string.IsNullOrEmpty(request.Status) && linkedTransaction.Status != transaction.Status)
                 {
-                    linkedTransaction.IsCleared = transaction.IsCleared;
+                    linkedTransaction.Status = transaction.Status;
                     linkedNeedsUpdate = true;
                 }
                 
@@ -1009,7 +1009,7 @@ public class TransactionService : ITransactionService
                 t.RecurringRule.NextOccurrence) : null,
             t.ParentTransactionId,
             t.IsRecurringTemplate,
-            t.IsCleared,
+            t.Status.ToString(),
             t.CreatedAt,
             t.UpdatedAt,
             t.TransactionLinkId,
@@ -1104,8 +1104,13 @@ public class TransactionService : ITransactionService
         );
     }
 
-    public async Task<BatchOperationResponse> BatchMarkClearedAsync(string userId, List<string> ids, bool isCleared)
+    public async Task<BatchOperationResponse> BatchUpdateStatusAsync(string userId, List<string> ids, string status)
     {
+        if (!Enum.TryParse<TransactionStatus>(status, true, out var parsedStatus))
+        {
+            return new BatchOperationResponse(0, ids.Count, ids, $"Invalid status: {status}");
+        }
+        
         var successCount = 0;
         var failedIds = new List<string>();
 
@@ -1118,18 +1123,17 @@ public class TransactionService : ITransactionService
                 continue;
             }
 
-            transaction.IsCleared = isCleared;
+            transaction.Status = parsedStatus;
             transaction.UpdatedAt = DateTime.UtcNow;
             await _transactionRepository.UpdateAsync(transaction);
             successCount++;
         }
 
-        var action = isCleared ? "marked as cleared" : "marked as pending";
         return new BatchOperationResponse(
             successCount,
             failedIds.Count,
             failedIds,
-            $"{successCount} of {ids.Count} transactions {action}"
+            $"{successCount} of {ids.Count} transactions updated to {status}"
         );
     }
 
@@ -1363,7 +1367,7 @@ public class TransactionService : ITransactionService
         }).ToList();
         transaction.TagIds = request.TagIds ?? new List<string>();
         transaction.EncryptedNotes = EncryptIfNotEmpty(request.Notes, dek);
-        transaction.IsCleared = true;
+        transaction.Status = TransactionStatus.Confirmed;
         transaction.UpdatedAt = DateTime.UtcNow;
 
         await _transactionRepository.UpdateAsync(transaction);

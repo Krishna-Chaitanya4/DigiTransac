@@ -133,8 +133,7 @@ export function useTransactionFilters(
         types: types?.length ? types : undefined,
         labelIds: searchParams.get('categories')?.split(',').filter(Boolean) || undefined,
         tagIds: searchParams.get('tags')?.split(',').filter(Boolean) || undefined,
-        isCleared: searchParams.get('cleared') === 'true' ? true : 
-                   searchParams.get('cleared') === 'false' ? false : undefined,
+        status: searchParams.get('status') as 'Pending' | 'Confirmed' | 'Declined' | undefined,
         minAmount: searchParams.get('minAmount') ? parseFloat(searchParams.get('minAmount')!) : undefined,
         maxAmount: searchParams.get('maxAmount') ? parseFloat(searchParams.get('maxAmount')!) : undefined,
       },
@@ -175,8 +174,8 @@ export function useTransactionFilters(
     if (newState.filter.tagIds?.length) {
       params.set('tags', newState.filter.tagIds.join(','));
     }
-    if (newState.filter.isCleared !== undefined) {
-      params.set('cleared', String(newState.filter.isCleared));
+    if (newState.filter.status) {
+      params.set('status', newState.filter.status);
     }
     if (newState.filter.minAmount !== undefined) {
       params.set('minAmount', String(newState.filter.minAmount));
@@ -292,7 +291,7 @@ export function useTransactionFilters(
       state.filter.types && state.filter.types.length > 0,
       state.filter.labelIds && state.filter.labelIds.length > 0,
       state.filter.tagIds && state.filter.tagIds.length > 0,
-      state.filter.isCleared !== undefined,
+      state.filter.status !== undefined,
       state.filter.minAmount !== undefined,
       state.filter.maxAmount !== undefined,
     ].filter(Boolean).length;

@@ -5,8 +5,8 @@ interface BulkActionsBarProps {
   onClearSelection: () => void;
   /** Called when user wants to delete selected items */
   onDelete?: () => void;
-  /** Called when user wants to mark items as cleared */
-  onMarkCleared?: () => void;
+  /** Called when user wants to mark items as confirmed */
+  onMarkConfirmed?: () => void;
   /** Called when user wants to mark items as pending */
   onMarkPending?: () => void;
   /** Whether actions are currently being processed */
@@ -17,7 +17,7 @@ export function BulkActionsBar({
   selectedCount,
   onClearSelection,
   onDelete,
-  onMarkCleared,
+  onMarkConfirmed,
   onMarkPending,
   isProcessing = false,
 }: BulkActionsBarProps) {
@@ -45,9 +45,9 @@ export function BulkActionsBar({
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {onMarkCleared && (
+            {onMarkConfirmed && (
               <button
-                onClick={onMarkCleared}
+                onClick={onMarkConfirmed}
                 disabled={isProcessing}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg 
                   bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed
@@ -56,7 +56,7 @@ export function BulkActionsBar({
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="hidden sm:inline">Clear</span>
+                <span className="hidden sm:inline">Confirm</span>
               </button>
             )}
 

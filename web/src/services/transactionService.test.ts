@@ -135,7 +135,7 @@ describe('transactionService', () => {
         searchText: 'grocery',
         minAmount: 10,
         maxAmount: 100,
-        isCleared: true,
+        status: 'Confirmed',
       });
 
       const callArg = vi.mocked(apiClient.get).mock.calls[0][0];
@@ -148,7 +148,7 @@ describe('transactionService', () => {
       expect(callArg).toContain('searchText=grocery');
       expect(callArg).toContain('minAmount=10');
       expect(callArg).toContain('maxAmount=100');
-      expect(callArg).toContain('isCleared=true');
+      expect(callArg).toContain('status=Confirmed');
     });
 
     it('should not include empty arrays in query string', async () => {
@@ -374,18 +374,18 @@ describe('transactionService', () => {
     });
   });
 
-  describe('toggleCleared', () => {
-    it('should toggle cleared status', async () => {
+  describe('updateStatus', () => {
+    it('should update transaction status', async () => {
       const { apiClient } = await import('./apiClient');
-      const { toggleCleared } = await import('./transactionService');
+      const { updateStatus } = await import('./transactionService');
 
-      const mockResponse = { id: 'txn-123', isCleared: true };
+      const mockResponse = { id: 'txn-123', status: 'Confirmed' };
       vi.mocked(apiClient.put).mockResolvedValue(mockResponse);
 
-      const result = await toggleCleared('txn-123', true);
+      const result = await updateStatus('txn-123', 'Confirmed');
 
-      expect(apiClient.put).toHaveBeenCalledWith('/transactions/txn-123', { isCleared: true });
-      expect(result.isCleared).toBe(true);
+      expect(apiClient.put).toHaveBeenCalledWith('/transactions/txn-123', { status: 'Confirmed' });
+      expect(result.status).toBe('Confirmed');
     });
   });
 
@@ -406,18 +406,18 @@ describe('transactionService', () => {
       expect(result.successCount).toBe(3);
     });
 
-    it('should batch mark cleared', async () => {
+    it('should batch mark confirmed', async () => {
       const { apiClient } = await import('./apiClient');
-      const { batchMarkCleared } = await import('./transactionService');
+      const { batchMarkConfirmed } = await import('./transactionService');
 
       const mockResponse = { successCount: 2, failedCount: 0, failedIds: [], message: 'Marked' };
       vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
 
-      const result = await batchMarkCleared(['txn-1', 'txn-2']);
+      const result = await batchMarkConfirmed(['txn-1', 'txn-2']);
 
       expect(apiClient.post).toHaveBeenCalledWith('/transactions/batch', {
         ids: ['txn-1', 'txn-2'],
-        action: 'markCleared',
+        action: 'markconfirmed',
       });
       expect(result.successCount).toBe(2);
     });
@@ -433,7 +433,7 @@ describe('transactionService', () => {
 
       expect(apiClient.post).toHaveBeenCalledWith('/transactions/batch', {
         ids: ['txn-1', 'txn-2'],
-        action: 'markPending',
+        action: 'markpending',
       });
       expect(result.successCount).toBe(2);
     });

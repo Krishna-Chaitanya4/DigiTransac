@@ -26,6 +26,13 @@ public enum RecurrenceFrequency
     Yearly
 }
 
+public enum TransactionStatus
+{
+    Pending,    // Awaiting counterparty confirmation (P2P)
+    Confirmed,  // Verified/accepted transaction
+    Declined    // Counterparty rejected (P2P)
+}
+
 public class TransactionSplit
 {
     [BsonElement("labelId")]
@@ -159,9 +166,10 @@ public class Transaction
     [BsonElement("isRecurringTemplate")]
     public bool IsRecurringTemplate { get; set; } = false; // True for recurring template transactions
 
-    // Metadata
-    [BsonElement("isCleared")]
-    public bool IsCleared { get; set; } = false;
+    // Status
+    [BsonElement("status")]
+    [BsonRepresentation(BsonType.String)]
+    public TransactionStatus Status { get; set; } = TransactionStatus.Confirmed;
 
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

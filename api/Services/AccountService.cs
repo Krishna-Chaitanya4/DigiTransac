@@ -365,7 +365,7 @@ public class AccountService : IAccountService
             Date = DateTime.UtcNow,
             Title = "Balance Adjustment",
             EncryptedNotes = dek != null ? EncryptIfNotEmpty(adjustmentNotes, dek) : adjustmentNotes,
-            IsCleared = true,
+            Status = TransactionStatus.Confirmed,
             Splits = new List<TransactionSplit>
             {
                 new TransactionSplit

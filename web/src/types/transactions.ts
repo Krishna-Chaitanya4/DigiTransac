@@ -9,6 +9,8 @@ export type TransactionUIType = TransactionType | 'Transfer';
 
 export type TransactionRole = 'Sender' | 'Receiver';
 
+export type TransactionStatus = 'Pending' | 'Confirmed' | 'Declined';
+
 export type RecurrenceFrequency = 
   | 'Daily' 
   | 'Weekly' 
@@ -68,7 +70,7 @@ export interface Transaction {
   recurringRule?: RecurringRule;
   parentTransactionId?: string;
   isRecurringTemplate: boolean;
-  isCleared: boolean;
+  status: TransactionStatus;
   createdAt: string;
   updatedAt: string;
   // P2P fields
@@ -159,7 +161,7 @@ export interface UpdateTransactionRequest {
   splits?: TransactionSplitRequest[];
   tagIds?: string[];
   location?: TransactionLocationRequest;
-  isCleared?: boolean;
+  status?: TransactionStatus;
   transferToAccountId?: string;
   accountId?: string;
 }
@@ -175,7 +177,7 @@ export interface TransactionFilter {
   minAmount?: number;
   maxAmount?: number;
   searchText?: string;
-  isCleared?: boolean;
+  status?: TransactionStatus;
   isRecurring?: boolean;
   page?: number;
   pageSize?: number;

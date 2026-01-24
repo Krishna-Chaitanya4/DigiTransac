@@ -155,9 +155,12 @@ public class TransactionRepository : ITransactionRepository
             filters.Add(filterBuilder.Lte(t => t.Amount, filter.MaxAmount.Value));
         }
 
-        if (filter.IsCleared.HasValue)
+        if (!string.IsNullOrEmpty(filter.Status))
         {
-            filters.Add(filterBuilder.Eq(t => t.IsCleared, filter.IsCleared.Value));
+            if (Enum.TryParse<TransactionStatus>(filter.Status, true, out var status))
+            {
+                filters.Add(filterBuilder.Eq(t => t.Status, status));
+            }
         }
 
         if (filter.IsRecurring.HasValue)
@@ -508,11 +511,10 @@ public class TransactionRepository : ITransactionRepository
 
     public async Task<List<Transaction>> GetPendingP2PAsync(string userId)
     {
-        // Pending P2P transactions: belong to user, have null AccountId (not yet assigned), and are uncleared
+        // Pending P2P transactions: belong to user and have Pending status
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.AccountId, null),
-            Builders<Transaction>.Filter.Eq(t => t.IsCleared, false),
+            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending),
             Builders<Transaction>.Filter.Ne(t => t.TransactionLinkId, null)
         );
         
@@ -525,8 +527,7 @@ public class TransactionRepository : ITransactionRepository
     {
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.AccountId, null),
-            Builders<Transaction>.Filter.Eq(t => t.IsCleared, false),
+            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending),
             Builders<Transaction>.Filter.Ne(t => t.TransactionLinkId, null)
         );
         

@@ -53,7 +53,7 @@ const createTransaction = (overrides: Partial<Transaction> = {}): Transaction =>
   splits: [{ labelId: 'label-1', amount: 100 }],
   tagIds: [],
   tags: [],
-  isCleared: true,
+  status: 'Confirmed',
   isRecurringTemplate: false,
   createdAt: '2026-01-22T12:00:00.000Z',
   updatedAt: '2026-01-22T12:00:00.000Z',
@@ -111,7 +111,7 @@ describe('TransactionList', () => {
     tags: [] as Tag[],
     onEdit: vi.fn(),
     onDelete: vi.fn(),
-    onToggleCleared: vi.fn(),
+    onUpdateStatus: vi.fn(),
   };
 
   beforeEach(() => {
@@ -189,8 +189,8 @@ describe('TransactionList', () => {
       expect(screen.getByText(/Amazon/)).toBeInTheDocument();
     });
 
-    it('should render pending indicator for uncleared transactions', () => {
-      const transaction = createTransaction({ isCleared: false });
+    it('should render pending indicator for pending transactions', () => {
+      const transaction = createTransaction({ status: 'Pending' });
       
       render(
         <TransactionList
@@ -204,8 +204,8 @@ describe('TransactionList', () => {
       expect(screen.getByText('Pending')).toBeInTheDocument();
     });
 
-    it('should not render pending indicator for cleared transactions', () => {
-      const transaction = createTransaction({ isCleared: true });
+    it('should not render pending indicator for confirmed transactions', () => {
+      const transaction = createTransaction({ status: 'Confirmed' });
       
       render(
         <TransactionList
@@ -217,6 +217,7 @@ describe('TransactionList', () => {
       );
       
       expect(screen.queryByText('Pending')).not.toBeInTheDocument();
+      expect(screen.queryByText('Confirmed')).not.toBeInTheDocument();
     });
 
     it('should render amount with correct formatting for send', () => {
@@ -545,9 +546,9 @@ describe('TransactionList', () => {
       expect(onDelete).not.toHaveBeenCalled();
     });
 
-    it('should call onToggleCleared when Mark Cleared button is clicked', () => {
-      const onToggleCleared = vi.fn();
-      const transaction = createTransaction({ isCleared: false });
+    it('should call onUpdateStatus when Confirm button is clicked', () => {
+      const onUpdateStatus = vi.fn();
+      const transaction = createTransaction({ status: 'Pending' });
       
       render(
         <TransactionList
@@ -555,7 +556,7 @@ describe('TransactionList', () => {
           transactions={[transaction]}
           accounts={[createAccount()]}
           labels={[createLabel()]}
-          onToggleCleared={onToggleCleared}
+          onUpdateStatus={onUpdateStatus}
         />
       );
       
@@ -563,15 +564,15 @@ describe('TransactionList', () => {
       const row = screen.getByText('Test Transaction').closest('.cursor-pointer');
       fireEvent.click(row!);
       
-      // Click clear
-      fireEvent.click(screen.getByText('✓ Mark Cleared'));
+      // Click confirm
+      fireEvent.click(screen.getByText('✓ Confirm'));
       
-      expect(onToggleCleared).toHaveBeenCalledWith('tx-1', true);
+      expect(onUpdateStatus).toHaveBeenCalledWith('tx-1', 'Confirmed');
     });
 
-    it('should call onToggleCleared when Mark Pending button is clicked', () => {
-      const onToggleCleared = vi.fn();
-      const transaction = createTransaction({ isCleared: true });
+    it('should call onUpdateStatus when Mark Pending button is clicked', () => {
+      const onUpdateStatus = vi.fn();
+      const transaction = createTransaction({ status: 'Confirmed' });
       
       render(
         <TransactionList
@@ -579,7 +580,7 @@ describe('TransactionList', () => {
           transactions={[transaction]}
           accounts={[createAccount()]}
           labels={[createLabel()]}
-          onToggleCleared={onToggleCleared}
+          onUpdateStatus={onUpdateStatus}
         />
       );
       
@@ -590,14 +591,14 @@ describe('TransactionList', () => {
       // Click pending
       fireEvent.click(screen.getByText('↩ Mark Pending'));
       
-      expect(onToggleCleared).toHaveBeenCalledWith('tx-1', false);
+      expect(onUpdateStatus).toHaveBeenCalledWith('tx-1', 'Pending');
     });
   });
 
   describe('Swipe Actions', () => {
-    it('should call onToggleCleared on swipe right', () => {
-      const onToggleCleared = vi.fn();
-      const transaction = createTransaction({ isCleared: false });
+    it('should call onUpdateStatus on swipe right', () => {
+      const onUpdateStatus = vi.fn();
+      const transaction = createTransaction({ status: 'Pending' });
       
       render(
         <TransactionList
@@ -605,13 +606,13 @@ describe('TransactionList', () => {
           transactions={[transaction]}
           accounts={[createAccount()]}
           labels={[createLabel()]}
-          onToggleCleared={onToggleCleared}
+          onUpdateStatus={onUpdateStatus}
         />
       );
       
       fireEvent.click(screen.getByTestId('swipe-right'));
       
-      expect(onToggleCleared).toHaveBeenCalledWith('tx-1', true);
+      expect(onUpdateStatus).toHaveBeenCalledWith('tx-1', 'Confirmed');
     });
 
     it('should call onDelete on swipe left when confirmed', () => {

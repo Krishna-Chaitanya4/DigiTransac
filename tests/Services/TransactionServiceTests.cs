@@ -635,7 +635,7 @@ public class TransactionServiceTests
             MinAmount: null,
             MaxAmount: null,
             SearchText: null,
-            IsCleared: null,
+            Status: null,
             IsRecurring: null,
             Page: 1,
             PageSize: 50);
@@ -671,7 +671,7 @@ public class TransactionServiceTests
             MinAmount: null,
             MaxAmount: null,
             SearchText: null,
-            IsCleared: null,
+            Status: null,
             IsRecurring: null,
             Page: 1,
             PageSize: 50);
@@ -709,7 +709,7 @@ public class TransactionServiceTests
             MinAmount: null,
             MaxAmount: null,
             SearchText: null,
-            IsCleared: null,
+            Status: null,
             IsRecurring: null,
             Page: 1,
             PageSize: 50);
@@ -749,7 +749,7 @@ public class TransactionServiceTests
             MinAmount: null,
             MaxAmount: null,
             SearchText: null,
-            IsCleared: null,
+            Status: null,
             IsRecurring: null,
             Page: 1,
             PageSize: 50);
@@ -789,7 +789,7 @@ public class TransactionServiceTests
             MinAmount: null,
             MaxAmount: null,
             SearchText: null,
-            IsCleared: null,
+            Status: null,
             IsRecurring: null,
             Page: 1,
             PageSize: 50);
@@ -832,7 +832,7 @@ public class TransactionServiceTests
             MinAmount: null,
             MaxAmount: null,
             SearchText: "groc",
-            IsCleared: null,
+            Status: null,
             IsRecurring: null,
             Page: 1,
             PageSize: 50);
@@ -885,7 +885,7 @@ public class TransactionServiceTests
             Splits: null,
             TagIds: null,
             Location: null,
-            IsCleared: true,
+            Status: "Confirmed",
             TransferToAccountId: null,
             AccountId: null);
 
@@ -896,10 +896,10 @@ public class TransactionServiceTests
         success.Should().BeTrue();
         transaction.Should().NotBeNull();
         transaction!.Title.Should().Be("New Title");
-        transaction.IsCleared.Should().BeTrue();
+        transaction.Status.Should().Be("Confirmed");
 
         _transactionRepositoryMock.Verify(x => x.UpdateAsync(It.Is<Transaction>(t =>
-            t.Title == "New Title" && t.IsCleared)), Times.Once);
+            t.Title == "New Title" && t.Status == TransactionStatus.Confirmed)), Times.Once);
     }
 
     [Fact]
@@ -912,7 +912,7 @@ public class TransactionServiceTests
         var updateRequest = new UpdateTransactionRequest(
             Type: null, Amount: null, Date: null, Title: "New Title",
             Payee: null, Notes: null, Splits: null, TagIds: null,
-            Location: null, IsCleared: null, TransferToAccountId: null, AccountId: null);
+            Location: null, Status: null, TransferToAccountId: null, AccountId: null);
 
         // Act
         var (success, message, _) = await _transactionService.UpdateAsync("invalid-id", TestUserId, updateRequest);
@@ -946,7 +946,7 @@ public class TransactionServiceTests
         var updateRequest = new UpdateTransactionRequest(
             Type: null, Amount: 100m, Date: null, Title: null,
             Payee: null, Notes: null, Splits: null, TagIds: null,
-            Location: null, IsCleared: null, TransferToAccountId: null, AccountId: null);
+            Location: null, Status: null, TransferToAccountId: null, AccountId: null);
 
         // Act
         var (success, message, _) = await _transactionService.UpdateAsync("template-1", TestUserId, updateRequest);
