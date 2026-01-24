@@ -77,6 +77,7 @@ public class RecurringRule
     public DateTime? LastProcessed { get; set; }
 }
 
+[BsonIgnoreExtraElements]
 public class Transaction
 {
     [BsonId]
