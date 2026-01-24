@@ -83,6 +83,7 @@ export interface EditMessageRequest {
 
 export interface SendMoneyRequest {
   accountId: string;
+  type: 'Send' | 'Receive';  // Send = I paid them, Receive = They paid me
   amount: number;
   title?: string;
   notes?: string;

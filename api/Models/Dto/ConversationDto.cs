@@ -95,6 +95,7 @@ public record EditMessageRequest(
 
 public record SendMoneyRequest(
     string AccountId,
+    string Type,  // "Send" or "Receive"
     decimal Amount,
     string? Title,
     string? Notes,

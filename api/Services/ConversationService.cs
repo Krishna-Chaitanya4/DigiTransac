@@ -491,6 +491,12 @@ public class ConversationService : IConversationService
         string counterpartyUserId, 
         SendMoneyRequest request)
     {
+        // Validate type
+        if (request.Type != nameof(TransactionType.Send) && request.Type != nameof(TransactionType.Receive))
+        {
+            return (false, "Type must be Send or Receive", null);
+        }
+        
         // Verify counterparty exists
         var counterparty = await _userRepository.GetByIdAsync(counterpartyUserId);
         if (counterparty == null)
@@ -501,13 +507,13 @@ public class ConversationService : IConversationService
         // Prevent sending to yourself
         if (counterpartyUserId == userId)
         {
-            return (false, "Cannot send money to yourself. Use Transfer to move between your accounts.", null);
+            return (false, "Cannot transact with yourself. Use Transfer to move between your accounts.", null);
         }
         
         // Create transaction through TransactionService
         var createRequest = new CreateTransactionRequest(
             AccountId: request.AccountId,
-            Type: nameof(TransactionType.Send),
+            Type: request.Type,  // Use the requested type (Send or Receive)
             Amount: request.Amount,
             Date: DateTime.UtcNow,
             Title: request.Title,
@@ -547,7 +553,7 @@ public class ConversationService : IConversationService
         var txData = new TransactionMessageData(
             TransactionId: transaction.Id,
             TransactionLinkId: transaction.TransactionLinkId ?? Guid.Empty,
-            TransactionType: nameof(TransactionType.Send),
+            TransactionType: request.Type,  // Use the actual type
             Amount: transaction.Amount,
             Currency: transaction.Currency,
             Date: transaction.Date,
@@ -575,7 +581,8 @@ public class ConversationService : IConversationService
             ReplyTo: null
         );
         
-        return (true, "Money sent", response);
+        var actionWord = request.Type == nameof(TransactionType.Send) ? "sent" : "received";
+        return (true, $"Money {actionWord}", response);
     }
 
     public async Task MarkAsReadAsync(string userId, string counterpartyUserId)
