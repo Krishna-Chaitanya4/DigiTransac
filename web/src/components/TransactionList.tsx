@@ -29,7 +29,7 @@ interface TransactionRowProps {
   onDelete: (id: string) => void;
   onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
   onAcceptP2P?: (transaction: Transaction) => void;
-  onRejectP2P?: (transactionId: string) => void;
+  onDecline?: (transactionId: string) => void;
 }
 
 const TransactionRow = memo(function TransactionRow({
@@ -53,7 +53,7 @@ const TransactionRow = memo(function TransactionRow({
   onDelete,
   onViewLinkedTransaction,
   onAcceptP2P,
-  onRejectP2P,
+  onDecline,
 }: TransactionRowProps) {
   const handleClick = useCallback(() => {
     if (selectionMode && onToggleSelection) {
@@ -372,7 +372,7 @@ const TransactionRow = memo(function TransactionRow({
                     ↩ Mark Pending
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); onRejectP2P?.(transaction.id); }}
+                    onClick={(e) => { e.stopPropagation(); onDecline?.(transaction.id); }}
                     className="px-3 py-1.5 text-sm rounded-lg border border-orange-300 dark:border-orange-700 
                       text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                   >
@@ -404,7 +404,7 @@ const TransactionRow = memo(function TransactionRow({
                     ✓ Confirm
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); onRejectP2P?.(transaction.id); }}
+                    onClick={(e) => { e.stopPropagation(); onDecline?.(transaction.id); }}
                     className="px-3 py-1.5 text-sm rounded-lg border border-orange-300 dark:border-orange-700 
                       text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                   >
@@ -476,9 +476,11 @@ interface TransactionListProps {
   onUpdateStatus: (id: string, status: 'Pending' | 'Confirmed') => void;
   onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
   onAcceptP2P?: (transaction: Transaction) => void;
-  onRejectP2P?: (transactionId: string) => void;
+  onDecline?: (transactionId: string) => void;
   highlightedTransactionId?: string | null;
   isLoading?: boolean;
+  /** Current status filter for empty state messaging */
+  statusFilter?: 'Confirmed' | 'Pending' | 'Declined';
   /** Selection mode props */
   selectionMode?: boolean;
   selectedIds?: Set<string>;
@@ -574,9 +576,10 @@ export function TransactionList({
   onUpdateStatus,
   onViewLinkedTransaction,
   onAcceptP2P,
-  onRejectP2P,
+  onDecline,
   highlightedTransactionId,
   isLoading = false,
+  statusFilter,
   selectionMode = false,
   selectedIds = new Set(),
   onToggleSelection,
@@ -631,16 +634,50 @@ export function TransactionList({
   }
 
   if (transactions.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+    // Status-specific empty states
+    const emptyStateConfig = {
+      Pending: {
+        icon: (
+          <svg className="w-8 h-8 text-yellow-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+        ),
+        title: 'No pending transactions',
+        description: 'All caught up! You have no transactions awaiting review.',
+        bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+      },
+      Declined: {
+        icon: (
+          <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+          </svg>
+        ),
+        title: 'No declined transactions',
+        description: 'You haven\'t declined any transactions yet.',
+        bgColor: 'bg-red-50 dark:bg-red-900/20',
+      },
+      Confirmed: {
+        icon: (
           <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
           </svg>
+        ),
+        title: 'No transactions found',
+        description: 'Add your first transaction to get started',
+        bgColor: 'bg-gray-100 dark:bg-gray-700',
+      },
+    };
+    
+    const config = statusFilter ? emptyStateConfig[statusFilter] : emptyStateConfig.Confirmed;
+    
+    return (
+      <div className="text-center py-12">
+        <div className={`w-16 h-16 mx-auto mb-4 rounded-full ${config.bgColor} flex items-center justify-center`}>
+          {config.icon}
         </div>
-        <p className="text-gray-500 dark:text-gray-400">No transactions found</p>
+        <p className="text-gray-500 dark:text-gray-400">{config.title}</p>
         <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-          Add your first transaction to get started
+          {config.description}
         </p>
       </div>
     );
@@ -696,7 +733,7 @@ export function TransactionList({
                     onDelete={onDelete}
                     onViewLinkedTransaction={onViewLinkedTransaction}
                     onAcceptP2P={onAcceptP2P}
-                    onRejectP2P={onRejectP2P}
+                    onDecline={onDecline}
                   />
                 );
               })}

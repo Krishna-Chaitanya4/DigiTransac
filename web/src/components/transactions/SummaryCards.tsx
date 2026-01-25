@@ -8,6 +8,8 @@ interface SummaryCardProps {
   icon: string;
   colorClass: string;
   currency: string;
+  /** Optional count to display below the amount */
+  count?: number;
 }
 
 export const SummaryCard = memo(function SummaryCard({ 
@@ -15,7 +17,8 @@ export const SummaryCard = memo(function SummaryCard({
   amount, 
   icon, 
   colorClass,
-  currency 
+  currency,
+  count 
 }: SummaryCardProps) {
   const symbol = getCurrencySymbol(currency);
   const formattedAmount = formatAmount(Math.abs(amount), currency);
@@ -29,6 +32,11 @@ export const SummaryCard = memo(function SummaryCard({
       <div className={`text-lg font-semibold ${colorClass}`}>
         {amount < 0 ? '-' : ''}{symbol}{formattedAmount}
       </div>
+      {count !== undefined && (
+        <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+          {count} transaction{count !== 1 ? 's' : ''}
+        </div>
+      )}
     </div>
   );
 });
@@ -38,13 +46,16 @@ interface SummaryCardsProps {
   totalDebits: number;
   netChange: number;
   currency: string;
+  /** Transaction count to display on net card */
+  transactionCount?: number;
 }
 
 export const SummaryCards = memo(function SummaryCards({ 
   totalCredits, 
   totalDebits, 
   netChange, 
-  currency 
+  currency,
+  transactionCount 
 }: SummaryCardsProps) {
   return (
     <div className="grid grid-cols-3 gap-3 mb-4">
@@ -70,6 +81,7 @@ export const SummaryCards = memo(function SummaryCards({
           ? 'text-blue-600 dark:text-blue-400' 
           : 'text-orange-600 dark:text-orange-400'}
         currency={currency}
+        count={transactionCount}
       />
     </div>
   );

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
 import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
 import { PendingIndicator } from '../components/PendingIndicator';
+import { ToastContainer, useToast } from '../components/Toast';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
@@ -54,6 +55,9 @@ export default function TransactionsPage() {
   const [labels, setLabels] = useState<Label[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [summary, setSummary] = useState<TransactionSummary | null>(null);
+  
+  // Toast notifications
+  const { showInfo, toasts, dismissToast } = useToast();
   
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -372,41 +376,116 @@ export default function TransactionsPage() {
     setIsFormOpen(true);
   };
 
-  // Handle delete
+  // Handle delete with optimistic UI and undo
   const handleDelete = async (id: string) => {
+    // Find the transaction to delete
+    const transactionToDelete = transactions.find(t => t.id === id);
+    if (!transactionToDelete) return;
+    
+    // Optimistically remove from UI immediately
+    const originalIndex = transactions.findIndex(t => t.id === id);
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    
+    // Show undo toast
+    const toastId = showInfo('Transaction deleted', {
+      label: 'Undo',
+      onClick: () => {
+        // Restore transaction in the same position
+        setTransactions(prev => {
+          const newList = [...prev];
+          newList.splice(originalIndex, 0, transactionToDelete);
+          return newList;
+        });
+        dismissToast(toastId);
+      },
+    });
+    
     try {
       await deleteTransaction(id);
-      loadTransactions(1, false);
+      // Update summary after successful delete
+      refreshSummary();
+      setPendingRefreshTrigger(prev => prev + 1);
     } catch (err) {
       logger.error('Failed to delete transaction:', err);
+      // Restore transaction on error
+      setTransactions(prev => {
+        const newList = [...prev];
+        newList.splice(originalIndex, 0, transactionToDelete);
+        return newList;
+      });
+      dismissToast(toastId);
       setError('Failed to delete transaction. Please try again.');
     }
   };
 
-  // Handle update status
+  // Handle update status with undo toast
   const handleUpdateStatus = async (id: string, status: 'Pending' | 'Confirmed') => {
+    // Find the transaction for undo
+    const transactionToUpdate = transactions.find(t => t.id === id);
+    if (!transactionToUpdate) return;
+    
+    const previousStatus = transactionToUpdate.status;
+    const currentStatusFilter = filter.status;
+    const shouldRemove = currentStatusFilter && currentStatusFilter !== status;
+    const originalIndex = transactions.findIndex(t => t.id === id);
+    
+    // Optimistic update
+    if (shouldRemove) {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    } else {
+      setTransactions(prev => prev.map(t => 
+        t.id === id ? { ...t, status } : t
+      ));
+    }
+    
+    // Show undo toast
+    const statusLabel = status === 'Confirmed' ? 'confirmed' : 'marked pending';
+    const toastId = showInfo(`Transaction ${statusLabel}`, {
+      label: 'Undo',
+      onClick: async () => {
+        dismissToast(toastId);
+        try {
+          await updateStatus(id, previousStatus);
+          // Restore to previous state
+          if (shouldRemove) {
+            setTransactions(prev => {
+              const newList = [...prev];
+              newList.splice(originalIndex, 0, { ...transactionToUpdate, status: previousStatus });
+              return newList;
+            });
+          } else {
+            setTransactions(prev => prev.map(t => 
+              t.id === id ? { ...t, status: previousStatus } : t
+            ));
+          }
+          setPendingRefreshTrigger(prev => prev + 1);
+          refreshSummary();
+        } catch (err) {
+          logger.error('Failed to undo status change:', err);
+          setError('Failed to undo. Please try again.');
+        }
+      },
+    });
+    
     try {
       await updateStatus(id, status);
-      
-      // Check if the transaction should still be visible with current filter
-      const currentStatusFilter = filter.status;
-      const shouldRemove = currentStatusFilter && currentStatusFilter !== status;
-      
-      if (shouldRemove) {
-        // Remove from list immediately - it no longer matches the filter
-        setTransactions(prev => prev.filter(t => t.id !== id));
-      } else {
-        // Update in place
-        setTransactions(prev => prev.map(t => 
-          t.id === id ? { ...t, status } : t
-        ));
-      }
-      
-      // Refresh pending count and summary immediately
       setPendingRefreshTrigger(prev => prev + 1);
       refreshSummary();
     } catch (err) {
       logger.error('Failed to update transaction:', err);
+      // Restore on error
+      if (shouldRemove) {
+        setTransactions(prev => {
+          const newList = [...prev];
+          newList.splice(originalIndex, 0, transactionToUpdate);
+          return newList;
+        });
+      } else {
+        setTransactions(prev => prev.map(t => 
+          t.id === id ? { ...t, status: previousStatus } : t
+        ));
+      }
+      dismissToast(toastId);
       setError('Failed to update transaction. Please try again.');
     }
   };
@@ -441,25 +520,76 @@ export default function TransactionsPage() {
     setIsFormOpen(true);
   }, []);
 
-  // Handle Decline - sets status to Declined
+  // Handle Decline - sets status to Declined with undo toast
   const handleDecline = useCallback(async (id: string) => {
+    // Find the transaction for undo
+    const transactionToDecline = transactions.find(t => t.id === id);
+    if (!transactionToDecline) return;
+    
+    const previousStatus = transactionToDecline.status;
+    const currentStatusFilter = filter.status;
+    const shouldRemove = currentStatusFilter && currentStatusFilter !== 'Declined';
+    const originalIndex = transactions.findIndex(t => t.id === id);
+    
+    // Optimistic update
+    if (shouldRemove) {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    } else {
+      setTransactions(prev => prev.map(t => 
+        t.id === id ? { ...t, status: 'Declined' as const } : t
+      ));
+    }
+    
+    // Show undo toast
+    const toastId = showInfo('Transaction declined', {
+      label: 'Undo',
+      onClick: async () => {
+        dismissToast(toastId);
+        try {
+          await updateStatus(id, previousStatus);
+          // Restore to previous state
+          if (shouldRemove) {
+            setTransactions(prev => {
+              const newList = [...prev];
+              newList.splice(originalIndex, 0, { ...transactionToDecline, status: previousStatus });
+              return newList;
+            });
+          } else {
+            setTransactions(prev => prev.map(t => 
+              t.id === id ? { ...t, status: previousStatus } : t
+            ));
+          }
+          setPendingRefreshTrigger(prev => prev + 1);
+          refreshSummary();
+        } catch (err) {
+          logger.error('Failed to undo decline:', err);
+          setError('Failed to undo. Please try again.');
+        }
+      },
+    });
+    
     try {
       await updateStatus(id, 'Declined');
-      
-      // Remove from list if current filter wouldn't show Declined
-      const currentStatusFilter = filter.status;
-      if (currentStatusFilter && currentStatusFilter !== 'Declined') {
-        setTransactions(prev => prev.filter(t => t.id !== id));
-      }
-      
-      // Refresh pending count and summary immediately
       setPendingRefreshTrigger(prev => prev + 1);
       refreshSummary();
     } catch (err) {
       logger.error('Failed to decline transaction:', err);
+      // Restore on error
+      if (shouldRemove) {
+        setTransactions(prev => {
+          const newList = [...prev];
+          newList.splice(originalIndex, 0, transactionToDecline);
+          return newList;
+        });
+      } else {
+        setTransactions(prev => prev.map(t => 
+          t.id === id ? { ...t, status: previousStatus } : t
+        ));
+      }
+      dismissToast(toastId);
       setError('Failed to decline transaction. Please try again.');
     }
-  }, [filter.status, refreshSummary]);
+  }, [filter.status, transactions, refreshSummary, showInfo, dismissToast]);
 
   // Batch operations
   const handleBatchDelete = async () => {
@@ -708,6 +838,7 @@ export default function TransactionsPage() {
           totalDebits={summary.totalDebits}
           netChange={summary.netChange}
           currency={primaryCurrency}
+          transactionCount={summary.transactionCount}
         />
       )}
 
@@ -797,9 +928,10 @@ export default function TransactionsPage() {
           onUpdateStatus={handleUpdateStatus}
           onViewLinkedTransaction={handleViewLinkedTransaction}
           onAcceptP2P={handleAcceptP2P}
-          onRejectP2P={handleDecline}
+          onDecline={handleDecline}
           highlightedTransactionId={highlightedTransactionId}
           isLoading={showLoadingSkeleton}
+          statusFilter={filter.status}
           selectionMode={hasSelection}
           selectedIds={selectedIds}
           onToggleSelection={toggleSelection}
@@ -867,6 +999,9 @@ export default function TransactionsPage() {
           }
         }}
       />
+      
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
