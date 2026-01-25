@@ -372,6 +372,45 @@ const TransactionRow = memo(function TransactionRow({
                     ↩ Mark Pending
                   </button>
                   <button
+                    onClick={(e) => { e.stopPropagation(); onRejectP2P?.(transaction.id); }}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-orange-300 dark:border-orange-700 
+                      text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                  >
+                    ✗ Decline
+                  </button>
+                  <button
+                    onClick={handleEdit}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 
+                      text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 
+                      text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : transaction.status === 'Pending' ? (
+                /* Pending transaction actions */
+                <>
+                  <button
+                    onClick={handleUpdateStatus}
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-green-300 dark:border-green-700 
+                      text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                  >
+                    ✓ Confirm
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRejectP2P?.(transaction.id); }}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-orange-300 dark:border-orange-700 
+                      text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                  >
+                    ✗ Decline
+                  </button>
+                  <button
                     onClick={handleEdit}
                     className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 
                       text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -387,7 +426,7 @@ const TransactionRow = memo(function TransactionRow({
                   </button>
                 </>
               ) : (
-                /* Pending/Declined transaction actions */
+                /* Declined transaction actions */
                 <>
                   <button
                     onClick={handleUpdateStatus}
@@ -396,15 +435,13 @@ const TransactionRow = memo(function TransactionRow({
                   >
                     ✓ Confirm
                   </button>
-                  {transaction.status === 'Pending' && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRejectP2P?.(transaction.id); }}
-                      className="px-3 py-1.5 text-sm rounded-lg border border-orange-300 dark:border-orange-700 
-                        text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
-                    >
-                      ✗ Decline
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onUpdateStatus(transaction.id, 'Pending'); }}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 
+                      text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    ↩ Mark Pending
+                  </button>
                   <button
                     onClick={handleEdit}
                     className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 

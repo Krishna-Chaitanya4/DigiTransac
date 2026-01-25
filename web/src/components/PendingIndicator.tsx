@@ -1,35 +1,43 @@
-import { useState, useEffect } from 'react';
-import { getPendingP2PCount } from '../services/transactionService';
+import { useState, useEffect, useCallback } from 'react';
+import { getPendingCount } from '../services/transactionService';
 
-interface PendingP2PIndicatorProps {
+interface PendingIndicatorProps {
   onClick?: () => void;
   onShowPending?: () => void; // Called to filter transactions to Pending
   showingPending?: boolean; // Whether currently showing pending transactions
+  refreshTrigger?: number; // Increment to trigger a refresh
   className?: string;
 }
 
-export function PendingP2PIndicator({ onClick, onShowPending, showingPending = false, className = '' }: PendingP2PIndicatorProps) {
+export function PendingIndicator({ onClick, onShowPending, showingPending = false, refreshTrigger = 0, className = '' }: PendingIndicatorProps) {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const pendingCount = await getPendingP2PCount();
-        setCount(pendingCount);
-      } catch (error) {
-        console.error('Failed to fetch pending P2P count:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchCount = useCallback(async () => {
+    try {
+      const pendingCount = await getPendingCount();
+      setCount(pendingCount);
+    } catch (error) {
+      console.error('Failed to fetch pending count:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchCount();
     
     // Poll every 30 seconds for new pending transactions
     const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchCount]);
+
+  // Refresh when trigger changes
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchCount();
+    }
+  }, [refreshTrigger, fetchCount]);
 
   if (loading || count === 0) {
     return null;
@@ -70,4 +78,6 @@ export function PendingP2PIndicator({ onClick, onShowPending, showingPending = f
   );
 }
 
-export default PendingP2PIndicator;
+// Export with both names for backward compatibility
+export { PendingIndicator as PendingP2PIndicator };
+export default PendingIndicator;

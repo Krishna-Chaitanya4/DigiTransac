@@ -226,39 +226,3 @@ public record AveragesByType(
     decimal AverageDebit,
     decimal AverageTransfer
 );
-
-// P2P Pending Transaction DTOs
-public record PendingP2PResponse(
-    string Id,
-    string Type,
-    decimal Amount,
-    string Currency,
-    DateTime Date,
-    string? Title,
-    string? CounterpartyEmail,
-    string? Role,
-    Guid? TransactionLinkId
-);
-
-public record PendingP2PListResponse(
-    List<PendingP2PResponse> Transactions,
-    int TotalCount
-);
-
-public record AssignP2PRequest(
-    string AccountId,
-    List<TransactionSplitRequest> Splits,
-    List<string>? TagIds
-);
-
-public record AcceptP2PRequest(
-    string AccountId,
-    decimal Amount,  // The actual amount received (may differ from sender's amount due to currency conversion)
-    List<TransactionSplitRequest> Splits,
-    List<string>? TagIds,
-    string? Notes
-);
-
-public record RejectP2PRequest(
-    string? Reason
-);

@@ -282,25 +282,7 @@ export async function getTransactionsByDateRange(
 }
 
 // P2P Pending Transactions
-import type {
-  PendingP2PListResponse,
-  AcceptP2PRequest,
-  RejectP2PRequest,
-} from '../types/transactions';
-
-export async function getPendingP2PTransactions(): Promise<PendingP2PListResponse> {
-  return apiClient.get<PendingP2PListResponse>('/transactions/pending-p2p');
-}
-
-export async function getPendingP2PCount(): Promise<number> {
-  const response = await apiClient.get<{ count: number }>('/transactions/pending-p2p/count');
+export async function getPendingCount(): Promise<number> {
+  const response = await apiClient.get<{ count: number }>('/transactions/pending/count');
   return response.count;
-}
-
-export async function acceptP2PTransaction(id: string, request: AcceptP2PRequest): Promise<Transaction> {
-  return apiClient.post<Transaction>(`/transactions/${id}/accept`, request);
-}
-
-export async function rejectP2PTransaction(id: string, request?: RejectP2PRequest): Promise<void> {
-  await apiClient.post(`/transactions/${id}/reject`, request ?? {});
 }

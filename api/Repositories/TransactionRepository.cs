@@ -35,9 +35,8 @@ public interface ITransactionRepository
     Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId);
     Task RemoveTagFromAllAsync(string tagId, string userId);
     
-    // P2P pending transactions
-    Task<List<Transaction>> GetPendingP2PAsync(string userId);
-    Task<int> GetPendingP2PCountAsync(string userId);
+    // Pending transactions
+    Task<int> GetPendingCountAsync(string userId);
     Task<Transaction?> GetLinkedP2PTransactionAsync(Guid transactionLinkId, string excludeUserId);
     
     // P2P conversation queries
@@ -525,26 +524,12 @@ public class TransactionRepository : ITransactionRepository
         await _transactions.UpdateManyAsync(filter, update);
     }
 
-    public async Task<List<Transaction>> GetPendingP2PAsync(string userId)
+    public async Task<int> GetPendingCountAsync(string userId)
     {
-        // Pending P2P transactions: belong to user and have Pending status
+        // Count ALL pending transactions (not just P2P)
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending),
-            Builders<Transaction>.Filter.Ne(t => t.TransactionLinkId, null)
-        );
-        
-        return await _transactions.Find(filter)
-            .SortByDescending(t => t.Date)
-            .ToListAsync();
-    }
-
-    public async Task<int> GetPendingP2PCountAsync(string userId)
-    {
-        var filter = Builders<Transaction>.Filter.And(
-            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending),
-            Builders<Transaction>.Filter.Ne(t => t.TransactionLinkId, null)
+            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending)
         );
         
         return (int)await _transactions.CountDocumentsAsync(filter);

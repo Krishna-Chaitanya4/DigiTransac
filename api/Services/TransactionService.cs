@@ -26,11 +26,8 @@ public interface ITransactionService
     // Export
     Task<List<TransactionResponse>> GetAllForExportAsync(string userId, TransactionFilterRequest filter);
     
-    // P2P Pending Transactions
-    Task<PendingP2PListResponse> GetPendingP2PAsync(string userId);
-    Task<int> GetPendingP2PCountAsync(string userId);
-    Task<(bool Success, string Message, TransactionResponse? Transaction)> AcceptP2PAsync(string userId, string transactionId, AcceptP2PRequest request);
-    Task<(bool Success, string Message)> RejectP2PAsync(string userId, string transactionId, RejectP2PRequest? request);
+    // Pending count
+    Task<int> GetPendingCountAsync(string userId);
 }
 
 public class TransactionService : ITransactionService
@@ -189,8 +186,11 @@ public class TransactionService : ITransactionService
         string userId, 
         TransactionFilterRequest filter)
     {
-        // Summary should ONLY count Confirmed transactions, regardless of list filter
-        var summaryFilter = filter with { Status = "Confirmed" };
+        // Summary reflects the current status filter for consistency with the list view
+        // If no status filter is specified, default to Confirmed (main financial view)
+        var summaryFilter = string.IsNullOrEmpty(filter.Status) 
+            ? filter with { Status = "Confirmed" } 
+            : filter;
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, summaryFilter);
         
         var user = await _userRepository.GetByIdAsync(userId);
@@ -1376,164 +1376,8 @@ public class TransactionService : ITransactionService
             .ToList();
     }
 
-    #region P2P Pending Transactions
-
-    public async Task<PendingP2PListResponse> GetPendingP2PAsync(string userId)
+    public async Task<int> GetPendingCountAsync(string userId)
     {
-        var transactions = await _transactionRepository.GetPendingP2PAsync(userId);
-        
-        // Fetch counterparty users for email resolution
-        var counterpartyUserIds = transactions
-            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
-            .Select(t => t.CounterpartyUserId!)
-            .Distinct();
-        var counterpartyUsers = await _userRepository.GetByIdsAsync(counterpartyUserIds);
-        
-        var pendingList = transactions.Select(t => {
-            string? counterpartyEmail = null;
-            if (!string.IsNullOrEmpty(t.CounterpartyUserId) && counterpartyUsers.TryGetValue(t.CounterpartyUserId, out var user))
-            {
-                counterpartyEmail = user.Email;
-            }
-            
-            return new PendingP2PResponse(
-                Id: t.Id,
-                Type: t.Type.ToString(),
-                Amount: t.Amount,
-                Currency: t.Currency,
-                Date: t.Date,
-                Title: t.Title,
-                CounterpartyEmail: counterpartyEmail,
-                // Derive role from type
-                Role: t.Type == TransactionType.Send ? "Sender" : "Receiver",
-                TransactionLinkId: t.TransactionLinkId
-            );
-        }).ToList();
-
-        return new PendingP2PListResponse(pendingList, pendingList.Count);
+        return await _transactionRepository.GetPendingCountAsync(userId);
     }
-
-    public async Task<int> GetPendingP2PCountAsync(string userId)
-    {
-        return await _transactionRepository.GetPendingP2PCountAsync(userId);
-    }
-
-    public async Task<(bool Success, string Message, TransactionResponse? Transaction)> AcceptP2PAsync(
-        string userId, 
-        string transactionId, 
-        AcceptP2PRequest request)
-    {
-        // Get the pending P2P transaction
-        var transaction = await _transactionRepository.GetByIdAsync(transactionId);
-        if (transaction == null)
-            return (false, "Transaction not found", null);
-
-        // Verify this transaction belongs to the user and is pending P2P
-        if (transaction.UserId != userId)
-            return (false, "Transaction not found", null);
-
-        if (!string.IsNullOrEmpty(transaction.AccountId))
-            return (false, "Transaction has already been assigned to an account", null);
-
-        if (transaction.TransactionLinkId == null)
-            return (false, "This is not a P2P transaction", null);
-
-        // Verify the account belongs to the user
-        var account = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId);
-        if (account == null)
-            return (false, "Account not found", null);
-
-        // Validate labels exist
-        var labels = await _labelRepository.GetByUserIdAsync(userId);
-        var validLabelIds = labels.Select(l => l.Id).ToHashSet();
-        foreach (var split in request.Splits)
-        {
-            if (!validLabelIds.Contains(split.LabelId))
-                return (false, $"Invalid category ID: {split.LabelId}", null);
-        }
-
-        // Validate tags if provided
-        if (request.TagIds?.Count > 0)
-        {
-            var tags = await _tagRepository.GetByUserIdAsync(userId);
-            var validTagIds = tags.Select(t => t.Id).ToHashSet();
-            foreach (var tagId in request.TagIds)
-            {
-                if (!validTagIds.Contains(tagId))
-                    return (false, $"Invalid tag ID: {tagId}", null);
-            }
-        }
-
-        // Get DEK for encryption
-        var dek = await GetUserDekAsync(userId);
-        if (dek == null)
-            return (false, "Encryption key not available", null);
-
-        // Validate that splits sum equals the amount
-        var splitsTotal = request.Splits.Sum(s => s.Amount);
-        if (Math.Abs(splitsTotal - request.Amount) > 0.01m)
-            return (false, $"Splits total ({splitsTotal}) must equal amount ({request.Amount})", null);
-
-        // Update the transaction with user-provided amount (may differ from sender's due to currency conversion)
-        transaction.AccountId = request.AccountId;
-        transaction.Amount = request.Amount;  // Use the amount the receiver actually received
-        transaction.Currency = account.Currency; // Use the account's currency
-        transaction.Splits = request.Splits.Select(s => new TransactionSplit
-        {
-            LabelId = s.LabelId,
-            Amount = s.Amount,
-            Notes = s.Notes
-        }).ToList();
-        transaction.TagIds = request.TagIds ?? new List<string>();
-        transaction.EncryptedNotes = EncryptIfNotEmpty(request.Notes, dek);
-        transaction.Status = TransactionStatus.Confirmed;
-        transaction.UpdatedAt = DateTime.UtcNow;
-
-        await _transactionRepository.UpdateAsync(transaction);
-
-        // Update account balance
-        await UpdateAccountBalanceAsync(account, transaction.Type, transaction.Amount, true);
-
-        // Return the updated transaction
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true)).ToDictionary(a => a.Id);
-        var labelsDict = labels.ToDictionary(l => l.Id);
-        var tagsDict = (await _tagRepository.GetByUserIdAsync(userId)).ToDictionary(t => t.Id);
-        
-        // Fetch counterparty user for response
-        var counterpartyUsers = !string.IsNullOrEmpty(transaction.CounterpartyUserId)
-            ? await _userRepository.GetByIdsAsync(new[] { transaction.CounterpartyUserId })
-            : null;
-
-        var response = MapToResponse(transaction, dek, accounts, labelsDict, tagsDict, counterpartyUsers);
-        return (true, "P2P transaction accepted successfully", response);
-    }
-
-    public async Task<(bool Success, string Message)> RejectP2PAsync(
-        string userId, 
-        string transactionId, 
-        RejectP2PRequest? request)
-    {
-        // Get the pending P2P transaction
-        var transaction = await _transactionRepository.GetByIdAsync(transactionId);
-        if (transaction == null)
-            return (false, "Transaction not found");
-
-        // Verify this transaction belongs to the user and is pending P2P
-        if (transaction.UserId != userId)
-            return (false, "Transaction not found");
-
-        if (!string.IsNullOrEmpty(transaction.AccountId))
-            return (false, "Transaction has already been assigned to an account");
-
-        if (transaction.TransactionLinkId == null)
-            return (false, "This is not a P2P transaction");
-
-        // Delete the pending transaction
-        // Note: The sender's transaction remains unaffected
-        await _transactionRepository.DeleteAsync(transactionId, userId);
-
-        return (true, "P2P transaction rejected");
-    }
-
-    #endregion
 }

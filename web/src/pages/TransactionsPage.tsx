@@ -4,8 +4,7 @@ import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
 import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
-import { PendingP2PIndicator } from '../components/PendingP2PIndicator';
-import { PendingP2PModal } from '../components/PendingP2PModal';
+import { PendingIndicator } from '../components/PendingIndicator';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
@@ -61,8 +60,8 @@ export default function TransactionsPage() {
   const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [pendingRefreshTrigger, setPendingRefreshTrigger] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isPendingP2POpen, setIsPendingP2POpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
@@ -264,6 +263,25 @@ export default function TransactionsPage() {
     }
   }, [filter, searchText, getDateRange, clearSelection, getExpandedLabelIds]);
 
+  // Refresh just the summary (for instant updates after status changes)
+  const refreshSummary = useCallback(async () => {
+    try {
+      const dateRange = getDateRange();
+      const expandedLabelIds = getExpandedLabelIds();
+      const fullFilter: TransactionFilter = {
+        ...filter,
+        ...dateRange,
+        labelIds: expandedLabelIds,
+        folderIds: undefined,
+        searchText: searchText || undefined,
+      };
+      const summaryData = await getTransactionSummary(fullFilter);
+      setSummary(summaryData);
+    } catch (err) {
+      logger.error('Failed to refresh summary:', err);
+    }
+  }, [filter, searchText, getDateRange, getExpandedLabelIds]);
+
   // Initial load and reload on filter changes
   useEffect(() => {
     loadTransactions(1, false);
@@ -369,9 +387,24 @@ export default function TransactionsPage() {
   const handleUpdateStatus = async (id: string, status: 'Pending' | 'Confirmed') => {
     try {
       await updateStatus(id, status);
-      setTransactions(prev => prev.map(t => 
-        t.id === id ? { ...t, status } : t
-      ));
+      
+      // Check if the transaction should still be visible with current filter
+      const currentStatusFilter = filter.status;
+      const shouldRemove = currentStatusFilter && currentStatusFilter !== status;
+      
+      if (shouldRemove) {
+        // Remove from list immediately - it no longer matches the filter
+        setTransactions(prev => prev.filter(t => t.id !== id));
+      } else {
+        // Update in place
+        setTransactions(prev => prev.map(t => 
+          t.id === id ? { ...t, status } : t
+        ));
+      }
+      
+      // Refresh pending count and summary immediately
+      setPendingRefreshTrigger(prev => prev + 1);
+      refreshSummary();
     } catch (err) {
       logger.error('Failed to update transaction:', err);
       setError('Failed to update transaction. Please try again.');
@@ -412,13 +445,21 @@ export default function TransactionsPage() {
   const handleDecline = useCallback(async (id: string) => {
     try {
       await updateStatus(id, 'Declined');
-      // Reload to refresh the list
-      loadTransactions(1, false);
+      
+      // Remove from list if current filter wouldn't show Declined
+      const currentStatusFilter = filter.status;
+      if (currentStatusFilter && currentStatusFilter !== 'Declined') {
+        setTransactions(prev => prev.filter(t => t.id !== id));
+      }
+      
+      // Refresh pending count and summary immediately
+      setPendingRefreshTrigger(prev => prev + 1);
+      refreshSummary();
     } catch (err) {
       logger.error('Failed to decline transaction:', err);
       setError('Failed to decline transaction. Please try again.');
     }
-  }, []);
+  }, [filter.status, refreshSummary]);
 
   // Batch operations
   const handleBatchDelete = async () => {
@@ -566,8 +607,9 @@ export default function TransactionsPage() {
             </div>
           </div>
           
-          <PendingP2PIndicator 
+          <PendingIndicator 
             showingPending={filter.status === 'Pending'}
+            refreshTrigger={pendingRefreshTrigger}
             onShowPending={() => {
               if (filter.status === 'Pending') {
                 // Go back to default view: Confirmed, This Month
@@ -823,16 +865,6 @@ export default function TransactionsPage() {
             logger.error('Failed to create tag:', error);
             return null;
           }
-        }}
-      />
-
-      {/* Pending P2P Modal */}
-      <PendingP2PModal
-        isOpen={isPendingP2POpen}
-        onClose={() => setIsPendingP2POpen(false)}
-        onTransactionAccepted={() => {
-          // Refresh the transaction list after accepting a P2P transaction
-          loadTransactions(1);
         }}
       />
     </div>
