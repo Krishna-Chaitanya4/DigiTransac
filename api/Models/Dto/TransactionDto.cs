@@ -133,7 +133,8 @@ public record TransactionResponse(
     Guid? TransactionLinkId,
     string? CounterpartyEmail,
     string? CounterpartyUserId,
-    string? Role  // "Sender" or "Receiver"
+    string? Role,  // "Sender" or "Receiver"
+    DateTime? LastSyncedAt  // Set when transaction was updated via P2P sync (shows "Edited" badge)
 );
 
 public record TransactionListResponse(

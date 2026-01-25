@@ -150,12 +150,19 @@ public class TransactionService : ITransactionService
         var accountDict = accounts.ToDictionary(a => a.Id);
         var labelDict = labels.ToDictionary(l => l.Id);
         var tagDict = tags.ToDictionary(t => t.Id);
+        
+        // Fetch counterparty users for email resolution
+        var counterpartyUserIds = transactions
+            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
+            .Select(t => t.CounterpartyUserId!)
+            .Distinct();
+        var counterpartyUsers = await _userRepository.GetByIdsAsync(counterpartyUserIds);
 
         var page = filter.Page ?? 1;
         var pageSize = filter.PageSize ?? 50;
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
-        var responses = transactions.Select(t => MapToResponse(t, dek, accountDict, labelDict, tagDict)).ToList();
+        var responses = transactions.Select(t => MapToResponse(t, dek, accountDict, labelDict, tagDict, counterpartyUsers)).ToList();
 
         return new TransactionListResponse(responses, totalCount, page, pageSize, totalPages);
     }
@@ -169,15 +176,22 @@ public class TransactionService : ITransactionService
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labels = await _labelRepository.GetByUserIdAsync(userId);
         var tags = await _tagRepository.GetByUserIdAsync(userId);
+        
+        // Fetch counterparty user if exists
+        var counterpartyUsers = !string.IsNullOrEmpty(transaction.CounterpartyUserId)
+            ? await _userRepository.GetByIdsAsync(new[] { transaction.CounterpartyUserId })
+            : null;
 
-        return MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id), tags.ToDictionary(t => t.Id));
+        return MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id), tags.ToDictionary(t => t.Id), counterpartyUsers);
     }
 
     public async Task<TransactionSummaryResponse> GetSummaryAsync(
         string userId, 
         TransactionFilterRequest filter)
     {
-        var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
+        // Summary should ONLY count Confirmed transactions, regardless of list filter
+        var summaryFilter = filter with { Status = "Confirmed" };
+        var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, summaryFilter);
         
         var user = await _userRepository.GetByIdAsync(userId);
         var primaryCurrency = user?.PrimaryCurrency ?? "USD";
@@ -197,7 +211,7 @@ public class TransactionService : ITransactionService
         
         foreach (var t in transactions)
         {
-            // Skip pending P2P transactions (no AccountId yet)
+            // Skip transactions without AccountId (shouldn't happen with Confirmed filter, but safety check)
             if (string.IsNullOrEmpty(t.AccountId))
                 continue;
                 
@@ -213,7 +227,7 @@ public class TransactionService : ITransactionService
                 totalDebits += convertedAmount;  // Send = money leaving the account
         }
 
-        // Get sums by label (for the filtered date range)
+        // Get sums by label (for the filtered date range) - also only for Confirmed
         var byCategory = await _transactionRepository.GetSumByLabelAsync(userId, filter.StartDate, filter.EndDate);
         var byTag = await _transactionRepository.GetSumByTagAsync(userId, filter.StartDate, filter.EndDate);
 
@@ -372,7 +386,6 @@ public class TransactionService : ITransactionService
             Status = TransactionStatus.Confirmed, // Default to confirmed since users enter transactions after completion
             // P2P fields
             TransactionLinkId = transactionLinkId,
-            CounterpartyEmail = isP2P ? request.CounterpartyEmail : null,
             CounterpartyUserId = isP2P ? counterpartyUser?.Id : (isSelfTransfer ? userId : null)
         };
 
@@ -547,7 +560,6 @@ public class TransactionService : ITransactionService
                 Status = TransactionStatus.Pending, // Pending - counterparty needs to review
                 // P2P fields
                 TransactionLinkId = transactionLinkId,
-                CounterpartyEmail = (await _userRepository.GetByIdAsync(userId))?.Email,
                 CounterpartyUserId = userId
             };
             
@@ -566,7 +578,12 @@ public class TransactionService : ITransactionService
         
         // Return the first instance for recurring transactions, otherwise return the transaction itself
         var transactionToReturn = firstInstance ?? transaction;
-        var response = MapToResponse(transactionToReturn, dek, accounts.ToDictionary(a => a.Id), labelsDict, tagsDict);
+        
+        // Fetch counterparty user for response
+        var counterpartyUsers = !string.IsNullOrEmpty(transactionToReturn.CounterpartyUserId)
+            ? await _userRepository.GetByIdsAsync(new[] { transactionToReturn.CounterpartyUserId })
+            : null;
+        var response = MapToResponse(transactionToReturn, dek, accounts.ToDictionary(a => a.Id), labelsDict, tagsDict, counterpartyUsers);
 
         return (true, "Transaction created successfully", response);
     }
@@ -583,9 +600,14 @@ public class TransactionService : ITransactionService
         if (transaction.IsRecurringTemplate)
             return (false, "Cannot edit recurring template. Delete and recreate instead.", null);
 
-        var account = await _accountRepository.GetByIdAndUserIdAsync(transaction.AccountId, userId);
-        if (account == null)
-            return (false, "Account not found", null);
+        // Account lookup - only required if transaction has an accountId (P2P pending may not)
+        Account? account = null;
+        if (!string.IsNullOrEmpty(transaction.AccountId))
+        {
+            account = await _accountRepository.GetByIdAndUserIdAsync(transaction.AccountId, userId);
+            if (account == null)
+                return (false, "Account not found", null);
+        }
 
         var dek = await GetUserDekAsync(userId);
         if (dek == null)
@@ -765,24 +787,85 @@ public class TransactionService : ITransactionService
             }
         }
 
-        // Adjust balances
-        if (newAccount != null)
+        // Sync P2P linked transaction (different user, linked via TransactionLinkId)
+        // Only sync if the counterparty's transaction is still Pending
+        if (transaction.TransactionLinkId.HasValue && !string.IsNullOrEmpty(transaction.CounterpartyUserId))
+        {
+            var linkedP2PTransaction = await _transactionRepository.GetLinkedP2PTransactionAsync(
+                transaction.TransactionLinkId.Value, userId);
+            
+            if (linkedP2PTransaction != null && linkedP2PTransaction.Status == TransactionStatus.Pending)
+            {
+                // Sync shared fields to the counterparty's pending transaction
+                // Note: Type is flipped (Send → Receive, Receive → Send)
+                
+                // Sync amount
+                if (request.Amount.HasValue)
+                {
+                    linkedP2PTransaction.Amount = transaction.Amount;
+                }
+                
+                // Sync date
+                if (request.Date.HasValue)
+                {
+                    linkedP2PTransaction.Date = transaction.Date;
+                }
+                
+                // Sync title
+                if (request.Title != null)
+                {
+                    linkedP2PTransaction.Title = transaction.Title;
+                }
+                
+                // Sync type (flipped)
+                if (request.Type != null)
+                {
+                    linkedP2PTransaction.Type = transaction.Type == TransactionType.Send 
+                        ? TransactionType.Receive 
+                        : TransactionType.Send;
+                }
+                
+                // Currency syncs only if counterparty hasn't assigned an account yet
+                if (string.IsNullOrEmpty(linkedP2PTransaction.AccountId))
+                {
+                    linkedP2PTransaction.Currency = transaction.Currency;
+                }
+                
+                linkedP2PTransaction.UpdatedAt = DateTime.UtcNow;
+                linkedP2PTransaction.LastSyncedAt = DateTime.UtcNow; // Mark as edited via sync
+                await _transactionRepository.UpdateAsync(linkedP2PTransaction);
+            }
+        }
+
+        // Adjust balances (only if transaction has an account)
+        if (newAccount != null && oldAccount != null)
         {
             // Account changed - reverse from old account, apply to new account
             await UpdateAccountBalanceAsync(oldAccount, oldType, oldAmount, false);
             await UpdateAccountBalanceAsync(newAccount, transaction.Type, transaction.Amount, true);
         }
-        else if (oldType != transaction.Type || oldAmount != transaction.Amount)
+        else if (newAccount != null && oldAccount == null)
+        {
+            // P2P transaction being assigned an account for the first time
+            await UpdateAccountBalanceAsync(newAccount, transaction.Type, transaction.Amount, true);
+        }
+        else if (account != null && (oldType != transaction.Type || oldAmount != transaction.Amount))
         {
             // Same account but amount or type changed
             await UpdateAccountBalanceAsync(account, oldType, oldAmount, false);
             await UpdateAccountBalanceAsync(account, transaction.Type, transaction.Amount, true);
         }
+        // If account is null (P2P pending, just status change like Decline), no balance adjustment needed
 
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labels = await _labelRepository.GetByUserIdAsync(userId);
         var tags = await _tagRepository.GetByUserIdAsync(userId);
-        var response = MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id), tags.ToDictionary(t => t.Id));
+        
+        // Fetch counterparty user for response
+        var counterpartyUsers = !string.IsNullOrEmpty(transaction.CounterpartyUserId)
+            ? await _userRepository.GetByIdsAsync(new[] { transaction.CounterpartyUserId })
+            : null;
+        var response = MapToResponse(transaction, dek, accounts.ToDictionary(a => a.Id), labels.ToDictionary(l => l.Id), tags.ToDictionary(t => t.Id), counterpartyUsers);
 
         return (true, "Transaction updated successfully", response);
     }
@@ -814,6 +897,20 @@ public class TransactionService : ITransactionService
                         await UpdateAccountBalanceAsync(linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, false);
                     }
                     await _transactionRepository.DeleteAsync(linkedTransaction.Id, userId);
+                }
+            }
+            
+            // Delete P2P linked transaction (different user) if it's still Pending
+            if (transaction.TransactionLinkId.HasValue && !string.IsNullOrEmpty(transaction.CounterpartyUserId))
+            {
+                var linkedP2PTransaction = await _transactionRepository.GetLinkedP2PTransactionAsync(
+                    transaction.TransactionLinkId.Value, userId);
+                
+                // Only delete if the counterparty's transaction is still Pending
+                // If they've already confirmed it, leave it (it's their record now)
+                if (linkedP2PTransaction != null && linkedP2PTransaction.Status == TransactionStatus.Pending)
+                {
+                    await _transactionRepository.DeleteByIdAsync(linkedP2PTransaction.Id);
                 }
             }
         }
@@ -956,7 +1053,8 @@ public class TransactionService : ITransactionService
         byte[]? dek, 
         Dictionary<string, Account> accounts,
         Dictionary<string, Label> labels,
-        Dictionary<string, Tag> tags)
+        Dictionary<string, Tag> tags,
+        Dictionary<string, User>? counterpartyUsers = null)
     {
         Account? account = null;
         if (!string.IsNullOrEmpty(t.AccountId))
@@ -969,6 +1067,14 @@ public class TransactionService : ITransactionService
                 ? new TagInfo(tagId, tag.Name, tag.Color) 
                 : new TagInfo(tagId, "Unknown", null))
             .ToList();
+
+        // Resolve counterparty email from UserId
+        string? counterpartyEmail = null;
+        if (!string.IsNullOrEmpty(t.CounterpartyUserId) && counterpartyUsers != null)
+        {
+            counterpartyUsers.TryGetValue(t.CounterpartyUserId, out var counterpartyUser);
+            counterpartyEmail = counterpartyUser?.Email;
+        }
 
         return new TransactionResponse(
             t.Id,
@@ -999,12 +1105,13 @@ public class TransactionService : ITransactionService
             t.CreatedAt,
             t.UpdatedAt,
             t.TransactionLinkId,
-            t.CounterpartyEmail,
+            counterpartyEmail,
             t.CounterpartyUserId,
             // Derive role from type for P2P/transfer transactions (has counterparty)
-            t.CounterpartyUserId != null || t.CounterpartyEmail != null
+            t.CounterpartyUserId != null
                 ? (t.Type == TransactionType.Send ? "Sender" : "Receiver")
-                : null);
+                : null,
+            t.LastSyncedAt);
     }
 
     private TransactionSplitResponse MapSplitToResponse(TransactionSplit split, byte[]? dek, Dictionary<string, Label> labels)
@@ -1255,10 +1362,17 @@ public class TransactionService : ITransactionService
             .ToDictionary(t => t.Id);
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, exportFilter);
+        
+        // Fetch counterparty users for email resolution
+        var counterpartyUserIds = transactions
+            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
+            .Select(t => t.CounterpartyUserId!)
+            .Distinct();
+        var counterpartyUsers = await _userRepository.GetByIdsAsync(counterpartyUserIds);
 
         return transactions
             .Where(t => !t.IsRecurringTemplate)
-            .Select(t => MapToResponse(t, dek, accounts, labels, tags))
+            .Select(t => MapToResponse(t, dek, accounts, labels, tags, counterpartyUsers))
             .ToList();
     }
 
@@ -1268,18 +1382,33 @@ public class TransactionService : ITransactionService
     {
         var transactions = await _transactionRepository.GetPendingP2PAsync(userId);
         
-        var pendingList = transactions.Select(t => new PendingP2PResponse(
-            Id: t.Id,
-            Type: t.Type.ToString(),
-            Amount: t.Amount,
-            Currency: t.Currency,
-            Date: t.Date,
-            Title: t.Title,
-            CounterpartyEmail: t.CounterpartyEmail,
-            // Derive role from type
-            Role: t.Type == TransactionType.Send ? "Sender" : "Receiver",
-            TransactionLinkId: t.TransactionLinkId
-        )).ToList();
+        // Fetch counterparty users for email resolution
+        var counterpartyUserIds = transactions
+            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
+            .Select(t => t.CounterpartyUserId!)
+            .Distinct();
+        var counterpartyUsers = await _userRepository.GetByIdsAsync(counterpartyUserIds);
+        
+        var pendingList = transactions.Select(t => {
+            string? counterpartyEmail = null;
+            if (!string.IsNullOrEmpty(t.CounterpartyUserId) && counterpartyUsers.TryGetValue(t.CounterpartyUserId, out var user))
+            {
+                counterpartyEmail = user.Email;
+            }
+            
+            return new PendingP2PResponse(
+                Id: t.Id,
+                Type: t.Type.ToString(),
+                Amount: t.Amount,
+                Currency: t.Currency,
+                Date: t.Date,
+                Title: t.Title,
+                CounterpartyEmail: counterpartyEmail,
+                // Derive role from type
+                Role: t.Type == TransactionType.Send ? "Sender" : "Receiver",
+                TransactionLinkId: t.TransactionLinkId
+            );
+        }).ToList();
 
         return new PendingP2PListResponse(pendingList, pendingList.Count);
     }
@@ -1369,8 +1498,13 @@ public class TransactionService : ITransactionService
         var accounts = (await _accountRepository.GetByUserIdAsync(userId, true)).ToDictionary(a => a.Id);
         var labelsDict = labels.ToDictionary(l => l.Id);
         var tagsDict = (await _tagRepository.GetByUserIdAsync(userId)).ToDictionary(t => t.Id);
+        
+        // Fetch counterparty user for response
+        var counterpartyUsers = !string.IsNullOrEmpty(transaction.CounterpartyUserId)
+            ? await _userRepository.GetByIdsAsync(new[] { transaction.CounterpartyUserId })
+            : null;
 
-        var response = MapToResponse(transaction, dek, accounts, labelsDict, tagsDict);
+        var response = MapToResponse(transaction, dek, accounts, labelsDict, tagsDict, counterpartyUsers);
         return (true, "P2P transaction accepted successfully", response);
     }
 

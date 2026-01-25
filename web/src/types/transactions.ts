@@ -78,6 +78,7 @@ export interface Transaction {
   counterpartyEmail?: string;
   counterpartyUserId?: string;
   role?: TransactionRole;
+  lastSyncedAt?: string;
 }
 
 export interface TransactionListResponse {

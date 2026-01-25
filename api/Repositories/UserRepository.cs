@@ -9,6 +9,7 @@ public interface IUserRepository
 {
     Task<User?> GetByEmailAsync(string email);
     Task<User?> GetByIdAsync(string id);
+    Task<Dictionary<string, User>> GetByIdsAsync(IEnumerable<string> ids);
     Task<User> CreateAsync(User user);
     Task UpdateAsync(User user);
     Task<bool> DeleteAsync(string id);
@@ -36,6 +37,17 @@ public class UserRepository : IUserRepository
     public async Task<User?> GetByIdAsync(string id)
     {
         return await _users.Find(u => u.Id == id).FirstOrDefaultAsync();
+    }
+
+    public async Task<Dictionary<string, User>> GetByIdsAsync(IEnumerable<string> ids)
+    {
+        var idList = ids.Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
+        if (idList.Count == 0)
+            return new Dictionary<string, User>();
+
+        var filter = Builders<User>.Filter.In(u => u.Id, idList);
+        var users = await _users.Find(filter).ToListAsync();
+        return users.ToDictionary(u => u.Id);
     }
 
     public async Task<User> CreateAsync(User user)

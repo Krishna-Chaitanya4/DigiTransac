@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   getConversations,
   getConversation,
   sendMessage,
-  sendMoney,
   editMessage,
   deleteMessage,
   markAsRead,
@@ -14,7 +14,12 @@ import {
 } from '../services/conversationService';
 import { getAccounts, type Account } from '../services/accountService';
 import { getLabels } from '../services/labelService';
-import type { Label } from '../types/labels';
+import { getTags, createTag } from '../services/tagService';
+import { createTransaction } from '../services/transactionService';
+import { TransactionForm } from '../components/TransactionForm';
+import { useAuth } from '../context/AuthContext';
+import type { Label, Tag } from '../types/labels';
+import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
 import type {
   ConversationSummary,
   ConversationDetailResponse,
@@ -43,6 +48,12 @@ const canDeleteMessage = (msg: ConversationMessage): boolean => {
 };
 
 export default function ChatsPage() {
+  // Auth context for current user
+  const { user } = useAuth();
+  
+  // Navigation
+  const navigate = useNavigate();
+  
   // State
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetailResponse | null>(null);
@@ -124,15 +135,16 @@ export default function ChatsPage() {
   // Labels for category selection
   const [labels, setLabels] = useState<Label[]>([]);
   
-  // Send money modal state
-  const [showSendMoneyModal, setShowSendMoneyModal] = useState(false);
-  const [sendMoneyType, setSendMoneyType] = useState<'Send' | 'Receive'>('Send');
-  const [sendMoneyAccount, setSendMoneyAccount] = useState('');
-  const [sendMoneyAmount, setSendMoneyAmount] = useState('');
-  const [sendMoneyNote, setSendMoneyNote] = useState('');
-  const [sendMoneyCategory, setSendMoneyCategory] = useState('');
-  const [isSendingMoney, setIsSendingMoney] = useState(false);
-  const [sendMoneyError, setSendMoneyError] = useState('');
+  // Tags for transaction form
+  const [tags, setTags] = useState<Tag[]>([]);
+  
+  // Transaction form modal state
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false);
+  const [transactionFormError, setTransactionFormError] = useState<string | null>(null);
+  
+  // Determine if this is a self-chat (for Transfer option)
+  const isSelfChat = user?.email === selectedConversation?.counterpartyEmail;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -157,15 +169,17 @@ export default function ChatsPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [convosResponse, accts, lbls] = await Promise.all([
+        const [convosResponse, accts, lbls, tgs] = await Promise.all([
           getConversations(),
           getAccounts(),
           getLabels(),
+          getTags(),
         ]);
         setConversations(convosResponse.conversations);
         setAccounts(accts);
         // Filter to only Category labels (not Folders)
         setLabels(lbls.filter(l => l.type === 'Category'));
+        setTags(tgs);
       } catch (error) {
         console.error('Failed to load data:', error);
       } finally {
@@ -377,55 +391,35 @@ export default function ChatsPage() {
     }
   };
 
-  // Handle send money
-  const handleSendMoney = async () => {
-    if (!selectedUserId || !sendMoneyAccount || !sendMoneyAmount || !sendMoneyCategory) {
-      setSendMoneyError('Please fill in all required fields');
-      return;
-    }
+  // Handle transaction form submit
+  const handleTransactionSubmit = async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
+    if (!selectedConversation) return;
     
-    const amount = parseFloat(sendMoneyAmount);
-    if (isNaN(amount) || amount <= 0) {
-      setSendMoneyError('Please enter a valid amount');
-      return;
-    }
-    
-    setIsSendingMoney(true);
-    setSendMoneyError('');
+    setIsSubmittingTransaction(true);
+    setTransactionFormError(null);
     
     try {
-      const message = await sendMoney(selectedUserId, {
-        accountId: sendMoneyAccount,
-        type: sendMoneyType,
-        amount,
-        title: sendMoneyNote.trim() || undefined,
-        notes: undefined,
-        splits: [{ labelId: sendMoneyCategory, amount, notes: undefined }],
-      });
+      // Create the transaction using the standard transaction API
+      const transaction = await createTransaction(data as CreateTransactionRequest);
       
-      // Add message to conversation
-      if (selectedConversation) {
-        const isSend = sendMoneyType === 'Send';
-        setSelectedConversation({
-          ...selectedConversation,
-          messages: [...selectedConversation.messages, message],
-          totalSent: selectedConversation.totalSent + (isSend ? amount : 0),
-          totalReceived: selectedConversation.totalReceived + (isSend ? 0 : amount),
-        });
-      }
+      // Refresh the conversation to show the new transaction
+      await loadConversation(selectedConversation.counterpartyUserId);
       
       // Update conversation list preview
-      const actionWord = sendMoneyType === 'Send' ? 'Sent' : 'Received';
+      const isSend = transaction.type === 'Send';
+      const actionWord = isSend ? 'Sent' : 'Received';
       setConversations(prev => {
-        const existing = prev.find(c => c.counterpartyUserId === selectedUserId);
+        const existing = prev.find(c => c.counterpartyUserId === selectedConversation.counterpartyUserId);
         if (existing) {
           return prev.map(c => 
-            c.counterpartyUserId === selectedUserId 
+            c.counterpartyUserId === selectedConversation.counterpartyUserId 
               ? { 
                   ...c, 
                   lastActivityAt: new Date().toISOString(),
-                  lastMessagePreview: `${actionWord} ${formatChatCurrency(amount, message.transaction?.currency || 'INR')}`,
+                  lastMessagePreview: `${actionWord} ${formatChatCurrency(transaction.amount, transaction.currency || 'INR')}`,
                   lastMessageType: 'Transaction',
+                  totalSent: (c.totalSent || 0) + (isSend ? transaction.amount : 0),
+                  totalReceived: (c.totalReceived || 0) + (isSend ? 0 : transaction.amount),
                 }
               : c
           ).sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
@@ -433,18 +427,16 @@ export default function ChatsPage() {
         return prev;
       });
       
-      // Reset form and close modal
-      setShowSendMoneyModal(false);
-      setSendMoneyAmount('');
-      setSendMoneyNote('');
+      // Close form
+      setShowTransactionForm(false);
       
       // Scroll to bottom to show the new message
       setTimeout(scrollToBottom, 100);
     } catch (error) {
-      console.error('Failed to send money:', error);
-      setSendMoneyError(error instanceof Error ? error.message : 'Failed to send money');
+      console.error('Failed to create transaction:', error);
+      setTransactionFormError(error instanceof Error ? error.message : 'Failed to create transaction');
     } finally {
-      setIsSendingMoney(false);
+      setIsSubmittingTransaction(false);
     }
   };
 
@@ -1154,17 +1146,7 @@ export default function ChatsPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => {
-                          // Default to first account if available
-                          if (accounts.length > 0 && !sendMoneyAccount) {
-                            setSendMoneyAccount(accounts[0].id);
-                          }
-                          // Default to first category if available
-                          if (labels.length > 0 && !sendMoneyCategory) {
-                            setSendMoneyCategory(labels[0].id);
-                          }
-                          setShowSendMoneyModal(true);
-                        }}
+                        onClick={() => setShowTransactionForm(true)}
                         disabled={accounts.length === 0}
                         className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                         title="New transaction"
@@ -1269,184 +1251,41 @@ export default function ChatsPage() {
         </div>
       )}
 
-      {/* Send Money Modal */}
-      {showSendMoneyModal && selectedConversation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-4">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Transaction with {getDisplayName(selectedConversation.counterpartyName, selectedConversation.counterpartyEmail)}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowSendMoneyModal(false);
-                  setSendMoneyError('');
-                }}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            {/* Content */}
-            <div className="p-4 space-y-4">
-              {/* Transaction Type Selector */}
-              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
-                <button
-                  type="button"
-                  onClick={() => setSendMoneyType('Send')}
-                  className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                    sendMoneyType === 'Send'
-                      ? 'bg-red-500 dark:bg-red-600 text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  Send
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSendMoneyType('Receive')}
-                  className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                    sendMoneyType === 'Receive'
-                      ? 'bg-green-500 dark:bg-green-600 text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  Receive
-                </button>
-              </div>
-              
-              {/* Account Select */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {sendMoneyType === 'Send' ? 'From Account' : 'To Account'}
-                </label>
-                <select
-                  value={sendMoneyAccount}
-                  onChange={(e) => setSendMoneyAccount(e.target.value)}
-                  className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 ${
-                    sendMoneyType === 'Send' ? 'focus:ring-red-500' : 'focus:ring-green-500'
-                  }`}
-                >
-                  {accounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({acc.currency})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Amount */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Amount
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    {accounts.find(a => a.id === sendMoneyAccount)?.currency === 'INR' ? '₹' : accounts.find(a => a.id === sendMoneyAccount)?.currency || '₹'}
-                  </span>
-                  <input
-                    type="number"
-                    value={sendMoneyAmount}
-                    onChange={(e) => setSendMoneyAmount(e.target.value)}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className={`w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 ${
-                      sendMoneyType === 'Send' ? 'focus:ring-red-500' : 'focus:ring-green-500'
-                    }`}
-                  />
-                </div>
-              </div>
-              
-              {/* Category */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Category
-                </label>
-                <select
-                  value={sendMoneyCategory}
-                  onChange={(e) => setSendMoneyCategory(e.target.value)}
-                  className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 ${
-                    sendMoneyType === 'Send' ? 'focus:ring-red-500' : 'focus:ring-green-500'
-                  }`}
-                >
-                  {labels.map(label => (
-                    <option key={label.id} value={label.id}>
-                      {label.icon ? `${label.icon} ` : ''}{label.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Note (optional) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Note (optional)
-                </label>
-                <input
-                  type="text"
-                  value={sendMoneyNote}
-                  onChange={(e) => setSendMoneyNote(e.target.value)}
-                  placeholder="What's this for?"
-                  className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 ${
-                    sendMoneyType === 'Send' ? 'focus:ring-red-500' : 'focus:ring-green-500'
-                  }`}
-                />
-              </div>
-              
-              {/* Error */}
-              {sendMoneyError && (
-                <p className="text-sm text-red-500">{sendMoneyError}</p>
-              )}
-            </div>
-            
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowSendMoneyModal(false);
-                  setSendMoneyError('');
-                }}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSendMoney}
-                disabled={isSendingMoney || !sendMoneyAmount || !sendMoneyAccount || !sendMoneyCategory}
-                className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
-                  sendMoneyType === 'Send' 
-                    ? 'bg-red-500 hover:bg-red-600' 
-                    : 'bg-green-500 hover:bg-green-600'
-                }`}
-              >
-                {isSendingMoney ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    {sendMoneyType === 'Send' ? 'Sending...' : 'Recording...'}
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {sendMoneyType === 'Send' ? 'Send Money' : 'Record Payment'}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Transaction Form Modal */}
+      <TransactionForm
+        isOpen={showTransactionForm}
+        onClose={() => {
+          setShowTransactionForm(false);
+          setTransactionFormError(null);
+        }}
+        onSubmit={handleTransactionSubmit}
+        editingTransaction={null}
+        accounts={accounts}
+        labels={labels}
+        tags={tags}
+        isLoading={isSubmittingTransaction}
+        error={transactionFormError}
+        // Chat context props
+        hideRecipientField={true}
+        showTransfer={isSelfChat}
+        fixedCounterpartyEmail={selectedConversation?.counterpartyEmail}
+        hidePayeeField={!isSelfChat}
+        onCreateTag={async (name) => {
+          try {
+            const newTag = await createTag({ name });
+            setTags(prev => [...prev, newTag]);
+            return newTag;
+          } catch (error) {
+            console.error('Failed to create tag:', error);
+            return null;
+          }
+        }}
+      />
 
       {/* Message Actions Menu - attached to message */}
       {menuMessage && menuPosition && (() => {
         // Calculate menu height based on options (each option ~40px + padding)
-        const optionCount = 1 + (menuMessage.type === 'Text' ? 1 : 0) + (menuMessage.isFromMe && menuMessage.type === 'Text' ? 1 : 0) + (menuMessage.isFromMe ? 1 : 0);
+        const optionCount = 1 + (menuMessage.type === 'Text' ? 1 : 0) + (menuMessage.type === 'Transaction' ? 1 : 0) + (menuMessage.isFromMe && menuMessage.type === 'Text' ? 1 : 0) + (menuMessage.isFromMe ? 1 : 0);
         const menuHeight = optionCount * 40 + 8;
         const spaceBelow = window.innerHeight - menuPosition.y;
         const spaceAbove = menuPosition.buttonTop;
@@ -1501,6 +1340,23 @@ export default function ChatsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 <span>Copy</span>
+              </button>
+            )}
+            
+            {/* View in Transactions - only for transaction messages */}
+            {menuMessage.type === 'Transaction' && menuMessage.transaction && (
+              <button
+                onClick={() => {
+                  navigate(`/transactions?highlight=${menuMessage.transaction!.transactionId}`);
+                  setMenuMessage(null);
+                  setMenuPosition(null);
+                }}
+                className="w-full px-4 py-2.5 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+              >
+                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>View in Transactions</span>
               </button>
             )}
             

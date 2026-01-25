@@ -4,10 +4,11 @@ import type { TransactionUIType } from '../../types/transactions';
 interface TransactionTypeSelectorProps {
   value: TransactionUIType;
   onChange: (type: TransactionUIType) => void;
+  showTransfer?: boolean;
 }
 
-export const TransactionTypeSelector = memo(function TransactionTypeSelector({ value, onChange }: TransactionTypeSelectorProps) {
-  const types: TransactionUIType[] = ['Send', 'Receive', 'Transfer'];
+export const TransactionTypeSelector = memo(function TransactionTypeSelector({ value, onChange, showTransfer = true }: TransactionTypeSelectorProps) {
+  const types: TransactionUIType[] = showTransfer ? ['Send', 'Receive', 'Transfer'] : ['Send', 'Receive'];
 
   return (
     <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700 p-1">

@@ -139,12 +139,9 @@ public class Transaction
     [BsonGuidRepresentation(GuidRepresentation.Standard)]
     public Guid? TransactionLinkId { get; set; } // Shared GUID linking both sender and receiver records
 
-    [BsonElement("counterpartyEmail")]
-    public string? CounterpartyEmail { get; set; } // The other party's email (for reference)
-
     [BsonElement("counterpartyUserId")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string? CounterpartyUserId { get; set; } // Resolved once they're on the platform
+    public string? CounterpartyUserId { get; set; } // The other party's user ID (immutable)
 
     // Recurring transaction support
     [BsonElement("recurringRule")]
@@ -167,4 +164,7 @@ public class Transaction
 
     [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [BsonElement("lastSyncedAt")]
+    public DateTime? LastSyncedAt { get; set; } // Set when transaction is updated via P2P sync
 }

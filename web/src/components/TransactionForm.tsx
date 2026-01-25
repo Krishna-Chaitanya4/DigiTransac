@@ -50,6 +50,11 @@ interface TransactionFormProps {
   isLoading: boolean;
   autoLocationEnabled?: boolean;
   error?: string | null;
+  // Chat context props
+  hideRecipientField?: boolean;
+  showTransfer?: boolean;
+  fixedCounterpartyEmail?: string;
+  hidePayeeField?: boolean;
 }
 
 export function TransactionForm({
@@ -65,6 +70,11 @@ export function TransactionForm({
   isLoading,
   autoLocationEnabled = true,
   error,
+  // Chat context props
+  hideRecipientField = false,
+  showTransfer = true,
+  fixedCounterpartyEmail,
+  hidePayeeField = false,
 }: TransactionFormProps) {
   // Focus trap for modal accessibility
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
@@ -168,7 +178,7 @@ export function TransactionForm({
         setSplits([]);
         setSelectedTagIds([]);
         setTransferToAccountId('');
-        setCounterpartyEmail('');
+        setCounterpartyEmail(fixedCounterpartyEmail || '');
         setIsRecurring(false);
         setRecurrenceFrequency('Monthly');
         setRecurrenceInterval(1);
@@ -231,8 +241,10 @@ export function TransactionForm({
     e.preventDefault();
     
     const finalSplits = showSplits ? splits : [{ labelId: selectedLabelId, amount, notes: undefined }];
-    // P2P only applies to Send transactions (sender initiates)
-    const isP2P = type === 'Send' && counterpartyEmail.trim();
+    // P2P applies to Send/Receive transactions with counterparty email
+    // In chat context, counterpartyEmail is set from fixedCounterpartyEmail
+    const effectiveCounterpartyEmail = counterpartyEmail.trim();
+    const isP2P = (type === 'Send' || type === 'Receive') && effectiveCounterpartyEmail;
     
     // Convert UI type to API type: Transfer -> Send (backend creates linked Send+Receive)
     const apiType: TransactionType = type === 'Transfer' ? 'Send' : type;
@@ -271,8 +283,8 @@ export function TransactionForm({
           interval: recurrenceInterval,
           endDate: recurrenceEndDate || undefined,
         } : undefined,
-        // P2P fields (only for Send/Receive with counterparty email)
-        counterpartyEmail: isP2P ? counterpartyEmail.trim() : undefined,
+        // P2P fields (for Send/Receive with counterparty email)
+        counterpartyEmail: isP2P ? effectiveCounterpartyEmail : undefined,
       };
       onSubmit(createData);
     }
@@ -313,7 +325,7 @@ export function TransactionForm({
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
               {/* Transaction Type */}
-              <TransactionTypeSelector value={type} onChange={setType} />
+              <TransactionTypeSelector value={type} onChange={setType} showTransfer={showTransfer} />
 
               {/* Account Selection */}
               <div>
@@ -389,7 +401,8 @@ export function TransactionForm({
               )}
 
               {/* P2P: Counterparty email (only for Send - sender initiates P2P) */}
-              {type === 'Send' && (
+              {/* Hidden when in chat context (hideRecipientField=true) since recipient is the conversation partner */}
+              {type === 'Send' && !hideRecipientField && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Recipient's Email (optional)
@@ -505,8 +518,8 @@ export function TransactionForm({
                 />
               </div>
 
-              {/* Payee/Payer - hidden for transfers */}
-              {type !== 'Transfer' && (
+              {/* Payee/Payer - hidden for transfers and when hidePayeeField is true */}
+              {type !== 'Transfer' && !hidePayeeField && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {type === 'Send' ? 'Payee' : 'Payer'}

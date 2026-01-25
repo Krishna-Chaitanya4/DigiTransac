@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
 import { DatePicker } from '../components/DatePicker';
@@ -45,6 +46,9 @@ export default function TransactionsPage() {
   // Currency context - backend returns summary already converted to primary currency
   const { primaryCurrency } = useCurrency();
   
+  // URL search params for highlight
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   // Data state
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -75,7 +79,7 @@ export default function TransactionsPage() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchText, setSearchText] = useState('');
-  const [filter, setFilter] = useState<TransactionFilter>({});
+  const [filter, setFilter] = useState<TransactionFilter>({ status: 'Confirmed' }); // Default to Confirmed
   
   // Linked transaction navigation
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null);
@@ -265,6 +269,30 @@ export default function TransactionsPage() {
     loadTransactions(1, false);
   }, [loadTransactions]);
 
+  // Handle highlight from URL param (e.g., /transactions?highlight=abc123)
+  useEffect(() => {
+    const highlightId = searchParams.get('highlight');
+    if (highlightId && transactions.length > 0) {
+      // Set the highlighted transaction
+      setHighlightedTransactionId(highlightId);
+      
+      // Clear the URL param
+      searchParams.delete('highlight');
+      setSearchParams(searchParams, { replace: true });
+      
+      // Scroll to the transaction after a short delay
+      setTimeout(() => {
+        const element = document.querySelector(`[data-transaction-id="${highlightId}"]`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      
+      // Clear highlight after animation
+      setTimeout(() => setHighlightedTransactionId(null), 3000);
+    }
+  }, [searchParams, setSearchParams, transactions.length]);
+
   // Debounced search
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -371,6 +399,25 @@ export default function TransactionsPage() {
         }
       }, 100);
     });
+  }, []);
+
+  // Handle Accept P2P - opens form with transaction data for account/category assignment
+  const handleAcceptP2P = useCallback((transaction: Transaction) => {
+    // Open the form with this transaction's data so user can add account and categories
+    setEditingTransaction(transaction);
+    setIsFormOpen(true);
+  }, []);
+
+  // Handle Decline - sets status to Declined
+  const handleDecline = useCallback(async (id: string) => {
+    try {
+      await updateStatus(id, 'Declined');
+      // Reload to refresh the list
+      loadTransactions(1, false);
+    } catch (err) {
+      logger.error('Failed to decline transaction:', err);
+      setError('Failed to decline transaction. Please try again.');
+    }
   }, []);
 
   // Batch operations
@@ -519,7 +566,26 @@ export default function TransactionsPage() {
             </div>
           </div>
           
-          <PendingP2PIndicator onClick={() => setIsPendingP2POpen(true)} />
+          <PendingP2PIndicator 
+            showingPending={filter.status === 'Pending'}
+            onShowPending={() => {
+              if (filter.status === 'Pending') {
+                // Go back to default view: Confirmed, This Month
+                setDatePreset('thisMonth');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setSearchText('');
+                setFilter({ status: 'Confirmed' });
+              } else {
+                // Show ALL pending transactions: clear filters, set all time
+                setDatePreset('custom');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setSearchText('');
+                setFilter({ status: 'Pending' });
+              }
+            }}
+          />
           
           <button
             onClick={() => setIsFormOpen(true)}
@@ -688,6 +754,8 @@ export default function TransactionsPage() {
           onDelete={handleDelete}
           onUpdateStatus={handleUpdateStatus}
           onViewLinkedTransaction={handleViewLinkedTransaction}
+          onAcceptP2P={handleAcceptP2P}
+          onRejectP2P={handleDecline}
           highlightedTransactionId={highlightedTransactionId}
           isLoading={showLoadingSkeleton}
           selectionMode={hasSelection}

@@ -18,6 +18,7 @@ public interface ITransactionRepository
     Task CreateManyAsync(List<Transaction> transactions);
     Task UpdateAsync(Transaction transaction);
     Task<bool> DeleteAsync(string id, string userId);
+    Task<bool> DeleteByIdAsync(string id);  // For P2P linked transaction deletion
     Task<bool> DeleteAllByUserIdAsync(string userId);
     Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId);
     Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null);
@@ -37,6 +38,7 @@ public interface ITransactionRepository
     // P2P pending transactions
     Task<List<Transaction>> GetPendingP2PAsync(string userId);
     Task<int> GetPendingP2PCountAsync(string userId);
+    Task<Transaction?> GetLinkedP2PTransactionAsync(Guid transactionLinkId, string excludeUserId);
     
     // P2P conversation queries
     Task<List<Transaction>> GetP2PTransactionsAsync(string userId);
@@ -100,8 +102,16 @@ public class TransactionRepository : ITransactionRepository
         {
             filterBuilder.Eq(t => t.UserId, userId),
             filterBuilder.Eq(t => t.IsRecurringTemplate, false), // Exclude templates from normal listings
-            filterBuilder.Ne(t => t.AccountId, null) // Exclude pending P2P transactions (handled separately)
         };
+        
+        // Include/exclude pending P2P transactions (AccountId is null) based on status filter
+        // When filtering for Pending status, include P2P pending transactions
+        // Otherwise, exclude them from normal listings
+        var isPendingFilter = string.Equals(filter.Status, "Pending", StringComparison.OrdinalIgnoreCase);
+        if (!isPendingFilter)
+        {
+            filters.Add(filterBuilder.Ne(t => t.AccountId, null));
+        }
 
         if (filter.StartDate.HasValue)
         {
@@ -286,6 +296,12 @@ public class TransactionRepository : ITransactionRepository
     public async Task<bool> DeleteAsync(string id, string userId)
     {
         var result = await _transactions.DeleteOneAsync(t => t.Id == id && t.UserId == userId);
+        return result.DeletedCount > 0;
+    }
+
+    public async Task<bool> DeleteByIdAsync(string id)
+    {
+        var result = await _transactions.DeleteOneAsync(t => t.Id == id);
         return result.DeletedCount > 0;
     }
 
@@ -532,6 +548,17 @@ public class TransactionRepository : ITransactionRepository
         );
         
         return (int)await _transactions.CountDocumentsAsync(filter);
+    }
+
+    public async Task<Transaction?> GetLinkedP2PTransactionAsync(Guid transactionLinkId, string excludeUserId)
+    {
+        // Find the linked transaction (same TransactionLinkId but different user)
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.TransactionLinkId, transactionLinkId),
+            Builders<Transaction>.Filter.Ne(t => t.UserId, excludeUserId)
+        );
+        
+        return await _transactions.Find(filter).FirstOrDefaultAsync();
     }
 
     public async Task<List<Transaction>> GetP2PTransactionsAsync(string userId)
