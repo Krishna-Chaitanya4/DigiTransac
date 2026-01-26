@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getConversations,
@@ -12,13 +12,9 @@ import {
   formatChatCurrency,
   searchUserByEmail,
 } from '../services/conversationService';
-import { getAccounts, type Account } from '../services/accountService';
-import { getLabels } from '../services/labelService';
-import { getTags, createTag } from '../services/tagService';
-import { createTransaction } from '../services/transactionService';
+import { useAccounts, useLabels, useTags, useCreateTag, useCreateTransaction } from '../hooks';
 import { TransactionForm } from '../components/TransactionForm';
 import { useAuth } from '../context/AuthContext';
-import type { Label, Tag } from '../types/labels';
 import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
 import type {
   ConversationSummary,
@@ -54,11 +50,20 @@ export default function ChatsPage() {
   // Navigation
   const navigate = useNavigate();
   
+  // React Query hooks for data
+  const { data: accounts = [] } = useAccounts();
+  const { data: allLabels = [] } = useLabels();
+  const { data: tags = [] } = useTags();
+  const createTagMutation = useCreateTag();
+  const createTransactionMutation = useCreateTransaction();
+  
+  // Filter to only Category labels (not Folders)
+  const labels = useMemo(() => allLabels.filter(l => l.type === 'Category'), [allLabels]);
+  
   // State
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetailResponse | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [messageInput, setMessageInput] = useState('');
@@ -132,15 +137,8 @@ export default function ChatsPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   
-  // Labels for category selection
-  const [labels, setLabels] = useState<Label[]>([]);
-  
-  // Tags for transaction form
-  const [tags, setTags] = useState<Tag[]>([]);
-  
   // Transaction form modal state
   const [showTransactionForm, setShowTransactionForm] = useState(false);
-  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false);
   const [transactionFormError, setTransactionFormError] = useState<string | null>(null);
   
   // Determine if this is a self-chat (for Transfer option)
@@ -165,28 +163,19 @@ export default function ChatsPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Load initial data
+  // Load initial conversations
   useEffect(() => {
-    const loadData = async () => {
+    const loadConversations = async () => {
       try {
-        const [convosResponse, accts, lbls, tgs] = await Promise.all([
-          getConversations(),
-          getAccounts(),
-          getLabels(),
-          getTags(),
-        ]);
+        const convosResponse = await getConversations();
         setConversations(convosResponse.conversations);
-        setAccounts(accts);
-        // Filter to only Category labels (not Folders)
-        setLabels(lbls.filter(l => l.type === 'Category'));
-        setTags(tgs);
       } catch (error) {
-        console.error('Failed to load data:', error);
+        console.error('Failed to load conversations:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    loadData();
+    loadConversations();
   }, []);
 
   // Load conversation when selected
@@ -395,12 +384,11 @@ export default function ChatsPage() {
   const handleTransactionSubmit = async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
     if (!selectedConversation) return;
     
-    setIsSubmittingTransaction(true);
     setTransactionFormError(null);
     
     try {
-      // Create the transaction using the standard transaction API
-      const transaction = await createTransaction(data as CreateTransactionRequest);
+      // Create the transaction using React Query mutation
+      const transaction = await createTransactionMutation.mutateAsync(data as CreateTransactionRequest);
       
       // Refresh the conversation to show the new transaction
       await loadConversation(selectedConversation.counterpartyUserId);
@@ -435,8 +423,6 @@ export default function ChatsPage() {
     } catch (error) {
       console.error('Failed to create transaction:', error);
       setTransactionFormError(error instanceof Error ? error.message : 'Failed to create transaction');
-    } finally {
-      setIsSubmittingTransaction(false);
     }
   };
 
@@ -1263,7 +1249,7 @@ export default function ChatsPage() {
         accounts={accounts}
         labels={labels}
         tags={tags}
-        isLoading={isSubmittingTransaction}
+        isLoading={createTransactionMutation.isPending}
         error={transactionFormError}
         // Chat context props
         hideRecipientField={true}
@@ -1272,8 +1258,7 @@ export default function ChatsPage() {
         hidePayeeField={!isSelfChat}
         onCreateTag={async (name) => {
           try {
-            const newTag = await createTag({ name });
-            setTags(prev => [...prev, newTag]);
+            const newTag = await createTagMutation.mutateAsync({ name });
             return newTag;
           } catch (error) {
             console.error('Failed to create tag:', error);

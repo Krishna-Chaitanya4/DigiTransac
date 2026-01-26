@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getPendingCount } from '../services/transactionService';
+import { useEffect } from 'react';
+import { usePendingCount, useInvalidateTransactions } from '../hooks';
 
 interface PendingIndicatorProps {
   onClick?: () => void;
@@ -10,36 +10,18 @@ interface PendingIndicatorProps {
 }
 
 export function PendingIndicator({ onClick, onShowPending, showingPending = false, refreshTrigger = 0, className = '' }: PendingIndicatorProps) {
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  const fetchCount = useCallback(async () => {
-    try {
-      const pendingCount = await getPendingCount();
-      setCount(pendingCount);
-    } catch (error) {
-      console.error('Failed to fetch pending count:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCount();
-    
-    // Poll every 30 seconds for new pending transactions
-    const interval = setInterval(fetchCount, 30000);
-    return () => clearInterval(interval);
-  }, [fetchCount]);
+  // Use React Query hook - it already handles polling every 30 seconds
+  const { data: count = 0, isLoading } = usePendingCount();
+  const invalidate = useInvalidateTransactions();
 
   // Refresh when trigger changes
   useEffect(() => {
     if (refreshTrigger > 0) {
-      fetchCount();
+      invalidate();
     }
-  }, [refreshTrigger, fetchCount]);
+  }, [refreshTrigger, invalidate]);
 
-  if (loading || count === 0) {
+  if (isLoading || count === 0) {
     return null;
   }
 
