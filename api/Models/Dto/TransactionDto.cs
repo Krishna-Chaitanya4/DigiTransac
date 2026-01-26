@@ -73,7 +73,9 @@ public record TransactionFilterRequest(
     bool? HasLinkedTransaction = null,  // Filter for transfers (transactions with linkedTransactionId)
     List<string>? SearchLabelIds = null,
     List<string>? SearchTagIds = null,
-    List<string>? SearchAccountIds = null
+    List<string>? SearchAccountIds = null,
+    List<string>? CounterpartyUserIds = null,  // Filter by counterparty users
+    List<string>? SearchCounterpartyUserIds = null  // Search matched counterparty IDs
 );
 
 // Response DTOs
@@ -147,6 +149,14 @@ public record TransactionListResponse(
     int Page,
     int PageSize,
     int TotalPages
+);
+
+// Counterparty info for filter dropdown
+public record CounterpartyInfo(
+    string UserId,
+    string Email,
+    string? Name,
+    int TransactionCount
 );
 
 public record TransactionSummaryResponse(

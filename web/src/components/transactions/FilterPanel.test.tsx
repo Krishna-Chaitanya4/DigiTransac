@@ -55,6 +55,7 @@ describe('FilterPanel', () => {
         accounts={mockAccounts}
         labels={mockLabels}
         tags={mockTags}
+        counterparties={[]}
         filter={filter}
         onFilterChange={onFilterChange}
         onClose={onClose}

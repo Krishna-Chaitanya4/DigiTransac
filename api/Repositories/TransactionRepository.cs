@@ -219,8 +219,20 @@ public class TransactionRepository : ITransactionRepository
                 searchFilters.Add(filterBuilder.In(t => t.AccountId, filter.SearchAccountIds));
             }
             
-            // Use OR - match any of title, label, tag, city, country, or account
+            // Add counterparty matches (if service provided matching IDs from search)
+            if (filter.SearchCounterpartyUserIds?.Count > 0)
+            {
+                searchFilters.Add(filterBuilder.In(t => t.CounterpartyUserId, filter.SearchCounterpartyUserIds));
+            }
+            
+            // Use OR - match any of title, label, tag, city, country, account, or counterparty
             filters.Add(filterBuilder.Or(searchFilters));
+        }
+
+        // Filter by counterparty users (explicit filter, not search)
+        if (filter.CounterpartyUserIds?.Count > 0)
+        {
+            filters.Add(filterBuilder.In(t => t.CounterpartyUserId, filter.CounterpartyUserIds));
         }
 
         // Filter for linked transactions (transfers)

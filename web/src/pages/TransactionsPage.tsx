@@ -24,6 +24,7 @@ import {
   useCreateTag,
   useTransactions,
   useTransactionSummary,
+  useCounterparties,
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
@@ -56,6 +57,7 @@ export default function TransactionsPage() {
   const { data: accounts = [], isLoading: isLoadingAccounts, error: accountsError } = useAccounts();
   const { data: labels = [], isLoading: isLoadingLabels, error: labelsError } = useLabels();
   const { data: tags = [], isLoading: isLoadingTags, error: tagsError } = useTags();
+  const { data: counterparties = [] } = useCounterparties();
   const createTagMutation = useCreateTag();
   const invalidateTransactions = useInvalidateTransactions();
   
@@ -664,6 +666,7 @@ export default function TransactionsPage() {
     filter.types && filter.types.length > 0,
     (filter.labelIds && filter.labelIds.length > 0) || (filter.folderIds && filter.folderIds.length > 0),
     filter.tagIds && filter.tagIds.length > 0,
+    filter.counterpartyUserIds && filter.counterpartyUserIds.length > 0,
     filter.status !== undefined,
     filter.minAmount !== undefined,
     filter.maxAmount !== undefined,
@@ -880,6 +883,7 @@ export default function TransactionsPage() {
         accounts={accounts}
         labels={labels}
         tags={tags}
+        counterparties={counterparties}
         filter={filter}
         onFilterChange={setFilter}
         onClose={() => setIsFilterOpen(false)}

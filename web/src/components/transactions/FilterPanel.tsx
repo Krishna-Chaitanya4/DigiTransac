@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Account } from '../../services/accountService';
 import type { Label, Tag } from '../../types/labels';
-import type { TransactionFilter, TransactionUIType } from '../../types/transactions';
+import type { TransactionFilter, TransactionUIType, CounterpartyInfo } from '../../types/transactions';
 
 interface FilterPanelProps {
   isOpen: boolean;
   accounts: Account[];
   labels: Label[];
   tags: Tag[];
+  counterparties: CounterpartyInfo[];
   filter: TransactionFilter;
   onFilterChange: (filter: TransactionFilter) => void;
   onClose: () => void;
@@ -18,6 +19,7 @@ export function FilterPanel({
   accounts,
   labels,
   tags,
+  counterparties,
   filter,
   onFilterChange,
   onClose,
@@ -26,24 +28,29 @@ export function FilterPanel({
   const [accountSearch, setAccountSearch] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
   const [tagSearch, setTagSearch] = useState('');
+  const [counterpartySearch, setCounterpartySearch] = useState('');
 
   // Dropdown open states
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
+  const [isCounterpartyDropdownOpen, setIsCounterpartyDropdownOpen] = useState(false);
 
   // Highlighted index for keyboard navigation
   const [highlightedAccountIndex, setHighlightedAccountIndex] = useState(-1);
   const [highlightedCategoryIndex, setHighlightedCategoryIndex] = useState(-1);
   const [highlightedTagIndex, setHighlightedTagIndex] = useState(-1);
+  const [highlightedCounterpartyIndex, setHighlightedCounterpartyIndex] = useState(-1);
 
   // Refs for inputs and dropdowns
   const accountInputRef = useRef<HTMLInputElement>(null);
   const categoryInputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const counterpartyInputRef = useRef<HTMLInputElement>(null);
   const accountDropdownRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const tagDropdownRef = useRef<HTMLDivElement>(null);
+  const counterpartyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Get all folders and categories for the dropdown
   const foldersAndCategories = useMemo(() => {
@@ -106,6 +113,15 @@ export function FilterPanel({
     );
   }, [tags, tagSearch, filter.tagIds]);
 
+  const filteredCounterparties = useMemo(() => {
+    const selectedIds = new Set(filter.counterpartyUserIds || []);
+    const searchLower = counterpartySearch.toLowerCase();
+    return counterparties.filter(c => 
+      !selectedIds.has(c.userId) &&
+      ((c.name?.toLowerCase().includes(searchLower)) || c.email.toLowerCase().includes(searchLower))
+    );
+  }, [counterparties, counterpartySearch, filter.counterpartyUserIds]);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -120,6 +136,10 @@ export function FilterPanel({
       if (tagDropdownRef.current && !tagDropdownRef.current.contains(event.target as Node)) {
         setIsTagDropdownOpen(false);
         setTagSearch('');
+      }
+      if (counterpartyDropdownRef.current && !counterpartyDropdownRef.current.contains(event.target as Node)) {
+        setIsCounterpartyDropdownOpen(false);
+        setCounterpartySearch('');
       }
     };
 
@@ -146,6 +166,27 @@ export function FilterPanel({
     setTagSearch('');
     setIsTagDropdownOpen(false);
     setHighlightedTagIndex(-1);
+  };
+
+  // Toggle counterparty selection
+  const toggleCounterparty = (userId: string) => {
+    const currentCounterparties = filter.counterpartyUserIds || [];
+    const isSelected = currentCounterparties.includes(userId);
+    const newCounterparties = isSelected
+      ? currentCounterparties.filter(id => id !== userId)
+      : [...currentCounterparties, userId];
+    onFilterChange({
+      ...filter,
+      counterpartyUserIds: newCounterparties.length > 0 ? newCounterparties : undefined
+    });
+  };
+
+  // Select counterparty from dropdown
+  const selectCounterparty = (userId: string) => {
+    toggleCounterparty(userId);
+    setCounterpartySearch('');
+    setIsCounterpartyDropdownOpen(false);
+    setHighlightedCounterpartyIndex(-1);
   };
 
   // Toggle account selection
@@ -672,6 +713,135 @@ export function FilterPanel({
             </p>
           )}
         </div>
+
+        {/* Counterparty Filter - Searchable multi-select */}
+        {counterparties.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              People
+            </label>
+            
+            {/* Token input container */}
+            <div className="relative" ref={counterpartyDropdownRef}>
+              <div 
+                className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 min-h-[42px] rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent cursor-text"
+                onClick={() => counterpartyInputRef.current?.focus()}
+              >
+                {/* Selected counterparties as tokens */}
+                {(filter.counterpartyUserIds || []).map((userId) => {
+                  const counterparty = counterparties.find(c => c.userId === userId);
+                  if (!counterparty) return null;
+                  return (
+                    <span
+                      key={counterparty.userId}
+                      className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-sm font-medium rounded-full bg-teal-500 dark:bg-teal-900 text-white"
+                    >
+                      {counterparty.name || counterparty.email}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCounterparty(counterparty.userId);
+                        }}
+                        className="flex items-center justify-center w-4 h-4 ml-0.5 hover:bg-white/20 rounded-full transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  );
+                })}
+                
+                {/* Search input */}
+                <input
+                  ref={counterpartyInputRef}
+                  type="text"
+                  value={counterpartySearch}
+                  onChange={(e) => {
+                    setCounterpartySearch(e.target.value);
+                    setIsCounterpartyDropdownOpen(true);
+                    setHighlightedCounterpartyIndex(-1);
+                  }}
+                  onFocus={() => setIsCounterpartyDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setHighlightedCounterpartyIndex(prev =>
+                        prev < filteredCounterparties.length - 1 ? prev + 1 : 0
+                      );
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setHighlightedCounterpartyIndex(prev =>
+                        prev > 0 ? prev - 1 : filteredCounterparties.length - 1
+                      );
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (highlightedCounterpartyIndex >= 0 && filteredCounterparties[highlightedCounterpartyIndex]) {
+                        selectCounterparty(filteredCounterparties[highlightedCounterpartyIndex].userId);
+                      } else if (filteredCounterparties.length === 1) {
+                        selectCounterparty(filteredCounterparties[0].userId);
+                      }
+                    } else if (e.key === 'Escape') {
+                      setIsCounterpartyDropdownOpen(false);
+                      setCounterpartySearch('');
+                    } else if (e.key === 'Backspace' && !counterpartySearch && filter.counterpartyUserIds?.length) {
+                      // Remove last counterparty
+                      toggleCounterparty(filter.counterpartyUserIds[filter.counterpartyUserIds.length - 1]);
+                    }
+                  }}
+                  placeholder={!filter.counterpartyUserIds?.length ? "Search people..." : ""}
+                  className="flex-1 min-w-[80px] bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm"
+                />
+              </div>
+              
+              {/* Dropdown */}
+              {isCounterpartyDropdownOpen && filteredCounterparties.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {filteredCounterparties.map((counterparty, index) => (
+                    <button
+                      key={counterparty.userId}
+                      type="button"
+                      onClick={() => selectCounterparty(counterparty.userId)}
+                      className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${
+                        index === highlightedCounterpartyIndex
+                          ? 'bg-teal-50 dark:bg-teal-900/30'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {/* Person icon */}
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-gray-900 dark:text-white block truncate">
+                          {counterparty.name || counterparty.email}
+                        </span>
+                        {counterparty.name && (
+                          <span className="text-gray-400 text-xs truncate block">{counterparty.email}</span>
+                        )}
+                      </div>
+                      <span className="text-gray-400 text-xs ml-auto flex-shrink-0">{counterparty.transactionCount} txns</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* No counterparties message */}
+              {isCounterpartyDropdownOpen && counterpartySearch && filteredCounterparties.length === 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No matching people</p>
+                </div>
+              )}
+            </div>
+            
+            {filter.counterpartyUserIds && filter.counterpartyUserIds.length > 0 && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Showing P2P transactions with selected people
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Status Filter */}
         <div>

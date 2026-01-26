@@ -28,6 +28,9 @@ public interface ITransactionService
     
     // Pending count
     Task<int> GetPendingCountAsync(string userId);
+    
+    // Get all counterparties the user has transacted with
+    Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId);
 }
 
 public class TransactionService : ITransactionService
@@ -111,7 +114,16 @@ public class TransactionService : ITransactionService
         var labels = await _labelRepository.GetByUserIdAsync(userId);
         var tags = await _tagRepository.GetByUserIdAsync(userId);
         
-        // If there's a search text, find matching label/tag/account IDs by name
+        // Get all counterparties the user has transacted with (for search)
+        var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
+        var allCounterpartyIds = p2pTransactions
+            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
+            .Select(t => t.CounterpartyUserId!)
+            .Distinct()
+            .ToList();
+        var allCounterpartyUsers = await _userRepository.GetByIdsAsync(allCounterpartyIds);
+        
+        // If there's a search text, find matching label/tag/account/counterparty IDs by name
         var enrichedFilter = filter;
         if (!string.IsNullOrEmpty(filter.SearchText))
         {
@@ -135,12 +147,20 @@ public class TransactionService : ITransactionService
                 .Select(a => a.Id)
                 .ToList();
             
+            // Find counterparties whose name or email contains the search text
+            var matchingCounterpartyIds = allCounterpartyUsers.Values
+                .Where(u => (u.FullName?.ToLowerInvariant().Contains(searchLower) ?? false) ||
+                           u.Email.ToLowerInvariant().Contains(searchLower))
+                .Select(u => u.Id)
+                .ToList();
+            
             // Create enriched filter with matching IDs
             enrichedFilter = filter with 
             { 
                 SearchLabelIds = matchingLabelIds.Count > 0 ? matchingLabelIds : null,
                 SearchTagIds = matchingTagIds.Count > 0 ? matchingTagIds : null,
-                SearchAccountIds = matchingAccountIds.Count > 0 ? matchingAccountIds : null
+                SearchAccountIds = matchingAccountIds.Count > 0 ? matchingAccountIds : null,
+                SearchCounterpartyUserIds = matchingCounterpartyIds.Count > 0 ? matchingCounterpartyIds : null
             };
         }
         
@@ -151,12 +171,8 @@ public class TransactionService : ITransactionService
         var labelDict = labels.ToDictionary(l => l.Id);
         var tagDict = tags.ToDictionary(t => t.Id);
         
-        // Fetch counterparty users for email resolution
-        var counterpartyUserIds = transactions
-            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
-            .Select(t => t.CounterpartyUserId!)
-            .Distinct();
-        var counterpartyUsers = await _userRepository.GetByIdsAsync(counterpartyUserIds);
+        // Use already fetched counterparty users for response mapping
+        var counterpartyUsers = allCounterpartyUsers;
 
         var page = filter.Page ?? 1;
         var pageSize = filter.PageSize ?? 50;
@@ -1439,5 +1455,32 @@ public class TransactionService : ITransactionService
     public async Task<int> GetPendingCountAsync(string userId)
     {
         return await _transactionRepository.GetPendingCountAsync(userId);
+    }
+
+    public async Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId)
+    {
+        // Get all P2P transactions for this user
+        var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
+        
+        // Group by counterparty and count
+        var counterpartyCounts = p2pTransactions
+            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
+            .GroupBy(t => t.CounterpartyUserId!)
+            .ToDictionary(g => g.Key, g => g.Count());
+        
+        // Get user details
+        var counterpartyIds = counterpartyCounts.Keys.ToList();
+        var usersDict = await _userRepository.GetByIdsAsync(counterpartyIds);
+        
+        return usersDict.Values
+            .Select(u => new CounterpartyInfo(
+                UserId: u.Id,
+                Email: u.Email,
+                Name: u.FullName,
+                TransactionCount: counterpartyCounts.GetValueOrDefault(u.Id, 0)
+            ))
+            .OrderByDescending(c => c.TransactionCount)
+            .ThenBy(c => c.Name ?? c.Email)
+            .ToList();
     }
 }

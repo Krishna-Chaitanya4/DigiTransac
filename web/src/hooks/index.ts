@@ -4,6 +4,7 @@ export {
   useInfiniteTransactions,
   useTransactionSummary,
   usePendingCount,
+  useCounterparties,
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,

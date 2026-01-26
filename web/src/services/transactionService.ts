@@ -8,6 +8,7 @@ import type {
   UpdateTransactionRequest,
   TransactionFilter,
   TransactionType,
+  CounterpartyInfo,
 } from '../types/transactions';
 
 // Build query string from filter
@@ -43,6 +44,10 @@ function buildFilterQuery(filter: TransactionFilter): string {
   // Multiple tag IDs - send as comma-separated string
   if (filter.tagIds && filter.tagIds.length > 0) {
     params.append('tagIds', filter.tagIds.join(','));
+  }
+  // Multiple counterparty user IDs - send as comma-separated string
+  if (filter.counterpartyUserIds && filter.counterpartyUserIds.length > 0) {
+    params.append('counterpartyUserIds', filter.counterpartyUserIds.join(','));
   }
   if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());
   if (filter.maxAmount !== undefined) params.append('maxAmount', filter.maxAmount.toString());
@@ -91,6 +96,7 @@ export async function getTransactionSummary(
   
   if (filter.labelIds?.length) params.append('labelIds', filter.labelIds.join(','));
   if (filter.tagIds?.length) params.append('tagIds', filter.tagIds.join(','));
+  if (filter.counterpartyUserIds?.length) params.append('counterpartyUserIds', filter.counterpartyUserIds.join(','));
   if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());
   if (filter.maxAmount !== undefined) params.append('maxAmount', filter.maxAmount.toString());
   if (filter.status) params.append('status', filter.status);
@@ -102,6 +108,11 @@ export async function getTransactionSummary(
 // Get recurring transactions
 export async function getRecurringTransactions(): Promise<RecurringTransaction[]> {
   return apiClient.get<RecurringTransaction[]>('/transactions/recurring');
+}
+
+// Get counterparties (users the current user has transacted with)
+export async function getCounterparties(): Promise<CounterpartyInfo[]> {
+  return apiClient.get<CounterpartyInfo[]>('/transactions/counterparties');
 }
 
 // Create transaction

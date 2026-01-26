@@ -23,6 +23,7 @@ public static class TransactionEndpoints
             string? types,
             string? labelIds,
             string? tagIds,
+            string? counterpartyUserIds,
             decimal? minAmount,
             decimal? maxAmount,
             string? searchText,
@@ -63,16 +64,39 @@ public static class TransactionEndpoints
                 tagIdList = tagIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
             }
 
+            List<string>? counterpartyUserIdList = null;
+            if (!string.IsNullOrEmpty(counterpartyUserIds))
+            {
+                counterpartyUserIdList = counterpartyUserIds.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            }
+
             var filter = new TransactionFilterRequest(
                 startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
                 minAmount, maxAmount, searchText, status, isRecurring,
-                page, pageSize, hasLinkedTransaction);
+                page, pageSize, hasLinkedTransaction, 
+                SearchLabelIds: null, SearchTagIds: null, SearchAccountIds: null,
+                CounterpartyUserIds: counterpartyUserIdList);
 
             var result = await transactionService.GetAllAsync(userId, filter);
             return Results.Ok(result);
         })
         .WithName("GetTransactions")
         .Produces<TransactionListResponse>(200);
+
+        // Get counterparties for filter dropdown
+        group.MapGet("/counterparties", async (
+            ClaimsPrincipal user,
+            ITransactionService transactionService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var counterparties = await transactionService.GetCounterpartiesAsync(userId);
+            return Results.Ok(counterparties);
+        })
+        .WithName("GetTransactionCounterparties")
+        .Produces<List<CounterpartyInfo>>(200);
 
         // Get transaction summary
         group.MapGet("/summary", async (
@@ -133,7 +157,8 @@ public static class TransactionEndpoints
         .Produces<List<RecurringTransactionResponse>>(200);
 
         // Get single transaction
-        group.MapGet("/{id}", async (
+        // Use regex constraint to only match valid MongoDB ObjectIds (24 hex chars)
+        group.MapGet("/{id:regex(^[a-fA-F0-9]{{24}}$)}", async (
             string id,
             ClaimsPrincipal user,
             ITransactionService transactionService) =>

@@ -28,6 +28,7 @@ export const queryKeys = {
     detail: (id: string) => ['transactions', 'detail', id] as const,
     summary: (filters: object) => ['transactions', 'summary', filters] as const,
     pendingCount: ['transactions', 'pendingCount'] as const,
+    counterparties: ['transactions', 'counterparties'] as const,
   },
   // Accounts
   accounts: {

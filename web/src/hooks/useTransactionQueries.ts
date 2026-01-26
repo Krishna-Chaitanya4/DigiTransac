@@ -11,6 +11,7 @@ import {
   batchDelete,
   batchMarkConfirmed,
   batchMarkPending,
+  getCounterparties,
 } from '../services/transactionService';
 import type {
   Transaction,
@@ -19,6 +20,7 @@ import type {
   TransactionListResponse,
   CreateTransactionRequest,
   UpdateTransactionRequest,
+  CounterpartyInfo,
 } from '../types/transactions';
 
 // Hook for fetching transactions with filters
@@ -63,6 +65,15 @@ export function usePendingCount() {
     queryFn: getPendingCount,
     staleTime: 30 * 1000, // 30 seconds - check frequently
     refetchInterval: 30 * 1000, // Poll every 30 seconds
+  });
+}
+
+// Hook for fetching counterparties (users the current user has transacted with)
+export function useCounterparties() {
+  return useQuery({
+    queryKey: queryKeys.transactions.counterparties,
+    queryFn: getCounterparties,
+    staleTime: 5 * 60 * 1000, // 5 minutes - counterparty list changes rarely
   });
 }
 
@@ -194,4 +205,4 @@ export function useInvalidateTransactions() {
 }
 
 // Export types for convenience
-export type { Transaction, TransactionFilter, TransactionSummary, TransactionListResponse };
+export type { Transaction, TransactionFilter, TransactionSummary, TransactionListResponse, CounterpartyInfo };

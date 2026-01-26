@@ -177,6 +177,7 @@ export interface TransactionFilter {
   labelIds?: string[];
   folderIds?: string[];  // UI-only: selected folders (expanded to labelIds for API)
   tagIds?: string[];
+  counterpartyUserIds?: string[];  // Filter by counterparty users
   minAmount?: number;
   maxAmount?: number;
   searchText?: string;
@@ -184,6 +185,14 @@ export interface TransactionFilter {
   isRecurring?: boolean;
   page?: number;
   pageSize?: number;
+}
+
+// Counterparty info from API
+export interface CounterpartyInfo {
+  userId: string;
+  email: string;
+  name: string | null;
+  transactionCount: number;
 }
 
 // Transaction type configuration (for API types)
