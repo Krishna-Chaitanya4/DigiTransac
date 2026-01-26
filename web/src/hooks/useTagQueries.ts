@@ -144,4 +144,17 @@ export function useInvalidateTags() {
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
 }
 
+// Hook to prefetch tags (e.g., on hover)
+export function usePrefetchTags() {
+  const queryClient = useQueryClient();
+  
+  return () => {
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.tags.list(),
+      queryFn: getTags,
+      staleTime: 10 * 60 * 1000,
+    });
+  };
+}
+
 export type { Tag };

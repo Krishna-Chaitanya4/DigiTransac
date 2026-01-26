@@ -163,4 +163,17 @@ export function useInvalidateAccounts() {
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
 }
 
+// Hook to prefetch accounts (e.g., on hover)
+export function usePrefetchAccounts() {
+  const queryClient = useQueryClient();
+  
+  return (includeArchived = false) => {
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.accounts.list(includeArchived),
+      queryFn: () => getAccounts(includeArchived),
+      staleTime: 5 * 60 * 1000,
+    });
+  };
+}
+
 export type { Account, AccountSummary };

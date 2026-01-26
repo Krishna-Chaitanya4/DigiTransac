@@ -161,4 +161,17 @@ export function useInvalidateLabels() {
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.labels.all });
 }
 
+// Hook to prefetch labels (e.g., on hover)
+export function usePrefetchLabels() {
+  const queryClient = useQueryClient();
+  
+  return () => {
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.labels.list(),
+      queryFn: getLabels,
+      staleTime: 10 * 60 * 1000,
+    });
+  };
+}
+
 export type { Label, LabelTree };

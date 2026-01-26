@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryClient';
 import {
   getTransactions,
@@ -27,6 +27,22 @@ export function useTransactions(filter: TransactionFilter, enabled = true) {
     queryKey: queryKeys.transactions.list(filter),
     queryFn: () => getTransactions(filter),
     staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled,
+  });
+}
+
+// Infinite query hook for paginated transactions (for infinite scroll)
+export function useInfiniteTransactions(
+  filter: Omit<TransactionFilter, 'page'>,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: ['transactions', 'infinite', filter],
+    queryFn: ({ pageParam = 1 }) => getTransactions({ ...filter, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => 
+      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
+    staleTime: 2 * 60 * 1000,
     enabled,
   });
 }

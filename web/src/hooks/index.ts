@@ -1,6 +1,7 @@
 // Transaction queries
 export {
   useTransactions,
+  useInfiniteTransactions,
   useTransactionSummary,
   usePendingCount,
   useCreateTransaction,
@@ -24,6 +25,7 @@ export {
   useAdjustBalance,
   useSetDefaultAccount,
   useInvalidateAccounts,
+  usePrefetchAccounts,
 } from './useAccountQueries';
 
 // Label queries
@@ -36,6 +38,7 @@ export {
   useDeleteLabelWithReassignment,
   useLabelTransactionCount,
   useInvalidateLabels,
+  usePrefetchLabels,
 } from './useLabelQueries';
 
 // Tag queries
@@ -47,6 +50,7 @@ export {
   useTagTransactionCount,
   useDeleteTagConfirmed,
   useInvalidateTags,
+  usePrefetchTags,
 } from './useTagQueries';
 
 // Other hooks
