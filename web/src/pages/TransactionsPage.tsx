@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
@@ -17,30 +17,30 @@ import {
   formatDateToStartOfDay,
   formatDateToEndOfDay,
 } from '../hooks/useTransactionFilters';
-import { getLabels } from '../services/labelService';
-import { getTags, createTag } from '../services/tagService';
-import { getAccounts, type Account } from '../services/accountService';
-import { logger } from '../services/logger';
 import {
-  getTransactions,
-  getTransactionSummary,
-  createTransaction,
-  updateTransaction,
-  deleteTransaction,
-  updateStatus,
-  batchDelete,
-  batchMarkConfirmed,
-  batchMarkPending,
-  exportTransactions,
-} from '../services/transactionService';
+  useAccounts,
+  useLabels,
+  useTags,
+  useCreateTag,
+  useTransactions,
+  useTransactionSummary,
+  useCreateTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
+  useUpdateStatus,
+  useBatchDelete,
+  useBatchMarkConfirmed,
+  useBatchMarkPending,
+  useInvalidateTransactions,
+} from '../hooks';
+import { exportTransactions } from '../services/transactionService';
+import { logger } from '../services/logger';
 import type {
   Transaction,
-  TransactionSummary,
   TransactionFilter,
   CreateTransactionRequest,
   UpdateTransactionRequest,
 } from '../types/transactions';
-import type { Label, Tag } from '../types/labels';
 
 export default function TransactionsPage() {
   // Currency context - backend returns summary already converted to primary currency
@@ -49,32 +49,39 @@ export default function TransactionsPage() {
   // URL search params for highlight
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Data state
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [labels, setLabels] = useState<Label[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [summary, setSummary] = useState<TransactionSummary | null>(null);
+  // React Query hooks for data fetching
+  const { data: accounts = [], isLoading: isLoadingAccounts, error: accountsError } = useAccounts();
+  const { data: labels = [], isLoading: isLoadingLabels, error: labelsError } = useLabels();
+  const { data: tags = [], isLoading: isLoadingTags, error: tagsError } = useTags();
+  const createTagMutation = useCreateTag();
+  const invalidateTransactions = useInvalidateTransactions();
+  
+  // Mutations
+  const createTransactionMutation = useCreateTransaction();
+  const updateTransactionMutation = useUpdateTransaction();
+  const deleteTransactionMutation = useDeleteTransaction();
+  const updateStatusMutation = useUpdateStatus();
+  const batchDeleteMutation = useBatchDelete();
+  const batchMarkConfirmedMutation = useBatchMarkConfirmed();
+  const batchMarkPendingMutation = useBatchMarkPending();
+  
+  // Local transaction state for optimistic updates
+  const [optimisticTransactions, setOptimisticTransactions] = useState<Transaction[] | null>(null);
   
   // Toast notifications
   const { showInfo, toasts, dismissToast } = useToast();
   
   // UI state
-  const [isLoading, setIsLoading] = useState(true);
   const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [pendingRefreshTrigger, setPendingRefreshTrigger] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
   const pageSize = 50;
   
   // Filter state
@@ -82,6 +89,7 @@ export default function TransactionsPage() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearchText, setDebouncedSearchText] = useState('');
   const [filter, setFilter] = useState<TransactionFilter>({ status: 'Confirmed' }); // Default to Confirmed
   
   // Linked transaction navigation
@@ -91,6 +99,84 @@ export default function TransactionsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get current date range based on preset
+  const getDateRange = useCallback((): { startDate: string; endDate: string } => {
+    if (datePreset === 'custom') {
+      return {
+        startDate: customStartDate ? formatDateToStartOfDay(new Date(customStartDate)) : '',
+        endDate: customEndDate ? formatDateToEndOfDay(new Date(customEndDate)) : '',
+      };
+    }
+    const range = getDateRangeForPreset(datePreset);
+    return {
+      startDate: formatDateToStartOfDay(range.start),
+      endDate: formatDateToEndOfDay(range.end),
+    };
+  }, [datePreset, customStartDate, customEndDate]);
+
+  // Helper to get all category IDs from selected folders
+  const getExpandedLabelIds = useCallback(() => {
+    const labelIds = new Set(filter.labelIds || []);
+    
+    // Expand folderIds to their child categories
+    if (filter.folderIds?.length) {
+      for (const folderId of filter.folderIds) {
+        // Get all categories that belong to this folder
+        const childCategories = labels.filter(l => l.parentId === folderId && l.type === 'Category');
+        for (const child of childCategories) {
+          labelIds.add(child.id);
+        }
+      }
+    }
+    
+    return labelIds.size > 0 ? Array.from(labelIds) : undefined;
+  }, [filter.labelIds, filter.folderIds, labels]);
+
+  // Build the full filter for transaction queries
+  const fullFilter: TransactionFilter = useMemo(() => {
+    const dateRange = getDateRange();
+    const expandedLabelIds = getExpandedLabelIds();
+    return {
+      ...filter,
+      ...dateRange,
+      labelIds: expandedLabelIds,
+      folderIds: undefined,
+      searchText: debouncedSearchText || undefined,
+      page: currentPage,
+      pageSize,
+    };
+  }, [filter, getDateRange, getExpandedLabelIds, debouncedSearchText, currentPage, pageSize]);
+
+  // React Query for transactions
+  const { 
+    data: transactionResponse, 
+    isLoading: isLoadingTransactions, 
+    error: transactionsError,
+    isFetching: isFetchingTransactions,
+  } = useTransactions(fullFilter);
+
+  // React Query for summary (without pagination)
+  const summaryFilter = useMemo(() => {
+    const { page, pageSize, ...rest } = fullFilter;
+    return rest;
+  }, [fullFilter]);
+  
+  const { data: summary } = useTransactionSummary(summaryFilter);
+
+  // Derived state
+  const transactions = optimisticTransactions ?? transactionResponse?.transactions ?? [];
+  const hasMore = transactionResponse ? transactionResponse.page < transactionResponse.totalPages : false;
+  const isLoading = isLoadingAccounts || isLoadingLabels || isLoadingTags || isLoadingTransactions;
+  const isLoadingMore = isFetchingTransactions && currentPage > 1;
+  const queryError = accountsError || labelsError || tagsError || transactionsError 
+    ? 'Failed to load data. Please refresh the page.' 
+    : null;
+  const isSubmitting = createTransactionMutation.isPending || updateTransactionMutation.isPending;
+  
+  // Local error state for non-query errors (export, etc.)
+  const [localError, setLocalError] = useState<string | null>(null);
+  const error = queryError || localError;
 
   // Bulk selection
   const {
@@ -104,12 +190,39 @@ export default function TransactionsPage() {
     items: transactions,
   });
 
-  // Infinite scroll
+  // Infinite scroll - load more by incrementing page
   const listRef = useInfiniteScroll({
     hasMore,
-    isLoading: isLoadingMore,
-    onLoadMore: () => loadTransactions(currentPage + 1, true),
+    isLoading: isLoadingMore || isFetchingTransactions,
+    onLoadMore: () => {
+      if (!isFetchingTransactions) {
+        setCurrentPage(prev => prev + 1);
+      }
+    },
   });
+
+  // Reset to page 1 when filter changes (except page itself)
+  useEffect(() => {
+    setCurrentPage(1);
+    setOptimisticTransactions(null);
+    clearSelection();
+  }, [filter, debouncedSearchText, datePreset, customStartDate, customEndDate]);
+
+  // Debounce search text
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchText]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -164,133 +277,6 @@ export default function TransactionsPage() {
     };
   }, [isLoading]);
 
-  // Get current date range based on preset
-  const getDateRange = useCallback((): { startDate: string; endDate: string } => {
-    if (datePreset === 'custom') {
-      return {
-        startDate: customStartDate ? formatDateToStartOfDay(new Date(customStartDate)) : '',
-        endDate: customEndDate ? formatDateToEndOfDay(new Date(customEndDate)) : '',
-      };
-    }
-    const range = getDateRangeForPreset(datePreset);
-    return {
-      startDate: formatDateToStartOfDay(range.start),
-      endDate: formatDateToEndOfDay(range.end),
-    };
-  }, [datePreset, customStartDate, customEndDate]);
-
-  // Load initial data
-  useEffect(() => {
-    async function loadInitialData() {
-      try {
-        const [accountsData, labelsData, tagsData] = await Promise.all([
-          getAccounts(),
-          getLabels(),
-          getTags(),
-        ]);
-        setAccounts(accountsData);
-        setLabels(labelsData);
-        setTags(tagsData);
-      } catch (err) {
-        logger.error('Failed to load initial data:', err);
-        setError('Failed to load data. Please refresh the page.');
-      }
-    }
-    loadInitialData();
-  }, []);
-
-  // Helper to get all category IDs from selected folders
-  const getExpandedLabelIds = useCallback(() => {
-    const labelIds = new Set(filter.labelIds || []);
-    
-    // Expand folderIds to their child categories
-    if (filter.folderIds?.length) {
-      for (const folderId of filter.folderIds) {
-        // Get all categories that belong to this folder
-        const childCategories = labels.filter(l => l.parentId === folderId && l.type === 'Category');
-        for (const child of childCategories) {
-          labelIds.add(child.id);
-        }
-      }
-    }
-    
-    return labelIds.size > 0 ? Array.from(labelIds) : undefined;
-  }, [filter.labelIds, filter.folderIds, labels]);
-
-  // Load transactions when filter changes
-  const loadTransactions = useCallback(async (page = 1, append = false) => {
-    if (page === 1) {
-      setIsLoading(true);
-    } else {
-      setIsLoadingMore(true);
-    }
-    setError(null);
-
-    try {
-      const dateRange = getDateRange();
-      const expandedLabelIds = getExpandedLabelIds();
-      const fullFilter: TransactionFilter = {
-        ...filter,
-        ...dateRange,
-        labelIds: expandedLabelIds, // Use expanded labelIds
-        folderIds: undefined, // Don't send folderIds to API
-        searchText: searchText || undefined,
-        page,
-        pageSize,
-      };
-
-      const [transactionsData, summaryData] = await Promise.all([
-        getTransactions(fullFilter),
-        // Pass full filter to summary for consistent results
-        page === 1 ? getTransactionSummary(fullFilter) : Promise.resolve(null),
-      ]);
-
-      if (append) {
-        setTransactions(prev => [...prev, ...transactionsData.transactions]);
-      } else {
-        setTransactions(transactionsData.transactions);
-        clearSelection(); // Clear selection when reloading
-      }
-      
-      if (summaryData) {
-        setSummary(summaryData);
-      }
-      
-      setCurrentPage(transactionsData.page);
-      setHasMore(transactionsData.page < transactionsData.totalPages);
-    } catch (err) {
-      logger.error('Failed to load transactions:', err);
-      setError('Failed to load transactions. Please try again.');
-    } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-    }
-  }, [filter, searchText, getDateRange, clearSelection, getExpandedLabelIds]);
-
-  // Refresh just the summary (for instant updates after status changes)
-  const refreshSummary = useCallback(async () => {
-    try {
-      const dateRange = getDateRange();
-      const expandedLabelIds = getExpandedLabelIds();
-      const fullFilter: TransactionFilter = {
-        ...filter,
-        ...dateRange,
-        labelIds: expandedLabelIds,
-        folderIds: undefined,
-        searchText: searchText || undefined,
-      };
-      const summaryData = await getTransactionSummary(fullFilter);
-      setSummary(summaryData);
-    } catch (err) {
-      logger.error('Failed to refresh summary:', err);
-    }
-  }, [filter, searchText, getDateRange, getExpandedLabelIds]);
-
-  // Initial load and reload on filter changes
-  useEffect(() => {
-    loadTransactions(1, false);
-  }, [loadTransactions]);
-
   // Handle highlight from URL param (e.g., /transactions?highlight=abc123)
   useEffect(() => {
     const highlightId = searchParams.get('highlight');
@@ -315,23 +301,6 @@ export default function TransactionsPage() {
     }
   }, [searchParams, setSearchParams, transactions.length]);
 
-  // Debounced search
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    searchTimeoutRef.current = setTimeout(() => {
-      loadTransactions(1, false);
-    }, 300);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText]);
-
   // Handle date preset change
   const handleDatePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
@@ -349,24 +318,20 @@ export default function TransactionsPage() {
 
   // Handle transaction form submit
   const handleFormSubmit = async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
-    setIsSubmitting(true);
     setFormError(null);
     try {
       if (editingTransaction) {
-        await updateTransaction(editingTransaction.id, data as UpdateTransactionRequest);
+        await updateTransactionMutation.mutateAsync({ id: editingTransaction.id, data: data as UpdateTransactionRequest });
       } else {
-        await createTransaction(data as CreateTransactionRequest);
+        await createTransactionMutation.mutateAsync(data as CreateTransactionRequest);
       }
       setIsFormOpen(false);
       setEditingTransaction(null);
-      loadTransactions(1, false);
     } catch (err) {
       logger.error('Failed to save transaction:', err);
       const message = err instanceof Error ? err.message : 'Failed to save transaction. Please try again.';
       setFormError(message);
       // Don't close the form on error so user can fix and retry
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -384,15 +349,19 @@ export default function TransactionsPage() {
     
     // Optimistically remove from UI immediately
     const originalIndex = transactions.findIndex(t => t.id === id);
-    setTransactions(prev => prev.filter(t => t.id !== id));
+    setOptimisticTransactions(prev => {
+      const list = prev ?? transactions;
+      return list.filter(t => t.id !== id);
+    });
     
     // Show undo toast
     const toastId = showInfo('Transaction deleted', {
       label: 'Undo',
       onClick: () => {
         // Restore transaction in the same position
-        setTransactions(prev => {
-          const newList = [...prev];
+        setOptimisticTransactions(prev => {
+          const list = prev ?? transactions;
+          const newList = [...list];
           newList.splice(originalIndex, 0, transactionToDelete);
           return newList;
         });
@@ -401,20 +370,15 @@ export default function TransactionsPage() {
     });
     
     try {
-      await deleteTransaction(id);
-      // Update summary after successful delete
-      refreshSummary();
+      await deleteTransactionMutation.mutateAsync(id);
+      // Clear optimistic state - query cache is updated
+      setOptimisticTransactions(null);
       setPendingRefreshTrigger(prev => prev + 1);
     } catch (err) {
       logger.error('Failed to delete transaction:', err);
       // Restore transaction on error
-      setTransactions(prev => {
-        const newList = [...prev];
-        newList.splice(originalIndex, 0, transactionToDelete);
-        return newList;
-      });
+      setOptimisticTransactions(null);
       dismissToast(toastId);
-      setError('Failed to delete transaction. Please try again.');
     }
   };
 
@@ -430,13 +394,14 @@ export default function TransactionsPage() {
     const originalIndex = transactions.findIndex(t => t.id === id);
     
     // Optimistic update
-    if (shouldRemove) {
-      setTransactions(prev => prev.filter(t => t.id !== id));
-    } else {
-      setTransactions(prev => prev.map(t => 
-        t.id === id ? { ...t, status } : t
-      ));
-    }
+    setOptimisticTransactions(prev => {
+      const list = prev ?? transactions;
+      if (shouldRemove) {
+        return list.filter(t => t.id !== id);
+      } else {
+        return list.map(t => t.id === id ? { ...t, status } : t);
+      }
+    });
     
     // Show undo toast
     const statusLabel = status === 'Confirmed' ? 'confirmed' : 'marked pending';
@@ -445,48 +410,37 @@ export default function TransactionsPage() {
       onClick: async () => {
         dismissToast(toastId);
         try {
-          await updateStatus(id, previousStatus);
-          // Restore to previous state
-          if (shouldRemove) {
-            setTransactions(prev => {
-              const newList = [...prev];
+          await updateStatusMutation.mutateAsync({ id, status: previousStatus });
+          // Restore to previous state via optimistic update
+          setOptimisticTransactions(prev => {
+            const list = prev ?? transactions;
+            if (shouldRemove) {
+              const newList = [...list];
               newList.splice(originalIndex, 0, { ...transactionToUpdate, status: previousStatus });
               return newList;
-            });
-          } else {
-            setTransactions(prev => prev.map(t => 
-              t.id === id ? { ...t, status: previousStatus } : t
-            ));
-          }
+            } else {
+              return list.map(t => t.id === id ? { ...t, status: previousStatus } : t);
+            }
+          });
           setPendingRefreshTrigger(prev => prev + 1);
-          refreshSummary();
+          // Clear optimistic state after undo
+          setTimeout(() => setOptimisticTransactions(null), 100);
         } catch (err) {
           logger.error('Failed to undo status change:', err);
-          setError('Failed to undo. Please try again.');
         }
       },
     });
     
     try {
-      await updateStatus(id, status);
+      await updateStatusMutation.mutateAsync({ id, status });
       setPendingRefreshTrigger(prev => prev + 1);
-      refreshSummary();
+      // Clear optimistic state - query cache is updated
+      setOptimisticTransactions(null);
     } catch (err) {
       logger.error('Failed to update transaction:', err);
       // Restore on error
-      if (shouldRemove) {
-        setTransactions(prev => {
-          const newList = [...prev];
-          newList.splice(originalIndex, 0, transactionToUpdate);
-          return newList;
-        });
-      } else {
-        setTransactions(prev => prev.map(t => 
-          t.id === id ? { ...t, status: previousStatus } : t
-        ));
-      }
+      setOptimisticTransactions(null);
       dismissToast(toastId);
-      setError('Failed to update transaction. Please try again.');
     }
   };
 
@@ -501,17 +455,16 @@ export default function TransactionsPage() {
     // Clear highlight after animation
     setTimeout(() => setHighlightedTransactionId(null), 3000);
     
-    // Reload transactions to include all accounts, then scroll to the linked one
-    loadTransactions(1, false).then(() => {
-      // Small delay to let the DOM update
-      setTimeout(() => {
-        const element = document.querySelector(`[data-transaction-id="${linkedTransactionId}"]`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
-    });
-  }, []);
+    // Invalidate to reload transactions with new filter, then scroll to the linked one
+    invalidateTransactions();
+    // Small delay to let the DOM update after query refresh
+    setTimeout(() => {
+      const element = document.querySelector(`[data-transaction-id="${linkedTransactionId}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+  }, [invalidateTransactions]);
 
   // Handle Accept P2P - opens form with transaction data for account/category assignment
   const handleAcceptP2P = useCallback((transaction: Transaction) => {
@@ -532,13 +485,14 @@ export default function TransactionsPage() {
     const originalIndex = transactions.findIndex(t => t.id === id);
     
     // Optimistic update
-    if (shouldRemove) {
-      setTransactions(prev => prev.filter(t => t.id !== id));
-    } else {
-      setTransactions(prev => prev.map(t => 
-        t.id === id ? { ...t, status: 'Declined' as const } : t
-      ));
-    }
+    setOptimisticTransactions(prev => {
+      const list = prev ?? transactions;
+      if (shouldRemove) {
+        return list.filter(t => t.id !== id);
+      } else {
+        return list.map(t => t.id === id ? { ...t, status: 'Declined' as const } : t);
+      }
+    });
     
     // Show undo toast
     const toastId = showInfo('Transaction declined', {
@@ -546,50 +500,39 @@ export default function TransactionsPage() {
       onClick: async () => {
         dismissToast(toastId);
         try {
-          await updateStatus(id, previousStatus);
-          // Restore to previous state
-          if (shouldRemove) {
-            setTransactions(prev => {
-              const newList = [...prev];
+          await updateStatusMutation.mutateAsync({ id, status: previousStatus });
+          // Restore to previous state via optimistic update
+          setOptimisticTransactions(prev => {
+            const list = prev ?? transactions;
+            if (shouldRemove) {
+              const newList = [...list];
               newList.splice(originalIndex, 0, { ...transactionToDecline, status: previousStatus });
               return newList;
-            });
-          } else {
-            setTransactions(prev => prev.map(t => 
-              t.id === id ? { ...t, status: previousStatus } : t
-            ));
-          }
+            } else {
+              return list.map(t => t.id === id ? { ...t, status: previousStatus } : t);
+            }
+          });
           setPendingRefreshTrigger(prev => prev + 1);
-          refreshSummary();
+          // Clear optimistic state after undo
+          setTimeout(() => setOptimisticTransactions(null), 100);
         } catch (err) {
           logger.error('Failed to undo decline:', err);
-          setError('Failed to undo. Please try again.');
         }
       },
     });
     
     try {
-      await updateStatus(id, 'Declined');
+      await updateStatusMutation.mutateAsync({ id, status: 'Declined' });
       setPendingRefreshTrigger(prev => prev + 1);
-      refreshSummary();
+      // Clear optimistic state - query cache is updated
+      setOptimisticTransactions(null);
     } catch (err) {
       logger.error('Failed to decline transaction:', err);
       // Restore on error
-      if (shouldRemove) {
-        setTransactions(prev => {
-          const newList = [...prev];
-          newList.splice(originalIndex, 0, transactionToDecline);
-          return newList;
-        });
-      } else {
-        setTransactions(prev => prev.map(t => 
-          t.id === id ? { ...t, status: previousStatus } : t
-        ));
-      }
+      setOptimisticTransactions(null);
       dismissToast(toastId);
-      setError('Failed to decline transaction. Please try again.');
     }
-  }, [filter.status, transactions, refreshSummary, showInfo, dismissToast]);
+  }, [filter.status, transactions, updateStatusMutation, showInfo, dismissToast]);
 
   // Batch operations
   const handleBatchDelete = async () => {
@@ -599,15 +542,13 @@ export default function TransactionsPage() {
     
     setIsBatchProcessing(true);
     try {
-      const result = await batchDelete(Array.from(selectedIds));
+      const result = await batchDeleteMutation.mutateAsync(Array.from(selectedIds));
       clearSelection();
-      loadTransactions(1, false);
       if (result.failedCount > 0) {
-        setError(`${result.failedCount} transaction(s) could not be deleted.`);
+        logger.error(`${result.failedCount} transaction(s) could not be deleted.`);
       }
     } catch (err) {
       logger.error('Failed to batch delete:', err);
-      setError('Failed to delete transactions. Please try again.');
     } finally {
       setIsBatchProcessing(false);
     }
@@ -616,14 +557,17 @@ export default function TransactionsPage() {
   const handleBatchMarkConfirmed = async () => {
     setIsBatchProcessing(true);
     try {
-      await batchMarkConfirmed(Array.from(selectedIds));
-      setTransactions(prev => prev.map(t => 
-        selectedIds.has(t.id) ? { ...t, status: 'Confirmed' as const } : t
-      ));
+      await batchMarkConfirmedMutation.mutateAsync(Array.from(selectedIds));
+      // Optimistic update
+      setOptimisticTransactions(prev => {
+        const list = prev ?? transactions;
+        return list.map(t => selectedIds.has(t.id) ? { ...t, status: 'Confirmed' as const } : t);
+      });
       clearSelection();
+      // Clear optimistic state after cache update
+      setTimeout(() => setOptimisticTransactions(null), 100);
     } catch (err) {
       logger.error('Failed to batch mark confirmed:', err);
-      setError('Failed to update transactions. Please try again.');
     } finally {
       setIsBatchProcessing(false);
     }
@@ -632,14 +576,17 @@ export default function TransactionsPage() {
   const handleBatchMarkPending = async () => {
     setIsBatchProcessing(true);
     try {
-      await batchMarkPending(Array.from(selectedIds));
-      setTransactions(prev => prev.map(t => 
-        selectedIds.has(t.id) ? { ...t, status: 'Pending' as const } : t
-      ));
+      await batchMarkPendingMutation.mutateAsync(Array.from(selectedIds));
+      // Optimistic update
+      setOptimisticTransactions(prev => {
+        const list = prev ?? transactions;
+        return list.map(t => selectedIds.has(t.id) ? { ...t, status: 'Pending' as const } : t);
+      });
       clearSelection();
+      // Clear optimistic state after cache update
+      setTimeout(() => setOptimisticTransactions(null), 100);
     } catch (err) {
       logger.error('Failed to batch mark pending:', err);
-      setError('Failed to update transactions. Please try again.');
     } finally {
       setIsBatchProcessing(false);
     }
@@ -675,7 +622,7 @@ export default function TransactionsPage() {
       URL.revokeObjectURL(url);
     } catch (err) {
       logger.error('Failed to export:', err);
-      setError('Failed to export transactions. Please try again.');
+      setLocalError('Failed to export transactions. Please try again.');
     }
   };
 
@@ -777,7 +724,7 @@ export default function TransactionsPage() {
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 
           rounded-lg text-red-600 dark:text-red-400 text-sm">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
+          {localError && <button onClick={() => setLocalError(null)} className="ml-2 underline">Dismiss</button>}
         </div>
       )}
 
@@ -989,9 +936,8 @@ export default function TransactionsPage() {
         error={formError}
         onCreateTag={async (name) => {
           try {
-            const newTag = await createTag({ name });
-            // Add to local tags list
-            setTags(prev => [...prev, newTag]);
+            const newTag = await createTagMutation.mutateAsync({ name });
+            // React Query will automatically invalidate and refetch tags
             return newTag;
           } catch (error) {
             logger.error('Failed to create tag:', error);

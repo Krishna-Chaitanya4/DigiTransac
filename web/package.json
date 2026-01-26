@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@sentry/react": "^10.36.0",
+    "@tanstack/react-query": "^5.90.20",
     "@tanstack/react-virtual": "^3.13.18",
     "date-fns": "^4.1.0",
     "emoji-picker-react": "^4.16.1",
@@ -31,7 +32,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@playwright/test": "^1.57.0",
+    "@playwright/test": "^1.58.0",
     "@storybook/react-vite": "^10.2.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.9.1",

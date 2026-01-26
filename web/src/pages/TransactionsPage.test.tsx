@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TransactionsPage from './TransactionsPage';
 import * as transactionService from '../services/transactionService';
 import * as accountService from '../services/accountService';
@@ -74,17 +75,29 @@ vi.mock('../services/currencyService', async () => {
 });
 
 // Test wrapper with providers
-const TestWrapper = ({ children }: { children: React.ReactNode }) => (
-  <BrowserRouter>
-    <ThemeProvider>
-      <AuthProvider>
-        <CurrencyProvider>
-          {children}
-        </CurrencyProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </BrowserRouter>
-);
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: { retry: false, gcTime: 0 },
+    mutations: { retry: false },
+  },
+});
+
+const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+  const queryClient = createTestQueryClient();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <CurrencyProvider>
+              {children}
+            </CurrencyProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(ui, { wrapper: TestWrapper });
