@@ -29,6 +29,7 @@ interface MessageBubbleProps {
   isCurrentSearchResult?: boolean;
   counterpartyName?: string | null;
   counterpartyUserId?: string;
+  isSelfChat?: boolean; // When true, use isSystemGenerated for left/right positioning
   onMenuOpen: (message: ConversationMessage, position: { x: number; y: number; buttonTop: number }) => void;
   onScrollToReply: (messageId: string) => void;
 }
@@ -40,11 +41,17 @@ export const MessageBubble = memo(function MessageBubble({
   isCurrentSearchResult = false,
   counterpartyName,
   counterpartyUserId,
+  isSelfChat = false,
   onMenuOpen,
   onScrollToReply,
 }: MessageBubbleProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isMine = message.isFromMe;
+  
+  // In self-chat: right = user-created, left = system-generated (needs review)
+  // In P2P chat: right = my messages, left = counterparty messages
+  const isMine = isSelfChat 
+    ? !message.isSystemGenerated  // In self-chat, non-system messages go on right
+    : message.isFromMe;
 
   // Long press handlers for mobile
   const handleTouchStart = useCallback(
@@ -77,52 +84,68 @@ export const MessageBubble = memo(function MessageBubble({
   if (message.type === 'Transaction' && message.transaction) {
     const tx = message.transaction;
     const isSent = tx.transactionType === 'Send';
+    
+    // In self-chat, positioning is based on isSystemGenerated (left = system, right = user-created)
+    // In P2P chat, positioning is based on Send/Receive
+    const isRightAligned = isSelfChat ? isMine : isSent;
 
     return (
       <div
         id={`msg-${message.id}`}
-        className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-3 group transition-all duration-300`}
+        className={`flex ${isRightAligned ? 'justify-end' : 'justify-start'} mb-2 group transition-all duration-300`}
       >
         <div className="relative">
           <div
-            className={`max-w-xs rounded-2xl p-4 ${
+            className={`min-w-[120px] max-w-[180px] rounded-xl p-3 shadow-md ${
               isSent
-                ? 'bg-gradient-to-br from-red-500 to-red-600 text-white'
-                : 'bg-gradient-to-br from-green-500 to-green-600 text-white'
+                ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white'
+                : 'bg-gradient-to-br from-emerald-500 to-green-600 text-white'
             }`}
           >
             {/* Menu trigger */}
             <button
               onClick={handleMenuClick}
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/20 text-white/70 hover:text-white transition-opacity"
+              className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/20 text-white/70 hover:text-white transition-opacity"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {/* Status badge */}
-            <div className="flex items-center justify-center gap-1 mb-2">
+            <div className="flex items-center justify-center gap-1 mb-1.5">
               <span
-                className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  isSent ? 'bg-red-400/30' : 'bg-green-400/30'
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide ${
+                  isSent 
+                    ? 'bg-white/90 text-red-600' 
+                    : 'bg-white/90 text-green-600'
                 }`}
               >
                 {isSent ? '↑ Sent' : '↓ Received'}
               </span>
+              {/* System-generated badge for self-chat */}
+              {isSelfChat && message.isSystemGenerated && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+                  {message.systemSource || 'Auto'}
+                </span>
+              )}
             </div>
 
             {/* Amount */}
             <div className="text-center">
-              <div className="text-2xl font-bold">{formatChatCurrency(tx.amount, tx.currency)}</div>
-              {tx.accountName && <div className="text-sm opacity-80 mt-1">{tx.accountName}</div>}
-              {tx.notes && <div className="text-sm opacity-80 mt-1 italic">"{tx.notes}"</div>}
-              {showTime && (
-                <div className="text-xs opacity-60 mt-2">
-                  {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
+              <div className="text-xl font-bold tracking-tight">{formatChatCurrency(tx.amount, tx.currency)}</div>
+              {tx.accountName && (
+                <div className="text-xs text-white/90 mt-0.5 font-medium truncate">{tx.accountName}</div>
+              )}
+              {tx.notes && (
+                <div className="text-[11px] text-white/80 mt-1 italic truncate max-w-full">"{tx.notes}"</div>
               )}
             </div>
+            {showTime && (
+              <div className="text-[10px] text-white/70 mt-1.5 text-right">
+                {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
           </div>
         </div>
       </div>

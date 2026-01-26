@@ -52,19 +52,13 @@ public class ChatMessage
     public string? Content { get; set; }
 
     /// <summary>
+    /// <summary>
     /// Reference to transaction (for Transaction type messages)
-    /// Links to the user's own transaction in the P2P pair
+    /// All transaction data (amount, currency, status, source, etc.) is fetched from Transaction.
     /// </summary>
     [BsonElement("transactionId")]
     [BsonRepresentation(BsonType.ObjectId)]
     public string? TransactionId { get; set; }
-
-    /// <summary>
-    /// The shared link ID between P2P transaction pairs
-    /// Used to identify the same transaction from both sides
-    /// </summary>
-    [BsonElement("transactionLinkId")]
-    public Guid? TransactionLinkId { get; set; }
 
     /// <summary>
     /// ID of message this is replying to (for threaded replies)

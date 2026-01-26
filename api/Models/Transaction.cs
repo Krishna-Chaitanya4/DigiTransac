@@ -27,6 +27,18 @@ public enum TransactionStatus
     Declined    // Counterparty rejected (P2P)
 }
 
+/// <summary>
+/// How the transaction was created
+/// </summary>
+public enum TransactionSource
+{
+    Manual,     // User created via transaction form
+    Chat,       // Created via chat "Send Money"
+    Recurring,  // Auto-generated from recurring template
+    Import,     // Imported from CSV/bank
+    Transfer    // Internal account transfer
+}
+
 public class TransactionSplit
 {
     [BsonElement("labelId")]
@@ -158,6 +170,21 @@ public class Transaction
     [BsonElement("status")]
     [BsonRepresentation(BsonType.String)]
     public TransactionStatus Status { get; set; } = TransactionStatus.Confirmed;
+
+    /// <summary>
+    /// Reference to the chat message created for this transaction.
+    /// Enables bidirectional navigation between transaction and chat.
+    /// </summary>
+    [BsonElement("chatMessageId")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? ChatMessageId { get; set; }
+
+    /// <summary>
+    /// How the transaction was created (Manual, Chat, Recurring, Import, Transfer)
+    /// </summary>
+    [BsonElement("source")]
+    [BsonRepresentation(BsonType.String)]
+    public TransactionSource Source { get; set; } = TransactionSource.Manual;
 
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

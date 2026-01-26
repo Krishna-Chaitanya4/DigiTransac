@@ -14,6 +14,7 @@ export interface ConversationSummary {
   totalSent: number | null;
   totalReceived: number | null;
   primaryCurrency: string | null;
+  isSelfChat?: boolean; // True when this is user's personal transaction log
 }
 
 export interface ConversationListResponse {
@@ -58,6 +59,8 @@ export interface ConversationMessage {
   isDeleted: boolean;
   replyToMessageId: string | null;
   replyTo: ReplyPreview | null;
+  isSystemGenerated?: boolean; // True if auto-created (recurring, import, etc.)
+  systemSource?: string | null; // Source: "Recurring", "Import", "Transfer", etc.
 }
 
 export interface ConversationDetailResponse {
@@ -69,6 +72,7 @@ export interface ConversationDetailResponse {
   hasMore: boolean;
   totalSent: number;
   totalReceived: number;
+  isSelfChat?: boolean; // True when this is user's personal transaction log
 }
 
 // Request types

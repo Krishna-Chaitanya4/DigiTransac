@@ -14,6 +14,7 @@ public class TransactionServiceTests
     private readonly Mock<ILabelRepository> _labelRepositoryMock;
     private readonly Mock<ITagRepository> _tagRepositoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
+    private readonly Mock<IChatMessageRepository> _chatMessageRepositoryMock;
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
     private readonly Mock<IDekCacheService> _dekCacheServiceMock;
     private readonly Mock<IEncryptionService> _encryptionServiceMock;
@@ -31,6 +32,7 @@ public class TransactionServiceTests
         _labelRepositoryMock = new Mock<ILabelRepository>();
         _tagRepositoryMock = new Mock<ITagRepository>();
         _userRepositoryMock = new Mock<IUserRepository>();
+        _chatMessageRepositoryMock = new Mock<IChatMessageRepository>();
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
         _dekCacheServiceMock = new Mock<IDekCacheService>();
         _encryptionServiceMock = new Mock<IEncryptionService>();
@@ -87,6 +89,7 @@ public class TransactionServiceTests
             _labelRepositoryMock.Object,
             _tagRepositoryMock.Object,
             _userRepositoryMock.Object,
+            _chatMessageRepositoryMock.Object,
             _keyManagementServiceMock.Object,
             _dekCacheServiceMock.Object,
             _encryptionServiceMock.Object,

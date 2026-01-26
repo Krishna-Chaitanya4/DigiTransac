@@ -30,6 +30,7 @@ interface TransactionRowProps {
   onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
   onAcceptP2P?: (transaction: Transaction) => void;
   onDecline?: (transactionId: string) => void;
+  onViewInChat?: (transaction: Transaction) => void;
 }
 
 const TransactionRow = memo(function TransactionRow({
@@ -54,6 +55,7 @@ const TransactionRow = memo(function TransactionRow({
   onViewLinkedTransaction,
   onAcceptP2P,
   onDecline,
+  onViewInChat,
 }: TransactionRowProps) {
   const handleClick = useCallback(() => {
     if (selectionMode && onToggleSelection) {
@@ -104,6 +106,11 @@ const TransactionRow = memo(function TransactionRow({
       onDelete(transaction.id);
     }
   }, [onDelete, transaction.id]);
+
+  const handleViewInChat = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onViewInChat?.(transaction);
+  }, [onViewInChat, transaction]);
 
   const handleSwipeRight = useCallback(() => {
     const newStatus = transaction.status === 'Confirmed' ? 'Pending' : 'Confirmed';
@@ -458,6 +465,17 @@ const TransactionRow = memo(function TransactionRow({
                   </button>
                 </>
               )}
+              {/* View in Chat - only if transaction has a chat message */}
+              {transaction.chatMessageId && onViewInChat && (
+                <button
+                  onClick={handleViewInChat}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-purple-300 dark:border-purple-700 
+                    text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                  title="View this transaction in chat"
+                >
+                  💬 Chat
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -477,6 +495,7 @@ interface TransactionListProps {
   onViewLinkedTransaction?: (linkedTransactionId: string, linkedAccountId: string) => void;
   onAcceptP2P?: (transaction: Transaction) => void;
   onDecline?: (transactionId: string) => void;
+  onViewInChat?: (transaction: Transaction) => void;
   highlightedTransactionId?: string | null;
   isLoading?: boolean;
   /** Current status filter for empty state messaging */
@@ -577,6 +596,7 @@ export function TransactionList({
   onViewLinkedTransaction,
   onAcceptP2P,
   onDecline,
+  onViewInChat,
   highlightedTransactionId,
   isLoading = false,
   statusFilter,
@@ -734,6 +754,7 @@ export function TransactionList({
                     onViewLinkedTransaction={onViewLinkedTransaction}
                     onAcceptP2P={onAcceptP2P}
                     onDecline={onDecline}
+                    onViewInChat={onViewInChat}
                   />
                 );
               })}

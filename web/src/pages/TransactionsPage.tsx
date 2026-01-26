@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
 import { DatePicker } from '../components/DatePicker';
@@ -48,6 +48,9 @@ export default function TransactionsPage() {
   
   // URL search params for highlight
   const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Navigation for View in Chat
+  const navigate = useNavigate();
   
   // React Query hooks for data fetching
   const { data: accounts = [], isLoading: isLoadingAccounts, error: accountsError } = useAccounts();
@@ -534,6 +537,20 @@ export default function TransactionsPage() {
     }
   }, [filter.status, transactions, updateStatusMutation, showInfo, dismissToast]);
 
+  // Navigate to chat view for a transaction
+  const handleViewInChat = useCallback((transaction: Transaction) => {
+    // If transaction has a counterparty, navigate to their chat
+    // Otherwise, navigate to self-chat (personal transactions)
+    const userId = transaction.counterpartyUserId;
+    if (userId) {
+      navigate(`/chats?user=${userId}`);
+    } else {
+      // Self-chat - navigate to chats page with self as counterparty
+      // The ChatsPage will handle showing the self-chat
+      navigate('/chats?self=true');
+    }
+  }, [navigate]);
+
   // Batch operations
   const handleBatchDelete = async () => {
     if (!confirm(`Delete ${selectionCount} transaction${selectionCount > 1 ? 's' : ''}?`)) {
@@ -876,6 +893,7 @@ export default function TransactionsPage() {
           onViewLinkedTransaction={handleViewLinkedTransaction}
           onAcceptP2P={handleAcceptP2P}
           onDecline={handleDecline}
+          onViewInChat={handleViewInChat}
           highlightedTransactionId={highlightedTransactionId}
           isLoading={showLoadingSkeleton}
           statusFilter={filter.status}

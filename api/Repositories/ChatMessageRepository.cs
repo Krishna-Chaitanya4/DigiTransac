@@ -52,9 +52,9 @@ public interface IChatMessageRepository
     Task<bool> DeleteMessageAsync(string messageId, string senderUserId);
     
     /// <summary>
-    /// Create transaction message entries for both sender and recipient
+    /// Create transaction message entry for a P2P transaction
     /// </summary>
-    Task CreateTransactionMessagesAsync(string senderUserId, string recipientUserId, string senderTransactionId, string recipientTransactionId, Guid transactionLinkId);
+    Task CreateTransactionMessageAsync(string senderUserId, string recipientUserId, string transactionId);
 }
 
 public class ChatMessageRepository : IChatMessageRepository
@@ -269,12 +269,10 @@ public class ChatMessageRepository : IChatMessageRepository
         return result.ModifiedCount > 0;
     }
 
-    public async Task CreateTransactionMessagesAsync(
+    public async Task CreateTransactionMessageAsync(
         string senderUserId, 
         string recipientUserId, 
-        string senderTransactionId, 
-        string recipientTransactionId, 
-        Guid transactionLinkId)
+        string transactionId)
     {
         // Create a single message that represents the transaction in the chat
         // The sender "sends" a transaction message to the recipient
@@ -283,8 +281,7 @@ public class ChatMessageRepository : IChatMessageRepository
             SenderUserId = senderUserId,
             RecipientUserId = recipientUserId,
             Type = ChatMessageType.Transaction,
-            TransactionId = senderTransactionId, // Reference to sender's transaction
-            TransactionLinkId = transactionLinkId,
+            TransactionId = transactionId, // Reference to the transaction (contains TransactionLinkId)
             Status = MessageStatus.Sent,
             CreatedAt = DateTime.UtcNow
         };

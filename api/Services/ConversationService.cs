@@ -94,7 +94,14 @@ public class ConversationService : IConversationService
             counterpartyIds.Add(counterpartyId);
         }
         
-        // Fetch user details for all counterparties
+        // Include self-chat (userId == counterpartyId) if there are self-chat messages
+        var hasSelfChat = latestMessages.Any(m => m.SenderUserId == userId && m.RecipientUserId == userId);
+        if (hasSelfChat)
+        {
+            counterpartyIds.Add(userId); // Add self to conversation list
+        }
+        
+        // Fetch user details for all counterparties (including self)
         var userDetails = new Dictionary<string, User>();
         foreach (var cpId in counterpartyIds)
         {
@@ -113,10 +120,12 @@ public class ConversationService : IConversationService
             var user = userDetails.GetValueOrDefault(counterpartyId);
             if (user == null) continue; // Skip if user not found
             
-            // Get transactions with this counterparty
-            var txsWithCounterparty = p2pTransactions
-                .Where(t => t.CounterpartyUserId == counterpartyId)
-                .ToList();
+            var isSelfChat = counterpartyId == userId;
+            
+            // Get transactions with this counterparty (or self-transactions for self-chat)
+            var txsWithCounterparty = isSelfChat
+                ? new List<Transaction>() // Self-chat doesn't aggregate P2P transactions
+                : p2pTransactions.Where(t => t.CounterpartyUserId == counterpartyId).ToList();
             
             // Calculate totals
             decimal totalSent = txsWithCounterparty
@@ -127,9 +136,19 @@ public class ConversationService : IConversationService
                 .Sum(t => t.Amount);
             
             // Get latest activity (from messages or transactions)
-            var latestMessage = latestMessages.FirstOrDefault(m => 
-                (m.SenderUserId == userId && m.RecipientUserId == counterpartyId) ||
-                (m.SenderUserId == counterpartyId && m.RecipientUserId == userId));
+            ChatMessage? latestMessage;
+            if (isSelfChat)
+            {
+                // Self-chat: both sender and recipient are the same user
+                latestMessage = latestMessages.FirstOrDefault(m => 
+                    m.SenderUserId == userId && m.RecipientUserId == userId);
+            }
+            else
+            {
+                latestMessage = latestMessages.FirstOrDefault(m => 
+                    (m.SenderUserId == userId && m.RecipientUserId == counterpartyId) ||
+                    (m.SenderUserId == counterpartyId && m.RecipientUserId == userId));
+            }
             
             var latestTx = txsWithCounterparty
                 .OrderByDescending(t => t.Date)
@@ -171,14 +190,15 @@ public class ConversationService : IConversationService
             conversations.Add(new ConversationSummary(
                 CounterpartyUserId: counterpartyId,
                 CounterpartyEmail: user.Email,
-                CounterpartyName: user.FullName,
+                CounterpartyName: isSelfChat ? "Personal Transactions" : user.FullName,
                 LastActivityAt: lastActivityAt,
                 LastMessagePreview: lastMessagePreview,
                 LastMessageType: lastMessageType,
                 UnreadCount: unreadCount,
                 TotalSent: totalSent,
                 TotalReceived: totalReceived,
-                PrimaryCurrency: currencies?.Key
+                PrimaryCurrency: currencies?.Key,
+                IsSelfChat: isSelfChat
             ));
         }
         
@@ -204,8 +224,10 @@ public class ConversationService : IConversationService
         {
             return new ConversationDetailResponse(
                 counterpartyUserId, "", null, 
-                new List<ConversationMessage>(), 0, false, 0, 0);
+                new List<ConversationMessage>(), 0, false, 0, 0, false);
         }
+        
+        var isSelfChat = userId == counterpartyUserId;
         
         // Get chat messages
         var chatMessages = await _chatMessageRepository.GetConversationMessagesAsync(
@@ -228,27 +250,31 @@ public class ConversationService : IConversationService
         // Build unified message list
         var messages = new List<ConversationMessage>();
         
+        // Build a dictionary of transactions by ID for quick lookup
+        var transactionsById = p2pTransactions.ToDictionary(t => t.Id);
+        
         // Track which transactions are already represented by chat messages
-        var transactionLinkIdsInChat = chatMessages
-            .Where(m => m.TransactionLinkId.HasValue)
-            .Select(m => m.TransactionLinkId!.Value)
+        var transactionIdsInChat = chatMessages
+            .Where(m => !string.IsNullOrEmpty(m.TransactionId))
+            .Select(m => m.TransactionId!)
             .ToHashSet();
         
         // Add chat messages
         foreach (var msg in chatMessages)
         {
             TransactionMessageData? txData = null;
+            Transaction? tx = null;
             
-            if (msg.Type == ChatMessageType.Transaction && msg.TransactionLinkId.HasValue)
+            if (msg.Type == ChatMessageType.Transaction && !string.IsNullOrEmpty(msg.TransactionId))
             {
-                // Find the transaction for this user
-                var tx = p2pTransactions.FirstOrDefault(t => t.TransactionLinkId == msg.TransactionLinkId);
+                // Find the transaction by ID
+                transactionsById.TryGetValue(msg.TransactionId, out tx);
                 if (tx != null)
                 {
                     accounts.TryGetValue(tx.AccountId ?? "", out var account);
                     txData = new TransactionMessageData(
                         TransactionId: tx.Id,
-                        TransactionLinkId: msg.TransactionLinkId.Value,
+                        TransactionLinkId: tx.TransactionLinkId ?? Guid.Empty,
                         TransactionType: tx.Type.ToString(),
                         Amount: tx.Amount,
                         Currency: tx.Currency,
@@ -260,6 +286,12 @@ public class ConversationService : IConversationService
                     );
                 }
             }
+            
+            // Derive IsSystemGenerated and SystemSource from Transaction.Source
+            var isSystemGenerated = tx?.Source is TransactionSource.Recurring 
+                                               or TransactionSource.Import 
+                                               or TransactionSource.Transfer;
+            var systemSource = isSystemGenerated ? tx?.Source.ToString() : null;
             
             messages.Add(new ConversationMessage(
                 Id: msg.Id,
@@ -276,7 +308,9 @@ public class ConversationService : IConversationService
                 EditedAt: msg.EditedAt,
                 IsDeleted: msg.IsDeleted,
                 ReplyToMessageId: msg.ReplyToMessageId,
-                ReplyTo: null // Will be populated below if needed
+                ReplyTo: null, // Will be populated below if needed
+                IsSystemGenerated: isSystemGenerated,
+                SystemSource: systemSource
             ));
         }
         
@@ -333,7 +367,7 @@ public class ConversationService : IConversationService
         // Add transactions that don't have chat messages yet (for backward compatibility)
         foreach (var tx in p2pTransactions)
         {
-            if (tx.TransactionLinkId.HasValue && transactionLinkIdsInChat.Contains(tx.TransactionLinkId.Value))
+            if (transactionIdsInChat.Contains(tx.Id))
             {
                 continue; // Already have a chat message for this
             }
@@ -355,6 +389,12 @@ public class ConversationService : IConversationService
             // Determine sender based on transaction type
             var isFromMe = tx.Type == TransactionType.Send;
             
+            // Derive IsSystemGenerated from Transaction.Source
+            var isSystemGenerated = tx.Source is TransactionSource.Recurring 
+                                              or TransactionSource.Import 
+                                              or TransactionSource.Transfer;
+            var systemSource = isSystemGenerated ? tx.Source.ToString() : null;
+            
             messages.Add(new ConversationMessage(
                 Id: $"tx-{tx.Id}",
                 Type: "Transaction",
@@ -370,7 +410,9 @@ public class ConversationService : IConversationService
                 EditedAt: null,
                 IsDeleted: false,
                 ReplyToMessageId: null,
-                ReplyTo: null
+                ReplyTo: null,
+                IsSystemGenerated: isSystemGenerated,
+                SystemSource: systemSource
             ));
         }
         
@@ -394,12 +436,13 @@ public class ConversationService : IConversationService
         return new ConversationDetailResponse(
             CounterpartyUserId: counterpartyUserId,
             CounterpartyEmail: counterparty.Email,
-            CounterpartyName: counterparty.FullName,
+            CounterpartyName: isSelfChat ? "Personal Transactions" : counterparty.FullName,
             Messages: messages,
             TotalCount: totalCount,
             HasMore: hasMore,
             TotalSent: totalSent,
-            TotalReceived: totalReceived
+            TotalReceived: totalReceived,
+            IsSelfChat: isSelfChat
         );
     }
 
@@ -480,7 +523,9 @@ public class ConversationService : IConversationService
             EditedAt: null,
             IsDeleted: false,
             ReplyToMessageId: request.ReplyToMessageId,
-            ReplyTo: replyPreview
+            ReplyTo: replyPreview,
+            IsSystemGenerated: false, // User-sent messages are not system-generated
+            SystemSource: null
         );
         
         return (true, "Message sent", response);
@@ -525,7 +570,8 @@ public class ConversationService : IConversationService
             TransferToAccountId: null,
             RecurringRule: null,
             CounterpartyEmail: counterparty.Email, // Use email for the existing P2P flow
-            CounterpartyAmount: null
+            CounterpartyAmount: null,
+            Source: nameof(TransactionSource.Chat)  // Mark as created via chat
         );
         
         var (success, message, transaction) = await _transactionService.CreateAsync(userId, createRequest);
@@ -538,12 +584,10 @@ public class ConversationService : IConversationService
         // Create chat message for this transaction
         if (transaction.TransactionLinkId.HasValue)
         {
-            await _chatMessageRepository.CreateTransactionMessagesAsync(
+            await _chatMessageRepository.CreateTransactionMessageAsync(
                 userId,
                 counterpartyUserId,
-                transaction.Id,
-                transaction.Id, // The recipient's transaction will be found via TransactionLinkId
-                transaction.TransactionLinkId.Value
+                transaction.Id
             );
         }
         
@@ -578,7 +622,9 @@ public class ConversationService : IConversationService
             EditedAt: null,
             IsDeleted: false,
             ReplyToMessageId: null,
-            ReplyTo: null
+            ReplyTo: null,
+            IsSystemGenerated: false, // User-initiated send money is not system-generated
+            SystemSource: null
         );
         
         var actionWord = request.Type == nameof(TransactionType.Send) ? "sent" : "received";

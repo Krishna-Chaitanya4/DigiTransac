@@ -15,7 +15,8 @@ public record ConversationSummary(
     int UnreadCount,
     decimal? TotalSent,       // Total amount sent to this person
     decimal? TotalReceived,   // Total amount received from this person
-    string? PrimaryCurrency   // Most common currency used
+    string? PrimaryCurrency,  // Most common currency used
+    bool IsSelfChat = false   // True when this is user's personal transaction log
 );
 
 public record ConversationListResponse(
@@ -41,7 +42,9 @@ public record ConversationMessage(
     DateTime? EditedAt,
     bool IsDeleted,
     string? ReplyToMessageId,
-    ReplyPreview? ReplyTo     // Preview of the replied message
+    ReplyPreview? ReplyTo,    // Preview of the replied message
+    bool IsSystemGenerated = false,  // True if auto-created (recurring, import, etc.)
+    string? SystemSource = null      // Source: "Recurring", "Import", "Transfer", etc.
 );
 
 /// <summary>
@@ -79,7 +82,8 @@ public record ConversationDetailResponse(
     int TotalCount,
     bool HasMore,
     decimal TotalSent,
-    decimal TotalReceived
+    decimal TotalReceived,
+    bool IsSelfChat = false  // True when this is user's personal transaction log
 );
 
 // Request DTOs

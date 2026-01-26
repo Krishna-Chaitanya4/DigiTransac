@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAccounts, useLabels, useTags, useCreateTag, useCreateTransaction } from '../hooks';
 import {
@@ -55,6 +56,9 @@ const isDifferentDay = (date1: string, date2: string): boolean => {
 export default function ChatsPage() {
   // Auth context
   const { user } = useAuth();
+  
+  // URL params for deep linking (e.g., from "View in Chat" on transactions)
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // React Query hooks for data
   const { data: accounts = [] } = useAccounts();
@@ -70,6 +74,28 @@ export default function ChatsPage() {
   // Selected conversation state
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [pendingConversation, setPendingConversation] = useState<ConversationDetailResponse | null>(null);
+  
+  // Handle URL params for deep linking
+  useEffect(() => {
+    const userParam = searchParams.get('user');
+    const selfParam = searchParams.get('self');
+    
+    if (userParam) {
+      // Navigate to specific user's chat
+      setSelectedUserId(userParam);
+      // Clear the param after use
+      setSearchParams({}, { replace: true });
+    } else if (selfParam === 'true' && conversations.length > 0) {
+      // Navigate to self-chat (personal transactions)
+      // Find the self-chat conversation from the list
+      const selfChat = conversations.find(c => c.isSelfChat);
+      if (selfChat) {
+        setSelectedUserId(selfChat.counterpartyUserId);
+      }
+      // Clear the param after use
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, conversations]);
 
   const {
     data: conversationData,
@@ -84,7 +110,7 @@ export default function ChatsPage() {
   const editMessageMutation = useEditMessage();
   const deleteMessageMutation = useDeleteMessage();
   const markAsReadMutation = useMarkAsRead();
-  const { invalidateList } = useInvalidateConversations();
+  const { invalidateList, invalidateDetail } = useInvalidateConversations();
 
   // Filter labels to only Category (not Folders)
   const labels = useMemo(() => allLabels.filter((l) => l.type === 'Category'), [allLabels]);
@@ -121,8 +147,9 @@ export default function ChatsPage() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionFormError, setTransactionFormError] = useState<string | null>(null);
 
-  // Is self-chat (for Transfer option)
-  const isSelfChat = user?.email === selectedConversation?.counterpartyEmail;
+  // Is self-chat (for Transfer option and special message positioning)
+  // Use the API flag if available, fallback to email comparison for backward compatibility
+  const isSelfChat = selectedConversation?.isSelfChat ?? (user?.email === selectedConversation?.counterpartyEmail);
 
   // Mark as read when conversation loads
   useEffect(() => {
@@ -345,8 +372,9 @@ export default function ChatsPage() {
       try {
         await createTransactionMutation.mutateAsync(data as CreateTransactionRequest);
 
-        // Invalidate conversations to refresh
+        // Invalidate both conversations list and the current conversation detail
         invalidateList();
+        invalidateDetail(selectedConversation.counterpartyUserId);
 
         // Close form
         setShowTransactionForm(false);
@@ -358,7 +386,7 @@ export default function ChatsPage() {
         setTransactionFormError(error instanceof Error ? error.message : 'Failed to create transaction');
       }
     },
-    [selectedConversation, createTransactionMutation, invalidateList, scrollToBottom]
+    [selectedConversation, createTransactionMutation, invalidateList, invalidateDetail, scrollToBottom]
   );
 
   // Go back (mobile)
@@ -466,6 +494,7 @@ export default function ChatsPage() {
                             }
                             counterpartyName={selectedConversation.counterpartyName}
                             counterpartyUserId={selectedConversation.counterpartyUserId}
+                            isSelfChat={isSelfChat}
                             onMenuOpen={handleMenuOpen}
                             onScrollToReply={scrollToMessage}
                           />

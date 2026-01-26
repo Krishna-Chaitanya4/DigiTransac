@@ -13,7 +13,10 @@ export const ConversationItem = memo(function ConversationItem({
   isSelected,
   onClick,
 }: ConversationItemProps) {
-  const displayName = getDisplayName(conversation.counterpartyName, conversation.counterpartyEmail);
+  const isSelfChat = conversation.isSelfChat ?? false;
+  const displayName = isSelfChat 
+    ? 'Personal Transactions' 
+    : getDisplayName(conversation.counterpartyName, conversation.counterpartyEmail);
 
   return (
     <button
@@ -22,10 +25,18 @@ export const ConversationItem = memo(function ConversationItem({
         isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-r-2 border-blue-500' : ''
       }`}
     >
-      {/* Avatar */}
-      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
-        {displayName.charAt(0).toUpperCase()}
-      </div>
+      {/* Avatar - special icon for self-chat */}
+      {isSelfChat ? (
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white flex-shrink-0">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        </div>
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
+          {displayName.charAt(0).toUpperCase()}
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-w-0">

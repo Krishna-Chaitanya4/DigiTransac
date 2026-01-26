@@ -37,6 +37,7 @@ public class TransactionService : ITransactionService
     private readonly ILabelRepository _labelRepository;
     private readonly ITagRepository _tagRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IChatMessageRepository _chatMessageRepository;
     private readonly IKeyManagementService _keyManagementService;
     private readonly IDekCacheService _dekCacheService;
     private readonly IEncryptionService _encryptionService;
@@ -48,6 +49,7 @@ public class TransactionService : ITransactionService
         ILabelRepository labelRepository,
         ITagRepository tagRepository,
         IUserRepository userRepository,
+        IChatMessageRepository chatMessageRepository,
         IKeyManagementService keyManagementService,
         IDekCacheService dekCacheService,
         IEncryptionService encryptionService,
@@ -58,6 +60,7 @@ public class TransactionService : ITransactionService
         _labelRepository = labelRepository;
         _tagRepository = tagRepository;
         _userRepository = userRepository;
+        _chatMessageRepository = chatMessageRepository;
         _keyManagementService = keyManagementService;
         _dekCacheService = dekCacheService;
         _encryptionService = encryptionService;
@@ -368,6 +371,17 @@ public class TransactionService : ITransactionService
         // Generate TransactionLinkId for transfers and P2P
         var transactionLinkId = (isSelfTransfer || isP2P) ? Guid.NewGuid() : (Guid?)null;
 
+        // Determine transaction source
+        TransactionSource source;
+        if (!string.IsNullOrEmpty(request.Source) && Enum.TryParse<TransactionSource>(request.Source, true, out var requestedSource))
+        {
+            source = requestedSource;
+        }
+        else
+        {
+            source = isSelfTransfer ? TransactionSource.Transfer : TransactionSource.Manual;
+        }
+
         // Build transaction
         var transaction = new Transaction
         {
@@ -386,7 +400,8 @@ public class TransactionService : ITransactionService
             Status = TransactionStatus.Confirmed, // Default to confirmed since users enter transactions after completion
             // P2P fields
             TransactionLinkId = transactionLinkId,
-            CounterpartyUserId = isP2P ? counterpartyUser?.Id : (isSelfTransfer ? userId : null)
+            CounterpartyUserId = isP2P ? counterpartyUser?.Id : (isSelfTransfer ? userId : null),
+            Source = source
         };
 
         // Handle location
@@ -525,7 +540,8 @@ public class TransactionService : ITransactionService
                 Status = transaction.Status,
                 // P2P fields for self-transfer
                 TransactionLinkId = transactionLinkId,
-                CounterpartyUserId = userId  // Self-transfer, same user
+                CounterpartyUserId = userId,  // Self-transfer, same user
+                Source = TransactionSource.Transfer
             };
 
             await _transactionRepository.CreateAsync(linkedTransaction);
@@ -560,7 +576,8 @@ public class TransactionService : ITransactionService
                 Status = TransactionStatus.Pending, // Pending - counterparty needs to review
                 // P2P fields
                 TransactionLinkId = transactionLinkId,
-                CounterpartyUserId = userId
+                CounterpartyUserId = userId,
+                Source = transaction.Source // Inherit source from the initiating transaction
             };
             
             // Only create if counterparty is on the platform
@@ -578,6 +595,31 @@ public class TransactionService : ITransactionService
         
         // Return the first instance for recurring transactions, otherwise return the transaction itself
         var transactionToReturn = firstInstance ?? transaction;
+        
+        // Create a chat message for this transaction (for both self-chat and P2P)
+        // Skip for recurring templates - messages are created when instances are generated
+        if (!transaction.IsRecurringTemplate)
+        {
+            var recipientUserId = isP2P && counterpartyUser != null 
+                ? counterpartyUser.Id  // P2P: send to counterparty
+                : userId;              // Self-chat: send to self
+            
+            var chatMessage = new ChatMessage
+            {
+                SenderUserId = userId,
+                RecipientUserId = recipientUserId,
+                Type = ChatMessageType.Transaction,
+                TransactionId = transactionToReturn.Id,
+                Status = MessageStatus.Sent,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            await _chatMessageRepository.CreateAsync(chatMessage);
+            
+            // Update transaction with chat message ID for bidirectional linking
+            transactionToReturn.ChatMessageId = chatMessage.Id;
+            await _transactionRepository.UpdateAsync(transactionToReturn);
+        }
         
         // Fetch counterparty user for response
         var counterpartyUsers = !string.IsNullOrEmpty(transactionToReturn.CounterpartyUserId)
@@ -968,11 +1010,27 @@ public class TransactionService : ITransactionService
                     Splits = template.Splits,
                     TagIds = template.TagIds,
                     Location = template.Location,
-                    ParentTransactionId = template.Id
+                    ParentTransactionId = template.Id,
+                    Source = TransactionSource.Recurring  // Auto-generated from recurring
                 };
 
                 await _transactionRepository.CreateAsync(newTransaction);
                 await UpdateAccountBalanceAsync(account, newTransaction.Type, newTransaction.Amount, true);
+                
+                // Create a chat message for this recurring instance (self-chat)
+                var recurringChatMessage = new ChatMessage
+                {
+                    SenderUserId = template.UserId,
+                    RecipientUserId = template.UserId, // Self-chat for recurring
+                    Type = ChatMessageType.Transaction,
+                    TransactionId = newTransaction.Id,
+                    Status = MessageStatus.Sent,
+                    CreatedAt = DateTime.UtcNow
+                };
+                
+                await _chatMessageRepository.CreateAsync(recurringChatMessage);
+                newTransaction.ChatMessageId = recurringChatMessage.Id;
+                await _transactionRepository.UpdateAsync(newTransaction);
 
                 // Handle transfer linked transaction (detected by TransferToAccountId, not type)
                 if (!string.IsNullOrEmpty(template.TransferToAccountId))
@@ -994,7 +1052,8 @@ public class TransactionService : ITransactionService
                             Splits = template.Splits,
                             TagIds = template.TagIds,
                             LinkedTransactionId = newTransaction.Id,
-                            ParentTransactionId = template.Id
+                            ParentTransactionId = template.Id,
+                            Source = TransactionSource.Recurring  // Also recurring
                         };
 
                         await _transactionRepository.CreateAsync(linkedTransaction);
@@ -1111,7 +1170,8 @@ public class TransactionService : ITransactionService
             t.CounterpartyUserId != null
                 ? (t.Type == TransactionType.Send ? "Sender" : "Receiver")
                 : null,
-            t.LastSyncedAt);
+            t.LastSyncedAt,
+            t.ChatMessageId);
     }
 
     private TransactionSplitResponse MapSplitToResponse(TransactionSplit split, byte[]? dek, Dictionary<string, Label> labels)

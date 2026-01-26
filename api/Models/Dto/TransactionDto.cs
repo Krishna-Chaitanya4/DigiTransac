@@ -36,7 +36,9 @@ public record CreateTransactionRequest(
     RecurringRuleRequest? RecurringRule,
     // P2P fields (optional for Send/Receive)
     string? CounterpartyEmail,    // If provided, creates P2P transaction
-    decimal? CounterpartyAmount   // Optional: if different currency
+    decimal? CounterpartyAmount,  // Optional: if different currency
+    // Source (optional, defaults to Manual)
+    string? Source = null         // "Manual", "Chat", "Recurring", "Import", "Transfer"
 );
 
 public record UpdateTransactionRequest(
@@ -134,7 +136,9 @@ public record TransactionResponse(
     string? CounterpartyEmail,
     string? CounterpartyUserId,
     string? Role,  // "Sender" or "Receiver"
-    DateTime? LastSyncedAt  // Set when transaction was updated via P2P sync (shows "Edited" badge)
+    DateTime? LastSyncedAt,  // Set when transaction was updated via P2P sync (shows "Edited" badge)
+    // Chat integration
+    string? ChatMessageId  // Reference to chat message for "View in Chat" action
 );
 
 public record TransactionListResponse(

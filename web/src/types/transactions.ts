@@ -79,6 +79,8 @@ export interface Transaction {
   counterpartyUserId?: string;
   role?: TransactionRole;
   lastSyncedAt?: string;
+  // Chat integration
+  chatMessageId?: string; // Reference to chat message for "View in Chat" action
 }
 
 export interface TransactionListResponse {
