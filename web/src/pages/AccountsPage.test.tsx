@@ -1,5 +1,6 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AccountsPage from './AccountsPage';
 import * as accountService from '../services/accountService';
 import { CurrencyProvider } from '../context/CurrencyContext';
@@ -39,18 +40,39 @@ vi.mock('../services/currencyService', async () => {
   };
 });
 
+// Create a new QueryClient for each test
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+        staleTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
+}
+
 // Wrapper with all required providers
-const TestWrapper = ({ children }: { children: React.ReactNode }) => (
-  <BrowserRouter>
-    <ThemeProvider>
-      <AuthProvider>
-        <CurrencyProvider>
-          {children}
-        </CurrencyProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </BrowserRouter>
-);
+const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+  const queryClient = createTestQueryClient();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <CurrencyProvider>
+              {children}
+            </CurrencyProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(ui, { wrapper: TestWrapper });
@@ -269,7 +291,7 @@ describe('AccountsPage', () => {
   });
 
   it('should display error when loading fails', async () => {
-    vi.mocked(accountService.getAccounts).mockRejectedValue(new Error('Failed'));
+    vi.mocked(accountService.getAccounts).mockRejectedValue(new Error('Failed to load accounts'));
     vi.mocked(accountService.getAccountSummary).mockRejectedValue(new Error('Failed'));
 
     renderWithProviders(<AccountsPage />);

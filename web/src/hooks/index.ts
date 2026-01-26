@@ -21,14 +21,20 @@ export {
   useCreateAccount,
   useUpdateAccount,
   useDeleteAccount,
+  useAdjustBalance,
+  useSetDefaultAccount,
+  useInvalidateAccounts,
 } from './useAccountQueries';
 
 // Label queries
 export {
   useLabels,
+  useLabelsTree,
   useCreateLabel,
   useUpdateLabel,
   useDeleteLabel,
+  useDeleteLabelWithReassignment,
+  useInvalidateLabels,
 } from './useLabelQueries';
 
 // Tag queries
@@ -37,6 +43,9 @@ export {
   useCreateTag,
   useUpdateTag,
   useDeleteTag,
+  useTagTransactionCount,
+  useDeleteTagConfirmed,
+  useInvalidateTags,
 } from './useTagQueries';
 
 // Other hooks

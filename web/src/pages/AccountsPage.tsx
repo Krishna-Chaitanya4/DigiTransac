@@ -1,19 +1,23 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useCurrency } from '../context/CurrencyContext';
 import {
-  Account,
+  useAccounts,
+  useAccountSummary,
+  useCreateAccount,
+  useUpdateAccount,
+  useDeleteAccount,
+  useAdjustBalance,
+  useSetDefaultAccount,
+  useInvalidateAccounts,
+} from '../hooks';
+import {
   AccountType,
-  AccountSummary,
+  accountTypeConfig,
+} from '../services/accountService';
+import type {
+  Account,
   CreateAccountRequest,
   UpdateAccountRequest,
-  accountTypeConfig,
-  getAccounts,
-  getAccountSummary,
-  createAccount,
-  updateAccount,
-  deleteAccount,
-  adjustBalance,
-  setDefaultAccount,
 } from '../services/accountService';
 import { 
   formatCurrency as formatCurrencyWithCode, 
@@ -30,16 +34,28 @@ import {
 export default function AccountsPage() {
   const { formatWithConversion, primaryCurrency: userPrimaryCurrency, refreshRates: refreshCurrencyContext } = useCurrency();
   
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [summary, setSummary] = useState<AccountSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // UI state
   const [showArchived, setShowArchived] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // React Query hooks
+  const { data: accounts = [], isLoading, error: queryError } = useAccounts(showArchived);
+  const { data: summary } = useAccountSummary();
+  const invalidateAccounts = useInvalidateAccounts();
+  
+  // Combined error display
+  const displayError = queryError?.message || error;
+  
+  // Mutations
+  const createAccountMutation = useCreateAccount();
+  const updateAccountMutation = useUpdateAccount();
+  const deleteAccountMutation = useDeleteAccount();
+  const adjustBalanceMutation = useAdjustBalance();
+  const setDefaultAccountMutation = useSetDefaultAccount();
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -48,40 +64,25 @@ export default function AccountsPage() {
 
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [adjustingAccount, setAdjustingAccount] = useState<Account | null>(null);
-
-  const loadData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const [accountsData, summaryData] = await Promise.all([
-        getAccounts(showArchived),
-        getAccountSummary(),
-      ]);
-      setAccounts(accountsData);
-      setSummary(summaryData);
-    } catch {
-      setError('Failed to load accounts');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [showArchived]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  
+  // Derived submitting state from mutations
+  const isSubmitting = createAccountMutation.isPending || 
+    updateAccountMutation.isPending || 
+    deleteAccountMutation.isPending ||
+    adjustBalanceMutation.isPending ||
+    setDefaultAccountMutation.isPending;
 
   const handleRefreshRates = useCallback(async () => {
     try {
       await refreshExchangeRates();
       // Update CurrencyContext to use new rates
       await refreshCurrencyContext();
-      // Reload summary to get updated converted values
-      const summaryData = await getAccountSummary();
-      setSummary(summaryData);
+      // Invalidate account queries to refetch with new rates
+      invalidateAccounts();
     } catch {
       setError('Failed to refresh exchange rates');
     }
-  }, [refreshCurrencyContext]);
+  }, [refreshCurrencyContext, invalidateAccounts]);
 
   // Group accounts by type
   const groupedAccounts = useMemo(() => {
@@ -128,23 +129,18 @@ export default function AccountsPage() {
     if (!deletingAccount) return;
     
     try {
-      setIsSubmitting(true);
-      await updateAccount(deletingAccount.id, { isArchived: true });
+      await updateAccountMutation.mutateAsync({ id: deletingAccount.id, data: { isArchived: true } });
       setIsDeleteModalOpen(false);
       setDeletingAccount(null);
       setDeleteError(null);
-      await loadData();
     } catch {
       setError('Failed to archive account');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   const handleArchiveToggle = async (account: Account) => {
     try {
-      await updateAccount(account.id, { isArchived: !account.isArchived });
-      await loadData();
+      await updateAccountMutation.mutateAsync({ id: account.id, data: { isArchived: !account.isArchived } });
     } catch {
       setError('Failed to update account');
     }
@@ -152,8 +148,7 @@ export default function AccountsPage() {
 
   const handleSetDefault = async (account: Account) => {
     try {
-      await setDefaultAccount(account.id);
-      await loadData();
+      await setDefaultAccountMutation.mutateAsync(account.id);
     } catch {
       setError('Failed to set default account');
     }
@@ -161,22 +156,18 @@ export default function AccountsPage() {
 
   const handleModalSubmit = async (data: CreateAccountRequest | UpdateAccountRequest) => {
     try {
-      setIsSubmitting(true);
       setModalError(null);
       if (editingAccount) {
-        await updateAccount(editingAccount.id, data as UpdateAccountRequest);
+        await updateAccountMutation.mutateAsync({ id: editingAccount.id, data: data as UpdateAccountRequest });
       } else {
-        await createAccount(data as CreateAccountRequest);
+        await createAccountMutation.mutateAsync(data as CreateAccountRequest);
       }
       setIsModalOpen(false);
       setModalError(null);
-      await loadData();
     } catch (err) {
       // Show error in the modal
       const message = err instanceof Error ? err.message : (editingAccount ? 'Failed to update account' : 'Failed to create account');
       setModalError(message);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -184,18 +175,14 @@ export default function AccountsPage() {
     if (!deletingAccount) return;
 
     try {
-      setIsSubmitting(true);
-      await deleteAccount(deletingAccount.id);
+      await deleteAccountMutation.mutateAsync(deletingAccount.id);
       setIsDeleteModalOpen(false);
       setDeletingAccount(null);
       setDeleteError(null);
-      await loadData();
     } catch (err) {
       // Show error in the modal instead of the global error
       const message = err instanceof Error ? err.message : 'Failed to delete account';
       setDeleteError(message);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -203,15 +190,11 @@ export default function AccountsPage() {
     if (!adjustingAccount) return;
 
     try {
-      setIsSubmitting(true);
-      await adjustBalance(adjustingAccount.id, { newBalance, notes });
+      await adjustBalanceMutation.mutateAsync({ id: adjustingAccount.id, data: { newBalance, notes } });
       setIsAdjustModalOpen(false);
       setAdjustingAccount(null);
-      await loadData();
     } catch {
       setError('Failed to adjust balance');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -238,9 +221,9 @@ export default function AccountsPage() {
         </button>
       </div>
 
-      {error && (
+      {displayError && (
         <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300">
-          {error}
+          {displayError}
           <button onClick={() => setError(null)} className="float-right font-bold">×</button>
         </div>
       )}

@@ -32,7 +32,7 @@ export const queryKeys = {
   // Accounts
   accounts: {
     all: ['accounts'] as const,
-    list: () => ['accounts', 'list'] as const,
+    list: (includeArchived = false) => ['accounts', 'list', { includeArchived }] as const,
     detail: (id: string) => ['accounts', 'detail', id] as const,
     summary: ['accounts', 'summary'] as const,
   },
@@ -40,6 +40,7 @@ export const queryKeys = {
   labels: {
     all: ['labels'] as const,
     list: () => ['labels', 'list'] as const,
+    tree: () => ['labels', 'tree'] as const,
   },
   // Tags
   tags: {

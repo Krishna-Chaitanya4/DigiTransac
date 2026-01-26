@@ -7,14 +7,16 @@ import {
   createAccount,
   updateAccount,
   deleteAccount,
+  adjustBalance,
+  setDefaultAccount,
 } from '../services/accountService';
-import type { Account, AccountSummary, CreateAccountRequest, UpdateAccountRequest } from '../services/accountService';
+import type { Account, AccountSummary, CreateAccountRequest, UpdateAccountRequest, AdjustBalanceRequest } from '../services/accountService';
 
 // Hook for fetching all accounts
-export function useAccounts(): UseQueryResult<Account[], Error> {
+export function useAccounts(includeArchived = false): UseQueryResult<Account[], Error> {
   return useQuery({
-    queryKey: queryKeys.accounts.list(),
-    queryFn: () => getAccounts(),
+    queryKey: queryKeys.accounts.list(includeArchived),
+    queryFn: () => getAccounts(includeArchived),
     staleTime: 5 * 60 * 1000, // 5 minutes - accounts don't change often
   });
 }
@@ -65,6 +67,38 @@ export function useDeleteAccount() {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
     },
   });
+}
+
+// Hook for adjusting account balance
+export function useAdjustBalance() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: AdjustBalanceRequest }) => 
+      adjustBalance(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    },
+  });
+}
+
+// Hook for setting default account
+export function useSetDefaultAccount() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: string) => setDefaultAccount(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+  });
+}
+
+// Hook to invalidate all account queries
+export function useInvalidateAccounts() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
 }
 
 export type { Account, AccountSummary };

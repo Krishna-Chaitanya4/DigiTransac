@@ -1,6 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
-import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel, getLabelTransactionCount, deleteLabelWithReassignment } from '../services/labelService';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
+import { getLabelTransactionCount } from '../services/labelService';
+import { 
+  useLabels,
+  useLabelsTree,
+  useCreateLabel,
+  useUpdateLabel,
+  useDeleteLabel,
+  useDeleteLabelWithReassignment,
+} from '../hooks';
 import { 
   SearchResultItem, 
   LabelTreeItem, 
@@ -10,27 +18,38 @@ import {
 } from './categories';
 
 export default function CategoriesTab() {
-  const [labels, setLabels] = useState<LabelTree[]>([]);
-  const [allLabels, setAllLabels] = useState<Label[]>([]);  // Flat list for parent dropdown
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // React Query hooks
+  const { data: labels = [], isLoading, error: queryError } = useLabelsTree();
+  const { data: allLabels = [] } = useLabels();
+  
+  // Mutations
+  const createLabelMutation = useCreateLabel();
+  const updateLabelMutation = useUpdateLabel();
+  const deleteLabelMutation = useDeleteLabel();
+  const deleteLabelWithReassignmentMutation = useDeleteLabelWithReassignment();
+  
+  // UI state
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const hasInitiallyExpanded = useRef(false);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLabel, setEditingLabel] = useState<LabelTree | null>(null);
   const [newLabelParentId, setNewLabelParentId] = useState<string | null>(null);
   const [newLabelType, setNewLabelType] = useState<'Folder' | 'Category'>('Folder');
-  const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [labelToDelete, setLabelToDelete] = useState<LabelTree | null>(null);
   const [labelTransactionCount, setLabelTransactionCount] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  // Derived loading states
+  const isSaving = createLabelMutation.isPending || updateLabelMutation.isPending;
+  const isDeleting = deleteLabelMutation.isPending || deleteLabelWithReassignmentMutation.isPending;
 
   // Search results
   const searchResults = useMemo(() => {
@@ -49,27 +68,14 @@ export default function CategoriesTab() {
     return allLabels.filter(l => l.type === 'Folder').map(l => l.id);
   }, [allLabels]);
 
-  const loadLabels = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const [tree, flat] = await Promise.all([getLabelsTree(), getLabels()]);
-      setLabels(tree);
-      setAllLabels(flat);
-      
-      // Auto-expand all folders by default
-      const allFolders = flat.filter((l: Label) => l.type === 'Folder').map((l: Label) => l.id);
-      setExpandedIds(new Set(allFolders));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load labels');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
+  // Auto-expand all folders when labels load (only on initial load)
   useEffect(() => {
-    loadLabels();
-  }, [loadLabels]);
+    if (allLabels.length > 0 && !hasInitiallyExpanded.current) {
+      const allFolders = allLabels.filter(l => l.type === 'Folder').map(l => l.id);
+      setExpandedIds(new Set(allFolders));
+      hasInitiallyExpanded.current = true;
+    }
+  }, [allLabels]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -140,19 +146,15 @@ export default function CategoriesTab() {
 
   const handleModalSubmit = async (data: CreateLabelRequest | UpdateLabelRequest) => {
     try {
-      setIsSaving(true);
       setSaveError(null);
       if (editingLabel) {
-        await updateLabel(editingLabel.id, data as UpdateLabelRequest);
+        await updateLabelMutation.mutateAsync({ id: editingLabel.id, data: data as UpdateLabelRequest });
       } else {
-        await createLabel(data as CreateLabelRequest);
+        await createLabelMutation.mutateAsync(data as CreateLabelRequest);
       }
-      await loadLabels();
       setIsModalOpen(false);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save label');
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -160,21 +162,17 @@ export default function CategoriesTab() {
     if (!labelToDelete) return;
     
     try {
-      setIsDeleting(true);
       setDeleteError(null);
       // Use reassignment delete if there are transactions
       if (labelTransactionCount > 0) {
-        await deleteLabelWithReassignment(labelToDelete.id, reassignToId);
+        await deleteLabelWithReassignmentMutation.mutateAsync({ id: labelToDelete.id, reassignToId });
       } else {
-        await deleteLabel(labelToDelete.id);
+        await deleteLabelMutation.mutateAsync(labelToDelete.id);
       }
-      await loadLabels();
       setDeleteModalOpen(false);
       setLabelToDelete(null);
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete label');
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -186,11 +184,13 @@ export default function CategoriesTab() {
     );
   }
 
+  const displayError = error || (queryError ? queryError.message : null);
+
   return (
     <div>
-      {error && (
+      {displayError && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
-          {error}
+          {displayError}
           <button onClick={() => setError(null)} className="ml-2 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">×</button>
         </div>
       )}

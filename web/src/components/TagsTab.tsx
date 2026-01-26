@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Tag, CreateTagRequest, UpdateTagRequest } from '../types/labels';
-import { getTags, createTag, updateTag, deleteTag, getTagTransactionCount, deleteTagConfirmed } from '../services/tagService';
+import { useTags, useCreateTag, useUpdateTag, useDeleteTag, useTagTransactionCount, useDeleteTagConfirmed } from '../hooks';
 
 // Preset colors for tags
 const PRESET_COLORS = [
@@ -221,40 +221,30 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, tagName, transactionCo
 }
 
 export default function TagsTab() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // React Query hooks
+  const { data: tags = [], isLoading, error: queryError } = useTags();
+  const createTagMutation = useCreateTag();
+  const updateTagMutation = useUpdateTag();
+  const deleteTagMutation = useDeleteTag();
+  const tagTransactionCountMutation = useTagTransactionCount();
+  const deleteTagConfirmedMutation = useDeleteTagConfirmed();
+  
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
   const [tagTransactionCount, setTagTransactionCount] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const loadTags = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await getTags();
-      setTags(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load tags');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadTags();
-  }, [loadTags]);
+  // Combined error from query or local state
+  const displayError = queryError?.message || error;
 
   // Filtered tags based on search
   const filteredTags = useMemo(() => {
@@ -280,8 +270,8 @@ export default function TagsTab() {
     
     // Fetch transaction count in background
     try {
-      const { transactionCount } = await getTagTransactionCount(tag.id);
-      setTagTransactionCount(transactionCount);
+      const result = await tagTransactionCountMutation.mutateAsync(tag.id);
+      setTagTransactionCount(result.transactionCount);
     } catch (err) {
       // If we can't get the count, just show the normal delete dialog
       console.error('Failed to get transaction count:', err);
@@ -290,19 +280,15 @@ export default function TagsTab() {
 
   const handleModalSubmit = async (data: CreateTagRequest | UpdateTagRequest) => {
     try {
-      setIsSaving(true);
       setSaveError(null);
       if (editingTag) {
-        await updateTag(editingTag.id, data as UpdateTagRequest);
+        await updateTagMutation.mutateAsync({ id: editingTag.id, data: data as UpdateTagRequest });
       } else {
-        await createTag(data as CreateTagRequest);
+        await createTagMutation.mutateAsync(data as CreateTagRequest);
       }
-      await loadTags();
       setIsModalOpen(false);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save tag');
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -310,21 +296,17 @@ export default function TagsTab() {
     if (!tagToDelete) return;
     
     try {
-      setIsDeleting(true);
       setDeleteError(null);
       // Use confirmed delete if there are transactions
       if (tagTransactionCount > 0) {
-        await deleteTagConfirmed(tagToDelete.id);
+        await deleteTagConfirmedMutation.mutateAsync(tagToDelete.id);
       } else {
-        await deleteTag(tagToDelete.id);
+        await deleteTagMutation.mutateAsync(tagToDelete.id);
       }
-      await loadTags();
       setDeleteModalOpen(false);
       setTagToDelete(null);
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete tag');
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -338,9 +320,9 @@ export default function TagsTab() {
 
   return (
     <div>
-      {error && (
+      {displayError && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
-          {error}
+          {displayError}
           <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">×</button>
         </div>
       )}
@@ -460,7 +442,7 @@ export default function TagsTab() {
         onClose={() => { setIsModalOpen(false); setSaveError(null); }}
         onSubmit={handleModalSubmit}
         editingTag={editingTag}
-        isLoading={isSaving}
+        isLoading={createTagMutation.isPending || updateTagMutation.isPending}
         error={saveError}
       />
 
@@ -470,7 +452,7 @@ export default function TagsTab() {
         onConfirm={handleDeleteConfirm}
         tagName={tagToDelete?.name || ''}
         transactionCount={tagTransactionCount}
-        isLoading={isDeleting}
+        isLoading={deleteTagMutation.isPending || deleteTagConfirmedMutation.isPending}
         error={deleteError}
       />
     </div>
