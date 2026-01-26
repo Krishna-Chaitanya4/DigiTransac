@@ -15,6 +15,7 @@ import {
 import { useAccounts, useLabels, useTags, useCreateTag, useCreateTransaction } from '../hooks';
 import { TransactionForm } from '../components/TransactionForm';
 import { useAuth } from '../context/AuthContext';
+import { logger } from '../services/logger';
 import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
 import type {
   ConversationSummary,
@@ -170,7 +171,7 @@ export default function ChatsPage() {
         const convosResponse = await getConversations();
         setConversations(convosResponse.conversations);
       } catch (error) {
-        console.error('Failed to load conversations:', error);
+        logger.error('Failed to load conversations:', error);
       } finally {
         setIsLoading(false);
       }
@@ -192,7 +193,7 @@ export default function ChatsPage() {
         c.counterpartyUserId === userId ? { ...c, unreadCount: 0 } : c
       ));
     } catch (error) {
-      console.error('Failed to load conversation:', error);
+      logger.error('Failed to load conversation:', error);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -231,7 +232,7 @@ export default function ChatsPage() {
       const convosResponse = await getConversations();
       setConversations(convosResponse.conversations);
     } catch (error) {
-      console.error('Failed to send message:', error);
+      logger.error('Failed to send message:', error);
     } finally {
       setIsSending(false);
     }
@@ -248,7 +249,7 @@ export default function ChatsPage() {
       // Reload conversation
       await loadConversation(selectedUserId);
     } catch (error) {
-      console.error('Failed to edit message:', error);
+      logger.error('Failed to edit message:', error);
     }
   };
 
@@ -264,7 +265,7 @@ export default function ChatsPage() {
       const convosResponse = await getConversations();
       setConversations(convosResponse.conversations);
     } catch (error) {
-      console.error('Failed to delete message:', error);
+      logger.error('Failed to delete message:', error);
     }
   };
 
@@ -421,17 +422,10 @@ export default function ChatsPage() {
       // Scroll to bottom to show the new message
       setTimeout(scrollToBottom, 100);
     } catch (error) {
-      console.error('Failed to create transaction:', error);
+      logger.error('Failed to create transaction:', error);
       setTransactionFormError(error instanceof Error ? error.message : 'Failed to create transaction');
     }
   };
-
-  // Get account name helper - used by transaction messages
-  const getAccountName = (accountId: string): string => {
-    const account = accounts.find(a => a.id === accountId);
-    return account?.name || 'Unknown Account';
-  };
-  void getAccountName; // Suppress unused warning - available for future use
 
   // Format date for date separator
   const formatDateSeparator = (dateString: string): string => {
@@ -1261,7 +1255,7 @@ export default function ChatsPage() {
             const newTag = await createTagMutation.mutateAsync({ name });
             return newTag;
           } catch (error) {
-            console.error('Failed to create tag:', error);
+            logger.error('Failed to create tag:', error);
             return null;
           }
         }}
