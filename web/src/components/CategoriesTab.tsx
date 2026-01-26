@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
-import { getLabelTransactionCount } from '../services/labelService';
 import { 
   useLabels,
   useLabelsTree,
@@ -8,6 +7,7 @@ import {
   useUpdateLabel,
   useDeleteLabel,
   useDeleteLabelWithReassignment,
+  useLabelTransactionCount,
 } from '../hooks';
 import { 
   SearchResultItem, 
@@ -44,12 +44,18 @@ export default function CategoriesTab() {
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [labelToDelete, setLabelToDelete] = useState<LabelTree | null>(null);
-  const [labelTransactionCount, setLabelTransactionCount] = useState(0);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  // React Query for transaction count - only fetches for categories when modal is open
+  const { data: transactionCountData, isLoading: isLoadingCount } = useLabelTransactionCount(
+    labelToDelete?.type === 'Category' ? labelToDelete?.id : undefined,
+    { enabled: deleteModalOpen && labelToDelete?.type === 'Category' }
+  );
+  const labelTransactionCount = transactionCountData?.transactionCount ?? 0;
   
   // Derived loading states
   const isSaving = createLabelMutation.isPending || updateLabelMutation.isPending;
-  const isDeleting = deleteLabelMutation.isPending || deleteLabelWithReassignmentMutation.isPending;
+  const isDeleting = deleteLabelMutation.isPending || deleteLabelWithReassignmentMutation.isPending || isLoadingCount;
 
   // Search results
   const searchResults = useMemo(() => {
@@ -128,20 +134,10 @@ export default function CategoriesTab() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (label: LabelTree) => {
+  const handleDelete = (label: LabelTree) => {
     setLabelToDelete(label);
-    setLabelTransactionCount(0);
     setDeleteModalOpen(true);
-    
-    // Fetch transaction count for categories (folders don't have direct transactions)
-    if (label.type === 'Category') {
-      try {
-        const { transactionCount } = await getLabelTransactionCount(label.id);
-        setLabelTransactionCount(transactionCount);
-      } catch (err) {
-        console.error('Failed to get transaction count:', err);
-      }
-    }
+    // Transaction count is automatically fetched by React Query when modal opens
   };
 
   const handleModalSubmit = async (data: CreateLabelRequest | UpdateLabelRequest) => {

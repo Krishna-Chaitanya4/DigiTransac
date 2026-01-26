@@ -41,11 +41,13 @@ export const queryKeys = {
     all: ['labels'] as const,
     list: () => ['labels', 'list'] as const,
     tree: () => ['labels', 'tree'] as const,
+    transactionCount: (id: string) => ['labels', 'transactionCount', id] as const,
   },
   // Tags
   tags: {
     all: ['tags'] as const,
     list: () => ['tags', 'list'] as const,
+    transactionCount: (id: string) => ['tags', 'transactionCount', id] as const,
   },
   // Exchange rates
   exchangeRates: {

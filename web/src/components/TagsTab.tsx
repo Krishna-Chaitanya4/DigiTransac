@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Tag, CreateTagRequest, UpdateTagRequest } from '../types/labels';
-import { useTags, useCreateTag, useUpdateTag, useDeleteTag, useTagTransactionCount, useDeleteTagConfirmed } from '../hooks';
+import { useTags, useCreateTag, useUpdateTag, useDeleteTag, useTagTransactionCount, useDeleteTagConfirmed, useModalState } from '../hooks';
 
 // Preset colors for tags
 const PRESET_COLORS = [
@@ -226,22 +226,24 @@ export default function TagsTab() {
   const createTagMutation = useCreateTag();
   const updateTagMutation = useUpdateTag();
   const deleteTagMutation = useDeleteTag();
-  const tagTransactionCountMutation = useTagTransactionCount();
   const deleteTagConfirmedMutation = useDeleteTagConfirmed();
   
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTag, setEditingTag] = useState<Tag | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  // Modal states using custom hook
+  const editModal = useModalState<Tag>();
   
-  // Delete modal
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  // Delete modal with React Query for transaction count
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
-  const [tagTransactionCount, setTagTransactionCount] = useState(0);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  // React Query for transaction count - only fetches when tagToDelete is set
+  const { data: transactionCountData, isLoading: isLoadingCount } = useTagTransactionCount(
+    tagToDelete?.id,
+    { enabled: !!tagToDelete }
+  );
+  const tagTransactionCount = transactionCountData?.transactionCount ?? 0;
 
   // Combined error from query or local state
   const displayError = queryError?.message || error;
@@ -254,41 +256,29 @@ export default function TagsTab() {
   }, [searchQuery, tags]);
 
   const handleAddTag = () => {
-    setEditingTag(null);
-    setIsModalOpen(true);
+    editModal.open();
   };
 
   const handleEdit = (tag: Tag) => {
-    setEditingTag(tag);
-    setIsModalOpen(true);
+    editModal.open(tag);
   };
 
-  const handleDelete = async (tag: Tag) => {
+  const handleDelete = (tag: Tag) => {
     setTagToDelete(tag);
-    setTagTransactionCount(0);
-    setDeleteModalOpen(true);
-    
-    // Fetch transaction count in background
-    try {
-      const result = await tagTransactionCountMutation.mutateAsync(tag.id);
-      setTagTransactionCount(result.transactionCount);
-    } catch (err) {
-      // If we can't get the count, just show the normal delete dialog
-      console.error('Failed to get transaction count:', err);
-    }
+    setDeleteError(null);
   };
 
   const handleModalSubmit = async (data: CreateTagRequest | UpdateTagRequest) => {
     try {
-      setSaveError(null);
-      if (editingTag) {
-        await updateTagMutation.mutateAsync({ id: editingTag.id, data: data as UpdateTagRequest });
+      editModal.setError(null);
+      if (editModal.item) {
+        await updateTagMutation.mutateAsync({ id: editModal.item.id, data: data as UpdateTagRequest });
       } else {
         await createTagMutation.mutateAsync(data as CreateTagRequest);
       }
-      setIsModalOpen(false);
+      editModal.close();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save tag');
+      editModal.setError(err instanceof Error ? err.message : 'Failed to save tag');
     }
   };
 
@@ -303,7 +293,6 @@ export default function TagsTab() {
       } else {
         await deleteTagMutation.mutateAsync(tagToDelete.id);
       }
-      setDeleteModalOpen(false);
       setTagToDelete(null);
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete tag');
@@ -438,21 +427,21 @@ export default function TagsTab() {
       </div>
 
       <TagModal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setSaveError(null); }}
+        isOpen={editModal.isOpen}
+        onClose={editModal.close}
         onSubmit={handleModalSubmit}
-        editingTag={editingTag}
+        editingTag={editModal.item}
         isLoading={createTagMutation.isPending || updateTagMutation.isPending}
-        error={saveError}
+        error={editModal.error}
       />
 
       <DeleteConfirmModal
-        isOpen={deleteModalOpen}
-        onClose={() => { setDeleteModalOpen(false); setDeleteError(null); }}
+        isOpen={!!tagToDelete}
+        onClose={() => { setTagToDelete(null); setDeleteError(null); }}
         onConfirm={handleDeleteConfirm}
         tagName={tagToDelete?.name || ''}
-        transactionCount={tagTransactionCount}
-        isLoading={deleteTagMutation.isPending || deleteTagConfirmedMutation.isPending}
+        transactionCount={isLoadingCount ? 0 : tagTransactionCount}
+        isLoading={deleteTagMutation.isPending || deleteTagConfirmedMutation.isPending || isLoadingCount}
         error={deleteError}
       />
     </div>

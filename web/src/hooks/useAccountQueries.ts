@@ -37,6 +37,8 @@ export function useCreateAccount() {
   return useMutation({
     mutationFn: (data: CreateAccountRequest) => createAccount(data),
     onSuccess: () => {
+      // Invalidate to refetch with server data (optimistic updates for accounts
+      // are complex due to many required fields)
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
     },
   });
@@ -49,7 +51,37 @@ export function useUpdateAccount() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateAccountRequest }) => 
       updateAccount(id, data),
-    onSuccess: () => {
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.accounts.list(false) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.accounts.list(true) });
+      
+      const previousAccounts = queryClient.getQueryData<Account[]>(queryKeys.accounts.list(false));
+      const previousArchivedAccounts = queryClient.getQueryData<Account[]>(queryKeys.accounts.list(true));
+      
+      // Update in the appropriate list
+      const updateList = (accounts: Account[] | undefined) => 
+        accounts?.map(account =>
+          account.id === id ? { ...account, ...data, updatedAt: new Date().toISOString() } : account
+        );
+      
+      if (previousAccounts) {
+        queryClient.setQueryData<Account[]>(queryKeys.accounts.list(false), updateList(previousAccounts)!);
+      }
+      if (previousArchivedAccounts) {
+        queryClient.setQueryData<Account[]>(queryKeys.accounts.list(true), updateList(previousArchivedAccounts)!);
+      }
+      
+      return { previousAccounts, previousArchivedAccounts };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(queryKeys.accounts.list(false), context.previousAccounts);
+      }
+      if (context?.previousArchivedAccounts) {
+        queryClient.setQueryData(queryKeys.accounts.list(true), context.previousArchivedAccounts);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
     },
   });
@@ -61,7 +93,37 @@ export function useDeleteAccount() {
   
   return useMutation({
     mutationFn: (id: string) => deleteAccount(id),
-    onSuccess: () => {
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.accounts.list(false) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.accounts.list(true) });
+      
+      const previousAccounts = queryClient.getQueryData<Account[]>(queryKeys.accounts.list(false));
+      const previousArchivedAccounts = queryClient.getQueryData<Account[]>(queryKeys.accounts.list(true));
+      
+      if (previousAccounts) {
+        queryClient.setQueryData<Account[]>(
+          queryKeys.accounts.list(false),
+          previousAccounts.filter(account => account.id !== deletedId)
+        );
+      }
+      if (previousArchivedAccounts) {
+        queryClient.setQueryData<Account[]>(
+          queryKeys.accounts.list(true),
+          previousArchivedAccounts.filter(account => account.id !== deletedId)
+        );
+      }
+      
+      return { previousAccounts, previousArchivedAccounts };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(queryKeys.accounts.list(false), context.previousAccounts);
+      }
+      if (context?.previousArchivedAccounts) {
+        queryClient.setQueryData(queryKeys.accounts.list(true), context.previousArchivedAccounts);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
       // Also invalidate transactions since they reference accounts
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });

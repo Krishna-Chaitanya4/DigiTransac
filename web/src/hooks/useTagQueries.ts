@@ -19,11 +19,30 @@ export function useCreateTag() {
   
   return useMutation({
     mutationFn: (data: CreateTagRequest) => createTag(data),
-    onSuccess: (newTag) => {
-      // Update cache with new tag
-      queryClient.setQueryData<Tag[]>(queryKeys.tags.list(), (old) => 
-        old ? [...old, newTag] : [newTag]
-      );
+    onMutate: async (newTagData) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.tags.list() });
+      
+      const previousTags = queryClient.getQueryData<Tag[]>(queryKeys.tags.list());
+      
+      if (previousTags) {
+        const optimisticTag: Tag = {
+          id: `temp-${Date.now()}`,
+          name: newTagData.name,
+          color: newTagData.color ?? null,
+          createdAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<Tag[]>(queryKeys.tags.list(), [...previousTags, optimisticTag]);
+      }
+      
+      return { previousTags };
+    },
+    onError: (_err, _newTag, context) => {
+      if (context?.previousTags) {
+        queryClient.setQueryData(queryKeys.tags.list(), context.previousTags);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
     },
   });
 }
@@ -35,7 +54,28 @@ export function useUpdateTag() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTagRequest }) => 
       updateTag(id, data),
-    onSuccess: () => {
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.tags.list() });
+      
+      const previousTags = queryClient.getQueryData<Tag[]>(queryKeys.tags.list());
+      
+      if (previousTags) {
+        queryClient.setQueryData<Tag[]>(
+          queryKeys.tags.list(),
+          previousTags.map(tag =>
+            tag.id === id ? { ...tag, ...data } : tag
+          )
+        );
+      }
+      
+      return { previousTags };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousTags) {
+        queryClient.setQueryData(queryKeys.tags.list(), context.previousTags);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
     },
   });
@@ -47,16 +87,39 @@ export function useDeleteTag() {
   
   return useMutation({
     mutationFn: (id: string) => deleteTag(id),
-    onSuccess: () => {
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.tags.list() });
+      
+      const previousTags = queryClient.getQueryData<Tag[]>(queryKeys.tags.list());
+      
+      if (previousTags) {
+        queryClient.setQueryData<Tag[]>(
+          queryKeys.tags.list(),
+          previousTags.filter(tag => tag.id !== deletedId)
+        );
+      }
+      
+      return { previousTags };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previousTags) {
+        queryClient.setQueryData(queryKeys.tags.list(), context.previousTags);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
     },
   });
 }
 
-// Hook for getting tag transaction count
-export function useTagTransactionCount() {
-  return useMutation({
-    mutationFn: (id: string) => getTagTransactionCount(id),
+// Hook for getting tag transaction count (for delete confirmation)
+// Uses useQuery with enabled option for conditional fetching
+export function useTagTransactionCount(tagId: string | undefined, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.tags.transactionCount(tagId ?? ''),
+    queryFn: () => getTagTransactionCount(tagId!),
+    enabled: options?.enabled ?? !!tagId,
+    staleTime: 30 * 1000, // 30 seconds - counts can change
   });
 }
 

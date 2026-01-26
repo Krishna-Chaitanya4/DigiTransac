@@ -34,6 +34,7 @@ export {
   useUpdateLabel,
   useDeleteLabel,
   useDeleteLabelWithReassignment,
+  useLabelTransactionCount,
   useInvalidateLabels,
 } from './useLabelQueries';
 
@@ -55,3 +56,7 @@ export { useInfiniteScroll } from './useInfiniteScroll';
 export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 export { useTransactionFilters } from './useTransactionFilters';
 export { useOnlineStatus, useOfflineQueue } from './useOffline';
+export { useModalState, useDeleteModalState } from './useModalState';
+
+// Re-export query keys for external use
+export { queryKeys } from '../lib/queryClient';
