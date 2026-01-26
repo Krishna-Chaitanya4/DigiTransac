@@ -233,14 +233,30 @@ public class ConversationService : IConversationService
         var chatMessages = await _chatMessageRepository.GetConversationMessagesAsync(
             userId, counterpartyUserId, limit, before);
         
-        // Get P2P transactions with this counterparty
-        var p2pTransactions = await _transactionRepository.GetP2PTransactionsWithCounterpartyAsync(
-            userId, counterpartyUserId);
+        // Get transactions for this conversation
+        List<Transaction> transactionsForChat;
+        if (isSelfChat)
+        {
+            // For self-chat, get transactions by their IDs from chat messages
+            // This includes all transactions that have a chat message (not just P2P)
+            var transactionIds = chatMessages
+                .Where(m => m.Type == ChatMessageType.Transaction && !string.IsNullOrEmpty(m.TransactionId))
+                .Select(m => m.TransactionId!)
+                .Distinct()
+                .ToList();
+            transactionsForChat = await _transactionRepository.GetByIdsAsync(transactionIds, userId);
+        }
+        else
+        {
+            // For P2P chat, get transactions with this counterparty
+            transactionsForChat = await _transactionRepository.GetP2PTransactionsWithCounterpartyAsync(
+                userId, counterpartyUserId);
+        }
         
         // Filter transactions by before date if specified
         if (before.HasValue)
         {
-            p2pTransactions = p2pTransactions.Where(t => t.Date < before.Value).ToList();
+            transactionsForChat = transactionsForChat.Where(t => t.Date < before.Value).ToList();
         }
         
         // Get user's accounts for display names
@@ -251,7 +267,7 @@ public class ConversationService : IConversationService
         var messages = new List<ConversationMessage>();
         
         // Build a dictionary of transactions by ID for quick lookup
-        var transactionsById = p2pTransactions.ToDictionary(t => t.Id);
+        var transactionsById = transactionsForChat.ToDictionary(t => t.Id);
         
         // Track which transactions are already represented by chat messages
         var transactionIdsInChat = chatMessages
@@ -365,55 +381,59 @@ public class ConversationService : IConversationService
         }
         
         // Add transactions that don't have chat messages yet (for backward compatibility)
-        foreach (var tx in p2pTransactions)
+        // Skip for self-chat since we only have transactions that are already in chat messages
+        if (!isSelfChat)
         {
-            if (transactionIdsInChat.Contains(tx.Id))
+            foreach (var tx in transactionsForChat)
             {
-                continue; // Already have a chat message for this
+                if (transactionIdsInChat.Contains(tx.Id))
+                {
+                    continue; // Already have a chat message for this
+                }
+                
+                accounts.TryGetValue(tx.AccountId ?? "", out var account);
+                var txData = new TransactionMessageData(
+                    TransactionId: tx.Id,
+                    TransactionLinkId: tx.TransactionLinkId ?? Guid.Empty,
+                    TransactionType: tx.Type.ToString(),
+                    Amount: tx.Amount,
+                    Currency: tx.Currency,
+                    Date: tx.Date,
+                    Title: tx.Title,
+                    Notes: null,
+                    Status: tx.Status.ToString(),
+                    AccountName: account?.Name
+                );
+                
+                // Determine sender based on transaction type
+                var isFromMe = tx.Type == TransactionType.Send;
+                
+                // Derive IsSystemGenerated from Transaction.Source
+                var isSystemGenerated = tx.Source is TransactionSource.Recurring 
+                                                  or TransactionSource.Import 
+                                                  or TransactionSource.Transfer;
+                var systemSource = isSystemGenerated ? tx.Source.ToString() : null;
+                
+                messages.Add(new ConversationMessage(
+                    Id: $"tx-{tx.Id}",
+                    Type: "Transaction",
+                    SenderUserId: isFromMe ? userId : counterpartyUserId,
+                    IsFromMe: isFromMe,
+                    Content: null,
+                    Transaction: txData,
+                    Status: "Read", // Legacy transactions are considered read
+                    CreatedAt: tx.Date,
+                    DeliveredAt: tx.Date,
+                    ReadAt: tx.Date,
+                    IsEdited: false,
+                    EditedAt: null,
+                    IsDeleted: false,
+                    ReplyToMessageId: null,
+                    ReplyTo: null,
+                    IsSystemGenerated: isSystemGenerated,
+                    SystemSource: systemSource
+                ));
             }
-            
-            accounts.TryGetValue(tx.AccountId ?? "", out var account);
-            var txData = new TransactionMessageData(
-                TransactionId: tx.Id,
-                TransactionLinkId: tx.TransactionLinkId ?? Guid.Empty,
-                TransactionType: tx.Type.ToString(),
-                Amount: tx.Amount,
-                Currency: tx.Currency,
-                Date: tx.Date,
-                Title: tx.Title,
-                Notes: null,
-                Status: tx.Status.ToString(),
-                AccountName: account?.Name
-            );
-            
-            // Determine sender based on transaction type
-            var isFromMe = tx.Type == TransactionType.Send;
-            
-            // Derive IsSystemGenerated from Transaction.Source
-            var isSystemGenerated = tx.Source is TransactionSource.Recurring 
-                                              or TransactionSource.Import 
-                                              or TransactionSource.Transfer;
-            var systemSource = isSystemGenerated ? tx.Source.ToString() : null;
-            
-            messages.Add(new ConversationMessage(
-                Id: $"tx-{tx.Id}",
-                Type: "Transaction",
-                SenderUserId: isFromMe ? userId : counterpartyUserId,
-                IsFromMe: isFromMe,
-                Content: null,
-                Transaction: txData,
-                Status: "Read", // Legacy transactions are considered read
-                CreatedAt: tx.Date,
-                DeliveredAt: tx.Date,
-                ReadAt: tx.Date,
-                IsEdited: false,
-                EditedAt: null,
-                IsDeleted: false,
-                ReplyToMessageId: null,
-                ReplyTo: null,
-                IsSystemGenerated: isSystemGenerated,
-                SystemSource: systemSource
-            ));
         }
         
         // Sort by date ascending (oldest first, newest at bottom) and limit
@@ -423,15 +443,15 @@ public class ConversationService : IConversationService
             .ToList();
         
         // Calculate totals
-        decimal totalSent = p2pTransactions
+        decimal totalSent = transactionsForChat
             .Where(t => t.Type == TransactionType.Send && !string.IsNullOrEmpty(t.AccountId))
             .Sum(t => t.Amount);
-        decimal totalReceived = p2pTransactions
+        decimal totalReceived = transactionsForChat
             .Where(t => t.Type == TransactionType.Receive && !string.IsNullOrEmpty(t.AccountId))
             .Sum(t => t.Amount);
         
         var totalCount = messages.Count;
-        var hasMore = chatMessages.Count == limit || p2pTransactions.Count > limit;
+        var hasMore = chatMessages.Count == limit || transactionsForChat.Count > limit;
         
         return new ConversationDetailResponse(
             CounterpartyUserId: counterpartyUserId,

@@ -42,6 +42,9 @@ public interface ITransactionRepository
     // P2P conversation queries
     Task<List<Transaction>> GetP2PTransactionsAsync(string userId);
     Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId);
+    
+    // Get transactions by IDs (for chat message resolution)
+    Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId);
 }
 
 public class TransactionRepository : ITransactionRepository
@@ -572,5 +575,19 @@ public class TransactionRepository : ITransactionRepository
         return await _transactions.Find(filter)
             .SortByDescending(t => t.Date)
             .ToListAsync();
+    }
+
+    public async Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId)
+    {
+        var idsList = ids.ToList();
+        if (idsList.Count == 0)
+            return new List<Transaction>();
+            
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.In(t => t.Id, idsList),
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId)
+        );
+        
+        return await _transactions.Find(filter).ToListAsync();
     }
 }

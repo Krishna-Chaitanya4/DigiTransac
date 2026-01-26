@@ -50,7 +50,13 @@ public class ConversationServiceTests
         // Default empty results
         _transactionRepositoryMock.Setup(x => x.GetP2PTransactionsAsync(It.IsAny<string>()))
             .ReturnsAsync(new List<Transaction>());
+        _transactionRepositoryMock.Setup(x => x.GetP2PTransactionsWithCounterpartyAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new List<Transaction>());
+        _transactionRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string>()))
+            .ReturnsAsync(new List<Transaction>());
         _chatMessageRepositoryMock.Setup(x => x.GetLatestMessagePerConversationAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<ChatMessage>());
+        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(new List<ChatMessage>());
         _chatMessageRepositoryMock.Setup(x => x.GetUnreadCountAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(0);
@@ -253,7 +259,8 @@ public class ConversationServiceTests
         };
         _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, TestUserId, It.IsAny<int>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(chatMessages);
-        _transactionRepositoryMock.Setup(x => x.GetP2PTransactionsWithCounterpartyAsync(TestUserId, TestUserId))
+        // For self-chat, we use GetByIdsAsync instead of GetP2PTransactionsWithCounterpartyAsync
+        _transactionRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), TestUserId))
             .ReturnsAsync(new List<Transaction>());
 
         // Act
@@ -295,7 +302,8 @@ public class ConversationServiceTests
         };
         _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, TestUserId, It.IsAny<int>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(chatMessages);
-        _transactionRepositoryMock.Setup(x => x.GetP2PTransactionsWithCounterpartyAsync(TestUserId, TestUserId))
+        // For self-chat, we use GetByIdsAsync instead of GetP2PTransactionsWithCounterpartyAsync
+        _transactionRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), TestUserId))
             .ReturnsAsync(new List<Transaction> { transaction });
 
         // Act
