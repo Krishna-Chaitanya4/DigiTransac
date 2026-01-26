@@ -539,16 +539,24 @@ export default function TransactionsPage() {
 
   // Navigate to chat view for a transaction
   const handleViewInChat = useCallback((transaction: Transaction) => {
+    // Build URL params for navigation
+    const params = new URLSearchParams();
+    
     // If transaction has a counterparty, navigate to their chat
     // Otherwise, navigate to self-chat (personal transactions)
     const userId = transaction.counterpartyUserId;
     if (userId) {
-      navigate(`/chats?user=${userId}`);
+      params.set('user', userId);
     } else {
-      // Self-chat - navigate to chats page with self as counterparty
-      // The ChatsPage will handle showing the self-chat
-      navigate('/chats?self=true');
+      params.set('self', 'true');
     }
+    
+    // Add message ID for scrolling and highlighting
+    if (transaction.chatMessageId) {
+      params.set('messageId', transaction.chatMessageId);
+    }
+    
+    navigate(`/chats?${params.toString()}`);
   }, [navigate]);
 
   // Batch operations

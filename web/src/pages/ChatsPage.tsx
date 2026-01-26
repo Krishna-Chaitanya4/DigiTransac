@@ -75,14 +75,22 @@ export default function ChatsPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [pendingConversation, setPendingConversation] = useState<ConversationDetailResponse | null>(null);
   
+  // State for pending message scroll (from deep link)
+  const [pendingScrollMessageId, setPendingScrollMessageId] = useState<string | null>(null);
+
   // Handle URL params for deep linking
   useEffect(() => {
     const userParam = searchParams.get('user');
     const selfParam = searchParams.get('self');
+    const messageIdParam = searchParams.get('messageId');
     
     if (userParam) {
       // Navigate to specific user's chat
       setSelectedUserId(userParam);
+      // Store message ID for scrolling after conversation loads
+      if (messageIdParam) {
+        setPendingScrollMessageId(messageIdParam);
+      }
       // Clear the param after use
       setSearchParams({}, { replace: true });
     } else if (selfParam === 'true' && conversations.length > 0) {
@@ -91,6 +99,10 @@ export default function ChatsPage() {
       const selfChat = conversations.find(c => c.isSelfChat);
       if (selfChat) {
         setSelectedUserId(selfChat.counterpartyUserId);
+        // Store message ID for scrolling after conversation loads
+        if (messageIdParam) {
+          setPendingScrollMessageId(messageIdParam);
+        }
       }
       // Clear the param after use
       setSearchParams({}, { replace: true });
@@ -151,6 +163,22 @@ export default function ChatsPage() {
   // Use the API flag if available, fallback to email comparison for backward compatibility
   const isSelfChat = selectedConversation?.isSelfChat ?? (user?.email === selectedConversation?.counterpartyEmail);
 
+  // Scroll to a message and highlight it temporarily
+  const scrollToMessage = useCallback((messageId: string) => {
+    const element = document.getElementById(`msg-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('rounded-2xl', 'transition-colors', 'duration-500');
+      element.classList.add('bg-gray-200', 'dark:bg-gray-700');
+      setTimeout(() => {
+        element.classList.remove('bg-gray-200', 'dark:bg-gray-700');
+        setTimeout(() => {
+          element.classList.remove('rounded-2xl', 'transition-colors', 'duration-500');
+        }, 500);
+      }, 1000);
+    }
+  }, []);
+
   // Mark as read when conversation loads
   useEffect(() => {
     if (selectedUserId && conversationData) {
@@ -160,13 +188,28 @@ export default function ChatsPage() {
 
   // Scroll to bottom when messages change
   useEffect(() => {
+    // Don't auto-scroll if we're about to scroll to a specific message
+    if (pendingScrollMessageId) return;
+    
     if (selectedConversation?.messages && selectedConversation.messages.length > 0) {
       const timeoutId = setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
       }, 50);
       return () => clearTimeout(timeoutId);
     }
-  }, [selectedConversation?.messages]);
+  }, [selectedConversation?.messages, pendingScrollMessageId]);
+
+  // Scroll to specific message from deep link (View in Chat)
+  useEffect(() => {
+    if (pendingScrollMessageId && selectedConversation?.messages && selectedConversation.messages.length > 0) {
+      // Small delay to ensure DOM is rendered
+      const timeoutId = setTimeout(() => {
+        scrollToMessage(pendingScrollMessageId);
+        setPendingScrollMessageId(null);
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [pendingScrollMessageId, selectedConversation?.messages, scrollToMessage]);
 
   // Handle scroll detection
   const handleScroll = useCallback(() => {
@@ -319,22 +362,6 @@ export default function ChatsPage() {
   const handleMenuClose = useCallback(() => {
     setMenuMessage(null);
     setMenuPosition(null);
-  }, []);
-
-  // Scroll to replied message
-  const scrollToMessage = useCallback((messageId: string) => {
-    const element = document.getElementById(`msg-${messageId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('rounded-2xl', 'transition-colors', 'duration-500');
-      element.classList.add('bg-gray-200', 'dark:bg-gray-700');
-      setTimeout(() => {
-        element.classList.remove('bg-gray-200', 'dark:bg-gray-700');
-        setTimeout(() => {
-          element.classList.remove('rounded-2xl', 'transition-colors', 'duration-500');
-        }, 500);
-      }, 1000);
-    }
   }, []);
 
   // Handle new chat start
