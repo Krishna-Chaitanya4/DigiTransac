@@ -53,6 +53,20 @@ export {
   usePrefetchTags,
 } from './useTagQueries';
 
+// Conversation queries
+export {
+  useConversations,
+  useConversation,
+  useSendMessage,
+  useEditMessage,
+  useDeleteMessage,
+  useMarkAsRead,
+  useUserSearch,
+  useInvalidateConversations,
+  useOptimisticSendMessage,
+  conversationKeys,
+} from './useConversationQueries';
+
 // Other hooks
 export { useBulkSelection } from './useBulkSelection';
 export { useFocusTrap } from './useFocusTrap';

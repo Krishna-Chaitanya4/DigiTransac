@@ -210,6 +210,7 @@ export default function TwoFactorSettings() {
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupData.qrCodeUri)}`}
                       alt="2FA QR Code"
                       className="w-48 h-48"
+                      loading="lazy"
                     />
                   </div>
                 </div>
