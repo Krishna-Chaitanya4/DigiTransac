@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { ConversationSummary } from '../../types/conversations';
-import { getDisplayName, formatRelativeTime, formatChatCurrency } from '../../services/conversationService';
+import { getDisplayName, formatRelativeTime } from '../../services/conversationService';
 
 interface ConversationItemProps {
   conversation: ConversationSummary;
@@ -52,22 +52,6 @@ export const ConversationItem = memo(function ConversationItem({
         <p className="text-sm text-gray-600 dark:text-gray-400 truncate mt-0.5">
           {conversation.lastMessagePreview || 'No messages yet'}
         </p>
-
-        {/* Amount summary */}
-        <div className="flex items-center gap-3 mt-1.5">
-          {(conversation.totalSent ?? 0) > 0 && (
-            <span className="text-xs font-medium text-red-600 dark:text-red-400 flex items-center gap-0.5">
-              <span>↑</span>
-              {formatChatCurrency(conversation.totalSent!, conversation.primaryCurrency)}
-            </span>
-          )}
-          {(conversation.totalReceived ?? 0) > 0 && (
-            <span className="text-xs font-medium text-green-600 dark:text-green-400 flex items-center gap-0.5">
-              <span>↓</span>
-              {formatChatCurrency(conversation.totalReceived!, conversation.primaryCurrency)}
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Unread badge */}

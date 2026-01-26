@@ -7,8 +7,6 @@ import type { ConversationSummary } from '../../types/conversations';
 vi.mock('../../services/conversationService', () => ({
   getDisplayName: (name: string | null, email: string) => name || email.split('@')[0],
   formatRelativeTime: (dateString: string) => '5m',
-  formatChatCurrency: (amount: number, currency: string | null) => 
-    currency ? `${currency} ${amount}` : `${amount}`,
 }));
 
 // Helper to create mock conversation
@@ -157,77 +155,6 @@ describe('ConversationItem', () => {
     });
   });
 
-  describe('Amount summary', () => {
-    it('should display total sent amount with arrow', () => {
-      render(
-        <ConversationItem
-          conversation={createConversation({ totalSent: 500, primaryCurrency: 'EUR' })}
-          isSelected={false}
-          onClick={mockOnClick}
-        />
-      );
-
-      expect(screen.getByText('↑')).toBeInTheDocument();
-      expect(screen.getByText('EUR 500')).toBeInTheDocument();
-    });
-
-    it('should display total received amount with arrow', () => {
-      render(
-        <ConversationItem
-          conversation={createConversation({ totalReceived: 250, primaryCurrency: 'GBP' })}
-          isSelected={false}
-          onClick={mockOnClick}
-        />
-      );
-
-      expect(screen.getByText('↓')).toBeInTheDocument();
-      expect(screen.getByText('GBP 250')).toBeInTheDocument();
-    });
-
-    it('should display both sent and received when available', () => {
-      render(
-        <ConversationItem
-          conversation={createConversation({ 
-            totalSent: 100, 
-            totalReceived: 200, 
-            primaryCurrency: 'USD' 
-          })}
-          isSelected={false}
-          onClick={mockOnClick}
-        />
-      );
-
-      expect(screen.getByText('USD 100')).toBeInTheDocument();
-      expect(screen.getByText('USD 200')).toBeInTheDocument();
-    });
-
-    it('should not display amount when zero', () => {
-      render(
-        <ConversationItem
-          conversation={createConversation({ totalSent: 0, totalReceived: 0 })}
-          isSelected={false}
-          onClick={mockOnClick}
-        />
-      );
-
-      expect(screen.queryByText('↑')).not.toBeInTheDocument();
-      expect(screen.queryByText('↓')).not.toBeInTheDocument();
-    });
-
-    it('should not display amount when null', () => {
-      render(
-        <ConversationItem
-          conversation={createConversation({ totalSent: null, totalReceived: null })}
-          isSelected={false}
-          onClick={mockOnClick}
-        />
-      );
-
-      expect(screen.queryByText('↑')).not.toBeInTheDocument();
-      expect(screen.queryByText('↓')).not.toBeInTheDocument();
-    });
-  });
-
   describe('Unread badge', () => {
     it('should display unread count when greater than 0', () => {
       render(
@@ -323,34 +250,6 @@ describe('ConversationItem', () => {
       );
 
       expect(screen.getByRole('button')).toBeInTheDocument();
-    });
-  });
-
-  describe('Styling variants', () => {
-    it('should use red color for sent amount', () => {
-      const { container } = render(
-        <ConversationItem
-          conversation={createConversation({ totalSent: 100 })}
-          isSelected={false}
-          onClick={mockOnClick}
-        />
-      );
-
-      const sentAmount = container.querySelector('.text-red-600');
-      expect(sentAmount).toBeInTheDocument();
-    });
-
-    it('should use green color for received amount', () => {
-      const { container } = render(
-        <ConversationItem
-          conversation={createConversation({ totalReceived: 100 })}
-          isSelected={false}
-          onClick={mockOnClick}
-        />
-      );
-
-      const receivedAmount = container.querySelector('.text-green-600');
-      expect(receivedAmount).toBeInTheDocument();
     });
   });
 });

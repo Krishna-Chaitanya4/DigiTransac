@@ -42,22 +42,6 @@ export const ChatHeader = memo(function ChatHeader({
         </p>
       </div>
 
-      {/* Totals */}
-      <div className="hidden sm:flex items-center gap-4 text-sm">
-        <div className="text-center">
-          <div className="text-xs text-gray-500 dark:text-gray-400">Sent</div>
-          <div className="font-semibold text-red-600 dark:text-red-400">
-            ₹{conversation.totalSent.toLocaleString()}
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs text-gray-500 dark:text-gray-400">Received</div>
-          <div className="font-semibold text-green-600 dark:text-green-400">
-            ₹{conversation.totalReceived.toLocaleString()}
-          </div>
-        </div>
-      </div>
-
       {/* Search button */}
       <button
         onClick={onToggleSearch}
