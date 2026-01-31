@@ -115,17 +115,31 @@ builder.Services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>()
 builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
 builder.Services.AddSingleton<IChatMessageRepository, ChatMessageRepository>();
 
-// Add HttpClient for external API calls
+// Add HttpClient for external API calls with resilience policies (Circuit Breaker + Retry)
+// Create a logger factory for Polly to use
+var loggerFactory = LoggerFactory.Create(logging =>
+{
+    logging.AddSerilog();
+});
+var httpClientLogger = loggerFactory.CreateLogger("HttpClient.Resilience");
+
 builder.Services.AddHttpClient("ExchangeRates", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(15);  // Standard timeout for user-facing requests
+    client.Timeout = TimeSpan.FromSeconds(30);  // Overall timeout (Polly handles per-request timeout)
     client.DefaultRequestHeaders.Add("User-Agent", "DigiTransac/1.0");
 })
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
     AutomaticDecompression = System.Net.DecompressionMethods.All,
     ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-});
+})
+// Add Polly resilience policies: Retry with exponential backoff + Circuit Breaker
+.AddResiliencePolicies(
+    httpClientLogger,
+    retryCount: 3,                      // Retry up to 3 times
+    circuitBreakerThreshold: 5,         // Open circuit after 5 consecutive failures
+    circuitBreakerDurationSeconds: 30,  // Keep circuit open for 30 seconds
+    timeoutSeconds: 15);                // Timeout each request after 15 seconds
 
 // Also add default HttpClient
 builder.Services.AddHttpClient();
