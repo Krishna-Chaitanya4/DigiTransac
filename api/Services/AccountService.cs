@@ -225,6 +225,12 @@ public class AccountService : IAccountService
             return (false, "Invalid account type", null);
         }
 
+        // Check for duplicate account name
+        if (await _accountRepository.ExistsByNameAsync(request.Name, userId))
+        {
+            return (false, "An account with this name already exists", null);
+        }
+
         var count = await _accountRepository.GetCountByUserIdAsync(userId);
 
         // Get user's primary currency if not specified

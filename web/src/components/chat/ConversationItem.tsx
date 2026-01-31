@@ -14,8 +14,8 @@ export const ConversationItem = memo(function ConversationItem({
   onClick,
 }: ConversationItemProps) {
   const isSelfChat = conversation.isSelfChat ?? false;
-  const displayName = isSelfChat 
-    ? 'Personal Transactions' 
+  const displayName = isSelfChat
+    ? 'Personal'
     : getDisplayName(conversation.counterpartyName, conversation.counterpartyEmail);
 
   return (

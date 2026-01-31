@@ -81,6 +81,9 @@ export interface Transaction {
   lastSyncedAt?: string;
   // Chat integration
   chatMessageId?: string; // Reference to chat message for "View in Chat" action
+  // Timezone-aware date fields (for global travel support)
+  dateLocal?: string;     // "YYYY-MM-DD" - the human-intended calendar date (always display this if available)
+  dateTimezone?: string;  // IANA timezone e.g., "Asia/Kolkata" (original timezone at creation)
 }
 
 export interface TransactionListResponse {
@@ -152,6 +155,9 @@ export interface CreateTransactionRequest {
   // P2P fields (optional for Send/Receive types)
   counterpartyEmail?: string;
   counterpartyAmount?: number;
+  // Timezone-aware date fields (for global travel support)
+  dateLocal?: string;     // "YYYY-MM-DD" - the human-intended calendar date
+  dateTimezone?: string;  // IANA timezone e.g., "Asia/Kolkata"
 }
 
 export interface UpdateTransactionRequest {
@@ -167,6 +173,9 @@ export interface UpdateTransactionRequest {
   status?: TransactionStatus;
   transferToAccountId?: string;
   accountId?: string;
+  // Timezone-aware date fields (for global travel support)
+  dateLocal?: string;     // "YYYY-MM-DD" - the human-intended calendar date
+  dateTimezone?: string;  // IANA timezone e.g., "Asia/Kolkata"
 }
 
 export interface TransactionFilter {

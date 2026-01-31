@@ -115,8 +115,27 @@ public class Transaction
     [BsonElement("currency")]
     public string Currency { get; set; } = null!; // Locked to account's currency
 
+    /// <summary>
+    /// UTC datetime used for queries/sorting. When DateLocal is present, this is
+    /// derived from DateLocal + DateTimezone (noon local → UTC).
+    /// </summary>
     [BsonElement("date")]
     public DateTime Date { get; set; }
+
+    /// <summary>
+    /// The human-intended calendar date in YYYY-MM-DD format (e.g., "2024-01-15").
+    /// This is the date the user selected, independent of timezone.
+    /// For display, always prefer this field when available.
+    /// </summary>
+    [BsonElement("dateLocal")]
+    public string? DateLocal { get; set; }
+
+    /// <summary>
+    /// The IANA timezone identifier at the time of transaction creation (e.g., "Asia/Kolkata").
+    /// Enables accurate reconstruction of local time for reporting/analytics.
+    /// </summary>
+    [BsonElement("dateTimezone")]
+    public string? DateTimezone { get; set; }
 
     [BsonElement("title")]
     public string? Title { get; set; }

@@ -9,6 +9,7 @@ interface ConversationListProps {
   onNewChat: () => void;
   isResizing: boolean;
   onResizeStart: () => void;
+  onResizeEnd: () => void;
   onResizeReset: () => void;
   sidebarWidth: number;
   onWidthChange: (width: number) => void;
@@ -23,6 +24,7 @@ export const ConversationList = memo(function ConversationList({
   onNewChat,
   isResizing,
   onResizeStart,
+  onResizeEnd,
   onResizeReset,
   sidebarWidth,
   onWidthChange,
@@ -46,6 +48,7 @@ export const ConversationList = memo(function ConversationList({
     const handleMouseUp = () => {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      onResizeEnd();
     };
 
     if (isResizing) {
@@ -62,12 +65,25 @@ export const ConversationList = memo(function ConversationList({
   }, [isResizing, minWidth, maxWidth, onWidthChange]);
 
   const filteredConversations = useCallback(() => {
-    if (!conversationFilter.trim()) return conversations;
-    const filter = conversationFilter.toLowerCase();
-    return conversations.filter((conv) => {
-      const name = (conv.counterpartyName || '').toLowerCase();
-      const email = (conv.counterpartyEmail || '').toLowerCase();
-      return name.includes(filter) || email.includes(filter);
+    let result = conversations;
+    
+    // Apply search filter if present
+    if (conversationFilter.trim()) {
+      const filter = conversationFilter.toLowerCase();
+      result = result.filter((conv) => {
+        const name = (conv.counterpartyName || '').toLowerCase();
+        const email = (conv.counterpartyEmail || '').toLowerCase();
+        return name.includes(filter) || email.includes(filter);
+      });
+    }
+    
+    // Sort: Pin self-chat (Personal) at the top, then by last activity
+    return result.sort((a, b) => {
+      // Self-chat always comes first
+      if (a.isSelfChat && !b.isSelfChat) return -1;
+      if (!a.isSelfChat && b.isSelfChat) return 1;
+      // Otherwise sort by last activity (newest first)
+      return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
     });
   }, [conversations, conversationFilter]);
 

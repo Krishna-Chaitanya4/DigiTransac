@@ -9,6 +9,7 @@ public interface IAccountRepository
     Task<List<Account>> GetByUserIdAsync(string userId, bool includeArchived = false);
     Task<Account?> GetByIdAsync(string id);
     Task<Account?> GetByIdAndUserIdAsync(string id, string userId);
+    Task<bool> ExistsByNameAsync(string name, string userId);
     Task<Account> CreateAsync(Account account);
     Task UpdateAsync(Account account, IClientSessionHandle? session = null);
     Task<bool> DeleteAsync(string id, string userId);
@@ -58,6 +59,15 @@ public class AccountRepository : IAccountRepository
     public async Task<Account?> GetByIdAndUserIdAsync(string id, string userId)
     {
         return await _accounts.Find(a => a.Id == id && a.UserId == userId).FirstOrDefaultAsync();
+    }
+
+    public async Task<bool> ExistsByNameAsync(string name, string userId)
+    {
+        var normalizedName = name.Trim().ToLowerInvariant();
+        return await _accounts.Find(a =>
+            a.UserId == userId &&
+            a.Name.ToLowerInvariant() == normalizedName
+        ).AnyAsync();
     }
 
     public async Task<Account> CreateAsync(Account account)

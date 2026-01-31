@@ -5,6 +5,7 @@ using System.Threading.RateLimiting;
 using Asp.Versioning;
 using DigiTransac.Api.Endpoints;
 using DigiTransac.Api.Extensions;
+using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Services.Caching;
@@ -181,6 +182,18 @@ builder.Services.AddScoped<ITransactionService, TransactionServiceFacade>();
 
 builder.Services.AddScoped<IConversationService, ConversationService>();
 
+// Add SignalR for real-time notifications
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+    options.MaximumReceiveMessageSize = 32 * 1024; // 32 KB
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
+
+// Add notification service for SignalR
+builder.Services.AddScoped<INotificationService, NotificationService>();
+
 // Background services
 builder.Services.AddHostedService<RecurringTransactionBackgroundService>();
 
@@ -334,6 +347,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key))
         };
+        
+        // Allow SignalR to get the JWT from query string
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                
+                // If the request is for the SignalR hub
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -404,17 +435,27 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.OpenApiSecurityScheme
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
-        Type = Microsoft.OpenApi.SecuritySchemeType.Http,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        In = Microsoft.OpenApi.ParameterLocation.Header
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header
     });
-    c.AddSecurityRequirement(document => new Microsoft.OpenApi.OpenApiSecurityRequirement
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
-        [new Microsoft.OpenApi.OpenApiSecuritySchemeReference("Bearer", document)] = []
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
     });
 });
 
@@ -531,6 +572,9 @@ app.MapCurrencyEndpoints();
 app.MapTransactionEndpoints();
 app.MapConversationEndpoints();
 
+// Map SignalR hub
+app.MapHub<NotificationHub>("/hubs/notifications");
+
 Log.Information("DigiTransac API starting...");
 app.Run();
 
@@ -543,3 +587,5 @@ finally
 {
     Log.CloseAndFlush();
 }
+// Make Program accessible to test project
+public partial class Program { }

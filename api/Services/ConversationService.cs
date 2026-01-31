@@ -162,9 +162,21 @@ public class ConversationService : IConversationService
             {
                 lastActivityAt = latestMessage.CreatedAt;
                 lastMessageType = latestMessage.Type.ToString();
-                lastMessagePreview = latestMessage.Type == ChatMessageType.Text 
-                    ? TruncateString(latestMessage.Content, 50)
-                    : GetTransactionPreview(latestTx, userId);
+                if (latestMessage.Type == ChatMessageType.Text)
+                {
+                    lastMessagePreview = TruncateString(latestMessage.Content, 50);
+                }
+                else if (latestMessage.Type == ChatMessageType.Transaction && !string.IsNullOrEmpty(latestMessage.TransactionId))
+                {
+                    // For transaction messages, fetch the actual transaction to generate preview
+                    // This is especially important for self-chat where latestTx is null
+                    var msgTransaction = latestTx ?? await _transactionRepository.GetByIdAndUserIdAsync(latestMessage.TransactionId, userId);
+                    lastMessagePreview = GetTransactionPreview(msgTransaction, userId);
+                }
+                else
+                {
+                    lastMessagePreview = "💰 Transaction";
+                }
             }
             else if (latestTx != null)
             {
@@ -190,7 +202,7 @@ public class ConversationService : IConversationService
             conversations.Add(new ConversationSummary(
                 CounterpartyUserId: counterpartyId,
                 CounterpartyEmail: user.Email,
-                CounterpartyName: isSelfChat ? "Personal Transactions" : user.FullName,
+                CounterpartyName: isSelfChat ? "Personal" : user.FullName,
                 LastActivityAt: lastActivityAt,
                 LastMessagePreview: lastMessagePreview,
                 LastMessageType: lastMessageType,
@@ -456,7 +468,7 @@ public class ConversationService : IConversationService
         return new ConversationDetailResponse(
             CounterpartyUserId: counterpartyUserId,
             CounterpartyEmail: counterparty.Email,
-            CounterpartyName: isSelfChat ? "Personal Transactions" : counterparty.FullName,
+            CounterpartyName: isSelfChat ? "Personal" : counterparty.FullName,
             Messages: messages,
             TotalCount: totalCount,
             HasMore: hasMore,

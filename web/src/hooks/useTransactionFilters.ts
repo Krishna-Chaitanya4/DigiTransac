@@ -11,18 +11,21 @@ interface DateRange {
 }
 
 // Date utility functions
+// These functions convert LOCAL date boundaries to UTC for API queries
+// E.g., Jan 31 00:00 IST → Jan 30 18:30 UTC (for +5:30 timezone)
+
 export const formatDateToStartOfDay = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T00:00:00.000Z`;
+  // Create a new date at start of day in LOCAL timezone
+  const localStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  // Convert to ISO string (which is UTC)
+  return localStart.toISOString();
 };
 
 export const formatDateToEndOfDay = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T23:59:59.999Z`;
+  // Create a new date at end of day in LOCAL timezone
+  const localEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  // Convert to ISO string (which is UTC)
+  return localEnd.toISOString();
 };
 
 export const formatDateForInput = (date: Date): string => {

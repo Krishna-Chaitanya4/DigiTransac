@@ -39,6 +39,7 @@ describe('ConversationList', () => {
   const mockOnSelectConversation = vi.fn();
   const mockOnNewChat = vi.fn();
   const mockOnResizeStart = vi.fn();
+  const mockOnResizeEnd = vi.fn();
   const mockOnResizeReset = vi.fn();
   const mockOnWidthChange = vi.fn();
 
@@ -49,6 +50,7 @@ describe('ConversationList', () => {
     onNewChat: mockOnNewChat,
     isResizing: false,
     onResizeStart: mockOnResizeStart,
+    onResizeEnd: mockOnResizeEnd,
     onResizeReset: mockOnResizeReset,
     sidebarWidth: 320,
     onWidthChange: mockOnWidthChange,

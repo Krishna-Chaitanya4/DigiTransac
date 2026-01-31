@@ -55,6 +55,11 @@ public interface IChatMessageRepository
     /// Create transaction message entry for a P2P transaction
     /// </summary>
     Task CreateTransactionMessageAsync(string senderUserId, string recipientUserId, string transactionId);
+
+    /// <summary>
+    /// Create a system-generated activity message (e.g., "Transaction confirmed")
+    /// </summary>
+    Task<ChatMessage> CreateSystemMessageAsync(string userId, string counterpartyUserId, string content, string systemSource, string? transactionId = null);
 }
 
 public class ChatMessageRepository : IChatMessageRepository
@@ -270,8 +275,8 @@ public class ChatMessageRepository : IChatMessageRepository
     }
 
     public async Task CreateTransactionMessageAsync(
-        string senderUserId, 
-        string recipientUserId, 
+        string senderUserId,
+        string recipientUserId,
         string transactionId)
     {
         // Create a single message that represents the transaction in the chat
@@ -287,5 +292,32 @@ public class ChatMessageRepository : IChatMessageRepository
         };
 
         await _chatMessages.InsertOneAsync(message);
+    }
+
+    public async Task<ChatMessage> CreateSystemMessageAsync(
+        string userId,
+        string counterpartyUserId,
+        string content,
+        string systemSource,
+        string? transactionId = null)
+    {
+        // System messages are created on behalf of the "system" but attributed to userId
+        // For self-chat, sender and recipient are the same
+        var message = new ChatMessage
+        {
+            SenderUserId = userId,
+            RecipientUserId = counterpartyUserId,
+            Type = transactionId != null ? ChatMessageType.Transaction : ChatMessageType.Text,
+            Content = content,
+            TransactionId = transactionId,
+            Status = MessageStatus.Read, // System messages are immediately "read"
+            IsSystemGenerated = true,
+            SystemSource = systemSource,
+            CreatedAt = DateTime.UtcNow,
+            ReadAt = DateTime.UtcNow
+        };
+
+        await _chatMessages.InsertOneAsync(message);
+        return message;
     }
 }

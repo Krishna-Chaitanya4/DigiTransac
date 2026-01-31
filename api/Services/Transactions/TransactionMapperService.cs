@@ -128,7 +128,10 @@ public class TransactionMapperService : ITransactionMapperService
                 ? (t.Type == TransactionType.Send ? "Sender" : "Receiver")
                 : null,
             t.LastSyncedAt,
-            t.ChatMessageId);
+            t.ChatMessageId,
+            // Timezone-aware date fields (for global travel support)
+            t.DateLocal,
+            t.DateTimezone);
     }
 
     public RecurringTransactionResponse MapToRecurringResponse(

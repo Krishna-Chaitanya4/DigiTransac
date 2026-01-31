@@ -86,6 +86,9 @@ public class RecurringTransactionService : IRecurringTransactionService
             Amount = request.Amount,
             Currency = account.Currency,
             Date = request.Date,
+            // Timezone-aware date fields (for global travel support)
+            DateLocal = request.DateLocal,
+            DateTimezone = request.DateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -128,6 +131,9 @@ public class RecurringTransactionService : IRecurringTransactionService
             Amount = request.Amount,
             Currency = account.Currency,
             Date = request.Date,
+            // Timezone-aware date fields (for global travel support)
+            DateLocal = request.DateLocal,
+            DateTimezone = request.DateTimezone,
             Title = request.Title,
             EncryptedPayee = template.EncryptedPayee,
             EncryptedNotes = template.EncryptedNotes,
@@ -226,6 +232,9 @@ public class RecurringTransactionService : IRecurringTransactionService
                     Amount = template.Amount,
                     Currency = template.Currency,
                     Date = template.RecurringRule!.NextOccurrence,
+                    // Timezone-aware date fields - derive from template's timezone
+                    DateLocal = template.RecurringRule!.NextOccurrence.ToString("yyyy-MM-dd"),
+                    DateTimezone = template.DateTimezone,
                     Title = template.Title,
                     EncryptedPayee = template.EncryptedPayee,
                     EncryptedNotes = template.EncryptedNotes,
@@ -268,6 +277,9 @@ public class RecurringTransactionService : IRecurringTransactionService
                             Amount = template.Amount,
                             Currency = transferToAccount.Currency,
                             Date = template.RecurringRule.NextOccurrence,
+                            // Timezone-aware date fields - derive from template's timezone
+                            DateLocal = template.RecurringRule.NextOccurrence.ToString("yyyy-MM-dd"),
+                            DateTimezone = template.DateTimezone,
                             Title = template.Title,
                             EncryptedPayee = template.EncryptedPayee,
                             EncryptedNotes = template.EncryptedNotes,

@@ -101,3 +101,15 @@ public record RecurringTransactionGeneratedEvent(
     decimal Amount,
     DateTime OccurrenceDate
 ) : DomainEvent;
+
+/// <summary>
+/// Raised when a P2P transaction is edited by the owner
+/// Used to create activity feed messages in the chat
+/// </summary>
+public record TransactionEditedEvent(
+    string TransactionId,
+    string UserId,
+    bool IsP2P,
+    string? CounterpartyUserId,
+    IReadOnlyList<string>? ChangedFields
+) : DomainEvent;

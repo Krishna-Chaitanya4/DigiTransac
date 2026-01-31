@@ -11,14 +11,17 @@ import {
   useMarkAsRead,
   useInvalidateConversations,
 } from '../hooks';
+import { useNotifications } from '../hooks/useNotifications';
 import {
   ConversationList,
-  ChatHeader,
+  ChatHeaderEnhanced,
   ChatSearchBar,
   MessageBubble,
   MessageInput,
   MessageActionsMenu,
   NewChatModal,
+  NetworkStatusBanner,
+  FloatingActionButton,
 } from '../components/chat';
 import { TransactionForm } from '../components/TransactionForm';
 import { logger } from '../services/logger';
@@ -59,6 +62,9 @@ export default function ChatsPage() {
   
   // URL params for deep linking (e.g., from "View in Chat" on transactions)
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // SignalR notifications for real-time updates
+  const { isConnected: isSignalRConnected } = useNotifications();
 
   // React Query hooks for data
   const { data: accounts = [] } = useAccounts();
@@ -441,6 +447,7 @@ export default function ChatsPage() {
         onNewChat={() => setShowNewChatModal(true)}
         isResizing={isResizing}
         onResizeStart={() => setIsResizing(true)}
+        onResizeEnd={() => setIsResizing(false)}
         onResizeReset={() => setSidebarWidth(320)}
         sidebarWidth={sidebarWidth}
         onWidthChange={setSidebarWidth}
@@ -450,12 +457,13 @@ export default function ChatsPage() {
       <div className={`flex-1 flex flex-col ${selectedUserId ? 'flex' : 'hidden md:flex'}`}>
         {selectedConversation ? (
           <>
-            {/* Header */}
-            <ChatHeader
+            {/* Header - Enhanced with balance summary */}
+            <ChatHeaderEnhanced
               conversation={selectedConversation}
               showSearchBar={showSearchBar}
               onToggleSearch={() => setShowSearchBar(!showSearchBar)}
               onBack={handleBack}
+              isConnected={isSignalRConnected}
             />
 
             {/* Search bar */}
@@ -529,8 +537,8 @@ export default function ChatsPage() {
                       );
                     })}
 
-                    {/* Seen indicator */}
-                    {(() => {
+                    {/* Seen indicator - only for P2P chats, not self-chat */}
+                    {!isSelfChat && (() => {
                       const lastMsg = selectedConversation.messages[selectedConversation.messages.length - 1];
                       if (lastMsg?.isFromMe && lastMsg?.status === 'Read') {
                         return (
@@ -629,7 +637,7 @@ export default function ChatsPage() {
         error={transactionFormError}
         hideRecipientField={true}
         showTransfer={isSelfChat}
-        fixedCounterpartyEmail={selectedConversation?.counterpartyEmail}
+        fixedCounterpartyEmail={isSelfChat ? undefined : selectedConversation?.counterpartyEmail}
         hidePayeeField={!isSelfChat}
         onCreateTag={async (name) => {
           try {
@@ -653,6 +661,18 @@ export default function ChatsPage() {
           onDelete={() => handleDeleteMessage(menuMessage.id)}
         />
       )}
+
+      {/* Floating Action Button for quick transaction creation (mobile) */}
+      {selectedConversation && (
+        <FloatingActionButton
+          onCreateTransaction={() => setShowTransactionForm(true)}
+          hasAccounts={accounts.length > 0}
+          className="md:hidden" // Only show on mobile
+        />
+      )}
+
+      {/* Network status banner */}
+      <NetworkStatusBanner />
     </div>
   );
 }

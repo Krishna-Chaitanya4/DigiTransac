@@ -11,7 +11,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
-const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 const ChatsPage = lazy(() => import('./pages/ChatsPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
@@ -55,22 +54,23 @@ function App() {
     <>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <PageBoundary name="Login"><LoginPage /></PageBoundary>} />
-          <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <PageBoundary name="Register"><RegisterPage /></PageBoundary>} />
-          <Route path="/forgot-password" element={user ? <Navigate to="/dashboard" replace /> : <PageBoundary name="ForgotPassword"><ForgotPasswordPage /></PageBoundary>} />
+          <Route path="/login" element={user ? <Navigate to="/chats" replace /> : <PageBoundary name="Login"><LoginPage /></PageBoundary>} />
+          <Route path="/register" element={user ? <Navigate to="/chats" replace /> : <PageBoundary name="Register"><RegisterPage /></PageBoundary>} />
+          <Route path="/forgot-password" element={user ? <Navigate to="/chats" replace /> : <PageBoundary name="ForgotPassword"><ForgotPasswordPage /></PageBoundary>} />
           
           {/* Protected routes with Layout */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route path="/dashboard" element={<PageBoundary name="Dashboard"><DashboardPage /></PageBoundary>} />
-            <Route path="/transactions" element={<PageBoundary name="Transactions"><TransactionsPage /></PageBoundary>} />
             <Route path="/chats" element={<PageBoundary name="Chats"><ChatsPage /></PageBoundary>} />
             <Route path="/accounts" element={<PageBoundary name="Accounts"><AccountsPage /></PageBoundary>} />
-            <Route path="/labels" element={<PageBoundary name="Labels"><LabelsPage /></PageBoundary>} />
             <Route path="/insights" element={<PageBoundary name="Insights"><InsightsPage /></PageBoundary>} />
+            <Route path="/transactions" element={<PageBoundary name="Transactions"><TransactionsPage /></PageBoundary>} />
+            <Route path="/labels" element={<PageBoundary name="Labels"><LabelsPage /></PageBoundary>} />
             <Route path="/settings" element={<PageBoundary name="Settings"><SettingsPage /></PageBoundary>} />
           </Route>
 
-          <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
+          {/* Redirect old dashboard route to chats */}
+          <Route path="/dashboard" element={<Navigate to="/chats" replace />} />
+          <Route path="/" element={<Navigate to={user ? "/chats" : "/login"} replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

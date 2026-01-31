@@ -466,7 +466,7 @@ public class AccountServiceTests
         result.Account!.Name.Should().Be("New Name");
         result.Account.Icon.Should().Be("🏦");
         result.Account.Institution.Should().Be("Updated Bank");
-        _accountRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Account>()), Times.Once);
+        _accountRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Account>(), null), Times.Once);
     }
 
     [Fact]
@@ -603,7 +603,7 @@ public class AccountServiceTests
         // Assert
         result.Success.Should().BeTrue();
         existingAccount.CurrentBalance.Should().Be(7500);
-        _accountRepositoryMock.Verify(x => x.UpdateAsync(existingAccount), Times.Once);
+        _accountRepositoryMock.Verify(x => x.UpdateAsync(existingAccount, null), Times.Once);
         
         // Verify transaction was created with correct values
         _transactionRepositoryMock.Verify(x => x.CreateAsync(It.Is<Transaction>(t =>
@@ -617,7 +617,7 @@ public class AccountServiceTests
             t.Splits.Count == 1 &&
             t.Splits[0].LabelId == "adjustment-category-id" &&
             t.Splits[0].Amount == 2500
-        )), Times.Once);
+        ), null), Times.Once);
         
         // Verify label service was called to get the adjustment category
         _labelServiceMock.Verify(x => x.GetOrCreateAdjustmentsCategoryAsync(TestUserId), Times.Once);
@@ -658,7 +658,7 @@ public class AccountServiceTests
             t.Splits != null &&
             t.Splits.Count == 1 &&
             t.Splits[0].LabelId == "adjustment-category-id"
-        )), Times.Once);
+        ), null), Times.Once);
     }
 
     [Fact]
@@ -686,8 +686,8 @@ public class AccountServiceTests
         // Assert
         result.Success.Should().BeTrue();
         result.Message.Should().Contain("already");
-        _transactionRepositoryMock.Verify(x => x.CreateAsync(It.IsAny<Transaction>()), Times.Never);
-        _accountRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Account>()), Times.Never);
+        _transactionRepositoryMock.Verify(x => x.CreateAsync(It.IsAny<Transaction>(), null), Times.Never);
+        _accountRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Account>(), null), Times.Never);
     }
 
     [Fact]

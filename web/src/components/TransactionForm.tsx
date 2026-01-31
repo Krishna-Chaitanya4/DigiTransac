@@ -26,15 +26,50 @@ import type { Label } from '../types/labels';
 import type { Tag } from '../types/labels';
 import { getCurrencySymbol } from '../services/currencyService';
 
-// Date utility functions - store dates at noon UTC to avoid timezone day-shift issues
+// Date utility functions for timezone-aware date handling
+// When dateLocal is available, we use that for display (the human-intended date).
+// The `date` field is still sent as noon UTC for backward compatibility with queries.
+
+/**
+ * Convert a date string (YYYY-MM-DD) to noon UTC for backward compatibility
+ */
 const toNoonUTC = (dateStr: string): string => `${dateStr}T12:00:00.000Z`;
 
-const toDateString = (dateInput: string | Date): string => {
+/**
+ * Get the user's current IANA timezone identifier (e.g., "Asia/Kolkata", "America/New_York")
+ */
+const getUserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+};
+
+/**
+ * Extract YYYY-MM-DD from a date, preferring dateLocal if available.
+ * For transactions with dateLocal, we use that directly (it's the user's intended date).
+ * For legacy transactions without dateLocal, we extract from the UTC date.
+ */
+const toDateString = (dateInput: string | Date, dateLocal?: string): string => {
+  // If we have the local date string, use it directly
+  if (dateLocal) {
+    return dateLocal;
+  }
+  
   if (typeof dateInput === 'string') {
+    // Check if it's just a date (YYYY-MM-DD) or has time component
+    if (dateInput.length === 10) {
+      return dateInput;
+    }
+    // Has time component - for legacy data, extract date from UTC
+    // This maintains backward compatibility
     return dateInput.split('T')[0];
   }
-  const d = new Date(dateInput);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  
+  // For Date objects, format as local date (user's perspective)
+  const d = dateInput;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 interface TransactionFormProps {
@@ -127,7 +162,7 @@ export function TransactionForm({
         setType(uiType);
         setAccountId(editingTransaction.accountId);
         setAmount(editingTransaction.amount);
-        setDate(toDateString(editingTransaction.date));
+        setDate(toDateString(editingTransaction.date, editingTransaction.dateLocal));
         setTitle(editingTransaction.title || '');
         setPayee(editingTransaction.payee || '');
         setNotes(editingTransaction.notes || '');
@@ -170,7 +205,7 @@ export function TransactionForm({
         setType('Send');
         setAccountId(defaultAccountId || accounts[0]?.id || '');
         setAmount(0);
-        setDate(toDateString(new Date()));
+        setDate(toDateString(new Date(), undefined));
         setTitle('');
         setPayee('');
         setNotes('');
@@ -250,6 +285,9 @@ export function TransactionForm({
     const apiType: TransactionType = type === 'Transfer' ? 'Send' : type;
     const isTransfer = type === 'Transfer';
     
+    // Get the user's current timezone for storage
+    const timezone = getUserTimezone();
+    
     if (editingTransaction) {
       const updateData: UpdateTransactionRequest = {
         type: apiType,
@@ -263,6 +301,9 @@ export function TransactionForm({
         location: includeLocation && location ? location : undefined,
         transferToAccountId: isTransfer ? transferToAccountId : undefined,
         accountId,
+        // Timezone-aware date fields
+        dateLocal: date,      // The YYYY-MM-DD date the user selected
+        dateTimezone: timezone, // User's current timezone
       };
       onSubmit(updateData);
     } else {
@@ -285,6 +326,9 @@ export function TransactionForm({
         } : undefined,
         // P2P fields (for Send/Receive with counterparty email)
         counterpartyEmail: isP2P ? effectiveCounterpartyEmail : undefined,
+        // Timezone-aware date fields
+        dateLocal: date,      // The YYYY-MM-DD date the user selected
+        dateTimezone: timezone, // User's current timezone
       };
       onSubmit(createData);
     }

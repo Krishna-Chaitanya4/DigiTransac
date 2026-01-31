@@ -74,8 +74,9 @@ export { useFocusTrap } from './useFocusTrap';
 export { useInfiniteScroll } from './useInfiniteScroll';
 export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 export { useTransactionFilters } from './useTransactionFilters';
-export { useOnlineStatus, useOfflineQueue } from './useOffline';
+export { useOnlineStatus, useOnlineStatusExtended, useOfflineQueue } from './useOffline';
 export { useModalState, useDeleteModalState } from './useModalState';
+export { usePullToRefresh } from './usePullToRefresh';
 
 // Re-export query keys for external use
 export { queryKeys } from '../lib/queryClient';

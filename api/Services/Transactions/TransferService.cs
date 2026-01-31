@@ -89,6 +89,9 @@ public class TransferService : ITransferService
             Amount = request.Amount,
             Currency = sourceAccount.Currency,
             Date = request.Date,
+            // Timezone-aware date fields (for global travel support)
+            DateLocal = request.DateLocal,
+            DateTimezone = request.DateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -123,6 +126,9 @@ public class TransferService : ITransferService
             Amount = convertedAmount,
             Currency = destinationAccount.Currency,
             Date = request.Date,
+            // Timezone-aware date fields (for global travel support)
+            DateLocal = request.DateLocal,
+            DateTimezone = request.DateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -208,6 +214,8 @@ public class TransferService : ITransferService
         if (request.Date.HasValue && linkedTransaction.Date != transaction.Date)
         {
             linkedTransaction.Date = transaction.Date;
+            linkedTransaction.DateLocal = transaction.DateLocal;
+            linkedTransaction.DateTimezone = transaction.DateTimezone;
             linkedNeedsUpdate = true;
         }
         if (request.Title != null && linkedTransaction.Title != transaction.Title)

@@ -38,7 +38,10 @@ public record CreateTransactionRequest(
     string? CounterpartyEmail,    // If provided, creates P2P transaction
     decimal? CounterpartyAmount,  // Optional: if different currency
     // Source (optional, defaults to Manual)
-    string? Source = null         // "Manual", "Chat", "Recurring", "Import", "Transfer"
+    string? Source = null,        // "Manual", "Chat", "Recurring", "Import", "Transfer"
+    // Timezone-aware date fields (for global travel support)
+    string? DateLocal = null,     // "YYYY-MM-DD" - the human-intended calendar date
+    string? DateTimezone = null   // IANA timezone e.g., "Asia/Kolkata"
 );
 
 public record UpdateTransactionRequest(
@@ -53,7 +56,10 @@ public record UpdateTransactionRequest(
     TransactionLocationRequest? Location,
     string? Status,  // "Pending", "Confirmed", "Declined"
     string? TransferToAccountId,
-    string? AccountId  // Allow changing the account
+    string? AccountId,  // Allow changing the account
+    // Timezone-aware date fields (for global travel support)
+    string? DateLocal = null,     // "YYYY-MM-DD" - the human-intended calendar date
+    string? DateTimezone = null   // IANA timezone e.g., "Asia/Kolkata"
 );
 
 public record TransactionFilterRequest(
@@ -140,7 +146,10 @@ public record TransactionResponse(
     string? Role,  // "Sender" or "Receiver"
     DateTime? LastSyncedAt,  // Set when transaction was updated via P2P sync (shows "Edited" badge)
     // Chat integration
-    string? ChatMessageId  // Reference to chat message for "View in Chat" action
+    string? ChatMessageId,  // Reference to chat message for "View in Chat" action
+    // Timezone-aware date fields (for global travel support)
+    string? DateLocal,      // "YYYY-MM-DD" - the human-intended calendar date (always display this if available)
+    string? DateTimezone    // IANA timezone e.g., "Asia/Kolkata" (original timezone at creation)
 );
 
 public record TransactionListResponse(

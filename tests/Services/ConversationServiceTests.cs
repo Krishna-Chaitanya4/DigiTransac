@@ -159,7 +159,7 @@ public class ConversationServiceTests
         // Assert
         result.Conversations.Should().HaveCount(1);
         result.Conversations[0].IsSelfChat.Should().BeTrue();
-        result.Conversations[0].CounterpartyName.Should().Be("Personal Transactions");
+        result.Conversations[0].CounterpartyName.Should().Be("Personal");
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class ConversationServiceTests
 
         // Assert
         result.IsSelfChat.Should().BeTrue();
-        result.CounterpartyName.Should().Be("Personal Transactions");
+        result.CounterpartyName.Should().Be("Personal");
     }
 
     [Fact]

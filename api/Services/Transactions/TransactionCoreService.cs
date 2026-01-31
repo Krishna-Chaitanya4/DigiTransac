@@ -280,6 +280,9 @@ public class TransactionCoreService : ITransactionCoreService
             Amount = request.Amount,
             Currency = account.Currency,
             Date = request.Date,
+            // Timezone-aware date fields (for global travel support)
+            DateLocal = request.DateLocal,
+            DateTimezone = request.DateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -430,7 +433,14 @@ public class TransactionCoreService : ITransactionCoreService
         }
 
         if (request.Date.HasValue)
+        {
             transaction.Date = request.Date.Value;
+            // Update timezone-aware date fields if provided
+            if (!string.IsNullOrEmpty(request.DateLocal))
+                transaction.DateLocal = request.DateLocal;
+            if (!string.IsNullOrEmpty(request.DateTimezone))
+                transaction.DateTimezone = request.DateTimezone;
+        }
 
         if (request.Title != null)
             transaction.Title = request.Title;

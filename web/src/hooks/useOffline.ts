@@ -1,4 +1,4 @@
-import { useState, useEffect, useSyncExternalStore, useCallback } from 'react';
+import { useState, useEffect, useSyncExternalStore, useCallback, useRef } from 'react';
 import { logger } from '../services/logger';
 
 function subscribe(callback: () => void) {
@@ -18,8 +18,42 @@ function getServerSnapshot() {
   return true; // Assume online during SSR
 }
 
+/**
+ * Simple hook to check if the device is online
+ */
 export function useOnlineStatus() {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+export interface OnlineStatusExtended {
+  isOnline: boolean;
+  wasOffline: boolean; // True if was offline and just came back online (for UI feedback)
+  lastOnlineAt: Date | null;
+}
+
+/**
+ * Extended online status hook with reconnection detection
+ * Useful for showing "Back online" notifications
+ */
+export function useOnlineStatusExtended(): OnlineStatusExtended {
+  const isOnline = useOnlineStatus();
+  const [wasOffline, setWasOffline] = useState(false);
+  const [lastOnlineAt, setLastOnlineAt] = useState<Date | null>(isOnline ? new Date() : null);
+  const wasOnlineRef = useRef(isOnline);
+
+  useEffect(() => {
+    // Coming back online
+    if (isOnline && !wasOnlineRef.current) {
+      setLastOnlineAt(new Date());
+      setWasOffline(true);
+      // Clear "back online" indicator after 3 seconds
+      const timer = setTimeout(() => setWasOffline(false), 3000);
+      return () => clearTimeout(timer);
+    }
+    wasOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  return { isOnline, wasOffline, lastOnlineAt };
 }
 
 export function useOfflineQueue() {
