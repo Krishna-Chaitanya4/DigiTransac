@@ -14,11 +14,11 @@ public interface ITransactionRepository
     Task<List<Transaction>> GetByAccountIdAsync(string accountId, string userId);
     Task<List<Transaction>> GetRecurringTemplatesAsync(string userId);
     Task<List<Transaction>> GetPendingRecurringAsync(DateTime beforeDate);
-    Task<Transaction> CreateAsync(Transaction transaction);
-    Task CreateManyAsync(List<Transaction> transactions);
-    Task UpdateAsync(Transaction transaction);
-    Task<bool> DeleteAsync(string id, string userId);
-    Task<bool> DeleteByIdAsync(string id);  // For P2P linked transaction deletion
+    Task<Transaction> CreateAsync(Transaction transaction, IClientSessionHandle? session = null);
+    Task CreateManyAsync(List<Transaction> transactions, IClientSessionHandle? session = null);
+    Task UpdateAsync(Transaction transaction, IClientSessionHandle? session = null);
+    Task<bool> DeleteAsync(string id, string userId, IClientSessionHandle? session = null);
+    Task<bool> DeleteByIdAsync(string id, IClientSessionHandle? session = null);
     Task<bool> DeleteAllByUserIdAsync(string userId);
     Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId);
     Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null);
@@ -285,37 +285,57 @@ public class TransactionRepository : ITransactionRepository
             .ToListAsync();
     }
 
-    public async Task<Transaction> CreateAsync(Transaction transaction)
+    public async Task<Transaction> CreateAsync(Transaction transaction, IClientSessionHandle? session = null)
     {
-        await _transactions.InsertOneAsync(transaction);
+        if (session != null)
+            await _transactions.InsertOneAsync(session, transaction);
+        else
+            await _transactions.InsertOneAsync(transaction);
         return transaction;
     }
 
-    public async Task CreateManyAsync(List<Transaction> transactions)
+    public async Task CreateManyAsync(List<Transaction> transactions, IClientSessionHandle? session = null)
     {
         if (transactions.Count > 0)
         {
-            await _transactions.InsertManyAsync(transactions);
+            if (session != null)
+                await _transactions.InsertManyAsync(session, transactions);
+            else
+                await _transactions.InsertManyAsync(transactions);
         }
     }
 
-    public async Task UpdateAsync(Transaction transaction)
+    public async Task UpdateAsync(Transaction transaction, IClientSessionHandle? session = null)
     {
         transaction.UpdatedAt = DateTime.UtcNow;
-        await _transactions.ReplaceOneAsync(
-            t => t.Id == transaction.Id && t.UserId == transaction.UserId, 
-            transaction);
+        if (session != null)
+            await _transactions.ReplaceOneAsync(
+                session,
+                t => t.Id == transaction.Id && t.UserId == transaction.UserId,
+                transaction);
+        else
+            await _transactions.ReplaceOneAsync(
+                t => t.Id == transaction.Id && t.UserId == transaction.UserId,
+                transaction);
     }
 
-    public async Task<bool> DeleteAsync(string id, string userId)
+    public async Task<bool> DeleteAsync(string id, string userId, IClientSessionHandle? session = null)
     {
-        var result = await _transactions.DeleteOneAsync(t => t.Id == id && t.UserId == userId);
+        DeleteResult result;
+        if (session != null)
+            result = await _transactions.DeleteOneAsync(session, t => t.Id == id && t.UserId == userId);
+        else
+            result = await _transactions.DeleteOneAsync(t => t.Id == id && t.UserId == userId);
         return result.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteByIdAsync(string id)
+    public async Task<bool> DeleteByIdAsync(string id, IClientSessionHandle? session = null)
     {
-        var result = await _transactions.DeleteOneAsync(t => t.Id == id);
+        DeleteResult result;
+        if (session != null)
+            result = await _transactions.DeleteOneAsync(session, t => t.Id == id);
+        else
+            result = await _transactions.DeleteOneAsync(t => t.Id == id);
         return result.DeletedCount > 0;
     }
 

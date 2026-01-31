@@ -88,6 +88,9 @@ export function useCreateTransaction() {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
     },
+    meta: {
+      successMessage: 'Transaction created successfully',
+    },
   });
 }
 
@@ -96,11 +99,14 @@ export function useUpdateTransaction() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateTransactionRequest }) => 
+    mutationFn: ({ id, data }: { id: string; data: UpdateTransactionRequest }) =>
       updateTransaction(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+    meta: {
+      successMessage: 'Transaction updated successfully',
     },
   });
 }
@@ -112,21 +118,47 @@ export function useDeleteTransaction() {
   return useMutation({
     mutationFn: (id: string) => deleteTransaction(id),
     onMutate: async (id: string) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: queryKeys.transactions.all });
+      // Cancel any outgoing refetches to avoid overwriting optimistic update
+      // Only cancel list queries, not summary/pendingCount/counterparties
+      await queryClient.cancelQueries({ queryKey: ['transactions', 'list'] });
       
-      // Return context for rollback
-      return { deletedId: id };
+      // Snapshot only the transaction list queries for rollback (not summary, pendingCount, etc.)
+      const previousTransactions = queryClient.getQueriesData<TransactionListResponse>({
+        queryKey: ['transactions', 'list']
+      });
+      
+      // Optimistically remove the transaction from list caches only
+      queryClient.setQueriesData<TransactionListResponse>(
+        { queryKey: ['transactions', 'list'] },
+        (old) => {
+          // Double-check that old has the expected structure
+          if (!old || !Array.isArray(old.transactions)) return old;
+          return {
+            ...old,
+            transactions: old.transactions.filter(t => t.id !== id),
+            totalCount: Math.max(0, old.totalCount - 1),
+          };
+        }
+      );
+      
+      // Return context with snapshot for rollback
+      return { previousTransactions };
     },
-    onSuccess: () => {
+    onError: (_err, _id, context) => {
+      // Rollback to previous state on error
+      if (context?.previousTransactions) {
+        context.previousTransactions.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
     },
-    onError: (_err, _id, context) => {
-      // Rollback is handled by refetching
-      if (context?.deletedId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
-      }
+    meta: {
+      successMessage: 'Transaction deleted',
     },
   });
 }
@@ -138,8 +170,44 @@ export function useUpdateStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'Pending' | 'Confirmed' | 'Declined' }) =>
       updateStatus(id, status),
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      // Cancel only list queries
+      await queryClient.cancelQueries({ queryKey: ['transactions', 'list'] });
+      
+      // Snapshot for rollback
+      const previousTransactions = queryClient.getQueriesData<TransactionListResponse>({
+        queryKey: ['transactions', 'list']
+      });
+      
+      // Optimistically update the status in list queries only
+      queryClient.setQueriesData<TransactionListResponse>(
+        { queryKey: ['transactions', 'list'] },
+        (old) => {
+          if (!old || !Array.isArray(old.transactions)) return old;
+          return {
+            ...old,
+            transactions: old.transactions.map(t =>
+              t.id === id ? { ...t, status } : t
+            ),
+          };
+        }
+      );
+      
+      return { previousTransactions };
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback on error
+      if (context?.previousTransactions) {
+        context.previousTransactions.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    },
+    meta: {
+      successMessage: 'Status updated',
     },
   });
 }
@@ -150,9 +218,41 @@ export function useBatchDelete() {
   
   return useMutation({
     mutationFn: (ids: string[]) => batchDelete(ids),
-    onSuccess: () => {
+    onMutate: async (ids: string[]) => {
+      await queryClient.cancelQueries({ queryKey: ['transactions', 'list'] });
+      
+      const previousTransactions = queryClient.getQueriesData<TransactionListResponse>({
+        queryKey: ['transactions', 'list']
+      });
+      
+      // Optimistically remove all deleted transactions from list queries only
+      queryClient.setQueriesData<TransactionListResponse>(
+        { queryKey: ['transactions', 'list'] },
+        (old) => {
+          if (!old || !Array.isArray(old.transactions)) return old;
+          return {
+            ...old,
+            transactions: old.transactions.filter(t => !ids.includes(t.id)),
+            totalCount: Math.max(0, old.totalCount - ids.length),
+          };
+        }
+      );
+      
+      return { previousTransactions };
+    },
+    onError: (_err, _ids, context) => {
+      if (context?.previousTransactions) {
+        context.previousTransactions.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+    meta: {
+      successMessage: 'Transactions deleted',
     },
   });
 }
@@ -163,8 +263,41 @@ export function useBatchMarkConfirmed() {
   
   return useMutation({
     mutationFn: (ids: string[]) => batchMarkConfirmed(ids),
-    onSuccess: () => {
+    onMutate: async (ids: string[]) => {
+      await queryClient.cancelQueries({ queryKey: ['transactions', 'list'] });
+      
+      const previousTransactions = queryClient.getQueriesData<TransactionListResponse>({
+        queryKey: ['transactions', 'list']
+      });
+      
+      // Optimistically update status in list queries only
+      queryClient.setQueriesData<TransactionListResponse>(
+        { queryKey: ['transactions', 'list'] },
+        (old) => {
+          if (!old || !Array.isArray(old.transactions)) return old;
+          return {
+            ...old,
+            transactions: old.transactions.map(t =>
+              ids.includes(t.id) ? { ...t, status: 'Confirmed' as const } : t
+            ),
+          };
+        }
+      );
+      
+      return { previousTransactions };
+    },
+    onError: (_err, _ids, context) => {
+      if (context?.previousTransactions) {
+        context.previousTransactions.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    },
+    meta: {
+      successMessage: 'Transactions marked as confirmed',
     },
   });
 }
@@ -175,8 +308,41 @@ export function useBatchMarkPending() {
   
   return useMutation({
     mutationFn: (ids: string[]) => batchMarkPending(ids),
-    onSuccess: () => {
+    onMutate: async (ids: string[]) => {
+      await queryClient.cancelQueries({ queryKey: ['transactions', 'list'] });
+      
+      const previousTransactions = queryClient.getQueriesData<TransactionListResponse>({
+        queryKey: ['transactions', 'list']
+      });
+      
+      // Optimistically update status in list queries only
+      queryClient.setQueriesData<TransactionListResponse>(
+        { queryKey: ['transactions', 'list'] },
+        (old) => {
+          if (!old || !Array.isArray(old.transactions)) return old;
+          return {
+            ...old,
+            transactions: old.transactions.map(t =>
+              ids.includes(t.id) ? { ...t, status: 'Pending' as const } : t
+            ),
+          };
+        }
+      );
+      
+      return { previousTransactions };
+    },
+    onError: (_err, _ids, context) => {
+      if (context?.previousTransactions) {
+        context.previousTransactions.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    },
+    meta: {
+      successMessage: 'Transactions marked as pending',
     },
   });
 }

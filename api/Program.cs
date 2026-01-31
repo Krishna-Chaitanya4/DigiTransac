@@ -1,9 +1,14 @@
 using System.IO.Compression;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using Asp.Versioning;
 using DigiTransac.Api.Endpoints;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Services.Caching;
+using DigiTransac.Api.Services.Transactions;
 using DigiTransac.Api.Settings;
 using DigiTransac.Api.Validators;
 using FluentValidation;
@@ -15,6 +20,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using System.Reflection;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -144,6 +150,9 @@ builder.Services.AddHealthChecks()
         failureStatus: HealthStatus.Degraded,
         tags: new[] { "external", "api" });
 
+// Add caching service
+builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
+
 // Add services
 builder.Services.AddSingleton<IEmailService, GmailEmailService>();
 builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
@@ -156,7 +165,20 @@ builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
-builder.Services.AddScoped<ITransactionService, TransactionService>();
+
+// Transaction services - split into focused services for better maintainability
+builder.Services.AddScoped<ITransactionMapperService, TransactionMapperService>();
+builder.Services.AddScoped<IAccountBalanceService, AccountBalanceService>();
+builder.Services.AddScoped<ITransferService, TransferService>();
+builder.Services.AddScoped<IP2PTransactionService, P2PTransactionService>();
+builder.Services.AddScoped<IRecurringTransactionService, RecurringTransactionService>();
+builder.Services.AddScoped<ITransactionAnalyticsService, TransactionAnalyticsService>();
+builder.Services.AddScoped<ITransactionExportService, TransactionExportService>();
+builder.Services.AddScoped<ITransactionBatchService, TransactionBatchService>();
+builder.Services.AddScoped<ITransactionCoreService, TransactionCoreService>();
+// Facade for backward compatibility with existing endpoints
+builder.Services.AddScoped<ITransactionService, TransactionServiceFacade>();
+
 builder.Services.AddScoped<IConversationService, ConversationService>();
 
 // Background services
@@ -164,6 +186,32 @@ builder.Services.AddHostedService<RecurringTransactionBackgroundService>();
 
 // Add FluentValidation validators
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Add MediatR for domain events
+builder.Services.AddMediatR(cfg => {
+    cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
+});
+
+// Add OpenTelemetry tracing
+builder.Services.AddOpenTelemetryTracing(builder.Configuration);
+
+// Add API Versioning
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new HeaderApiVersionReader("X-API-Version"),
+        new QueryStringApiVersionReader("api-version")
+    );
+})
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
 
 // Add Rate Limiting
 var rateLimitSettings = builder.Configuration.GetSection("RateLimit").Get<RateLimitSettings>() ?? new RateLimitSettings();
@@ -206,6 +254,69 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0
             }));
+    
+    // Per-user rate limiter for authenticated endpoints
+    // Uses user ID from JWT claims, falls back to IP if not authenticated
+    options.AddPolicy("per-user", httpContext =>
+    {
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+        
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"user:{userId}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitSettings.UserPermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimitSettings.UserWindowSeconds),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 2
+            });
+    });
+    
+    // Stricter per-user rate limiter for transaction creation
+    // Prevents users from creating too many transactions too quickly
+    options.AddPolicy("transaction-create", httpContext =>
+    {
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+        
+        return RateLimitPartition.GetTokenBucketLimiter(
+            partitionKey: $"transaction:{userId}",
+            factory: _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = rateLimitSettings.TransactionPermitLimit,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                ReplenishmentPeriod = TimeSpan.FromSeconds(rateLimitSettings.TransactionWindowSeconds),
+                TokensPerPeriod = rateLimitSettings.TransactionPermitLimit,
+                AutoReplenishment = true
+            });
+    });
+    
+    // Sliding window rate limiter for data export endpoints
+    // More lenient but still protects against abuse
+    options.AddPolicy("export", httpContext =>
+    {
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+        
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: $"export:{userId}",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,                    // 10 exports
+                Window = TimeSpan.FromMinutes(5),   // per 5 minutes
+                SegmentsPerWindow = 5,              // 5 segments for smooth limiting
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 1
+            });
+    });
 });
 
 // Add JWT authentication

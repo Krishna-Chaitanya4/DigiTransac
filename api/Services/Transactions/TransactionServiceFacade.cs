@@ -1,0 +1,96 @@
+using DigiTransac.Api.Models.Dto;
+
+namespace DigiTransac.Api.Services.Transactions;
+
+/// <summary>
+/// Facade service that implements ITransactionService for backward compatibility.
+/// Delegates all calls to the focused transaction services.
+/// This allows gradual migration of endpoints to use the focused services directly.
+/// </summary>
+public class TransactionServiceFacade : ITransactionService
+{
+    private readonly ITransactionCoreService _coreService;
+    private readonly IRecurringTransactionService _recurringService;
+    private readonly ITransactionAnalyticsService _analyticsService;
+    private readonly ITransactionExportService _exportService;
+    private readonly ITransactionBatchService _batchService;
+    private readonly IP2PTransactionService _p2pService;
+
+    public TransactionServiceFacade(
+        ITransactionCoreService coreService,
+        IRecurringTransactionService recurringService,
+        ITransactionAnalyticsService analyticsService,
+        ITransactionExportService exportService,
+        ITransactionBatchService batchService,
+        IP2PTransactionService p2pService)
+    {
+        _coreService = coreService;
+        _recurringService = recurringService;
+        _analyticsService = analyticsService;
+        _exportService = exportService;
+        _batchService = batchService;
+        _p2pService = p2pService;
+    }
+
+    // Core Service Methods
+    public Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter)
+        => _coreService.GetAllAsync(userId, filter);
+
+    public Task<TransactionResponse?> GetByIdAsync(string id, string userId)
+        => _coreService.GetByIdAsync(id, userId);
+
+    public Task<(bool Success, string Message, TransactionResponse? Transaction)> CreateAsync(
+        string userId, CreateTransactionRequest request)
+        => _coreService.CreateAsync(userId, request);
+
+    public Task<(bool Success, string Message, TransactionResponse? Transaction)> UpdateAsync(
+        string id, string userId, UpdateTransactionRequest request)
+        => _coreService.UpdateAsync(id, userId, request);
+
+    public Task<(bool Success, string Message)> DeleteAsync(string id, string userId)
+        => _coreService.DeleteAsync(id, userId);
+
+    public Task<int> GetPendingCountAsync(string userId)
+        => _coreService.GetPendingCountAsync(userId);
+
+    // Recurring Service Methods
+    public Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId)
+        => _recurringService.GetRecurringAsync(userId);
+
+    public Task<(bool Success, string Message)> DeleteRecurringAsync(string id, string userId, bool deleteFutureInstances)
+        => _recurringService.DeleteRecurringAsync(id, userId, deleteFutureInstances);
+
+    public Task ProcessRecurringTransactionsAsync()
+        => _recurringService.ProcessRecurringTransactionsAsync();
+
+    // Analytics Service Methods
+    public Task<TransactionSummaryResponse> GetSummaryAsync(string userId, TransactionFilterRequest filter)
+        => _analyticsService.GetSummaryAsync(userId, filter);
+
+    public Task<TransactionAnalyticsResponse> GetAnalyticsAsync(
+        string userId, DateTime? startDate, DateTime? endDate, string? accountId)
+        => _analyticsService.GetAnalyticsAsync(userId, startDate, endDate, accountId);
+
+    // Export Service Methods
+    public Task<List<TransactionResponse>> GetAllForExportAsync(string userId, TransactionFilterRequest filter)
+        => _exportService.GetAllForExportAsync(userId, filter);
+
+    // Batch Service Methods
+    public Task<BatchOperationResponse> BatchDeleteAsync(string userId, List<string> ids)
+        => _batchService.BatchDeleteAsync(userId, ids);
+
+    public Task<BatchOperationResponse> BatchUpdateStatusAsync(string userId, List<string> ids, string status)
+        => _batchService.BatchUpdateStatusAsync(userId, ids, status);
+
+    // P2P Service Methods
+    public Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId)
+        => _p2pService.GetCounterpartiesAsync(userId);
+
+    public Task<(bool Success, string Message, TransactionResponse? Transaction)> AcceptP2PTransactionAsync(
+        string transactionId, string userId, string accountId)
+        => _p2pService.AcceptP2PTransactionAsync(transactionId, userId, accountId);
+
+    public Task<(bool Success, string Message)> RejectP2PTransactionAsync(
+        string transactionId, string userId, string? reason)
+        => _p2pService.RejectP2PTransactionAsync(transactionId, userId, reason);
+}

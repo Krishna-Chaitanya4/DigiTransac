@@ -41,13 +41,52 @@ public class EncryptionSettings
 
 public class RateLimitSettings
 {
+    /// <summary>
+    /// Global rate limit - permits per window for anonymous/IP-based limiting
+    /// </summary>
     public int PermitLimit { get; set; } = 100;
+    
+    /// <summary>
+    /// Time window in seconds for global rate limiting
+    /// </summary>
     public int WindowSeconds { get; set; } = 60;
+    
+    /// <summary>
+    /// Number of requests allowed to queue when limit is reached
+    /// </summary>
     public int QueueLimit { get; set; } = 0;
+    
+    /// <summary>
+    /// Rate limit for authentication endpoints (login, register)
+    /// </summary>
     public int? AuthPermitLimit { get; set; }
     public int? AuthWindowSeconds { get; set; }
+    
+    /// <summary>
+    /// Rate limit for sensitive endpoints (password reset, 2FA)
+    /// </summary>
     public int? SensitivePermitLimit { get; set; }
     public int? SensitiveWindowSeconds { get; set; }
+    
+    /// <summary>
+    /// Per-user rate limit for authenticated requests
+    /// </summary>
+    public int UserPermitLimit { get; set; } = 200;
+    
+    /// <summary>
+    /// Time window in seconds for per-user rate limiting
+    /// </summary>
+    public int UserWindowSeconds { get; set; } = 60;
+    
+    /// <summary>
+    /// Rate limit for transaction creation per user
+    /// </summary>
+    public int TransactionPermitLimit { get; set; } = 50;
+    
+    /// <summary>
+    /// Time window in seconds for transaction creation rate limiting
+    /// </summary>
+    public int TransactionWindowSeconds { get; set; } = 60;
 }
 
 public class SecuritySettings

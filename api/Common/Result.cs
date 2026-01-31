@@ -1,0 +1,155 @@
+namespace DigiTransac.Api.Common;
+
+/// <summary>
+/// Represents the result of an operation that doesn't return a value.
+/// Provides a consistent way to handle success/failure across the application.
+/// </summary>
+public class Result
+{
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public Error Error { get; }
+
+    protected Result(bool isSuccess, Error error)
+    {
+        if (isSuccess && error != Error.None)
+            throw new InvalidOperationException("Success result cannot have an error.");
+        if (!isSuccess && error == Error.None)
+            throw new InvalidOperationException("Failure result must have an error.");
+
+        IsSuccess = isSuccess;
+        Error = error;
+    }
+
+    public static Result Success() => new(true, Error.None);
+    public static Result Failure(Error error) => new(false, error);
+    public static Result<T> Success<T>(T value) => new(value, true, Error.None);
+    public static Result<T> Failure<T>(Error error) => new(default!, false, error);
+    
+    // Implicit conversion from Error to Result (for convenience)
+    public static implicit operator Result(Error error) => Failure(error);
+}
+
+/// <summary>
+/// Represents the result of an operation that returns a value of type T.
+/// </summary>
+public class Result<T> : Result
+{
+    private readonly T _value;
+
+    public T Value
+    {
+        get
+        {
+            if (IsFailure)
+                throw new InvalidOperationException("Cannot access value of a failed result.");
+            return _value;
+        }
+    }
+
+    protected internal Result(T value, bool isSuccess, Error error) : base(isSuccess, error)
+    {
+        _value = value;
+    }
+
+    public static implicit operator Result<T>(T value) => new(value, true, Error.None);
+    public static implicit operator Result<T>(Error error) => new(default!, false, error);
+}
+
+/// <summary>
+/// Represents an error with a code and message.
+/// Uses static factory methods for common error types.
+/// </summary>
+public record Error(string Code, string Message)
+{
+    public static readonly Error None = new(string.Empty, string.Empty);
+    
+    // Common error factory methods
+    public static Error NotFound(string resource, string? id = null) =>
+        new("NotFound", id != null ? $"{resource} with id '{id}' was not found." : $"{resource} was not found.");
+    
+    public static Error Validation(string message) =>
+        new("Validation", message);
+    
+    public static Error Conflict(string message) =>
+        new("Conflict", message);
+    
+    public static Error Unauthorized(string message = "You are not authorized to perform this action.") =>
+        new("Unauthorized", message);
+    
+    public static Error Forbidden(string message = "Access to this resource is forbidden.") =>
+        new("Forbidden", message);
+    
+    public static Error InternalError(string message = "An unexpected error occurred.") =>
+        new("InternalError", message);
+    
+    public static Error ExternalService(string service, string message) =>
+        new("ExternalService", $"{service}: {message}");
+    
+    public static Error InvalidOperation(string message) =>
+        new("InvalidOperation", message);
+}
+
+/// <summary>
+/// Domain-specific error types for the application
+/// </summary>
+public static class DomainErrors
+{
+    public static class Account
+    {
+        public static Error NotFound(string id) => Error.NotFound("Account", id);
+        public static Error Archived => Error.InvalidOperation("Cannot perform operation on an archived account.");
+        public static Error InvalidTransfer => Error.Validation("Cannot transfer to the same account.");
+        public static Error HasTransactions(int count) => 
+            Error.Conflict($"Account has {count} transactions. Delete or reassign them first.");
+    }
+
+    public static class Transaction
+    {
+        public static Error NotFound(string id) => Error.NotFound("Transaction", id);
+        public static Error InvalidAmount => Error.Validation("Amount must be positive.");
+        public static Error InvalidSplits(decimal splitSum, decimal amount) =>
+            Error.Validation($"Split amounts ({splitSum}) must equal transaction amount ({amount}).");
+        public static Error InvalidType(string type) =>
+            Error.Validation($"Invalid transaction type '{type}'. Use Receive or Send.");
+        public static Error CannotEditRecurringTemplate =>
+            Error.InvalidOperation("Cannot edit recurring template. Delete and recreate instead.");
+        public static Error SelfP2PNotAllowed =>
+            Error.Validation("Cannot send to yourself. Use Transfer to move money between your accounts.");
+        public static Error TransferP2PConflict =>
+            Error.Validation("Cannot combine transfer with P2P. Use either transfer or counterparty email.");
+    }
+
+    public static class Label
+    {
+        public static Error NotFound(string id) => Error.NotFound("Label", id);
+        public static Error HasTransactions(int count) =>
+            Error.Conflict($"Label has {count} transactions. Reassign them first.");
+        public static Error CannotDeleteSystemLabel(string name) =>
+            Error.InvalidOperation($"Cannot delete system label '{name}'.");
+    }
+
+    public static class Tag
+    {
+        public static Error NotFound(string id) => Error.NotFound("Tag", id);
+        public static Error HasTransactions(int count) =>
+            Error.Conflict($"Tag is used in {count} transactions.");
+    }
+
+    public static class User
+    {
+        public static Error NotFound => Error.NotFound("User");
+        public static Error EmailNotVerified =>
+            Error.Unauthorized("Please verify your email address first.");
+        public static Error InvalidCredentials =>
+            Error.Unauthorized("Invalid email or password.");
+        public static Error EmailAlreadyExists =>
+            Error.Conflict("An account with this email already exists.");
+    }
+
+    public static class Encryption
+    {
+        public static Error KeyNotAvailable =>
+            Error.InternalError("Encryption key not available.");
+    }
+}

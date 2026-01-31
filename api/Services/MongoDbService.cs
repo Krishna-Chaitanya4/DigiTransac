@@ -11,11 +11,13 @@ namespace DigiTransac.Api.Services;
 public interface IMongoDbService
 {
     IMongoDatabase Database { get; }
+    IMongoClient Client { get; }
     IMongoCollection<T> GetCollection<T>(string name);
 }
 
 public class MongoDbService : IMongoDbService
 {
+    private readonly IMongoClient _client;
     private readonly IMongoDatabase _database;
 
     public MongoDbService(IOptions<MongoDbSettings> settings)
@@ -27,11 +29,12 @@ public class MongoDbService : IMongoDbService
         clientSettings.MinConnectionPoolSize = 10;
         clientSettings.WaitQueueTimeout = TimeSpan.FromSeconds(30);
         
-        var client = new MongoClient(clientSettings);
-        _database = client.GetDatabase(settings.Value.DatabaseName);
+        _client = new MongoClient(clientSettings);
+        _database = _client.GetDatabase(settings.Value.DatabaseName);
     }
 
     public IMongoDatabase Database => _database;
+    public IMongoClient Client => _client;
 
     public IMongoCollection<T> GetCollection<T>(string name)
     {

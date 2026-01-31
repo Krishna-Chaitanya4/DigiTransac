@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using DigiTransac.Api.Services.Transactions;
 
 namespace DigiTransac.Api.Services;
 
@@ -49,9 +50,9 @@ public class RecurringTransactionBackgroundService : BackgroundService
         _logger.LogInformation("Processing recurring transactions...");
 
         using var scope = _scopeFactory.CreateScope();
-        var transactionService = scope.ServiceProvider.GetRequiredService<ITransactionService>();
+        var recurringService = scope.ServiceProvider.GetRequiredService<IRecurringTransactionService>();
 
-        await transactionService.ProcessRecurringTransactionsAsync();
+        await recurringService.ProcessRecurringTransactionsAsync();
 
         _logger.LogInformation("Finished processing recurring transactions");
     }

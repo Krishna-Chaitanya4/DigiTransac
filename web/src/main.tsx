@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ToastProvider } from './components/ToastProvider'
 import { initSentry } from './services/sentry'
 import App from './App'
 import './index.css'
@@ -26,13 +27,15 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <BrowserRouter>
-            <AuthProvider>
-              <CurrencyProvider>
-                <App />
-              </CurrencyProvider>
-            </AuthProvider>
-          </BrowserRouter>
+          <ToastProvider>
+            <BrowserRouter>
+              <AuthProvider>
+                <CurrencyProvider>
+                  <App />
+                </CurrencyProvider>
+              </AuthProvider>
+            </BrowserRouter>
+          </ToastProvider>
         </ThemeProvider>
         {import.meta.env.DEV && (
           <Suspense fallback={null}>

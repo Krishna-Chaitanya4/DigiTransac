@@ -10,7 +10,7 @@ public interface IAccountRepository
     Task<Account?> GetByIdAsync(string id);
     Task<Account?> GetByIdAndUserIdAsync(string id, string userId);
     Task<Account> CreateAsync(Account account);
-    Task UpdateAsync(Account account);
+    Task UpdateAsync(Account account, IClientSessionHandle? session = null);
     Task<bool> DeleteAsync(string id, string userId);
     Task<bool> DeleteAllByUserIdAsync(string userId);
     Task<int> GetCountByUserIdAsync(string userId);
@@ -66,10 +66,13 @@ public class AccountRepository : IAccountRepository
         return account;
     }
 
-    public async Task UpdateAsync(Account account)
+    public async Task UpdateAsync(Account account, IClientSessionHandle? session = null)
     {
         account.UpdatedAt = DateTime.UtcNow;
-        await _accounts.ReplaceOneAsync(a => a.Id == account.Id && a.UserId == account.UserId, account);
+        if (session != null)
+            await _accounts.ReplaceOneAsync(session, a => a.Id == account.Id && a.UserId == account.UserId, account);
+        else
+            await _accounts.ReplaceOneAsync(a => a.Id == account.Id && a.UserId == account.UserId, account);
     }
 
     public async Task<bool> DeleteAsync(string id, string userId)
