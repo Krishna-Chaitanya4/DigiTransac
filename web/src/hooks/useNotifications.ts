@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { NOTIFICATION_CONSTANTS } from '../utils/constants';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -50,7 +51,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const [connectionState, setConnectionState] = useState<ConnectionState>('Disconnected');
   const [error, setError] = useState<string | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
   const optionsRef = useRef(options);
   
   // Update options ref when options change
@@ -72,11 +72,14 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       })
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext: signalR.RetryContext) => {
-          if (retryContext.previousRetryCount >= maxReconnectAttempts) {
+          if (retryContext.previousRetryCount >= NOTIFICATION_CONSTANTS.MAX_RECONNECT_ATTEMPTS) {
             return null; // Stop reconnecting
           }
           // Exponential backoff: 0, 2, 4, 8, 16 seconds
-          return Math.min(1000 * Math.pow(2, retryContext.previousRetryCount), 30000);
+          return Math.min(
+            1000 * Math.pow(2, retryContext.previousRetryCount),
+            NOTIFICATION_CONSTANTS.MAX_RECONNECT_DELAY_MS
+          );
         },
       })
       .configureLogging(signalR.LogLevel.Information)
@@ -222,13 +225,13 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     };
   }, [user, accessToken, connect, disconnect]);
 
-  // Keep-alive ping every 30 seconds
+  // Keep-alive ping at configured interval
   useEffect(() => {
     if (connectionState !== 'Connected') return;
 
     const pingInterval = setInterval(() => {
       ping();
-    }, 30000);
+    }, NOTIFICATION_CONSTANTS.PING_INTERVAL_MS);
 
     return () => clearInterval(pingInterval);
   }, [connectionState, ping]);

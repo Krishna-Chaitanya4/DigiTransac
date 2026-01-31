@@ -10,6 +10,11 @@ public interface IChatMessageRepository
     Task<ChatMessage?> GetByIdAsync(string id);
     
     /// <summary>
+    /// Get multiple messages by their IDs
+    /// </summary>
+    Task<Dictionary<string, ChatMessage>> GetByIdsAsync(IEnumerable<string> ids);
+    
+    /// <summary>
     /// Get all messages between two users (both directions)
     /// </summary>
     Task<List<ChatMessage>> GetConversationMessagesAsync(string userId, string counterpartyUserId, int? limit = null, DateTime? before = null);
@@ -94,6 +99,17 @@ public class ChatMessageRepository : IChatMessageRepository
     public async Task<ChatMessage?> GetByIdAsync(string id)
     {
         return await _chatMessages.Find(m => m.Id == id).FirstOrDefaultAsync();
+    }
+
+    public async Task<Dictionary<string, ChatMessage>> GetByIdsAsync(IEnumerable<string> ids)
+    {
+        var idList = ids.Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
+        if (idList.Count == 0)
+            return new Dictionary<string, ChatMessage>();
+
+        var filter = Builders<ChatMessage>.Filter.In(m => m.Id, idList);
+        var messages = await _chatMessages.Find(filter).ToListAsync();
+        return messages.ToDictionary(m => m.Id);
     }
 
     public async Task<List<ChatMessage>> GetConversationMessagesAsync(

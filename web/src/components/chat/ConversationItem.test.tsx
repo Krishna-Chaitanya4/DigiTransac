@@ -57,7 +57,7 @@ describe('ConversationItem', () => {
       expect(screen.getByText('bob')).toBeInTheDocument();
     });
 
-    it('should display "Personal Transactions" for self-chat', () => {
+    it('should display "Personal" for self-chat', () => {
       render(
         <ConversationItem
           conversation={createConversation({ isSelfChat: true })}
@@ -66,7 +66,7 @@ describe('ConversationItem', () => {
         />
       );
 
-      expect(screen.getByText('Personal Transactions')).toBeInTheDocument();
+      expect(screen.getByText('Personal')).toBeInTheDocument();
     });
   });
 

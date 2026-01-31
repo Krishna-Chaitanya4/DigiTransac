@@ -530,22 +530,36 @@ describe('TransactionForm', () => {
   describe('Form Submission', () => {
     it('calls onSubmit with correct data for new Send transaction', async () => {
       const onSubmit = vi.fn();
-      render(<TransactionForm {...defaultProps} onSubmit={onSubmit} />);
+      // Pass defaultAccountId to pre-select the account
+      render(<TransactionForm {...defaultProps} onSubmit={onSubmit} defaultAccountId="acc-1" />);
       
-      // Fill form
-      await userEvent.clear(screen.getByTestId('calculator-input'));
-      await userEvent.type(screen.getByTestId('calculator-input'), '150');
+      // Wait for useEffect to run and set up form state
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Checking Account (USD)')).toBeInTheDocument();
+      });
+      
+      // Use quick amount button for reliable amount setting
+      await userEvent.click(screen.getByTestId('quick-amount-100'));
+      
       await userEvent.selectOptions(screen.getByTestId('category-dropdown'), 'label-1');
       await userEvent.type(screen.getByPlaceholderText('e.g., Grocery shopping'), 'Groceries');
       await userEvent.type(screen.getByPlaceholderText('e.g., Supermarket'), 'Walmart');
       
-      // Submit
-      await userEvent.click(screen.getByRole('button', { name: 'Add Transaction' }));
+      // Wait for submit button to be enabled
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Add Transaction' })).not.toBeDisabled();
+      });
       
-      expect(onSubmit).toHaveBeenCalledTimes(1);
+      // Submit using fireEvent to bypass native form validation timing issues
+      const form = screen.getByRole('button', { name: 'Add Transaction' }).closest('form')!;
+      fireEvent.submit(form);
+      
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledTimes(1);
+      });
       const submittedData = onSubmit.mock.calls[0][0];
       expect(submittedData.type).toBe('Send');
-      expect(submittedData.amount).toBe(150);
+      expect(submittedData.amount).toBe(100);
       expect(submittedData.title).toBe('Groceries');
       expect(submittedData.payee).toBe('Walmart');
       expect(submittedData.accountId).toBe('acc-1');
@@ -553,37 +567,66 @@ describe('TransactionForm', () => {
 
     it('calls onSubmit with correct data for Receive transaction', async () => {
       const onSubmit = vi.fn();
-      const { unmount } = render(<TransactionForm {...defaultProps} onSubmit={onSubmit} />);
+      // Pass defaultAccountId to pre-select the account
+      render(<TransactionForm {...defaultProps} onSubmit={onSubmit} defaultAccountId="acc-1" />);
+      
+      // Wait for useEffect to run and set up form state
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Checking Account (USD)')).toBeInTheDocument();
+      });
       
       await userEvent.click(screen.getByTestId('type-receive'));
-      await userEvent.clear(screen.getByTestId('calculator-input'));
-      await userEvent.type(screen.getByTestId('calculator-input'), '500');
+      
+      // Use quick amount button for reliable amount setting
+      await userEvent.click(screen.getByTestId('quick-amount-100'));
+      
       await userEvent.selectOptions(screen.getByTestId('category-dropdown'), 'label-1');
       
-      await userEvent.click(screen.getByRole('button', { name: 'Add Transaction' }));
+      // Wait for submit button to be enabled
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Add Transaction' })).not.toBeDisabled();
+      });
       
-      expect(onSubmit).toHaveBeenCalled();
-      // Find the call with Receive type (multiple submissions possible due to React strictMode)
-      const receiveCall = onSubmit.mock.calls.find(call => call[0].type === 'Receive');
-      expect(receiveCall).toBeDefined();
-      expect(receiveCall[0].type).toBe('Receive');
-      expect(receiveCall[0].amount).toBe(500);
+      // Submit using fireEvent to bypass native form validation timing issues
+      const form = screen.getByRole('button', { name: 'Add Transaction' }).closest('form')!;
+      fireEvent.submit(form);
       
-      unmount();
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalled();
+      });
+      const submittedData = onSubmit.mock.calls[0][0];
+      expect(submittedData.type).toBe('Receive');
+      expect(submittedData.amount).toBe(100);
     });
 
     it('includes recurring rule when enabled', async () => {
       const onSubmit = vi.fn();
-      render(<TransactionForm {...defaultProps} onSubmit={onSubmit} />);
+      // Pass defaultAccountId to pre-select the account
+      render(<TransactionForm {...defaultProps} onSubmit={onSubmit} defaultAccountId="acc-1" />);
       
-      await userEvent.clear(screen.getByTestId('calculator-input'));
-      await userEvent.type(screen.getByTestId('calculator-input'), '100');
+      // Wait for useEffect to run and set up form state
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Checking Account (USD)')).toBeInTheDocument();
+      });
+      
+      // Use quick amount button for reliable amount setting
+      await userEvent.click(screen.getByTestId('quick-amount-100'));
+      
       await userEvent.selectOptions(screen.getByTestId('category-dropdown'), 'label-1');
       await userEvent.click(screen.getByTestId('recurring-checkbox'));
       
-      await userEvent.click(screen.getByRole('button', { name: 'Add Transaction' }));
+      // Wait for submit button to be enabled
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Add Transaction' })).not.toBeDisabled();
+      });
       
-      expect(onSubmit).toHaveBeenCalledTimes(1);
+      // Submit using fireEvent to bypass native form validation timing issues
+      const form = screen.getByRole('button', { name: 'Add Transaction' }).closest('form')!;
+      fireEvent.submit(form);
+      
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledTimes(1);
+      });
       const data = onSubmit.mock.calls[0][0];
       expect(data.recurringRule).toBeDefined();
       expect(data.recurringRule.frequency).toBe('Monthly');

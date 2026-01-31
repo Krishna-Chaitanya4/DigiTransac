@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, memo } from 'react';
 import type { ConversationSummary } from '../../types/conversations';
 import { ConversationItem } from './ConversationItem';
+import { SIDEBAR_CONSTANTS } from '../../utils/constants';
 
 interface ConversationListProps {
   conversations: ConversationSummary[];
@@ -28,8 +29,8 @@ export const ConversationList = memo(function ConversationList({
   onResizeReset,
   sidebarWidth,
   onWidthChange,
-  minWidth = 280,
-  maxWidth = 500,
+  minWidth = SIDEBAR_CONSTANTS.MIN_WIDTH,
+  maxWidth = SIDEBAR_CONSTANTS.MAX_WIDTH,
 }: ConversationListProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [conversationFilter, setConversationFilter] = useState('');

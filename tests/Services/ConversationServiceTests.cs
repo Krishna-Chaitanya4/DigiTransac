@@ -47,6 +47,21 @@ public class ConversationServiceTests
         _userRepositoryMock.Setup(x => x.GetByIdAsync(CounterpartyUserId))
             .ReturnsAsync(new User { Id = CounterpartyUserId, Email = "counter@example.com", FullName = "Counter Party" });
 
+        // Default batch user lookup - returns default users for known IDs
+        _userRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync((IEnumerable<string> ids) =>
+            {
+                var result = new Dictionary<string, User>();
+                foreach (var id in ids)
+                {
+                    if (id == TestUserId)
+                        result[id] = new User { Id = TestUserId, Email = "test@example.com", FullName = "Test User" };
+                    else if (id == CounterpartyUserId)
+                        result[id] = new User { Id = CounterpartyUserId, Email = "counter@example.com", FullName = "Counter Party" };
+                }
+                return result;
+            });
+
         // Default empty results
         _transactionRepositoryMock.Setup(x => x.GetP2PTransactionsAsync(It.IsAny<string>()))
             .ReturnsAsync(new List<Transaction>());
@@ -62,6 +77,8 @@ public class ConversationServiceTests
             .ReturnsAsync(0);
         _chatMessageRepositoryMock.Setup(x => x.GetTotalUnreadCountAsync(It.IsAny<string>()))
             .ReturnsAsync(0);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync(new Dictionary<string, ChatMessage>());
         _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>()))
             .ReturnsAsync(new List<Account>());
     }
@@ -190,6 +207,23 @@ public class ConversationServiceTests
         // Arrange
         var user2 = new User { Id = "user-2", Email = "user2@example.com", FullName = "User Two" };
         _userRepositoryMock.Setup(x => x.GetByIdAsync("user-2")).ReturnsAsync(user2);
+        
+        // Setup batch lookup to include user-2
+        _userRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync((IEnumerable<string> ids) =>
+            {
+                var result = new Dictionary<string, User>();
+                foreach (var id in ids)
+                {
+                    if (id == TestUserId)
+                        result[id] = new User { Id = TestUserId, Email = "test@example.com", FullName = "Test User" };
+                    else if (id == CounterpartyUserId)
+                        result[id] = new User { Id = CounterpartyUserId, Email = "counter@example.com", FullName = "Counter Party" };
+                    else if (id == "user-2")
+                        result[id] = user2;
+                }
+                return result;
+            });
 
         var transactions = new List<Transaction>
         {

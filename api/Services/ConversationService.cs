@@ -1,8 +1,117 @@
+using System.Text.RegularExpressions;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 
 namespace DigiTransac.Api.Services;
+
+/// <summary>
+/// Configuration constants for conversation service behavior
+/// </summary>
+public static class ConversationConstants
+{
+    /// <summary>Time window in minutes during which messages can be edited</summary>
+    public const int EditWindowMinutes = 15;
+    
+    /// <summary>Time window in minutes during which messages can be deleted</summary>
+    public const int DeleteWindowMinutes = 60;
+    
+    /// <summary>Maximum length for message content</summary>
+    public const int MaxMessageLength = 1000;
+    
+    /// <summary>Truncation length for message preview in conversation list</summary>
+    public const int PreviewTruncateLength = 50;
+    
+    /// <summary>Truncation length for reply preview content</summary>
+    public const int ReplyPreviewTruncateLength = 30;
+    
+    /// <summary>Default page size for conversation messages</summary>
+    public const int DefaultMessageLimit = 50;
+    
+    /// <summary>Display name for self-chat conversations</summary>
+    public const string SelfChatDisplayName = "Personal";
+}
+
+/// <summary>
+/// Utility class for formatting currency amounts with symbols
+/// </summary>
+public static class CurrencyFormatter
+{
+    private static readonly Dictionary<string, string> CurrencySymbols = new()
+    {
+        { "INR", "₹" },
+        { "USD", "$" },
+        { "EUR", "€" },
+        { "GBP", "£" },
+        { "JPY", "¥" },
+        { "AUD", "A$" },
+        { "CAD", "C$" },
+        { "CHF", "Fr" },
+        { "CNY", "¥" },
+        { "HKD", "HK$" },
+        { "NZD", "NZ$" },
+        { "SGD", "S$" },
+        { "KRW", "₩" },
+        { "MXN", "Mex$" },
+        { "BRL", "R$" },
+        { "ZAR", "R" },
+        { "RUB", "₽" },
+        { "AED", "د.إ" },
+        { "SAR", "﷼" },
+        { "THB", "฿" }
+    };
+    
+    /// <summary>
+    /// Get the symbol for a currency code
+    /// </summary>
+    public static string GetSymbol(string currencyCode)
+    {
+        if (string.IsNullOrEmpty(currencyCode))
+            return "";
+            
+        return CurrencySymbols.TryGetValue(currencyCode.ToUpperInvariant(), out var symbol)
+            ? symbol
+            : currencyCode + " ";
+    }
+    
+    /// <summary>
+    /// Format an amount with its currency symbol
+    /// </summary>
+    public static string Format(decimal amount, string currencyCode)
+    {
+        var symbol = GetSymbol(currencyCode);
+        return $"{symbol}{amount:N2}";
+    }
+    
+    /// <summary>
+    /// Format a transaction preview (e.g., "Sent ₹1,000.00")
+    /// </summary>
+    public static string FormatTransactionPreview(TransactionType type, decimal amount, string currencyCode)
+    {
+        var direction = type == TransactionType.Send ? "Sent" : "Received";
+        return $"{direction} {Format(amount, currencyCode)}";
+    }
+}
+
+/// <summary>
+/// Utility for email validation
+/// </summary>
+public static class EmailValidator
+{
+    private static readonly Regex EmailRegex = new(
+        @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    
+    /// <summary>
+    /// Validate email format
+    /// </summary>
+    public static bool IsValidEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+        return EmailRegex.IsMatch(email);
+    }
+}
 
 public interface IConversationService
 {
@@ -14,7 +123,7 @@ public interface IConversationService
     /// <summary>
     /// Get messages/transactions in a conversation with a specific user
     /// </summary>
-    Task<ConversationDetailResponse> GetConversationAsync(string userId, string counterpartyUserId, int limit = 50, DateTime? before = null);
+    Task<ConversationDetailResponse> GetConversationAsync(string userId, string counterpartyUserId, int limit = ConversationConstants.DefaultMessageLimit, DateTime? before = null);
     
     /// <summary>
     /// Send a text message to another user
@@ -101,16 +210,8 @@ public class ConversationService : IConversationService
             counterpartyIds.Add(userId); // Add self to conversation list
         }
         
-        // Fetch user details for all counterparties (including self)
-        var userDetails = new Dictionary<string, User>();
-        foreach (var cpId in counterpartyIds)
-        {
-            var user = await _userRepository.GetByIdAsync(cpId);
-            if (user != null)
-            {
-                userDetails[cpId] = user;
-            }
-        }
+        // Fetch user details for all counterparties in a single batch query (fixes N+1)
+        var userDetails = await _userRepository.GetByIdsAsync(counterpartyIds);
         
         // Build conversation summaries
         var conversations = new List<ConversationSummary>();
@@ -164,7 +265,7 @@ public class ConversationService : IConversationService
                 lastMessageType = latestMessage.Type.ToString();
                 if (latestMessage.Type == ChatMessageType.Text)
                 {
-                    lastMessagePreview = TruncateString(latestMessage.Content, 50);
+                    lastMessagePreview = TruncateString(latestMessage.Content, ConversationConstants.PreviewTruncateLength);
                 }
                 else if (latestMessage.Type == ChatMessageType.Transaction && !string.IsNullOrEmpty(latestMessage.TransactionId))
                 {
@@ -202,7 +303,7 @@ public class ConversationService : IConversationService
             conversations.Add(new ConversationSummary(
                 CounterpartyUserId: counterpartyId,
                 CounterpartyEmail: user.Email,
-                CounterpartyName: isSelfChat ? "Personal" : user.FullName,
+                CounterpartyName: isSelfChat ? ConversationConstants.SelfChatDisplayName : user.FullName,
                 LastActivityAt: lastActivityAt,
                 LastMessagePreview: lastMessagePreview,
                 LastMessageType: lastMessageType,
@@ -225,9 +326,9 @@ public class ConversationService : IConversationService
     }
 
     public async Task<ConversationDetailResponse> GetConversationAsync(
-        string userId, 
-        string counterpartyUserId, 
-        int limit = 50, 
+        string userId,
+        string counterpartyUserId,
+        int limit = ConversationConstants.DefaultMessageLimit,
         DateTime? before = null)
     {
         // Get counterparty details
@@ -348,16 +449,8 @@ public class ConversationService : IConversationService
         {
             var replyMessageIds = messagesWithReplies.Select(m => m.ReplyToMessageId!).Distinct().ToList();
             
-            // Fetch the original messages being replied to
-            var replyMessages = new Dictionary<string, ChatMessage>();
-            foreach (var replyId in replyMessageIds)
-            {
-                var replyMsg = await _chatMessageRepository.GetByIdAsync(replyId);
-                if (replyMsg != null)
-                {
-                    replyMessages[replyId] = replyMsg;
-                }
-            }
+            // Fetch the original messages being replied to in a single batch query (fixes N+1)
+            var replyMessages = await _chatMessageRepository.GetByIdsAsync(replyMessageIds);
             
             // Create new list with reply previews populated
             var messagesWithReplyPreviews = new List<ConversationMessage>();
@@ -368,7 +461,7 @@ public class ConversationService : IConversationService
                     var replySenderName = replyMsg.SenderUserId == userId ? "You" : counterparty.FullName ?? counterparty.Email;
                     var contentPreview = replyMsg.Type switch
                     {
-                        ChatMessageType.Text => TruncateString(replyMsg.Content, 30),
+                        ChatMessageType.Text => TruncateString(replyMsg.Content, ConversationConstants.ReplyPreviewTruncateLength),
                         ChatMessageType.Transaction => "💰 Transaction",
                         ChatMessageType.Request => "💸 Request",
                         _ => null
@@ -468,7 +561,7 @@ public class ConversationService : IConversationService
         return new ConversationDetailResponse(
             CounterpartyUserId: counterpartyUserId,
             CounterpartyEmail: counterparty.Email,
-            CounterpartyName: isSelfChat ? "Personal" : counterparty.FullName,
+            CounterpartyName: isSelfChat ? ConversationConstants.SelfChatDisplayName : counterparty.FullName,
             Messages: messages,
             TotalCount: totalCount,
             HasMore: hasMore,
@@ -488,9 +581,9 @@ public class ConversationService : IConversationService
             return (false, "Message content is required", null);
         }
         
-        if (request.Content.Length > 1000)
+        if (request.Content.Length > ConversationConstants.MaxMessageLength)
         {
-            return (false, "Message cannot exceed 1000 characters", null);
+            return (false, $"Message cannot exceed {ConversationConstants.MaxMessageLength} characters", null);
         }
         
         // Verify counterparty exists (for self-chat, user is their own counterparty)
@@ -524,7 +617,7 @@ public class ConversationService : IConversationService
                 var replySenderName = replyMsg.SenderUserId == userId ? "You" : replySender?.FullName ?? replySender?.Email;
                 var contentPreview = replyMsg.Type switch
                 {
-                    ChatMessageType.Text => TruncateString(replyMsg.Content, 30),
+                    ChatMessageType.Text => TruncateString(replyMsg.Content, ConversationConstants.ReplyPreviewTruncateLength),
                     ChatMessageType.Transaction => "💰 Transaction",
                     ChatMessageType.Request => "💸 Request",
                     _ => null
@@ -683,22 +776,21 @@ public class ConversationService : IConversationService
             return (false, "Message content is required");
         }
         
-        if (request.Content.Length > 1000)
+        if (request.Content.Length > ConversationConstants.MaxMessageLength)
         {
-            return (false, "Message cannot exceed 1000 characters");
+            return (false, $"Message cannot exceed {ConversationConstants.MaxMessageLength} characters");
         }
         
-        // Check time limit - 15 minutes for editing
+        // Check time limit for editing
         var message = await _chatMessageRepository.GetByIdAsync(messageId);
         if (message == null || message.SenderUserId != userId)
         {
             return (false, "Message not found or you don't have permission to edit it");
         }
         
-        var editWindowMinutes = 15;
-        if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(editWindowMinutes))
+        if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(ConversationConstants.EditWindowMinutes))
         {
-            return (false, $"Messages can only be edited within {editWindowMinutes} minutes of sending");
+            return (false, $"Messages can only be edited within {ConversationConstants.EditWindowMinutes} minutes of sending");
         }
         
         var success = await _chatMessageRepository.EditMessageAsync(messageId, userId, request.Content);
@@ -713,17 +805,16 @@ public class ConversationService : IConversationService
 
     public async Task<(bool Success, string Message)> DeleteMessageAsync(string userId, string messageId)
     {
-        // Check time limit - 1 hour for deleting
+        // Check time limit for deleting
         var message = await _chatMessageRepository.GetByIdAsync(messageId);
         if (message == null || message.SenderUserId != userId)
         {
             return (false, "Message not found or you don't have permission to delete it");
         }
         
-        var deleteWindowMinutes = 60; // 1 hour
-        if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(deleteWindowMinutes))
+        if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(ConversationConstants.DeleteWindowMinutes))
         {
-            return (false, "Messages can only be deleted within 1 hour of sending");
+            return (false, $"Messages can only be deleted within {ConversationConstants.DeleteWindowMinutes} minutes of sending");
         }
         
         var success = await _chatMessageRepository.DeleteMessageAsync(messageId, userId);
@@ -743,7 +834,14 @@ public class ConversationService : IConversationService
             return new UserSearchResponse(null, false);
         }
         
-        var user = await _userRepository.GetByEmailAsync(email.Trim().ToLowerInvariant());
+        // Validate email format before database lookup (security hardening)
+        var trimmedEmail = email.Trim().ToLowerInvariant();
+        if (!EmailValidator.IsValidEmail(trimmedEmail))
+        {
+            return new UserSearchResponse(null, false);
+        }
+        
+        var user = await _userRepository.GetByEmailAsync(trimmedEmail);
         
         if (user == null)
         {
@@ -772,16 +870,6 @@ public class ConversationService : IConversationService
     {
         if (tx == null) return "";
         
-        var direction = tx.Type == TransactionType.Send ? "Sent" : "Received";
-        var symbol = tx.Currency switch
-        {
-            "INR" => "₹",
-            "USD" => "$",
-            "EUR" => "€",
-            "GBP" => "£",
-            _ => tx.Currency + " "
-        };
-        
-        return $"{direction} {symbol}{tx.Amount:N2}";
+        return CurrencyFormatter.FormatTransactionPreview(tx.Type, tx.Amount, tx.Currency);
     }
 }

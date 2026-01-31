@@ -25,6 +25,7 @@ import {
 } from '../components/chat';
 import { TransactionForm } from '../components/TransactionForm';
 import { logger } from '../services/logger';
+import { SIDEBAR_CONSTANTS } from '../utils/constants';
 import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
 import type { ConversationMessage, ConversationDetailResponse, UserSearchResult } from '../types/conversations';
 
@@ -155,7 +156,7 @@ export default function ChatsPage() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Sidebar resize state
-  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_CONSTANTS.DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
 
   // New chat modal
@@ -448,7 +449,7 @@ export default function ChatsPage() {
         isResizing={isResizing}
         onResizeStart={() => setIsResizing(true)}
         onResizeEnd={() => setIsResizing(false)}
-        onResizeReset={() => setSidebarWidth(320)}
+        onResizeReset={() => setSidebarWidth(SIDEBAR_CONSTANTS.DEFAULT_WIDTH)}
         sidebarWidth={sidebarWidth}
         onWidthChange={setSidebarWidth}
       />
