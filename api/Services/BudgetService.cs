@@ -33,6 +33,8 @@ public class BudgetService : IBudgetService
     private readonly ITransactionRepository _transactionRepository;
     private readonly ILabelRepository _labelRepository;
     private readonly IAccountRepository _accountRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IExchangeRateService _exchangeRateService;
     private readonly INotificationService _notificationService;
     private readonly ILogger<BudgetService> _logger;
 
@@ -41,6 +43,8 @@ public class BudgetService : IBudgetService
         ITransactionRepository transactionRepository,
         ILabelRepository labelRepository,
         IAccountRepository accountRepository,
+        IUserRepository userRepository,
+        IExchangeRateService exchangeRateService,
         INotificationService notificationService,
         ILogger<BudgetService> logger)
     {
@@ -48,6 +52,8 @@ public class BudgetService : IBudgetService
         _transactionRepository = transactionRepository;
         _labelRepository = labelRepository;
         _accountRepository = accountRepository;
+        _userRepository = userRepository;
+        _exchangeRateService = exchangeRateService;
         _notificationService = notificationService;
         _logger = logger;
     }
@@ -173,26 +179,30 @@ public class BudgetService : IBudgetService
         var budgets = await _budgetRepository.GetByUserIdAsync(userId, activeOnly);
         var responses = new List<BudgetResponse>();
         
+        // Get user's primary currency and exchange rates for conversion
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse?.Rates ?? new Dictionary<string, decimal>();
+        
         decimal totalBudgetAmount = 0;
         decimal totalSpent = 0;
         int overBudgetCount = 0;
         int nearLimitCount = 0;
-        string? primaryCurrency = null;
 
         foreach (var budget in budgets)
         {
             var response = await BuildBudgetResponseAsync(budget, userId);
             responses.Add(response);
 
-            // Use first budget's currency as primary
-            primaryCurrency ??= budget.Currency;
+            // Convert budget amounts to user's primary currency
+            var convertedBudgetAmount = _exchangeRateService.Convert(
+                budget.Amount, budget.Currency, primaryCurrency, rates);
+            var convertedSpent = _exchangeRateService.Convert(
+                response.AmountSpent, budget.Currency, primaryCurrency, rates);
             
-            // Aggregate totals (only for same currency to keep it simple)
-            if (budget.Currency == primaryCurrency)
-            {
-                totalBudgetAmount += budget.Amount;
-                totalSpent += response.AmountSpent;
-            }
+            totalBudgetAmount += convertedBudgetAmount;
+            totalSpent += convertedSpent;
 
             if (response.IsOverBudget)
                 overBudgetCount++;
@@ -208,7 +218,7 @@ public class BudgetService : IBudgetService
             TotalBudgetAmount: totalBudgetAmount,
             TotalSpent: totalSpent,
             TotalRemaining: totalBudgetAmount - totalSpent,
-            PrimaryCurrency: primaryCurrency ?? "INR",
+            PrimaryCurrency: primaryCurrency,
             Budgets: responses
         );
     }

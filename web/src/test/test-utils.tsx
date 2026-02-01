@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { CurrencyProvider } from '../context/CurrencyContext';
 
 interface WrapperOptions {
   initialEntries?: string[];
@@ -34,9 +35,11 @@ export function createWrapper(options: WrapperOptions = {}) {
     const content = (
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <MemoryRouter initialEntries={initialEntries}>
-            {children}
-          </MemoryRouter>
+          <CurrencyProvider>
+            <MemoryRouter initialEntries={initialEntries}>
+              {children}
+            </MemoryRouter>
+          </CurrencyProvider>
         </ThemeProvider>
       </QueryClientProvider>
     );

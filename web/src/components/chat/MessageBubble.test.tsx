@@ -5,8 +5,20 @@ import type { ConversationMessage } from '../../types/conversations';
 
 // Mock the conversationService
 vi.mock('../../services/conversationService', () => ({
-  formatChatCurrency: (amount: number, currency: string | null | undefined) => 
+  formatChatCurrency: (amount: number, currency: string | null | undefined) =>
     currency ? `${currency} ${amount}` : `${amount}`,
+}));
+
+// Mock CurrencyContext
+vi.mock('../../context/CurrencyContext', () => ({
+  useCurrency: () => ({
+    primaryCurrency: 'USD',
+    formatCurrency: (amount: number, currency: string) => `${currency} ${amount}`,
+    formatInPrimaryCurrency: (amount: number, fromCurrency: string) => `USD ${amount}`,
+    convert: (amount: number) => amount,
+    exchangeRates: {},
+    isLoading: false,
+  }),
 }));
 
 // Helper to create a mock message

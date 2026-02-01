@@ -457,18 +457,15 @@ describe('TransactionsPage', () => {
         expect(screen.getByText('Grocery Shopping')).toBeInTheDocument();
       });
 
-      // Count buttons initially
-      const initialAddButtons = screen.getAllByText('Add Transaction');
-      const initialCount = initialAddButtons.length;
-
-      // Press "n" key
+      // Press "n" key - this opens the AddTransactionSheet
       fireEvent.keyDown(document, { key: 'n' });
 
-      // Form should open - there should be more "Add Transaction" elements (header + form submit button)
+      // AddTransactionSheet should open - it uses role="menu" in dropdown mode or role="dialog" in modal mode
+      // After pressing 'n', it opens in modal mode (no anchor), so look for the dialog or the sheet content
       await waitFor(() => {
-        const addButtons = screen.getAllByText('Add Transaction');
-        expect(addButtons.length).toBeGreaterThan(initialCount);
-      });
+        // The sheet shows "Add Transaction" title and action options
+        expect(screen.getByText('Personal (My Records)')).toBeInTheDocument();
+      }, { timeout: 2000 });
     });
   });
 

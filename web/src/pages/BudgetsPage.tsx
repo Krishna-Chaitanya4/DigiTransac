@@ -19,11 +19,15 @@ type BudgetFilter = 'all' | 'healthy' | 'warning' | 'exceeded';
 function BudgetCardWithActions({
   budget,
   onEdit,
-  onDelete
+  onDelete,
+  primaryCurrency,
+  formatInPrimaryCurrency,
 }: {
   budget: Budget;
   onEdit: (budget: Budget) => void;
   onDelete: (budgetId: string) => void;
+  primaryCurrency: string;
+  formatInPrimaryCurrency: (amount: number, fromCurrency: string) => string;
 }) {
   const status = getBudgetStatus(budget);
   const colors = budgetStatusColors[status];
@@ -102,17 +106,31 @@ function BudgetCardWithActions({
             {budget.percentUsed.toFixed(0)}%
           </span>
         </div>
+        {/* Show converted amount if different currency */}
+        {budget.currency !== primaryCurrency && (
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            ≈ {formatInPrimaryCurrency(budget.amountSpent, budget.currency)} of {formatInPrimaryCurrency(budget.amount, budget.currency)}
+          </div>
+        )}
       </div>
       
       {/* Remaining amount */}
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-500 dark:text-gray-400">Remaining</span>
-        <span className={`font-semibold ${budget.amountRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {budget.amountRemaining >= 0
-            ? formatCurrency(budget.amountRemaining, budget.currency)
-            : `-${formatCurrency(Math.abs(budget.amountRemaining), budget.currency)}`
-          }
-        </span>
+        <div className="text-right">
+          <span className={`font-semibold ${budget.amountRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {budget.amountRemaining >= 0
+              ? formatCurrency(budget.amountRemaining, budget.currency)
+              : `-${formatCurrency(Math.abs(budget.amountRemaining), budget.currency)}`
+            }
+          </span>
+          {/* Show converted remaining if different currency */}
+          {budget.currency !== primaryCurrency && (
+            <div className="text-xs text-gray-400 dark:text-gray-500">
+              ≈ {formatInPrimaryCurrency(Math.abs(budget.amountRemaining), budget.currency)}
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Labels/categories */}
@@ -141,7 +159,7 @@ function BudgetCardWithActions({
 }
 
 export default function BudgetsPage() {
-  const { primaryCurrency } = useCurrency();
+  const { primaryCurrency, formatInPrimaryCurrency } = useCurrency();
   
   // Data fetching
   const { data: budgetSummary, isLoading } = useBudgets(true);
@@ -401,6 +419,8 @@ export default function BudgetsPage() {
               budget={budget}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              primaryCurrency={primaryCurrency}
+              formatInPrimaryCurrency={formatInPrimaryCurrency}
             />
           ))}
         </div>

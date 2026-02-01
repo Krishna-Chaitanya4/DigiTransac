@@ -54,43 +54,6 @@ export const TRANSACTION_CONSTANTS = {
   DEFAULT_PAGE_SIZE: 50,
 } as const;
 
-/**
- * Currency symbols for formatting
- */
-export const CURRENCY_SYMBOLS: Record<string, string> = {
-  INR: '₹',
-  USD: '$',
-  EUR: '€',
-  GBP: '£',
-  JPY: '¥',
-  AUD: 'A$',
-  CAD: 'C$',
-  CHF: 'Fr',
-  CNY: '¥',
-  HKD: 'HK$',
-  NZD: 'NZ$',
-  SGD: 'S$',
-  KRW: '₩',
-  MXN: 'Mex$',
-  BRL: 'R$',
-  ZAR: 'R',
-  RUB: '₽',
-  AED: 'د.إ',
-  SAR: '﷼',
-  THB: '฿',
-} as const;
-
-/**
- * Format currency amount with symbol
- */
-export function formatCurrency(amount: number, currencyCode: string): string {
-  const symbol = CURRENCY_SYMBOLS[currencyCode?.toUpperCase()] || `${currencyCode} `;
-  return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-/**
- * Get currency symbol for a currency code
- */
-export function getCurrencySymbol(currencyCode: string): string {
-  return CURRENCY_SYMBOLS[currencyCode?.toUpperCase()] || `${currencyCode} `;
-}
+// NOTE: Currency symbols and formatting functions have been consolidated to
+// web/src/services/currencyService.ts to avoid duplication.
+// Import { formatCurrency, getCurrencySymbol, currencyConfig } from '../services/currencyService'

@@ -83,23 +83,21 @@ export async function updateCurrencyPreference(currency: string): Promise<void> 
 // Utility Functions
 export function formatCurrency(amount: number, currencyCode: string = 'INR'): string {
   const config = currencyConfig[currencyCode.toUpperCase()];
+  const upperCode = currencyCode.toUpperCase();
   
-  if (config) {
-    try {
-      return new Intl.NumberFormat(config.locale, {
-        style: 'currency',
-        currency: currencyCode,
-        minimumFractionDigits: currencyCode === 'JPY' || currencyCode === 'KRW' ? 0 : 2,
-        maximumFractionDigits: currencyCode === 'JPY' || currencyCode === 'KRW' ? 0 : 2,
-      }).format(amount);
-    } catch {
-      // Fallback if Intl doesn't support the currency
-      return `${config.symbol}${amount.toLocaleString()}`;
-    }
-  }
+  // Use our custom symbols for consistent display (e.g., A$ for AUD, not just $)
+  const symbol = config?.symbol || `${currencyCode} `;
   
-  // Fallback for unknown currencies
-  return `${currencyCode} ${amount.toLocaleString()}`;
+  // Determine decimal places based on currency
+  const fractionDigits = upperCode === 'JPY' || upperCode === 'KRW' ? 0 : 2;
+  
+  // Format the number with proper locale formatting
+  const formattedNumber = amount.toLocaleString(config?.locale || 'en-US', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
+  
+  return `${symbol}${formattedNumber}`;
 }
 
 export function getCurrencySymbol(currencyCode: string): string {

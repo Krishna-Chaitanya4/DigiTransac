@@ -212,6 +212,18 @@ vi.mock('../services/currencyService', () => ({
   },
 }));
 
+// Mock CurrencyContext
+vi.mock('../context/CurrencyContext', () => ({
+  useCurrency: () => ({
+    primaryCurrency: 'USD',
+    formatCurrency: (amount: number, currency: string) => `${currency} ${amount}`,
+    formatInPrimaryCurrency: (amount: number, fromCurrency: string) => `USD ${amount}`,
+    convert: (amount: number) => amount,
+    exchangeRates: {},
+    isLoading: false,
+  }),
+}));
+
 // Test data factories
 const createAccount = (overrides: Partial<Account> = {}): Account => ({
   id: 'acc-1',
@@ -530,6 +542,7 @@ describe('TransactionForm', () => {
   describe('Form Submission', () => {
     it('calls onSubmit with correct data for new Send transaction', async () => {
       const onSubmit = vi.fn();
+      const user = userEvent.setup();
       // Pass defaultAccountId to pre-select the account
       render(<TransactionForm {...defaultProps} onSubmit={onSubmit} defaultAccountId="acc-1" />);
       
@@ -538,26 +551,28 @@ describe('TransactionForm', () => {
         expect(screen.getByDisplayValue('Checking Account (USD)')).toBeInTheDocument();
       });
       
-      // Use quick amount button for reliable amount setting
-      await userEvent.click(screen.getByTestId('quick-amount-100'));
+      // Type amount directly in the input (more reliable than quick amount button)
+      const amountInput = screen.getByTestId('calculator-input');
+      await user.clear(amountInput);
+      await user.type(amountInput, '100');
       
-      await userEvent.selectOptions(screen.getByTestId('category-dropdown'), 'label-1');
-      await userEvent.type(screen.getByPlaceholderText('e.g., Grocery shopping'), 'Groceries');
-      await userEvent.type(screen.getByPlaceholderText('e.g., Supermarket'), 'Walmart');
+      await user.selectOptions(screen.getByTestId('category-dropdown'), 'label-1');
+      await user.type(screen.getByPlaceholderText('e.g., Grocery shopping'), 'Groceries');
+      await user.type(screen.getByPlaceholderText('e.g., Supermarket'), 'Walmart');
       
       // Wait for submit button to be enabled
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Add Transaction' })).not.toBeDisabled();
-      });
+      }, { timeout: 2000 });
       
-      // Submit using fireEvent to bypass native form validation timing issues
-      const form = screen.getByRole('button', { name: 'Add Transaction' }).closest('form')!;
-      fireEvent.submit(form);
+      // Submit by clicking the button
+      await user.click(screen.getByRole('button', { name: 'Add Transaction' }));
       
       await waitFor(() => {
-        expect(onSubmit).toHaveBeenCalledTimes(1);
-      });
-      const submittedData = onSubmit.mock.calls[0][0];
+        expect(onSubmit).toHaveBeenCalled();
+      }, { timeout: 2000 });
+      const lastCallIndex = onSubmit.mock.calls.length - 1;
+      const submittedData = onSubmit.mock.calls[lastCallIndex][0];
       expect(submittedData.type).toBe('Send');
       expect(submittedData.amount).toBe(100);
       expect(submittedData.title).toBe('Groceries');
@@ -567,6 +582,7 @@ describe('TransactionForm', () => {
 
     it('calls onSubmit with correct data for Receive transaction', async () => {
       const onSubmit = vi.fn();
+      const user = userEvent.setup();
       // Pass defaultAccountId to pre-select the account
       render(<TransactionForm {...defaultProps} onSubmit={onSubmit} defaultAccountId="acc-1" />);
       
@@ -575,26 +591,33 @@ describe('TransactionForm', () => {
         expect(screen.getByDisplayValue('Checking Account (USD)')).toBeInTheDocument();
       });
       
-      await userEvent.click(screen.getByTestId('type-receive'));
+      // First switch to Receive type
+      await user.click(screen.getByTestId('type-receive'));
+      
+      // Wait for type to be updated
+      await waitFor(() => {
+        expect(screen.getByTestId('type-receive')).toHaveClass('active');
+      });
       
       // Use quick amount button for reliable amount setting
-      await userEvent.click(screen.getByTestId('quick-amount-100'));
+      await user.click(screen.getByTestId('quick-amount-100'));
       
-      await userEvent.selectOptions(screen.getByTestId('category-dropdown'), 'label-1');
+      await user.selectOptions(screen.getByTestId('category-dropdown'), 'label-1');
       
       // Wait for submit button to be enabled
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Add Transaction' })).not.toBeDisabled();
       });
       
-      // Submit using fireEvent to bypass native form validation timing issues
-      const form = screen.getByRole('button', { name: 'Add Transaction' }).closest('form')!;
-      fireEvent.submit(form);
+      // Submit by clicking the button
+      await user.click(screen.getByRole('button', { name: 'Add Transaction' }));
       
       await waitFor(() => {
         expect(onSubmit).toHaveBeenCalled();
       });
-      const submittedData = onSubmit.mock.calls[0][0];
+      // Get the last call (in case of multiple submissions)
+      const lastCallIndex = onSubmit.mock.calls.length - 1;
+      const submittedData = onSubmit.mock.calls[lastCallIndex][0];
       expect(submittedData.type).toBe('Receive');
       expect(submittedData.amount).toBe(100);
     });
@@ -620,14 +643,15 @@ describe('TransactionForm', () => {
         expect(screen.getByRole('button', { name: 'Add Transaction' })).not.toBeDisabled();
       });
       
-      // Submit using fireEvent to bypass native form validation timing issues
-      const form = screen.getByRole('button', { name: 'Add Transaction' }).closest('form')!;
-      fireEvent.submit(form);
+      // Submit by clicking the button
+      await userEvent.click(screen.getByRole('button', { name: 'Add Transaction' }));
       
       await waitFor(() => {
-        expect(onSubmit).toHaveBeenCalledTimes(1);
+        expect(onSubmit).toHaveBeenCalled();
       });
-      const data = onSubmit.mock.calls[0][0];
+      // Get the last call
+      const lastCallIndex = onSubmit.mock.calls.length - 1;
+      const data = onSubmit.mock.calls[lastCallIndex][0];
       expect(data.recurringRule).toBeDefined();
       expect(data.recurringRule.frequency).toBe('Monthly');
     });

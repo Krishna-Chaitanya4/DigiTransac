@@ -58,6 +58,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         // Convert all transaction amounts to user's primary currency before summing
         decimal totalCredits = 0;
         decimal totalDebits = 0;
+        
+        // Also track category sums with currency conversion
+        var categoryTotals = new Dictionary<string, decimal>();
+        var tagTotals = new Dictionary<string, decimal>();
 
         foreach (var t in transactions)
         {
@@ -76,21 +80,37 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 totalCredits += convertedAmount;
             else if (t.Type == TransactionType.Send)
                 totalDebits += convertedAmount;
+                
+            // Accumulate category totals with currency conversion
+            foreach (var split in t.Splits)
+            {
+                var convertedSplitAmount = _exchangeRateService.Convert(
+                    split.Amount, transactionCurrency, primaryCurrency, rates);
+                    
+                if (!categoryTotals.ContainsKey(split.LabelId))
+                    categoryTotals[split.LabelId] = 0;
+                categoryTotals[split.LabelId] += convertedSplitAmount;
+            }
+            
+            // Accumulate tag totals with currency conversion
+            if (t.TagIds != null)
+            {
+                foreach (var tagId in t.TagIds)
+                {
+                    if (!tagTotals.ContainsKey(tagId))
+                        tagTotals[tagId] = 0;
+                    tagTotals[tagId] += convertedAmount;
+                }
+            }
         }
-
-        // Get sums by label (for the filtered date range) - also only for Confirmed
-        var byCategory = await _transactionRepository.GetSumByLabelAsync(
-            userId, filter.StartDate, filter.EndDate);
-        var byTag = await _transactionRepository.GetSumByTagAsync(
-            userId, filter.StartDate, filter.EndDate);
 
         return new TransactionSummaryResponse(
             totalCredits,
             totalDebits,
             totalCredits - totalDebits,
             transactions.Count,
-            byCategory,
-            byTag,
+            categoryTotals,
+            tagTotals,
             primaryCurrency);
     }
 

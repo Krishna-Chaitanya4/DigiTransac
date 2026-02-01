@@ -1,6 +1,7 @@
 import { memo, useRef, useCallback } from 'react';
 import type { ConversationMessage } from '../../types/conversations';
 import { formatChatCurrency } from '../../services/conversationService';
+import { useCurrency } from '../../context/CurrencyContext';
 
 // Time limits for message actions (in minutes)
 export const EDIT_TIME_LIMIT_MINUTES = 15;
@@ -46,6 +47,7 @@ export const MessageBubble = memo(function MessageBubble({
   onScrollToReply,
 }: MessageBubbleProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { primaryCurrency, formatInPrimaryCurrency } = useCurrency();
   
   // In self-chat: right = user-created, left = system-generated (needs review)
   // In P2P chat: right = my messages, left = counterparty messages
@@ -134,6 +136,12 @@ export const MessageBubble = memo(function MessageBubble({
             {/* Amount */}
             <div className="text-center">
               <div className="text-xl font-bold tracking-tight">{formatChatCurrency(tx.amount, tx.currency)}</div>
+              {/* Show converted amount if different currency */}
+              {tx.currency && tx.currency !== primaryCurrency && (
+                <div className="text-xs text-white/80 mt-0.5">
+                  ≈ {formatInPrimaryCurrency(tx.amount, tx.currency)}
+                </div>
+              )}
               {tx.accountName && (
                 <div className="text-xs text-white/90 mt-0.5 font-medium truncate">{tx.accountName}</div>
               )}

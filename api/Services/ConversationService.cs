@@ -33,34 +33,11 @@ public static class ConversationConstants
 }
 
 /// <summary>
-/// Utility class for formatting currency amounts with symbols
+/// Utility class for formatting currency amounts with symbols.
+/// Uses CurrencyConfig from ExchangeRate.cs as the single source of truth.
 /// </summary>
 public static class CurrencyFormatter
 {
-    private static readonly Dictionary<string, string> CurrencySymbols = new()
-    {
-        { "INR", "₹" },
-        { "USD", "$" },
-        { "EUR", "€" },
-        { "GBP", "£" },
-        { "JPY", "¥" },
-        { "AUD", "A$" },
-        { "CAD", "C$" },
-        { "CHF", "Fr" },
-        { "CNY", "¥" },
-        { "HKD", "HK$" },
-        { "NZD", "NZ$" },
-        { "SGD", "S$" },
-        { "KRW", "₩" },
-        { "MXN", "Mex$" },
-        { "BRL", "R$" },
-        { "ZAR", "R" },
-        { "RUB", "₽" },
-        { "AED", "د.إ" },
-        { "SAR", "﷼" },
-        { "THB", "฿" }
-    };
-    
     /// <summary>
     /// Get the symbol for a currency code
     /// </summary>
@@ -69,9 +46,9 @@ public static class CurrencyFormatter
         if (string.IsNullOrEmpty(currencyCode))
             return "";
             
-        return CurrencySymbols.TryGetValue(currencyCode.ToUpperInvariant(), out var symbol)
-            ? symbol
-            : currencyCode + " ";
+        // Use CurrencyConfig as the single source of truth
+        var currencyInfo = CurrencyConfig.GetCurrency(currencyCode);
+        return currencyInfo.Symbol;
     }
     
     /// <summary>
@@ -168,19 +145,22 @@ public class ConversationService : IConversationService
     private readonly IAccountRepository _accountRepository;
     private readonly IUserRepository _userRepository;
     private readonly ITransactionService _transactionService;
+    private readonly IExchangeRateService _exchangeRateService;
 
     public ConversationService(
         IChatMessageRepository chatMessageRepository,
         ITransactionRepository transactionRepository,
         IAccountRepository accountRepository,
         IUserRepository userRepository,
-        ITransactionService transactionService)
+        ITransactionService transactionService,
+        IExchangeRateService exchangeRateService)
     {
         _chatMessageRepository = chatMessageRepository;
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
         _userRepository = userRepository;
         _transactionService = transactionService;
+        _exchangeRateService = exchangeRateService;
     }
 
     public async Task<ConversationListResponse> GetConversationsAsync(string userId)
@@ -190,6 +170,12 @@ public class ConversationService : IConversationService
         
         // Get latest messages per conversation
         var latestMessages = await _chatMessageRepository.GetLatestMessagePerConversationAsync(userId);
+        
+        // Get user's primary currency and exchange rates for conversion
+        var currentUser = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = currentUser?.PrimaryCurrency ?? "USD";
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse.Rates;
         
         // Build set of all counterparty user IDs
         var counterpartyIds = new HashSet<string>();
@@ -228,13 +214,13 @@ public class ConversationService : IConversationService
                 ? new List<Transaction>() // Self-chat doesn't aggregate P2P transactions
                 : p2pTransactions.Where(t => t.CounterpartyUserId == counterpartyId).ToList();
             
-            // Calculate totals
+            // Calculate totals with currency conversion to user's primary currency
             decimal totalSent = txsWithCounterparty
                 .Where(t => t.Type == TransactionType.Send && !string.IsNullOrEmpty(t.AccountId))
-                .Sum(t => t.Amount);
+                .Sum(t => _exchangeRateService.Convert(t.Amount, t.Currency, primaryCurrency, rates));
             decimal totalReceived = txsWithCounterparty
                 .Where(t => t.Type == TransactionType.Receive && !string.IsNullOrEmpty(t.AccountId))
-                .Sum(t => t.Amount);
+                .Sum(t => _exchangeRateService.Convert(t.Amount, t.Currency, primaryCurrency, rates));
             
             // Get latest activity (from messages or transactions)
             ChatMessage? latestMessage;
@@ -336,9 +322,15 @@ public class ConversationService : IConversationService
         if (counterparty == null)
         {
             return new ConversationDetailResponse(
-                counterpartyUserId, "", null, 
+                counterpartyUserId, "", null,
                 new List<ConversationMessage>(), 0, false, 0, 0, false);
         }
+        
+        // Get user's primary currency and exchange rates for conversion
+        var currentUser = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = currentUser?.PrimaryCurrency ?? "USD";
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse.Rates;
         
         var isSelfChat = userId == counterpartyUserId;
         
@@ -547,13 +539,13 @@ public class ConversationService : IConversationService
             .TakeLast(limit)
             .ToList();
         
-        // Calculate totals
+        // Calculate totals with currency conversion to user's primary currency
         decimal totalSent = transactionsForChat
             .Where(t => t.Type == TransactionType.Send && !string.IsNullOrEmpty(t.AccountId))
-            .Sum(t => t.Amount);
+            .Sum(t => _exchangeRateService.Convert(t.Amount, t.Currency, primaryCurrency, rates));
         decimal totalReceived = transactionsForChat
             .Where(t => t.Type == TransactionType.Receive && !string.IsNullOrEmpty(t.AccountId))
-            .Sum(t => t.Amount);
+            .Sum(t => _exchangeRateService.Convert(t.Amount, t.Currency, primaryCurrency, rates));
         
         var totalCount = messages.Count;
         var hasMore = chatMessages.Count == limit || transactionsForChat.Count > limit;

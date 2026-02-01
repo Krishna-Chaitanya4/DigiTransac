@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import type { ConversationDetailResponse } from '../../types/conversations';
-import { formatChatCurrency } from '../../services/conversationService';
+import { useCurrency } from '../../context/CurrencyContext';
+import { formatCurrency } from '../../services/currencyService';
 
 interface ChatHeaderEnhancedProps {
   conversation: ConversationDetailResponse;
@@ -22,6 +23,7 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
   isConnected = true,
 }: ChatHeaderEnhancedProps) {
   const [showBalanceDetails, setShowBalanceDetails] = useState(false);
+  const { primaryCurrency } = useCurrency();
   
   const isSelfChat = conversation.isSelfChat ?? false;
   // Use counterpartyName from API (which returns "Personal" for self-chat)
@@ -88,14 +90,14 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
                     </svg>
-                    Owes you {formatChatCurrency(Math.abs(netBalance), 'INR')}
+                    Owes you {formatCurrency(Math.abs(netBalance), primaryCurrency)}
                   </span>
                 ) : netBalance < 0 ? (
                   <span className="text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
                     </svg>
-                    You owe {formatChatCurrency(Math.abs(netBalance), 'INR')}
+                    You owe {formatCurrency(Math.abs(netBalance), primaryCurrency)}
                   </span>
                 ) : (
                   <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
@@ -164,28 +166,28 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">You sent</p>
               <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                {formatChatCurrency(totalSent, 'INR')}
+                {formatCurrency(totalSent, primaryCurrency)}
               </p>
             </div>
             <div className="w-px bg-gray-200 dark:bg-gray-700" />
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">You received</p>
               <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                {formatChatCurrency(totalReceived, 'INR')}
+                {formatCurrency(totalReceived, primaryCurrency)}
               </p>
             </div>
             <div className="w-px bg-gray-200 dark:bg-gray-700" />
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Net balance</p>
               <p className={`text-sm font-bold ${
-                netBalance > 0 
-                  ? 'text-green-600 dark:text-green-400' 
-                  : netBalance < 0 
-                    ? 'text-red-600 dark:text-red-400' 
+                netBalance > 0
+                  ? 'text-green-600 dark:text-green-400'
+                  : netBalance < 0
+                    ? 'text-red-600 dark:text-red-400'
                     : 'text-gray-600 dark:text-gray-300'
               }`}>
                 {netBalance > 0 && '+'}
-                {formatChatCurrency(netBalance, 'INR')}
+                {formatCurrency(netBalance, primaryCurrency)}
               </p>
             </div>
           </div>

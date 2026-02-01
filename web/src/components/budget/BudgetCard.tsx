@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { formatCurrency } from '../../services/currencyService';
+import { useCurrency } from '../../context/CurrencyContext';
 import type { Budget } from '../../types/budgets';
 import { getBudgetStatus, budgetStatusColors, budgetPeriodConfig } from '../../types/budgets';
 
@@ -14,6 +15,8 @@ export const BudgetCard = memo(function BudgetCard({
   onClick,
   compact = false,
 }: BudgetCardProps) {
+  const { primaryCurrency, formatInPrimaryCurrency } = useCurrency();
+  const isDifferentCurrency = budget.currency !== primaryCurrency;
   const status = getBudgetStatus(budget);
   const colors = budgetStatusColors[status];
   const periodConfig = budgetPeriodConfig[budget.period];
@@ -116,17 +119,31 @@ export const BudgetCard = memo(function BudgetCard({
             {budget.percentUsed.toFixed(0)}%
           </span>
         </div>
+        {/* Show converted amount if different currency */}
+        {isDifferentCurrency && (
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            ≈ {formatInPrimaryCurrency(budget.amountSpent, budget.currency)} of {formatInPrimaryCurrency(budget.amount, budget.currency)}
+          </div>
+        )}
       </div>
       
       {/* Remaining amount */}
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-500 dark:text-gray-400">Remaining</span>
-        <span className={`font-semibold ${budget.amountRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {budget.amountRemaining >= 0 
-            ? formatCurrency(budget.amountRemaining, budget.currency)
-            : `-${formatCurrency(Math.abs(budget.amountRemaining), budget.currency)}`
-          }
-        </span>
+        <div className="text-right">
+          <span className={`font-semibold ${budget.amountRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {budget.amountRemaining >= 0
+              ? formatCurrency(budget.amountRemaining, budget.currency)
+              : `-${formatCurrency(Math.abs(budget.amountRemaining), budget.currency)}`
+            }
+          </span>
+          {/* Show converted remaining if different currency */}
+          {isDifferentCurrency && (
+            <div className="text-xs text-gray-400 dark:text-gray-500">
+              ≈ {formatInPrimaryCurrency(Math.abs(budget.amountRemaining), budget.currency)}
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Labels/categories */}
