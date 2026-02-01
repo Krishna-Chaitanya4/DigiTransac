@@ -430,9 +430,29 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var dayNames = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
-        // Group by day of week
+        // Helper to get the hour from TimeLocal (format "HH:mm") or fall back to Date.Hour
+        int GetTransactionHour(Transaction t) {
+            if (!string.IsNullOrEmpty(t.TimeLocal) && t.TimeLocal.Length >= 2)
+            {
+                if (int.TryParse(t.TimeLocal.Substring(0, 2), out var hour) && hour >= 0 && hour < 24)
+                    return hour;
+            }
+            // Fallback to Date.Hour for legacy transactions without TimeLocal
+            return t.Date.Hour;
+        }
+
+        // Helper to get day of week from DateLocal or fall back to Date
+        int GetTransactionDayOfWeek(Transaction t) {
+            if (!string.IsNullOrEmpty(t.DateLocal) && DateTime.TryParse(t.DateLocal, out var localDate))
+            {
+                return (int)localDate.DayOfWeek;
+            }
+            return (int)t.Date.DayOfWeek;
+        }
+
+        // Group by day of week (using DateLocal for accuracy)
         var byDayOfWeek = sendTransactions
-            .GroupBy(t => (int)t.Date.DayOfWeek)
+            .GroupBy(t => GetTransactionDayOfWeek(t))
             .Select(g => {
                 var totalAmount = g.Sum(t => _exchangeRateService.Convert(
                     t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
@@ -457,9 +477,9 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         }
         byDayOfWeek = byDayOfWeek.OrderBy(x => x.DayOfWeek).ToList();
 
-        // Group by hour of day
+        // Group by hour of day (using TimeLocal for accuracy)
         var byHourOfDay = sendTransactions
-            .GroupBy(t => t.Date.Hour)
+            .GroupBy(t => GetTransactionHour(t))
             .Select(g => {
                 var totalAmount = g.Sum(t => _exchangeRateService.Convert(
                     t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));

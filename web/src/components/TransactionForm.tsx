@@ -48,6 +48,43 @@ const getUserTimezone = (): string => {
 };
 
 /**
+ * Get the current local time in HH:mm format
+ */
+const getCurrentTime = (): string => {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+};
+
+/**
+ * Common timezone options for dropdown (sorted by offset)
+ */
+const TIMEZONE_OPTIONS = [
+  { value: 'Pacific/Honolulu', label: '(GMT-10:00) Hawaii' },
+  { value: 'America/Anchorage', label: '(GMT-09:00) Alaska' },
+  { value: 'America/Los_Angeles', label: '(GMT-08:00) Pacific Time' },
+  { value: 'America/Denver', label: '(GMT-07:00) Mountain Time' },
+  { value: 'America/Chicago', label: '(GMT-06:00) Central Time' },
+  { value: 'America/New_York', label: '(GMT-05:00) Eastern Time' },
+  { value: 'America/Sao_Paulo', label: '(GMT-03:00) São Paulo' },
+  { value: 'Atlantic/Reykjavik', label: '(GMT+00:00) Reykjavik' },
+  { value: 'Europe/London', label: '(GMT+00:00) London' },
+  { value: 'Europe/Paris', label: '(GMT+01:00) Paris' },
+  { value: 'Europe/Berlin', label: '(GMT+01:00) Berlin' },
+  { value: 'Africa/Cairo', label: '(GMT+02:00) Cairo' },
+  { value: 'Europe/Moscow', label: '(GMT+03:00) Moscow' },
+  { value: 'Asia/Dubai', label: '(GMT+04:00) Dubai' },
+  { value: 'Asia/Karachi', label: '(GMT+05:00) Karachi' },
+  { value: 'Asia/Kolkata', label: '(GMT+05:30) Mumbai, Kolkata' },
+  { value: 'Asia/Dhaka', label: '(GMT+06:00) Dhaka' },
+  { value: 'Asia/Bangkok', label: '(GMT+07:00) Bangkok' },
+  { value: 'Asia/Singapore', label: '(GMT+08:00) Singapore' },
+  { value: 'Asia/Shanghai', label: '(GMT+08:00) Shanghai' },
+  { value: 'Asia/Tokyo', label: '(GMT+09:00) Tokyo' },
+  { value: 'Australia/Sydney', label: '(GMT+10:00) Sydney' },
+  { value: 'Pacific/Auckland', label: '(GMT+12:00) Auckland' },
+];
+
+/**
  * Extract YYYY-MM-DD from a date, preferring dateLocal if available.
  * For transactions with dateLocal, we use that directly (it's the user's intended date).
  * For legacy transactions without dateLocal, we extract from the UTC date.
@@ -146,6 +183,11 @@ export function TransactionForm({
   // Split transactions state
   const [splits, setSplits] = useState<TransactionSplitRequest[]>([]);
   const [showSplits, setShowSplits] = useState(false);
+  
+  // Advanced options state (time & timezone)
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [timeLocal, setTimeLocal] = useState(getCurrentTime());
+  const [dateTimezone, setDateTimezone] = useState(getUserTimezone());
 
   // Get user's primary currency for fallback
   const { primaryCurrency } = useCurrency();
@@ -206,6 +248,12 @@ export function TransactionForm({
         setRecurrenceFrequency('Monthly');
         setRecurrenceInterval(1);
         setRecurrenceEndDate('');
+        
+        // Set time/timezone from existing transaction
+        setTimeLocal(editingTransaction.timeLocal || getCurrentTime());
+        setDateTimezone(editingTransaction.dateTimezone || getUserTimezone());
+        // Show advanced options if they were customized
+        setShowAdvancedOptions(!!editingTransaction.timeLocal || !!editingTransaction.dateTimezone);
       } else {
         // Reset to defaults for new transaction
         const categoryLabels = labels.filter(l => l.type === 'Category');
@@ -229,6 +277,11 @@ export function TransactionForm({
         setIncludeLocation(false);
         setLocation(null);
         setShowSplits(false);
+        
+        // Reset advanced options to defaults
+        setShowAdvancedOptions(false);
+        setTimeLocal(getCurrentTime());
+        setDateTimezone(getUserTimezone());
       }
     }
   }, [isOpen, editingTransaction, defaultAccountId, accounts, labels]);
@@ -296,6 +349,10 @@ export function TransactionForm({
     // Get the user's current timezone for storage
     const timezone = getUserTimezone();
     
+    // Use user-selected timezone or auto-detected one
+    const effectiveTimezone = showAdvancedOptions ? dateTimezone : timezone;
+    const effectiveTimeLocal = timeLocal;
+    
     if (editingTransaction) {
       const updateData: UpdateTransactionRequest = {
         type: apiType,
@@ -309,9 +366,10 @@ export function TransactionForm({
         location: includeLocation && location ? location : undefined,
         transferToAccountId: isTransfer ? transferToAccountId : undefined,
         accountId,
-        // Timezone-aware date fields
-        dateLocal: date,      // The YYYY-MM-DD date the user selected
-        dateTimezone: timezone, // User's current timezone
+        // Timezone-aware date/time fields
+        dateLocal: date,           // The YYYY-MM-DD date the user selected
+        timeLocal: effectiveTimeLocal, // The HH:mm time
+        dateTimezone: effectiveTimezone, // User's timezone
       };
       onSubmit(updateData);
     } else {
@@ -334,9 +392,10 @@ export function TransactionForm({
         } : undefined,
         // P2P fields (for Send/Receive with counterparty email)
         counterpartyEmail: isP2P ? effectiveCounterpartyEmail : undefined,
-        // Timezone-aware date fields
-        dateLocal: date,      // The YYYY-MM-DD date the user selected
-        dateTimezone: timezone, // User's current timezone
+        // Timezone-aware date/time fields
+        dateLocal: date,           // The YYYY-MM-DD date the user selected
+        timeLocal: effectiveTimeLocal, // The HH:mm time
+        dateTimezone: effectiveTimezone, // User's timezone
       };
       onSubmit(createData);
     }
@@ -525,24 +584,7 @@ export function TransactionForm({
                 </div>
               )}
 
-              {/* Category (Locked for self-transfers only) */}
-              {type === 'Transfer' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Category
-                  </label>
-                  <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg 
-                    bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                    <span>🔁</span>
-                    <span>Account Transfer</span>
-                    <svg className="w-4 h-4 ml-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                    </svg>
-                  </div>
-                </div>
-              )}
-
-              {/* Split Categories - Hidden for transfers */}
+              {/* Split Categories - Shown when user clicks "Split transaction" */}
               {showSplits && type !== 'Transfer' && (
                 <SplitCategoriesSection
                   splits={splits}
@@ -554,84 +596,167 @@ export function TransactionForm({
                 />
               )}
 
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                    bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                    focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Grocery shopping"
-                />
-              </div>
-
-              {/* Payee/Payer - hidden for transfers and when hidePayeeField is true */}
-              {type !== 'Transfer' && !hidePayeeField && (
+              {/* Category (Locked for self-transfers only) */}
+              {type === 'Transfer' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {type === 'Send' ? 'Payee' : 'Payer'}
+                    Category
                   </label>
-                  <input
-                    type="text"
-                    value={payee}
-                    onChange={(e) => setPayee(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={type === 'Send' ? 'e.g., Supermarket' : 'e.g., Employer'}
-                  />
+                  <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg
+                    bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                    <span>🔁</span>
+                    <span>Account Transfer</span>
+                    <svg className="w-4 h-4 ml-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                    </svg>
+                  </div>
                 </div>
               )}
 
-              {/* Tags */}
-              <TagTokenInput
-                tags={tags}
-                selectedTagIds={selectedTagIds}
-                onToggleTag={toggleTag}
-                onCreateTag={onCreateTag}
-              />
+              {/* Advanced Options Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400
+                  hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${showAdvancedOptions ? 'rotate-90' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+                Advanced options
+              </button>
 
-              {/* Location */}
-              <LocationPicker
-                location={location}
-                onChange={handleLocationChange}
-                autoCapture={isNewTransaction && autoLocationEnabled}
-              />
+              {/* Advanced Options Section */}
+              {showAdvancedOptions && (
+                <div className="space-y-4 pt-2">
+                  {/* Title */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                        focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Grocery shopping"
+                    />
+                  </div>
 
-              {/* Recurring (only for new transactions) */}
-              {isNewTransaction && (
-                <RecurringSection
-                  isRecurring={isRecurring}
-                  onIsRecurringChange={setIsRecurring}
-                  frequency={recurrenceFrequency}
-                  onFrequencyChange={setRecurrenceFrequency}
-                  interval={recurrenceInterval}
-                  onIntervalChange={setRecurrenceInterval}
-                  endDate={recurrenceEndDate}
-                  onEndDateChange={setRecurrenceEndDate}
-                />
+                  {/* Payee/Payer - hidden for transfers and when hidePayeeField is true */}
+                  {type !== 'Transfer' && !hidePayeeField && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {type === 'Send' ? 'Payee' : 'Payer'}
+                      </label>
+                      <input
+                        type="text"
+                        value={payee}
+                        onChange={(e) => setPayee(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder={type === 'Send' ? 'e.g., Supermarket' : 'e.g., Employer'}
+                      />
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  <TagTokenInput
+                    tags={tags}
+                    selectedTagIds={selectedTagIds}
+                    onToggleTag={toggleTag}
+                    onCreateTag={onCreateTag}
+                  />
+
+                  {/* Location */}
+                  <LocationPicker
+                    location={location}
+                    onChange={handleLocationChange}
+                    autoCapture={isNewTransaction && autoLocationEnabled}
+                  />
+
+                  {/* Time & Timezone */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Time
+                      </label>
+                      <input
+                        type="time"
+                        value={timeLocal}
+                        onChange={(e) => setTimeLocal(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Timezone
+                      </label>
+                      <select
+                        value={dateTimezone}
+                        onChange={(e) => setDateTimezone(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                          focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        {TIMEZONE_OPTIONS.map((tz) => (
+                          <option key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </option>
+                        ))}
+                        {/* Add current timezone if not in the list */}
+                        {!TIMEZONE_OPTIONS.find(tz => tz.value === dateTimezone) && (
+                          <option value={dateTimezone}>
+                            {dateTimezone}
+                          </option>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Recurring (only for new transactions) */}
+                  {isNewTransaction && (
+                    <RecurringSection
+                      isRecurring={isRecurring}
+                      onIsRecurringChange={setIsRecurring}
+                      frequency={recurrenceFrequency}
+                      onFrequencyChange={setRecurrenceFrequency}
+                      interval={recurrenceInterval}
+                      onIntervalChange={setRecurrenceInterval}
+                      endDate={recurrenceEndDate}
+                      onEndDateChange={setRecurrenceEndDate}
+                    />
+                  )}
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Notes
+                    </label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                        focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      placeholder="Additional notes..."
+                    />
+                  </div>
+                </div>
               )}
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                    bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                    focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                  placeholder="Additional notes..."
-                />
-              </div>
             </div>
 
             {/* Error Message */}

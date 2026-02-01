@@ -575,17 +575,21 @@ export const BudgetForm = memo(function BudgetForm({
                 </div>
               </div>
               
-              {/* Advanced options toggle */}
+              {/* Advanced options toggle - consistent styling with TransactionForm */}
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400
+                  hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
               >
-                <svg 
-                  className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} 
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                <svg
+                  className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
                 Advanced options
               </button>

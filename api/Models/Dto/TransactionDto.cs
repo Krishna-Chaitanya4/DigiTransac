@@ -39,8 +39,9 @@ public record CreateTransactionRequest(
     decimal? CounterpartyAmount,  // Optional: if different currency
     // Source (optional, defaults to Manual)
     string? Source = null,        // "Manual", "Chat", "Recurring", "Import", "Transfer"
-    // Timezone-aware date fields (for global travel support)
+    // Timezone-aware date/time fields (for global travel support & advanced options)
     string? DateLocal = null,     // "YYYY-MM-DD" - the human-intended calendar date
+    string? TimeLocal = null,     // "HH:mm" - the local time (e.g., "14:30")
     string? DateTimezone = null   // IANA timezone e.g., "Asia/Kolkata"
 );
 
@@ -57,8 +58,9 @@ public record UpdateTransactionRequest(
     string? Status,  // "Pending", "Confirmed", "Declined"
     string? TransferToAccountId,
     string? AccountId,  // Allow changing the account
-    // Timezone-aware date fields (for global travel support)
+    // Timezone-aware date/time fields (for global travel support & advanced options)
     string? DateLocal = null,     // "YYYY-MM-DD" - the human-intended calendar date
+    string? TimeLocal = null,     // "HH:mm" - the local time (e.g., "14:30")
     string? DateTimezone = null   // IANA timezone e.g., "Asia/Kolkata"
 );
 
@@ -147,8 +149,9 @@ public record TransactionResponse(
     DateTime? LastSyncedAt,  // Set when transaction was updated via P2P sync (shows "Edited" badge)
     // Chat integration
     string? ChatMessageId,  // Reference to chat message for "View in Chat" action
-    // Timezone-aware date fields (for global travel support)
+    // Timezone-aware date/time fields (for global travel support & analytics)
     string? DateLocal,      // "YYYY-MM-DD" - the human-intended calendar date (always display this if available)
+    string? TimeLocal,      // "HH:mm" - the local time (e.g., "14:30")
     string? DateTimezone    // IANA timezone e.g., "Asia/Kolkata" (original timezone at creation)
 );
 

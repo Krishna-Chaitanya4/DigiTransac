@@ -129,8 +129,9 @@ public class TransactionMapperService : ITransactionMapperService
                 : null,
             t.LastSyncedAt,
             t.ChatMessageId,
-            // Timezone-aware date fields (for global travel support)
+            // Timezone-aware date/time fields (for global travel support & analytics)
             t.DateLocal,
+            t.TimeLocal,
             t.DateTimezone);
     }
 

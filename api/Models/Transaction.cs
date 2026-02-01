@@ -131,6 +131,14 @@ public class Transaction
     public string? DateLocal { get; set; }
 
     /// <summary>
+    /// The local time in HH:mm format (e.g., "14:30").
+    /// This is the time the transaction occurred in the user's local timezone.
+    /// Combined with DateLocal and DateTimezone for accurate time reconstruction.
+    /// </summary>
+    [BsonElement("timeLocal")]
+    public string? TimeLocal { get; set; }
+
+    /// <summary>
     /// The IANA timezone identifier at the time of transaction creation (e.g., "Asia/Kolkata").
     /// Enables accurate reconstruction of local time for reporting/analytics.
     /// </summary>
