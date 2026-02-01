@@ -189,10 +189,12 @@ export const ConversationList = memo(function ConversationList({
         </div>
       </div>
 
-      {/* Resize handle */}
+      {/* Resize handle - improved visibility */}
       <div
-        className={`hidden md:flex w-3 items-center justify-center cursor-col-resize flex-shrink-0 group hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors ${
-          isResizing ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-transparent'
+        className={`hidden md:flex w-2 items-center justify-center cursor-col-resize flex-shrink-0 group transition-all relative ${
+          isResizing
+            ? 'bg-blue-200 dark:bg-blue-800/50'
+            : 'bg-gray-100 dark:bg-gray-800 hover:bg-blue-100 dark:hover:bg-blue-900/40'
         }`}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -200,11 +202,25 @@ export const ConversationList = memo(function ConversationList({
           onResizeStart();
         }}
         onDoubleClick={onResizeReset}
-        title="Drag to resize, double-click to reset"
+        title="Drag to resize • Double-click to reset"
+        aria-label="Resize sidebar"
+        role="separator"
+        aria-orientation="vertical"
       >
+        {/* Visual indicator - vertical dots */}
+        <div className="flex flex-col gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+          <div className={`w-1 h-1 rounded-full ${isResizing ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-500 group-hover:bg-blue-500'}`} />
+          <div className={`w-1 h-1 rounded-full ${isResizing ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-500 group-hover:bg-blue-500'}`} />
+          <div className={`w-1 h-1 rounded-full ${isResizing ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-500 group-hover:bg-blue-500'}`} />
+          <div className={`w-1 h-1 rounded-full ${isResizing ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-500 group-hover:bg-blue-500'}`} />
+          <div className={`w-1 h-1 rounded-full ${isResizing ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-500 group-hover:bg-blue-500'}`} />
+        </div>
+        {/* Hover/active highlight bar */}
         <div
-          className={`w-1 h-10 rounded-full transition-colors ${
-            isResizing ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600 group-hover:bg-blue-400'
+          className={`absolute inset-y-0 left-0 w-0.5 transition-opacity ${
+            isResizing
+              ? 'bg-blue-500 opacity-100'
+              : 'bg-blue-400 opacity-0 group-hover:opacity-100'
           }`}
         />
       </div>

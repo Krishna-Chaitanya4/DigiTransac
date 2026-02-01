@@ -199,9 +199,17 @@ export default function ChatsPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Sidebar resize state
-  const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_CONSTANTS.DEFAULT_WIDTH);
+  // Sidebar resize state - persist in localStorage
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('chatsSidebarWidth');
+    return saved ? parseInt(saved, 10) : SIDEBAR_CONSTANTS.DEFAULT_WIDTH;
+  });
   const [isResizing, setIsResizing] = useState(false);
+
+  // Persist sidebar width to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('chatsSidebarWidth', String(sidebarWidth));
+  }, [sidebarWidth]);
 
   // New chat modal
   const [showNewChatModal, setShowNewChatModal] = useState(false);
