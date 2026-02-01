@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
 
 // Configure Serilog
@@ -114,6 +115,8 @@ builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
 builder.Services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>();
 builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
 builder.Services.AddSingleton<IChatMessageRepository, ChatMessageRepository>();
+builder.Services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddSingleton<IBudgetRepository, BudgetRepository>();
 
 // Add HttpClient for external API calls with resilience policies (Circuit Breaker + Retry)
 // Create a logger factory for Polly to use
@@ -168,6 +171,9 @@ builder.Services.AddHealthChecks()
 // Add caching service
 builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
 
+// Add HttpContextAccessor for audit service
+builder.Services.AddHttpContextAccessor();
+
 // Add services
 builder.Services.AddSingleton<IEmailService, GmailEmailService>();
 builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
@@ -181,6 +187,9 @@ builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 
+// Add audit service for security logging
+builder.Services.AddScoped<IAuditService, AuditService>();
+
 // Transaction services - split into focused services for better maintainability
 builder.Services.AddScoped<ITransactionMapperService, TransactionMapperService>();
 builder.Services.AddScoped<IAccountBalanceService, AccountBalanceService>();
@@ -193,8 +202,13 @@ builder.Services.AddScoped<ITransactionBatchService, TransactionBatchService>();
 builder.Services.AddScoped<ITransactionCoreService, TransactionCoreService>();
 // Facade for backward compatibility with existing endpoints
 builder.Services.AddScoped<ITransactionService, TransactionServiceFacade>();
+// Transaction import service for CSV/Excel bulk imports
+builder.Services.AddScoped<ITransactionImportService, TransactionImportService>();
 
 builder.Services.AddScoped<IConversationService, ConversationService>();
+
+// Budget tracking and spending alerts
+builder.Services.AddScoped<IBudgetService, BudgetService>();
 
 // Add SignalR for real-time notifications
 builder.Services.AddSignalR(options =>
@@ -445,18 +459,83 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
     options.Level = CompressionLevel.SmallestSize;
 });
 
-// Add Swagger/OpenAPI
+// Add Swagger/OpenAPI with comprehensive documentation
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
+    // API Information
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Version = "v1",
+        Title = "DigiTransac API",
+        Description = @"
+## DigiTransac - Personal Finance Management API
+
+A comprehensive API for managing personal finances with WhatsApp-style P2P transaction tracking.
+
+### Features
+- **Authentication** - JWT-based auth with 2FA support
+- **Accounts** - Multi-currency account management
+- **Transactions** - Full CRUD with P2P, recurring, and bulk import
+- **Labels & Tags** - Hierarchical categorization
+- **Analytics** - Spending trends and insights
+- **Real-time Updates** - SignalR notifications
+- **Chat Integration** - Transaction messages with activity feed
+
+### Authentication
+All endpoints except `/api/auth/*` require JWT authentication.
+Include the token in the Authorization header: `Bearer {token}`
+
+### Rate Limits
+- General API: 100 requests/minute
+- Auth endpoints: 10 requests/minute
+- Sensitive operations: 5 requests/5 minutes
+
+### Response Codes
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request - validation error |
+| 401 | Unauthorized - invalid/expired token |
+| 403 | Forbidden - insufficient permissions |
+| 404 | Not Found |
+| 429 | Too Many Requests - rate limited |
+| 500 | Internal Server Error |
+",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "DigiTransac Support",
+            Email = "support@digitransac.app",
+            Url = new Uri("https://github.com/digitransac/api")
+        },
+        License = new Microsoft.OpenApi.Models.OpenApiLicense
+        {
+            Name = "MIT License",
+            Url = new Uri("https://opensource.org/licenses/MIT")
+        }
+    });
+
+    // Security scheme for JWT Bearer authentication
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
+        Name = "Authorization",
+        Description = @"JWT Authorization header using the Bearer scheme.
+
+Enter your token in the format: **Bearer {your_token}**
+
+Example: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+To obtain a token:
+1. Call `POST /api/auth/login` with valid credentials
+2. Copy the `accessToken` from the response
+3. Click the **Authorize** button and paste it",
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header
     });
+    
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -471,6 +550,23 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+
+    // Include XML comments for documentation
+    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
+
+    // Tag descriptions for grouping endpoints
+    c.TagActionsBy(api => new[] { api.GroupName ?? "Other" });
+    
+    // Order tags alphabetically
+    c.OrderActionsBy(api => api.RelativePath);
+    
+    // Enable annotations for endpoint metadata
+    c.EnableAnnotations();
 });
 
 var app = builder.Build();
@@ -512,8 +608,25 @@ app.UseExceptionHandler(errorApp =>
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwagger(c =>
+    {
+        c.RouteTemplate = "api-docs/{documentName}/swagger.json";
+    });
+    
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/api-docs/v1/swagger.json", "DigiTransac API v1");
+        c.RoutePrefix = "api-docs";
+        c.DocumentTitle = "DigiTransac API Documentation";
+        c.DefaultModelsExpandDepth(2);
+        c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Model);
+        c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+        c.EnableDeepLinking();
+        c.DisplayOperationId();
+        c.ShowExtensions();
+        c.EnableFilter();
+        c.EnableTryItOutByDefault();
+    });
 }
 
 // Rate limiting middleware
@@ -585,6 +698,7 @@ app.MapAccountEndpoints();
 app.MapCurrencyEndpoints();
 app.MapTransactionEndpoints();
 app.MapConversationEndpoints();
+app.MapBudgetEndpoints();
 
 // Map SignalR hub
 app.MapHub<NotificationHub>("/hubs/notifications");

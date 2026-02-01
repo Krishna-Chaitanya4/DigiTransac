@@ -56,6 +56,7 @@ public class AuthService : IAuthService
     private readonly ILabelService _labelService;
     private readonly ITwoFactorService _twoFactorService;
     private readonly IKeyManagementService _keyManagementService;
+    private readonly IAuditService _auditService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -68,6 +69,7 @@ public class AuthService : IAuthService
         ILabelService labelService,
         ITwoFactorService twoFactorService,
         IKeyManagementService keyManagementService,
+        IAuditService auditService,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
     {
@@ -79,6 +81,7 @@ public class AuthService : IAuthService
         _labelService = labelService;
         _twoFactorService = twoFactorService;
         _keyManagementService = keyManagementService;
+        _auditService = auditService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
     }
@@ -230,6 +233,10 @@ public class AuthService : IAuthService
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
             _logger.LogWarning("Failed login attempt for {Email}", request.Email);
+            
+            // Audit log for failed login
+            await _auditService.LogLoginFailedAsync(request.Email, "Invalid credentials");
+            
             return new LoginResponse(null, null, null, null, null); // Invalid credentials
         }
 
@@ -256,6 +263,9 @@ public class AuthService : IAuthService
         }
 
         _logger.LogInformation("User logged in successfully: {Email}, UserId: {UserId}", user.Email, user.Id);
+        
+        // Audit log for successful login
+        await _auditService.LogLoginSuccessAsync(user.Id, user.Email);
 
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);
@@ -283,6 +293,10 @@ public class AuthService : IAuthService
         if (!_twoFactorService.ValidateCode(user.TwoFactorSecret, code))
         {
             _logger.LogWarning("Invalid 2FA code for user {UserId}", user.Id);
+            
+            // Audit log for failed 2FA verification
+            await _auditService.LogTwoFactorVerificationAsync(user.Id, user.Email, success: false);
+            
             return null;
         }
 
@@ -290,6 +304,9 @@ public class AuthService : IAuthService
         await _twoFactorTokenRepository.MarkAsUsedAsync(twoFactorToken.Id);
 
         _logger.LogInformation("2FA login successful for user {Email}", user.Email);
+        
+        // Audit log for successful 2FA login
+        await _auditService.LogLoginSuccessAsync(user.Id, user.Email);
 
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);
@@ -345,11 +362,20 @@ public class AuthService : IAuthService
         if (string.IsNullOrEmpty(twoFactorToken.EmailOtpCode) || twoFactorToken.EmailOtpCode != emailCode)
         {
             _logger.LogWarning("Invalid email OTP code for user {UserId}", twoFactorToken.UserId);
+            
+            // Audit log for failed email OTP
+            await _auditService.LogAsync(
+                AuditAction.TwoFactorFailed,
+                AuditCategory.TwoFactor,
+                success: false,
+                description: "Invalid email OTP code",
+                userId: twoFactorToken.UserId);
+            
             return null;
         }
 
         // Check if email OTP has expired (10 minutes)
-        if (twoFactorToken.EmailOtpSentAt == null || 
+        if (twoFactorToken.EmailOtpSentAt == null ||
             DateTime.UtcNow - twoFactorToken.EmailOtpSentAt.Value > TimeSpan.FromMinutes(10))
         {
             _logger.LogWarning("Email OTP expired for user {UserId}", twoFactorToken.UserId);
@@ -366,6 +392,9 @@ public class AuthService : IAuthService
         await _twoFactorTokenRepository.MarkAsUsedAsync(twoFactorToken.Id);
 
         _logger.LogInformation("2FA email OTP login successful for user {Email}", user.Email);
+        
+        // Audit log for successful 2FA email OTP login
+        await _auditService.LogLoginSuccessAsync(user.Id, user.Email);
 
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);
@@ -395,6 +424,16 @@ public class AuthService : IAuthService
         if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
         {
             _logger.LogWarning("Delete account failed - invalid password for UserId: {UserId}", userId);
+            
+            // Audit log for failed account deletion attempt
+            await _auditService.LogAsync(
+                AuditAction.AccountDeleted,
+                AuditCategory.AccountManagement,
+                success: false,
+                description: "Account deletion attempt failed - invalid password",
+                userId: userId,
+                userEmail: userEmail);
+            
             return (false, "Invalid password");
         }
 
@@ -424,6 +463,10 @@ public class AuthService : IAuthService
         }
 
         _logger.LogInformation("Account deleted successfully: {Email}", userEmail);
+        
+        // Audit log for successful account deletion
+        await _auditService.LogAccountDeletedAsync(userId, userEmail);
+        
         return (true, "Account deleted successfully");
     }
 
@@ -562,6 +605,10 @@ public class AuthService : IAuthService
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
         {
             _logger.LogWarning("Password change failed - incorrect current password for UserId: {UserId}", userId);
+            
+            // Audit log for failed password change
+            await _auditService.LogPasswordChangeAsync(userId, user.Email, false, "Incorrect current password");
+            
             return (false, "Current password is incorrect");
         }
 
@@ -585,6 +632,10 @@ public class AuthService : IAuthService
         await _userRepository.UpdateAsync(user);
 
         _logger.LogInformation("Password changed successfully for UserId: {UserId}", userId);
+        
+        // Audit log for successful password change
+        await _auditService.LogPasswordChangeAsync(userId, user.Email, true);
+        
         return (true, "Password changed successfully");
     }
 
@@ -702,6 +753,16 @@ public class AuthService : IAuthService
         await _emailVerificationRepository.DeleteByEmailAsync(request.Email, VerificationPurpose.PasswordReset);
 
         _logger.LogInformation("Password reset successfully for {Email}", request.Email);
+        
+        // Audit log for password reset
+        await _auditService.LogAsync(
+            AuditAction.PasswordReset,
+            AuditCategory.AccountManagement,
+            success: true,
+            description: "Password reset via email verification",
+            userId: user.Id,
+            userEmail: user.Email);
+        
         return (true, "Password reset successfully");
     }
 

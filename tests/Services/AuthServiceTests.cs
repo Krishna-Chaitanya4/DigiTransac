@@ -20,6 +20,7 @@ public class AuthServiceTests
     private readonly Mock<ILabelService> _labelServiceMock;
     private readonly Mock<ITwoFactorService> _twoFactorServiceMock;
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
+    private readonly Mock<IAuditService> _auditServiceMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
     private readonly AuthService _authService;
@@ -35,6 +36,7 @@ public class AuthServiceTests
         _labelServiceMock = new Mock<ILabelService>();
         _twoFactorServiceMock = new Mock<ITwoFactorService>();
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
+        _auditServiceMock = new Mock<IAuditService>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
         {
@@ -66,6 +68,7 @@ public class AuthServiceTests
             _labelServiceMock.Object,
             _twoFactorServiceMock.Object,
             _keyManagementServiceMock.Object,
+            _auditServiceMock.Object,
             _jwtSettings,
             _loggerMock.Object
         );

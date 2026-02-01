@@ -78,8 +78,9 @@ public static class ResultExtensions
     }
 
     /// <summary>
-    /// Converts a Result<T> to an IResult for Minimal API responses.
+    /// Converts a Result with value to an IResult for Minimal API responses.
     /// </summary>
+    /// <typeparam name="T">The type of the value in the result.</typeparam>
     public static IResult ToApiResult<T>(this Result<T> result)
     {
         if (result.IsSuccess)
@@ -89,8 +90,9 @@ public static class ResultExtensions
     }
 
     /// <summary>
-    /// Converts a Result<T> to an IResult with a custom success mapper.
+    /// Converts a Result with value to an IResult using a custom success mapper.
     /// </summary>
+    /// <typeparam name="T">The type of the value in the result.</typeparam>
     public static IResult ToApiResult<T>(this Result<T> result, Func<T, IResult> successMapper)
     {
         if (result.IsSuccess)
@@ -190,8 +192,9 @@ public static class LegacyResultAdapter
     }
 
     /// <summary>
-    /// Converts a legacy (bool, string, T?) tuple to a Result<T>
+    /// Converts a legacy (bool, string, T?) tuple to a Result with value.
     /// </summary>
+    /// <typeparam name="T">The type of the value in the result.</typeparam>
     public static Result<T> ToResult<T>(this (bool Success, string Message, T? Value) legacy)
         where T : class
     {

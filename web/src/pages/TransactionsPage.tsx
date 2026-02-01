@@ -2,6 +2,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
+import { AddTransactionSheet } from '../components/AddTransactionSheet';
 import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
 import { PendingIndicator } from '../components/PendingIndicator';
@@ -10,9 +11,9 @@ import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import { useCurrency } from '../context/CurrencyContext';
-import { 
-  DatePreset, 
-  getDateRangeForPreset, 
+import {
+  DatePreset,
+  getDateRangeForPreset,
   formatDateForInput,
   formatDateToStartOfDay,
   formatDateToEndOfDay,
@@ -34,6 +35,7 @@ import {
   useBatchMarkPending,
   useInvalidateTransactions,
 } from '../hooks';
+import { useConversations } from '../hooks';
 import { exportTransactions } from '../services/transactionService';
 import { logger } from '../services/logger';
 import type {
@@ -76,9 +78,15 @@ export default function TransactionsPage() {
   // Toast notifications
   const { showInfo, toasts, dismissToast } = useToast();
   
+  // Conversations for contact picker in AddTransactionSheet
+  const { data: conversationsData } = useConversations();
+  const conversations = conversationsData?.conversations ?? [];
+  
   // UI state
   const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [addSheetMode, setAddSheetMode] = useState<'dropdown' | 'modal'>('dropdown');
   const [pendingRefreshTrigger, setPendingRefreshTrigger] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -104,6 +112,7 @@ export default function TransactionsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   // Get current date range based on preset
   const getDateRange = useCallback((): { startDate: string; endDate: string } => {
@@ -234,7 +243,7 @@ export default function TransactionsPage() {
     shortcuts: [
       {
         key: 'n',
-        handler: () => setIsFormOpen(true),
+        handler: () => setIsAddSheetOpen(true),
         description: 'New transaction',
       },
       {
@@ -735,11 +744,18 @@ export default function TransactionsPage() {
           />
           
           <button
-            onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg 
-              hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 transition-colors font-medium"
+            ref={addButtonRef}
+            onClick={() => {
+              setAddSheetMode('dropdown');
+              setIsAddSheetOpen(prev => !prev);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium ${
+              isAddSheetOpen && addSheetMode === 'dropdown'
+                ? 'bg-blue-700 dark:bg-blue-800 text-white ring-2 ring-blue-300 dark:ring-blue-600'
+                : 'bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900'
+            }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-5 h-5 transition-transform ${isAddSheetOpen && addSheetMode === 'dropdown' ? 'rotate-45' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Add Transaction
@@ -942,8 +958,11 @@ export default function TransactionsPage() {
       {/* Floating Action Button (Mobile) */}
       {!hasSelection && (
         <button
-          onClick={() => setIsFormOpen(true)}
-          className="sm:hidden fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-full 
+          onClick={() => {
+            setAddSheetMode('modal');
+            setIsAddSheetOpen(true);
+          }}
+          className="sm:hidden fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-full
             shadow-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 transition-colors flex items-center justify-center z-40"
         >
           <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -974,6 +993,16 @@ export default function TransactionsPage() {
             return null;
           }
         }}
+      />
+      
+      {/* Add Transaction Sheet - Dropdown for desktop, Modal for mobile FAB */}
+      <AddTransactionSheet
+        isOpen={isAddSheetOpen}
+        onClose={() => setIsAddSheetOpen(false)}
+        accounts={accounts}
+        conversations={conversations}
+        anchorRef={addSheetMode === 'dropdown' ? addButtonRef : undefined}
+        mode={addSheetMode}
       />
       
       {/* Toast notifications */}

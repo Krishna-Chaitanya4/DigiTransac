@@ -142,4 +142,12 @@ export const queryKeys = {
     profile: ['user', 'profile'] as const,
     settings: ['user', 'settings'] as const,
   },
+  // Budgets
+  budgets: {
+    all: ['budgets'] as const,
+    summary: (activeOnly = true) => ['budgets', 'summary', { activeOnly }] as const,
+    detail: (id: string) => ['budgets', 'detail', id] as const,
+    breakdown: (id: string) => ['budgets', 'breakdown', id] as const,
+    notifications: (unreadOnly = false) => ['budgets', 'notifications', { unreadOnly }] as const,
+  },
 };

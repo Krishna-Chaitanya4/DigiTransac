@@ -135,6 +135,19 @@ public interface INotificationService
     /// Send a chat message notification
     /// </summary>
     Task NotifyChatMessageAsync(string userId1, string userId2, ChatMessageNotification notification);
+    
+    /// <summary>
+    /// Send a budget alert notification when spending threshold is crossed
+    /// </summary>
+    Task SendBudgetAlertAsync(
+        string userId,
+        string budgetId,
+        string budgetName,
+        int thresholdPercent,
+        decimal actualPercent,
+        decimal amountSpent,
+        decimal budgetAmount,
+        string currency);
 }
 
 public class NotificationService : INotificationService
@@ -199,6 +212,31 @@ public class NotificationService : INotificationService
         var recipientId = notification.SenderId == userId1 ? userId2 : userId1;
         await NotifyUserAsync(recipientId, "NewChatMessage", notification);
     }
+    
+    public async Task SendBudgetAlertAsync(
+        string userId,
+        string budgetId,
+        string budgetName,
+        int thresholdPercent,
+        decimal actualPercent,
+        decimal amountSpent,
+        decimal budgetAmount,
+        string currency)
+    {
+        var notification = new BudgetAlertNotification(
+            BudgetId: budgetId,
+            BudgetName: budgetName,
+            ThresholdPercent: thresholdPercent,
+            ActualPercent: actualPercent,
+            AmountSpent: amountSpent,
+            BudgetAmount: budgetAmount,
+            Currency: currency,
+            AlertedAt: DateTime.UtcNow);
+            
+        await NotifyUserAsync(userId, "BudgetAlert", notification);
+        _logger.LogInformation("Sent budget alert for {BudgetName} ({Threshold}%) to user {UserId}",
+            budgetName, thresholdPercent, userId);
+    }
 }
 
 #region Notification DTOs
@@ -238,6 +276,20 @@ public record ChatMessageNotification(
 /// </summary>
 public record PendingCountNotification(
     int PendingCount
+);
+
+/// <summary>
+/// Notification payload for budget alerts
+/// </summary>
+public record BudgetAlertNotification(
+    string BudgetId,
+    string BudgetName,
+    int ThresholdPercent,
+    decimal ActualPercent,
+    decimal AmountSpent,
+    decimal BudgetAmount,
+    string Currency,
+    DateTime AlertedAt
 );
 
 #endregion

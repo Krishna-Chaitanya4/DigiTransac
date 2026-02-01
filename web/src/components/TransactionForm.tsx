@@ -82,6 +82,7 @@ interface TransactionFormProps {
   labels: Label[];
   tags: Tag[];
   defaultAccountId?: string;
+  defaultType?: TransactionUIType;
   isLoading: boolean;
   autoLocationEnabled?: boolean;
   error?: string | null;
@@ -102,6 +103,7 @@ export function TransactionForm({
   labels,
   tags,
   defaultAccountId,
+  defaultType,
   isLoading,
   autoLocationEnabled = true,
   error,
@@ -202,7 +204,8 @@ export function TransactionForm({
       } else {
         // Reset to defaults for new transaction
         const categoryLabels = labels.filter(l => l.type === 'Category');
-        setType('Send');
+        // Use defaultType if provided, otherwise 'Send'
+        setType(defaultType || 'Send');
         setAccountId(defaultAccountId || accounts[0]?.id || '');
         setAmount(0);
         setDate(toDateString(new Date(), undefined));

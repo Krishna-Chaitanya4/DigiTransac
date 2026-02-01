@@ -84,12 +84,23 @@ export default function ChatsPage() {
   
   // State for pending message scroll (from deep link)
   const [pendingScrollMessageId, setPendingScrollMessageId] = useState<string | null>(null);
+  
+  // State for pending transaction form open (from AddTransactionSheet navigation)
+  const [pendingTransactionAction, setPendingTransactionAction] = useState<{
+    type?: 'Send' | 'Receive' | 'Transfer';
+    fromAccount?: string;
+    toAccount?: string;
+  } | null>(null);
 
   // Handle URL params for deep linking
   useEffect(() => {
     const userParam = searchParams.get('user');
     const selfParam = searchParams.get('self');
     const messageIdParam = searchParams.get('messageId');
+    const actionParam = searchParams.get('action');
+    const typeParam = searchParams.get('type');
+    const fromAccountParam = searchParams.get('fromAccount');
+    const toAccountParam = searchParams.get('toAccount');
     
     if (userParam) {
       // Navigate to specific user's chat
@@ -98,9 +109,17 @@ export default function ChatsPage() {
       if (messageIdParam) {
         setPendingScrollMessageId(messageIdParam);
       }
+      // Handle transaction action from AddTransactionSheet
+      if (actionParam === 'transaction') {
+        setPendingTransactionAction({
+          type: typeParam as 'Send' | 'Receive' | undefined,
+          fromAccount: fromAccountParam || undefined,
+          toAccount: toAccountParam || undefined,
+        });
+      }
       // Clear the param after use
       setSearchParams({}, { replace: true });
-    } else if (selfParam === 'true' && conversations.length > 0) {
+    } else if (selfParam === 'true') {
       // Navigate to self-chat (personal transactions)
       // Find the self-chat conversation from the list
       const selfChat = conversations.find(c => c.isSelfChat);
@@ -110,6 +129,17 @@ export default function ChatsPage() {
         if (messageIdParam) {
           setPendingScrollMessageId(messageIdParam);
         }
+        // Handle transaction action from AddTransactionSheet
+        if (actionParam === 'transaction') {
+          setPendingTransactionAction({
+            type: typeParam as 'Send' | 'Receive' | 'Transfer' | undefined,
+            fromAccount: fromAccountParam || undefined,
+            toAccount: toAccountParam || undefined,
+          });
+        }
+      } else if (conversations.length === 0) {
+        // Wait for conversations to load - will re-trigger when they're available
+        return;
       }
       // Clear the param after use
       setSearchParams({}, { replace: true });
@@ -123,6 +153,20 @@ export default function ChatsPage() {
 
   // Use pending conversation for new chats, or the fetched data
   const selectedConversation = pendingConversation || conversationData || null;
+
+  // Track the default type for the transaction form
+  const [formDefaultType, setFormDefaultType] = useState<'Send' | 'Receive' | 'Transfer' | undefined>(undefined);
+
+  // Open transaction form when pending action and conversation is ready
+  useEffect(() => {
+    if (pendingTransactionAction && selectedConversation) {
+      // Set the default type from the pending action
+      setFormDefaultType(pendingTransactionAction.type);
+      setShowTransactionForm(true);
+      // Clear the pending action after opening
+      setPendingTransactionAction(null);
+    }
+  }, [pendingTransactionAction, selectedConversation]);
 
   // Mutations
   const sendMessageMutation = useOptimisticSendMessage();
@@ -628,12 +672,14 @@ export default function ChatsPage() {
         onClose={() => {
           setShowTransactionForm(false);
           setTransactionFormError(null);
+          setFormDefaultType(undefined);
         }}
         onSubmit={handleTransactionSubmit}
         editingTransaction={null}
         accounts={accounts}
         labels={labels}
         tags={tags}
+        defaultType={formDefaultType}
         isLoading={createTransactionMutation.isPending}
         error={transactionFormError}
         hideRecipientField={true}

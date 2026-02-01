@@ -68,6 +68,20 @@ export {
   conversationKeys,
 } from './useConversationQueries';
 
+// Budget queries
+export {
+  useBudgets,
+  useBudget,
+  useBudgetBreakdown,
+  useBudgetNotifications,
+  useCreateBudget,
+  useUpdateBudget,
+  useDeleteBudget,
+  useMarkNotificationAsRead,
+  useMarkAllNotificationsAsRead,
+  useInvalidateBudgets,
+} from './useBudgetQueries';
+
 // Other hooks
 export { useBulkSelection } from './useBulkSelection';
 export { useFocusTrap } from './useFocusTrap';

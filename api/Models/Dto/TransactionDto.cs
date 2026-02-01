@@ -249,3 +249,81 @@ public record AveragesByType(
     decimal AverageDebit,
     decimal AverageTransfer
 );
+
+// Import DTOs
+public record ImportTransactionRequest(
+    string Type,           // "Receive" or "Send"
+    decimal Amount,
+    string Date,           // YYYY-MM-DD format
+    string? Title,
+    string? Payee,
+    string? Notes,
+    string? LabelName,     // Label name for auto-mapping
+    List<string>? TagNames // Tag names for auto-mapping
+);
+
+public record BulkImportRequest(
+    string AccountId,
+    List<ImportTransactionRequest> Transactions,
+    bool CreateMissingLabels = false,  // Auto-create labels that don't exist
+    bool CreateMissingTags = false,    // Auto-create tags that don't exist
+    bool SkipDuplicates = true,        // Skip transactions with same date/amount/payee
+    string? DateTimezone = null        // IANA timezone for all imported transactions
+);
+
+public record ImportResult(
+    int RowNumber,
+    bool Success,
+    string? TransactionId,
+    string? Error
+);
+
+public record BulkImportResponse(
+    int TotalRows,
+    int SuccessCount,
+    int FailedCount,
+    int SkippedDuplicates,
+    List<ImportResult> Results,
+    List<string> CreatedLabels,
+    List<string> CreatedTags
+);
+
+public record ImportPreviewRequest(
+    string AccountId,
+    List<ImportTransactionRequest> Transactions,
+    bool CreateMissingLabels = false,
+    bool CreateMissingTags = false,
+    bool SkipDuplicates = true
+);
+
+// CSV parsing request (for raw CSV/Base64 input)
+public record CsvParseRequest(
+    string AccountId,
+    string? CsvContent,             // Raw CSV text content
+    string? Base64Content,          // Base64 encoded file content (for Excel/binary)
+    bool HasHeaderRow = true,       // Whether CSV has header row
+    string? DateFormat = null,      // Expected date format (optional, auto-detect if null)
+    bool CreateMissingLabels = false,
+    bool CreateMissingTags = false,
+    bool SkipDuplicates = true
+);
+
+public record ImportPreviewResponse(
+    int TotalRows,
+    int ValidRows,
+    int InvalidRows,
+    int DuplicateRows,
+    List<ImportPreviewRow> Rows,
+    List<string> MissingLabels,
+    List<string> MissingTags
+);
+
+public record ImportPreviewRow(
+    int RowNumber,
+    bool IsValid,
+    bool IsDuplicate,
+    ImportTransactionRequest Data,
+    string? LabelId,         // Mapped label ID (null if not found)
+    List<string> TagIds,     // Mapped tag IDs
+    List<string> Errors      // Validation errors
+);

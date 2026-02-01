@@ -5,6 +5,18 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { SearchableFolderDropdown } from './SearchableFolderDropdown';
 import { getDescendantIds } from './utils';
 
+// Preset colors (matching AccountModal style)
+const PRESET_COLORS = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+];
+
 interface LabelModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -171,10 +183,24 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
                 />
               </div>
 
+              {/* Color - with preset colors like AccountModal */}
               <div>
-                <label htmlFor="color" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Color
                 </label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {PRESET_COLORS.map((presetColor) => (
+                    <button
+                      key={presetColor}
+                      type="button"
+                      onClick={() => setColor(presetColor)}
+                      className={`w-8 h-8 rounded-full border-2 transition-transform ${
+                        color === presetColor ? 'border-gray-900 dark:border-gray-100 scale-110' : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: presetColor }}
+                    />
+                  ))}
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -183,20 +209,13 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
                     onChange={(e) => setColor(e.target.value)}
                     className="w-10 h-10 p-1 border border-gray-300 dark:border-gray-600 rounded cursor-pointer"
                   />
-                  <input
-                    type="text"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    placeholder="#6b7280"
-                  />
                   {color && (
                     <button
                       type="button"
                       onClick={() => setColor('')}
-                      className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     >
-                      Clear
+                      Use default
                     </button>
                   )}
                 </div>

@@ -52,8 +52,7 @@ public class ChatMessage
     public string? Content { get; set; }
 
     /// <summary>
-    /// <summary>
-    /// Reference to transaction (for Transaction type messages)
+    /// Reference to transaction (for Transaction type messages).
     /// All transaction data (amount, currency, status, source, etc.) is fetched from Transaction.
     /// </summary>
     [BsonElement("transactionId")]
