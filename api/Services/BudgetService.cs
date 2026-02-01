@@ -438,9 +438,59 @@ public class BudgetService : IBudgetService
     {
         var (periodStart, periodEnd) = GetCurrentPeriodDates(budget);
         var transactions = await GetBudgetTransactionsAsync(userId, budget, periodStart, periodEnd);
-        var amountSpent = transactions.Sum(t => t.Amount);
-        var amountRemaining = budget.Amount - amountSpent;
-        var percentUsed = budget.Amount > 0 ? Math.Round((amountSpent / budget.Amount) * 100, 1) : 0;
+        
+        // Get accounts to determine transaction currencies
+        var accounts = await _accountRepository.GetByUserIdAsync(userId);
+        var accountDict = accounts.ToDictionary(a => a.Id);
+        
+        // Get exchange rates for currency conversion
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse?.Rates ?? new Dictionary<string, decimal>();
+        
+        // Get user's primary currency for display
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        
+        // Group transactions by account currency and calculate spending
+        var spendingByCurrency = new Dictionary<string, BudgetCurrencyBreakdown>();
+        decimal totalSpentInBudgetCurrency = 0;
+        
+        foreach (var transaction in transactions)
+        {
+            // Get the account's currency for this transaction
+            var transactionCurrency = !string.IsNullOrEmpty(transaction.AccountId)
+                && accountDict.TryGetValue(transaction.AccountId, out var account)
+                ? account.Currency
+                : budget.Currency;
+            
+            // Convert transaction amount to budget currency
+            var amountInBudgetCurrency = _exchangeRateService.Convert(
+                transaction.Amount, transactionCurrency, budget.Currency, rates);
+            
+            totalSpentInBudgetCurrency += amountInBudgetCurrency;
+            
+            // Track by currency
+            if (spendingByCurrency.TryGetValue(transactionCurrency, out var existing))
+            {
+                spendingByCurrency[transactionCurrency] = existing with
+                {
+                    OriginalAmount = existing.OriginalAmount + transaction.Amount,
+                    ConvertedAmount = existing.ConvertedAmount + amountInBudgetCurrency,
+                    TransactionCount = existing.TransactionCount + 1
+                };
+            }
+            else
+            {
+                spendingByCurrency[transactionCurrency] = new BudgetCurrencyBreakdown(
+                    OriginalAmount: transaction.Amount,
+                    ConvertedAmount: amountInBudgetCurrency,
+                    TransactionCount: 1
+                );
+            }
+        }
+        
+        var amountRemaining = budget.Amount - totalSpentInBudgetCurrency;
+        var percentUsed = budget.Amount > 0 ? Math.Round((totalSpentInBudgetCurrency / budget.Amount) * 100, 1) : 0;
         var daysRemaining = Math.Max(0, (periodEnd.Date - DateTime.UtcNow.Date).Days);
 
         // Get label and account info for display
@@ -450,11 +500,13 @@ public class BudgetService : IBudgetService
             .Select(l => new LabelInfo(l.Id, l.Name, l.Color, l.Icon))
             .ToList();
 
-        var accounts = await _accountRepository.GetByUserIdAsync(userId);
         var accountInfos = accounts
             .Where(a => budget.AccountIds.Contains(a.Id))
             .Select(a => new AccountInfo(a.Id, a.Name, a.Currency))
             .ToList();
+        
+        // Only include currency breakdown if there are multiple currencies
+        var currencyBreakdown = spendingByCurrency.Count > 1 ? spendingByCurrency : null;
 
         return new BudgetResponse(
             Id: budget.Id,
@@ -474,13 +526,15 @@ public class BudgetService : IBudgetService
             IsActive: budget.IsActive,
             Color: budget.Color,
             Icon: budget.Icon,
-            AmountSpent: amountSpent,
+            AmountSpent: totalSpentInBudgetCurrency,
             AmountRemaining: amountRemaining,
             PercentUsed: percentUsed,
             PeriodStart: periodStart,
             PeriodEnd: periodEnd,
             DaysRemaining: daysRemaining,
-            IsOverBudget: amountSpent > budget.Amount,
+            IsOverBudget: totalSpentInBudgetCurrency > budget.Amount,
+            SpendingByCurrency: currencyBreakdown,
+            PrimaryCurrency: primaryCurrency,
             CreatedAt: budget.CreatedAt,
             UpdatedAt: budget.UpdatedAt
         );

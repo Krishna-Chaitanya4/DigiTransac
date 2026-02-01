@@ -22,6 +22,16 @@ export interface AccountInfo {
   currency: string;
 }
 
+/**
+ * Currency breakdown for budget spending.
+ * Shows original amount in each currency and converted amount to budget currency.
+ */
+export interface BudgetCurrencyBreakdown {
+  originalAmount: number;     // Amount in this currency
+  convertedAmount: number;    // Amount converted to budget currency
+  transactionCount: number;   // Number of transactions in this currency
+}
+
 export interface Budget {
   id: string;
   name: string;
@@ -47,6 +57,9 @@ export interface Budget {
   periodEnd: string;
   daysRemaining: number;
   isOverBudget: boolean;
+  // Multi-currency support
+  spendingByCurrency?: Record<string, BudgetCurrencyBreakdown>;  // Only present if multiple currencies
+  primaryCurrency?: string;   // User's primary currency for conversion display
   createdAt: string;
   updatedAt: string;
 }

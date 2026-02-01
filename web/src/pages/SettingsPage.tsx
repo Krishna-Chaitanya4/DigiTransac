@@ -4,13 +4,14 @@ import { useTheme } from '../context/ThemeContext';
 import { logger } from '../services/logger';
 import TwoFactorSettings from '../components/TwoFactorSettings';
 import { useFocusTrap } from '../hooks/useFocusTrap';
-import { 
-  getSupportedCurrencies, 
-  getCurrencyPreference, 
-  updateCurrencyPreference, 
+import {
+  getSupportedCurrencies,
+  getCurrencyPreference,
+  updateCurrencyPreference,
   getCurrencySymbol,
-  Currency 
+  Currency
 } from '../services/currencyService';
+import { invalidateCurrencyDependentQueries } from '../lib/queryClient';
 
 export default function SettingsPage() {
   const { user, logoutAll, deleteAccount, updateName, updatePrimaryCurrency, sendEmailChangeCode, verifyEmailChange } = useAuth();
@@ -87,6 +88,9 @@ export default function SettingsPage() {
       await updateCurrencyPreference(currency);
       setPrimaryCurrency(currency);
       updatePrimaryCurrency(currency); // Update AuthContext so CurrencyContext gets the new value
+      // Invalidate all queries that depend on the primary currency
+      // This ensures pages like Insights, Budgets, and Chats will refetch with converted amounts
+      invalidateCurrencyDependentQueries();
       setIsCurrencyDropdownOpen(false);
       setCurrencySearch('');
     } catch (err) {

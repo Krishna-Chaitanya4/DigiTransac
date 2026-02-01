@@ -9,7 +9,7 @@ import {
 } from '../hooks';
 import { BudgetForm } from '../components/budget';
 import { useCurrency } from '../context/CurrencyContext';
-import { formatCurrency } from '../services/currencyService';
+import { formatCurrency, getCurrencySymbol } from '../services/currencyService';
 import type { Budget, CreateBudgetRequest, UpdateBudgetRequest } from '../types/budgets';
 import { getBudgetStatus, budgetStatusColors, budgetPeriodConfig } from '../types/budgets';
 
@@ -132,6 +132,41 @@ function BudgetCardWithActions({
           )}
         </div>
       </div>
+      
+      {/* Currency breakdown - only shown when multiple currencies exist */}
+      {budget.spendingByCurrency && Object.keys(budget.spendingByCurrency).length > 1 && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Spending by Currency</p>
+          <div className="space-y-1.5">
+            {Object.entries(budget.spendingByCurrency).map(([code, breakdown]) => {
+              const isBudgetCurrency = code === budget.currency;
+              return (
+                <div key={code} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">{getCurrencySymbol(code)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">{code}</span>
+                    {isBudgetCurrency && (
+                      <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1 rounded">
+                        Budget
+                      </span>
+                    )}
+                  </span>
+                  <div className="text-right">
+                    <span className="text-gray-700 dark:text-gray-300">
+                      {formatCurrency(breakdown.originalAmount, code)}
+                    </span>
+                    {!isBudgetCurrency && (
+                      <span className="text-gray-400 dark:text-gray-500 ml-1">
+                        (≈ {formatCurrency(breakdown.convertedAmount, budget.currency)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       
       {/* Labels/categories */}
       {budget.labels.length > 0 && (

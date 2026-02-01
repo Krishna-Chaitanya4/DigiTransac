@@ -3,6 +3,8 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useCurrency } from '../../context/CurrencyContext';
 import { EmojiPickerInput } from '../EmojiPickerInput';
 import { DatePicker } from '../DatePicker';
+import { CurrencyDropdown } from '../CurrencyDropdown';
+import { getCurrencySymbol } from '../../services/currencyService';
 import type { Budget, BudgetPeriod, CreateBudgetRequest, UpdateBudgetRequest, BudgetAlertRequest } from '../../types/budgets';
 import { defaultAlerts } from '../../types/budgets';
 import type { Label } from '../../types/labels';
@@ -299,29 +301,38 @@ export const BudgetForm = memo(function BudgetForm({
                 />
               </div>
               
-              {/* Amount */}
+              {/* Amount and Currency */}
               <div>
                 <label htmlFor="budget-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Budget Amount *
                 </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                    {currency}
-                  </span>
-                  <input
-                    id="budget-amount"
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className="w-full pl-12 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
+                <div className="flex gap-2">
+                  <CurrencyDropdown
+                    currency={currency}
+                    onChange={setCurrency}
                   />
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                      {getCurrencySymbol(currency)}
+                    </span>
+                    <input
+                      id="budget-amount"
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                        focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
                 </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Select the currency for this budget. Transactions in other currencies will be converted.
+                </p>
               </div>
               
               {/* Period Selection - Visual buttons like AccountModal type selection */}

@@ -111,6 +111,7 @@ export const queryKeys = {
     summary: (filters: object) => ['transactions', 'summary', filters] as const,
     pendingCount: ['transactions', 'pendingCount'] as const,
     counterparties: ['transactions', 'counterparties'] as const,
+    analytics: ['transactions', 'analytics'] as const,
   },
   // Accounts
   accounts: {
@@ -150,4 +151,38 @@ export const queryKeys = {
     breakdown: (id: string) => ['budgets', 'breakdown', id] as const,
     notifications: (unreadOnly = false) => ['budgets', 'notifications', { unreadOnly }] as const,
   },
+  // Conversations (chats)
+  conversations: {
+    all: ['conversations'] as const,
+  },
 };
+
+/**
+ * Invalidate all queries that depend on the user's primary currency.
+ * Call this when the primary currency is changed in Settings.
+ *
+ * Uses refetchType: 'all' to force immediate refetch of any active queries,
+ * and also refetches inactive queries when they become active again.
+ */
+export function invalidateCurrencyDependentQueries() {
+  // These queries return data with amounts converted to user's primary currency
+  // Use refetchType: 'all' to force immediate refetch of active queries
+  const invalidateOptions = { refetchType: 'all' as const };
+  
+  // Accounts - balances may be displayed in primary currency
+  queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateOptions });
+  
+  // Transactions - analytics and summary show currency-converted totals
+  queryClient.invalidateQueries({ queryKey: queryKeys.transactions.analytics, ...invalidateOptions });
+  // Invalidate all transaction summaries regardless of filter params
+  queryClient.invalidateQueries({
+    queryKey: ['transactions', 'summary'],
+    ...invalidateOptions
+  });
+  
+  // Budgets - summary totals are converted to primary currency
+  queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateOptions });
+  
+  // Conversations/Chats - message totals may show converted amounts
+  queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all, ...invalidateOptions });
+}

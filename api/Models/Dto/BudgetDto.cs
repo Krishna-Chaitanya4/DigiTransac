@@ -80,15 +80,28 @@ public record BudgetResponse(
     string? Color,
     string? Icon,
     // Computed fields
-    decimal AmountSpent,         // Total spent in current period
+    decimal AmountSpent,         // Total spent in current period (in budget currency)
     decimal AmountRemaining,     // Amount remaining in budget
     decimal PercentUsed,         // Percentage of budget used (0-100+)
     DateTime PeriodStart,        // Current period start date
     DateTime PeriodEnd,          // Current period end date
     int DaysRemaining,           // Days left in current period
     bool IsOverBudget,           // True if spending exceeds budget
+    // Multi-currency support
+    Dictionary<string, BudgetCurrencyBreakdown>? SpendingByCurrency, // Breakdown by currency (null if single currency)
+    string? PrimaryCurrency,     // User's primary currency for conversion display
     DateTime CreatedAt,
     DateTime UpdatedAt
+);
+
+/// <summary>
+/// Currency breakdown for budget spending
+/// Shows original amount in each currency and converted amount to budget currency
+/// </summary>
+public record BudgetCurrencyBreakdown(
+    decimal OriginalAmount,      // Amount in this currency
+    decimal ConvertedAmount,     // Amount converted to budget currency
+    int TransactionCount         // Number of transactions in this currency
 );
 
 /// <summary>
