@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { formatCurrency } from '../services/currencyService';
-import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels } from '../hooks';
+import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies } from '../hooks';
 import { BudgetCard } from '../components/budget';
 import { getDateRangeForPreset, formatDateToStartOfDay, formatDateToEndOfDay } from '../hooks/useTransactionFilters';
 import { DateRangePicker } from '../components/DatePicker';
@@ -11,14 +11,14 @@ import { DateRangePicker } from '../components/DatePicker';
 type PeriodPreset = 'thisMonth' | 'lastMonth' | 'last3Months' | 'last6Months' | 'thisYear' | 'custom';
 
 // Widget IDs for reordering (excludes the fixed summary card)
-type WidgetId = 'categoryPair' | 'trends' | 'budgets' | 'averages';
+type WidgetId = 'categoryPair' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
 
 // Collapsible section IDs for persistence
-type SectionId = 'summary' | 'categories' | 'incomeCategories' | 'trends' | 'budgets' | 'averages';
+type SectionId = 'summary' | 'categories' | 'incomeCategories' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
 
 const COLLAPSED_SECTIONS_KEY = 'insights_collapsed_sections';
 const WIDGET_ORDER_KEY = 'insights_widget_order';
-const DEFAULT_WIDGET_ORDER: WidgetId[] = ['categoryPair', 'trends', 'budgets', 'averages'];
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ['categoryPair', 'trends', 'budgets', 'averages', 'counterparties', 'byAccount', 'patterns', 'anomalies'];
 
 // Helper to calculate percentage change
 function calculatePercentChange(current: number, previous: number): number | null {
@@ -470,6 +470,28 @@ export default function InsightsPage() {
   const { data: prevAnalytics } = useTransactionAnalytics(
     formatDate(prevPeriodStart),
     formatDate(prevPeriodEnd)
+  );
+  
+  // Get extended analytics data
+  const { data: counterparties, isLoading: counterpartiesLoading } = useTopCounterparties(
+    formatDate(periodStart),
+    formatDate(periodEnd),
+    10
+  );
+  
+  const { data: spendingByAccount, isLoading: byAccountLoading } = useSpendingByAccount(
+    formatDate(periodStart),
+    formatDate(periodEnd)
+  );
+  
+  const { data: spendingPatterns, isLoading: patternsLoading } = useSpendingPatterns(
+    formatDate(periodStart),
+    formatDate(periodEnd)
+  );
+  
+  const { data: anomalies, isLoading: anomaliesLoading } = useSpendingAnomalies(
+    formatDate(periodStart),
+    formatDate(periodEnd)
   );
 
   // Calculate true income/expense from category breakdown
@@ -1276,6 +1298,394 @@ export default function InsightsPage() {
                     )}
                   </div>
                 </div>
+              </CollapsibleSection>
+            );
+            
+          case 'counterparties':
+            return (
+              <CollapsibleSection
+                key="counterparties"
+                id="counterparties"
+                title="Top Payees"
+                subtitle={counterparties ? `${counterparties.counterparties.length} payees` : undefined}
+                icon={
+                  <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                }
+                isCollapsed={collapsedSections.has('counterparties')}
+                onToggle={toggleSection}
+                className="mb-6"
+                {...dragProps}
+              >
+                {counterpartiesLoading ? (
+                  <div className="space-y-3 pt-4">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                        <div className="flex-1">
+                          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1" />
+                          <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        </div>
+                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                ) : counterparties && counterparties.counterparties.length > 0 ? (
+                  <div className="space-y-3 pt-4">
+                    {counterparties.counterparties.map((cp, index) => {
+                      const avgAmount = cp.transactionCount > 0 ? cp.totalAmount / cp.transactionCount : 0;
+                      return (
+                        <div key={cp.name} className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
+                            {cp.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {cp.name}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                {formatCurrency(cp.totalAmount, primaryCurrency)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                              <span>{cp.transactionCount} transaction{cp.transactionCount !== 1 ? 's' : ''}</span>
+                              <span>•</span>
+                              <span>Avg: {formatCurrency(avgAmount, primaryCurrency)}</span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500 w-6 text-right">
+                            #{index + 1}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Total from top payees</span>
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                          {formatCurrency(
+                            counterparties.counterparties.reduce((sum, cp) => sum + cp.totalAmount, 0),
+                            primaryCurrency
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p>No payee data available</p>
+                  </div>
+                )}
+              </CollapsibleSection>
+            );
+            
+          case 'byAccount':
+            return (
+              <CollapsibleSection
+                key="byAccount"
+                id="byAccount"
+                title="Spending by Account"
+                subtitle={spendingByAccount ? `${spendingByAccount.accounts.length} account${spendingByAccount.accounts.length !== 1 ? 's' : ''}` : undefined}
+                icon={
+                  <svg className="w-5 h-5 text-cyan-600 dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                }
+                isCollapsed={collapsedSections.has('byAccount')}
+                onToggle={toggleSection}
+                className="mb-6"
+                {...dragProps}
+              >
+                {byAccountLoading ? (
+                  <div className="space-y-3 pt-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                        <div className="flex-1">
+                          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1" />
+                          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-full" />
+                        </div>
+                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                ) : spendingByAccount && spendingByAccount.accounts.length > 0 ? (
+                  <div className="space-y-3 pt-4">
+                    {spendingByAccount.accounts.map((account) => (
+                      <div key={account.accountId} className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-cyan-100 dark:bg-cyan-900/30"
+                        >
+                          🏦
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                              {account.accountName}
+                            </span>
+                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                              {formatCurrency(account.totalDebits, primaryCurrency)}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div
+                              className="h-2 rounded-full transition-all duration-300 bg-cyan-500"
+                              style={{
+                                width: `${account.percentage}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 w-12 text-right">
+                          {account.percentage.toFixed(0)}%
+                        </span>
+                      </div>
+                    ))}
+                    <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Total spending</span>
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                          {formatCurrency(
+                            spendingByAccount.accounts.reduce((sum, acc) => sum + acc.totalDebits, 0),
+                            primaryCurrency
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <p>No account spending data</p>
+                  </div>
+                )}
+              </CollapsibleSection>
+            );
+            
+          case 'patterns':
+            return (
+              <CollapsibleSection
+                key="patterns"
+                id="patterns"
+                title="Spending Patterns"
+                subtitle="When you spend the most"
+                icon={
+                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                }
+                isCollapsed={collapsedSections.has('patterns')}
+                onToggle={toggleSection}
+                className="mb-6"
+                {...dragProps}
+              >
+                {patternsLoading ? (
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
+                ) : spendingPatterns ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+                    {/* Day of Week Pattern */}
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">By Day of Week</h4>
+                      <div className="space-y-2">
+                        {spendingPatterns.byDayOfWeek.map((day) => {
+                          const maxAmount = Math.max(...spendingPatterns.byDayOfWeek.map(d => d.totalAmount));
+                          const barWidth = maxAmount > 0 ? (day.totalAmount / maxAmount) * 100 : 0;
+                          return (
+                            <div key={day.dayOfWeek} className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500 dark:text-gray-400 w-12">{day.dayName.substring(0, 3)}</span>
+                              <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                                  style={{ width: `${Math.max(barWidth, 4)}%` }}
+                                >
+                                  {barWidth > 20 && (
+                                    <span className="text-xs text-white font-medium">
+                                      {formatCurrency(day.totalAmount, primaryCurrency)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {barWidth <= 20 && (
+                                <span className="text-xs text-gray-600 dark:text-gray-400 w-16 text-right">
+                                  {formatCurrency(day.totalAmount, primaryCurrency)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Time of Day Pattern */}
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">By Time of Day</h4>
+                      <div className="grid grid-cols-6 gap-1 h-32">
+                        {spendingPatterns.byHourOfDay.map((hour) => {
+                          const maxAmount = Math.max(...spendingPatterns.byHourOfDay.map(h => h.totalAmount));
+                          const barHeight = maxAmount > 0 ? (hour.totalAmount / maxAmount) * 100 : 0;
+                          return (
+                            <div
+                              key={hour.hour}
+                              className="flex flex-col items-center justify-end group relative"
+                            >
+                              <div
+                                className="w-full bg-gradient-to-t from-orange-500 to-orange-400 rounded-t transition-all duration-300 hover:from-orange-600 hover:to-orange-500"
+                                style={{ height: `${Math.max(barHeight, 2)}%`, minHeight: '4px' }}
+                                title={`${hour.hour}:00 - ${formatCurrency(hour.totalAmount, primaryCurrency)} (${hour.transactionCount} txns)`}
+                              />
+                              {hour.hour % 4 === 0 && (
+                                <span className="text-xs text-gray-400 mt-1">{hour.hour}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>12am</span>
+                        <span>12pm</span>
+                        <span>11pm</span>
+                      </div>
+                    </div>
+                    
+                    {/* Peak spending info */}
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                        <div className="text-sm text-orange-600 dark:text-orange-400">Peak Day</div>
+                        <div className="text-lg font-bold text-orange-700 dark:text-orange-300">
+                          {spendingPatterns.byDayOfWeek.reduce((a, b) => a.totalAmount > b.totalAmount ? a : b).dayName}
+                        </div>
+                      </div>
+                      <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                        <div className="text-sm text-orange-600 dark:text-orange-400">Peak Hour</div>
+                        <div className="text-lg font-bold text-orange-700 dark:text-orange-300">
+                          {(() => {
+                            const peakHour = spendingPatterns.byHourOfDay.reduce((a, b) => a.totalAmount > b.totalAmount ? a : b);
+                            return `${peakHour.hour}:00 - ${peakHour.hour + 1}:00`;
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p>No spending pattern data</p>
+                  </div>
+                )}
+              </CollapsibleSection>
+            );
+            
+          case 'anomalies':
+            return (
+              <CollapsibleSection
+                key="anomalies"
+                id="anomalies"
+                title="Spending Alerts"
+                subtitle={anomalies && anomalies.anomalies.length > 0 ? `${anomalies.anomalies.length} unusual transaction${anomalies.anomalies.length !== 1 ? 's' : ''}` : 'All spending looks normal'}
+                icon={
+                  <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                }
+                isCollapsed={collapsedSections.has('anomalies')}
+                onToggle={toggleSection}
+                className="mb-6"
+                {...dragProps}
+              >
+                {anomaliesLoading ? (
+                  <div className="space-y-3 pt-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg animate-pulse">
+                        <div className="h-4 w-48 bg-gray-200 dark:bg-gray-600 rounded mb-2" />
+                        <div className="h-3 w-32 bg-gray-200 dark:bg-gray-600 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : anomalies && anomalies.anomalies.length > 0 ? (
+                  <div className="space-y-3 pt-4">
+                    {anomalies.anomalies.map((anomaly, index) => (
+                      <div
+                        key={anomaly.transactionId || `anomaly-${index}`}
+                        className={`p-4 rounded-lg border-l-4 ${
+                          anomaly.severity === 'High'
+                            ? 'bg-red-50 dark:bg-red-900/20 border-red-500'
+                            : anomaly.severity === 'Medium'
+                            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500'
+                            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-500'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${
+                                anomaly.severity === 'High'
+                                  ? 'text-red-700 dark:text-red-300'
+                                  : anomaly.severity === 'Medium'
+                                  ? 'text-yellow-700 dark:text-yellow-300'
+                                  : 'text-blue-700 dark:text-blue-300'
+                              }`}>
+                                {anomaly.title}
+                              </span>
+                              <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                anomaly.severity === 'High'
+                                  ? 'bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200'
+                                  : anomaly.severity === 'Medium'
+                                  ? 'bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200'
+                                  : 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
+                              }`}>
+                                {anomaly.severity}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              {anomaly.description}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                              {new Date(anomaly.detectedAt).toLocaleDateString()}
+                              {anomaly.payeeName && ` • Payee: ${anomaly.payeeName}`}
+                              {anomaly.categoryName && ` • Category: ${anomaly.categoryName}`}
+                            </p>
+                          </div>
+                          {anomaly.amount !== undefined && (
+                            <div className="text-right ml-4">
+                              <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                                {formatCurrency(anomaly.amount, primaryCurrency)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {/* Summary */}
+                    <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {anomalies.anomalies.length} unusual pattern{anomalies.anomalies.length !== 1 ? 's' : ''} detected
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-green-300 dark:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-green-600 dark:text-green-400 font-medium">All spending looks normal!</p>
+                    <p className="text-sm mt-1">No unusual transactions detected in this period</p>
+                  </div>
+                )}
               </CollapsibleSection>
             );
             

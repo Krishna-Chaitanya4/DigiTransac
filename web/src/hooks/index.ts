@@ -15,6 +15,11 @@ export {
   useBatchMarkPending,
   usePrefetchTransactions,
   useInvalidateTransactions,
+  // Extended analytics hooks
+  useTopCounterparties,
+  useSpendingByAccount,
+  useSpendingPatterns,
+  useSpendingAnomalies,
 } from './useTransactionQueries';
 
 // Account queries

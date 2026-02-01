@@ -13,6 +13,10 @@ import {
   batchMarkConfirmed,
   batchMarkPending,
   getCounterparties,
+  getTopCounterparties,
+  getSpendingByAccount,
+  getSpendingPatterns,
+  getSpendingAnomalies,
 } from '../services/transactionService';
 import type {
   Transaction,
@@ -22,6 +26,10 @@ import type {
   CreateTransactionRequest,
   UpdateTransactionRequest,
   CounterpartyInfo,
+  TopCounterpartiesResponse,
+  SpendingByAccountResponse,
+  SpendingPatternsResponse,
+  SpendingAnomaliesResponse,
 } from '../types/transactions';
 import type { TransactionAnalytics } from '../services/transactionService';
 
@@ -387,5 +395,75 @@ export function useInvalidateTransactions() {
   };
 }
 
+// ============ Extended Analytics Hooks ============
+
+// Hook for fetching top counterparties (payees) with spending breakdown
+export function useTopCounterparties(
+  startDate?: string,
+  endDate?: string,
+  limit = 10,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['transactions', 'analytics', 'counterparties', { startDate, endDate, limit }],
+    queryFn: () => getTopCounterparties(startDate, endDate, limit),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
+  });
+}
+
+// Hook for fetching spending breakdown by account
+export function useSpendingByAccount(
+  startDate?: string,
+  endDate?: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['transactions', 'analytics', 'byAccount', { startDate, endDate }],
+    queryFn: () => getSpendingByAccount(startDate, endDate),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
+  });
+}
+
+// Hook for fetching spending patterns (by day of week and hour of day)
+export function useSpendingPatterns(
+  startDate?: string,
+  endDate?: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['transactions', 'analytics', 'patterns', { startDate, endDate }],
+    queryFn: () => getSpendingPatterns(startDate, endDate),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
+  });
+}
+
+// Hook for fetching spending anomalies and alerts
+export function useSpendingAnomalies(
+  startDate?: string,
+  endDate?: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['transactions', 'analytics', 'anomalies', { startDate, endDate }],
+    queryFn: () => getSpendingAnomalies(startDate, endDate),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
+  });
+}
+
 // Export types for convenience
-export type { Transaction, TransactionFilter, TransactionSummary, TransactionListResponse, CounterpartyInfo, TransactionAnalytics };
+export type {
+  Transaction,
+  TransactionFilter,
+  TransactionSummary,
+  TransactionListResponse,
+  CounterpartyInfo,
+  TransactionAnalytics,
+  TopCounterpartiesResponse,
+  SpendingByAccountResponse,
+  SpendingPatternsResponse,
+  SpendingAnomaliesResponse,
+};

@@ -14,6 +14,7 @@ public class ConversationServiceTests
     private readonly Mock<IAccountRepository> _accountRepositoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<ITransactionService> _transactionServiceMock;
+    private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
     private readonly ConversationService _conversationService;
     
     private const string TestUserId = "test-user-id";
@@ -26,6 +27,7 @@ public class ConversationServiceTests
         _accountRepositoryMock = new Mock<IAccountRepository>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _transactionServiceMock = new Mock<ITransactionService>();
+        _exchangeRateServiceMock = new Mock<IExchangeRateService>();
 
         SetupDefaultMocks();
 
@@ -34,18 +36,25 @@ public class ConversationServiceTests
             _transactionRepositoryMock.Object,
             _accountRepositoryMock.Object,
             _userRepositoryMock.Object,
-            _transactionServiceMock.Object);
+            _transactionServiceMock.Object,
+            _exchangeRateServiceMock.Object);
     }
 
     private void SetupDefaultMocks()
     {
-        // Default user
+        // Default user with primary currency
         _userRepositoryMock.Setup(x => x.GetByIdAsync(TestUserId))
-            .ReturnsAsync(new User { Id = TestUserId, Email = "test@example.com", FullName = "Test User" });
+            .ReturnsAsync(new User { Id = TestUserId, Email = "test@example.com", FullName = "Test User", PrimaryCurrency = "USD" });
 
         // Default counterparty
         _userRepositoryMock.Setup(x => x.GetByIdAsync(CounterpartyUserId))
             .ReturnsAsync(new User { Id = CounterpartyUserId, Email = "counter@example.com", FullName = "Counter Party" });
+        
+        // Default exchange rate service - returns empty rates (so conversion returns original amount)
+        _exchangeRateServiceMock.Setup(x => x.GetRatesAsync(It.IsAny<string?>()))
+            .ReturnsAsync(new ExchangeRateResponse("USD", new Dictionary<string, decimal>(), DateTime.UtcNow, "Test"));
+        _exchangeRateServiceMock.Setup(x => x.Convert(It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Dictionary<string, decimal>>()))
+            .Returns((decimal amount, string from, string to, Dictionary<string, decimal> rates) => amount);
 
         // Default batch user lookup - returns default users for known IDs
         _userRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>()))

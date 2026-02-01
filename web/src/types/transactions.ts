@@ -226,3 +226,82 @@ export const recurrenceFrequencyConfig: Record<RecurrenceFrequency, { label: str
   Quarterly: { label: 'Quarterly', description: 'Every 3 months' },
   Yearly: { label: 'Yearly', description: 'Every year' },
 };
+
+// ============ Extended Analytics Types ============
+
+// Top Counterparties (Payees) Response
+export interface TopCounterpartiesResponse {
+  counterparties: CounterpartySpending[];
+  currency: string;
+}
+
+export interface CounterpartySpending {
+  name: string;
+  userId?: string;
+  email?: string;
+  totalAmount: number;
+  transactionCount: number;
+  percentage: number;
+  type: 'Payee' | 'P2P';
+}
+
+// Spending by Account Response
+export interface SpendingByAccountResponse {
+  accounts: AccountSpending[];
+  currency: string;
+}
+
+export interface AccountSpending {
+  accountId: string;
+  accountName: string;
+  accountCurrency: string;
+  totalDebits: number;
+  totalCredits: number;
+  netChange: number;
+  transactionCount: number;
+  percentage: number;
+}
+
+// Spending Patterns Response
+export interface SpendingPatternsResponse {
+  byDayOfWeek: DayOfWeekSpending[];
+  byHourOfDay: HourOfDaySpending[];
+  currency: string;
+}
+
+export interface DayOfWeekSpending {
+  dayOfWeek: number;  // 0 = Sunday, 6 = Saturday
+  dayName: string;
+  totalAmount: number;
+  transactionCount: number;
+  averageAmount: number;
+}
+
+export interface HourOfDaySpending {
+  hour: number;       // 0-23
+  label: string;      // "12 AM", "1 PM", etc.
+  totalAmount: number;
+  transactionCount: number;
+  averageAmount: number;
+}
+
+// Spending Anomalies Response
+export interface SpendingAnomaliesResponse {
+  anomalies: SpendingAnomaly[];
+  currency: string;
+}
+
+export type AnomalyType = 'HighTransaction' | 'UnusualCategory' | 'SpendingSpike' | 'NewPayee';
+export type AnomalySeverity = 'Low' | 'Medium' | 'High';
+
+export interface SpendingAnomaly {
+  type: AnomalyType;
+  severity: AnomalySeverity;
+  title: string;
+  description: string;
+  amount?: number;
+  transactionId?: string;
+  categoryName?: string;
+  payeeName?: string;
+  detectedAt: string;
+}

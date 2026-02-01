@@ -9,6 +9,10 @@ import type {
   TransactionFilter,
   TransactionType,
   CounterpartyInfo,
+  TopCounterpartiesResponse,
+  SpendingByAccountResponse,
+  SpendingPatternsResponse,
+  SpendingAnomaliesResponse,
 } from '../types/transactions';
 
 // Build query string from filter
@@ -296,4 +300,60 @@ export async function getTransactionsByDateRange(
 export async function getPendingCount(): Promise<number> {
   const response = await apiClient.get<{ count: number }>('/transactions/pending/count');
   return response.count;
+}
+
+// ============ Extended Analytics APIs ============
+
+// Get top counterparties (payees) spending breakdown
+export async function getTopCounterparties(
+  startDate?: string,
+  endDate?: string,
+  limit = 10
+): Promise<TopCounterpartiesResponse> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  params.append('limit', limit.toString());
+  
+  const query = params.toString();
+  return apiClient.get<TopCounterpartiesResponse>(`/transactions/analytics/counterparties?${query}`);
+}
+
+// Get spending breakdown by account
+export async function getSpendingByAccount(
+  startDate?: string,
+  endDate?: string
+): Promise<SpendingByAccountResponse> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  
+  const query = params.toString();
+  return apiClient.get<SpendingByAccountResponse>(`/transactions/analytics/by-account${query ? `?${query}` : ''}`);
+}
+
+// Get spending patterns (by day of week and hour of day)
+export async function getSpendingPatterns(
+  startDate?: string,
+  endDate?: string
+): Promise<SpendingPatternsResponse> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  
+  const query = params.toString();
+  return apiClient.get<SpendingPatternsResponse>(`/transactions/analytics/patterns${query ? `?${query}` : ''}`);
+}
+
+// Get spending anomalies and alerts
+export async function getSpendingAnomalies(
+  startDate?: string,
+  endDate?: string
+): Promise<SpendingAnomaliesResponse> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  
+  const query = params.toString();
+  return apiClient.get<SpendingAnomaliesResponse>(`/transactions/analytics/anomalies${query ? `?${query}` : ''}`);
 }

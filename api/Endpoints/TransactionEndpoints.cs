@@ -6,6 +6,8 @@ using DigiTransac.Api.Services;
 using DigiTransac.Api.Services.Transactions;
 using DigiTransac.Api.Validators;
 
+// Note: ITransactionAnalyticsService is already imported via DigiTransac.Api.Services.Transactions
+
 namespace DigiTransac.Api.Endpoints;
 
 public static class TransactionEndpoints
@@ -330,6 +332,75 @@ public static class TransactionEndpoints
         })
         .WithName("GetTransactionAnalytics")
         .Produces<TransactionAnalyticsResponse>(200);
+
+        // Get top counterparties (payees) spending breakdown
+        group.MapGet("/analytics/counterparties", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            int? limit,
+            ClaimsPrincipal user,
+            ITransactionAnalyticsService analyticsService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await analyticsService.GetTopCounterpartiesAsync(userId, startDate, endDate, limit ?? 10);
+            return Results.Ok(result);
+        })
+        .WithName("GetTopCounterparties")
+        .Produces<TopCounterpartiesResponse>(200);
+
+        // Get spending breakdown by account
+        group.MapGet("/analytics/by-account", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            ClaimsPrincipal user,
+            ITransactionAnalyticsService analyticsService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate);
+            return Results.Ok(result);
+        })
+        .WithName("GetSpendingByAccount")
+        .Produces<SpendingByAccountResponse>(200);
+
+        // Get spending patterns (by day of week and hour of day)
+        group.MapGet("/analytics/patterns", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            ClaimsPrincipal user,
+            ITransactionAnalyticsService analyticsService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await analyticsService.GetSpendingPatternsAsync(userId, startDate, endDate);
+            return Results.Ok(result);
+        })
+        .WithName("GetSpendingPatterns")
+        .Produces<SpendingPatternsResponse>(200);
+
+        // Get spending anomalies and alerts
+        group.MapGet("/analytics/anomalies", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            ClaimsPrincipal user,
+            ITransactionAnalyticsService analyticsService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await analyticsService.GetSpendingAnomaliesAsync(userId, startDate, endDate);
+            return Results.Ok(result);
+        })
+        .WithName("GetSpendingAnomalies")
+        .Produces<SpendingAnomaliesResponse>(200);
 
         // Export transactions
         group.MapGet("/export", async (

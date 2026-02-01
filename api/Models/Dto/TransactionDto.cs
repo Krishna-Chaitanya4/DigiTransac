@@ -250,6 +250,90 @@ public record AveragesByType(
     decimal AverageTransfer
 );
 
+// Extended Analytics DTOs for Insights Page
+
+/// <summary>
+/// Top counterparties (payees) with spending breakdown
+/// </summary>
+public record TopCounterpartiesResponse(
+    List<CounterpartySpending> Counterparties,
+    string Currency
+);
+
+public record CounterpartySpending(
+    string Name,            // Payee name (or counterparty email for P2P)
+    string? UserId,         // P2P counterparty user ID if applicable
+    string? Email,          // P2P counterparty email if applicable
+    decimal TotalAmount,
+    int TransactionCount,
+    decimal Percentage,     // Percentage of total spending
+    string Type             // "Payee" or "P2P"
+);
+
+/// <summary>
+/// Spending breakdown by account
+/// </summary>
+public record SpendingByAccountResponse(
+    List<AccountSpending> Accounts,
+    string Currency
+);
+
+public record AccountSpending(
+    string AccountId,
+    string AccountName,
+    string AccountCurrency,
+    decimal TotalDebits,    // Converted to primary currency
+    decimal TotalCredits,   // Converted to primary currency
+    decimal NetChange,
+    int TransactionCount,
+    decimal Percentage      // Percentage of total debits
+);
+
+/// <summary>
+/// Spending patterns by day of week and hour of day
+/// </summary>
+public record SpendingPatternsResponse(
+    List<DayOfWeekSpending> ByDayOfWeek,
+    List<HourOfDaySpending> ByHourOfDay,
+    string Currency
+);
+
+public record DayOfWeekSpending(
+    int DayOfWeek,          // 0 = Sunday, 6 = Saturday
+    string DayName,         // "Sunday", "Monday", etc.
+    decimal TotalAmount,
+    int TransactionCount,
+    decimal AverageAmount
+);
+
+public record HourOfDaySpending(
+    int Hour,               // 0-23
+    string Label,           // "12 AM", "1 AM", etc.
+    decimal TotalAmount,
+    int TransactionCount,
+    decimal AverageAmount
+);
+
+/// <summary>
+/// Spending anomalies and alerts
+/// </summary>
+public record SpendingAnomaliesResponse(
+    List<SpendingAnomaly> Anomalies,
+    string Currency
+);
+
+public record SpendingAnomaly(
+    string Type,            // "HighTransaction", "UnusualCategory", "SpendingSpike", "NewPayee"
+    string Severity,        // "Low", "Medium", "High"
+    string Title,
+    string Description,
+    decimal? Amount,
+    string? TransactionId,
+    string? CategoryName,
+    string? PayeeName,
+    DateTime DetectedAt
+);
+
 // Import DTOs
 public record ImportTransactionRequest(
     string Type,           // "Receive" or "Send"
