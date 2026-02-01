@@ -13,6 +13,10 @@ interface CalculatorInputProps {
   ariaLabel?: string;
   /** ID for label association */
   id?: string;
+  /** Expression text to set in the input (controlled externally) */
+  expressionInput?: string;
+  /** Called when expression input is consumed */
+  onExpressionInputConsumed?: () => void;
 }
 
 // Simple math expression evaluator (supports +, -, *, /)
@@ -54,20 +58,41 @@ export function CalculatorInput({
   autoFocus = false,
   ariaLabel,
   id,
+  expressionInput,
+  onExpressionInputConsumed,
 }: CalculatorInputProps) {
   const [inputValue, setInputValue] = useState(value > 0 ? value.toString() : '');
   const [isExpression, setIsExpression] = useState(false);
   const [evaluatedValue, setEvaluatedValue] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Track the last consumed expression to prevent race condition with value reset effect
+  const lastExpressionRef = useRef<string | null>(null);
+
+  // Handle external expression input (from quick buttons)
+  useEffect(() => {
+    if (expressionInput) {
+      // Store the expression so we don't clear it in the value effect
+      lastExpressionRef.current = expressionInput;
+      setInputValue(expressionInput);
+      setIsExpression(true);
+      const result = evaluateExpression(expressionInput);
+      setEvaluatedValue(result);
+      inputRef.current?.focus();
+      // Notify parent that we consumed the expression
+      if (onExpressionInputConsumed) {
+        onExpressionInputConsumed();
+      }
+    }
+  }, [expressionInput, onExpressionInputConsumed]);
 
   // Update input when external value changes
   useEffect(() => {
     if (value > 0 && !isExpression) {
       setInputValue(value.toString());
-    } else if (value === 0) {
-      // Always clear input when value is reset to 0 (e.g., form reset)
+      lastExpressionRef.current = null; // Clear after successful value set
+    } else if (value === 0 && !isExpression && !lastExpressionRef.current) {
+      // Only clear input if we didn't just receive an expression
       setInputValue('');
-      setIsExpression(false);
       setEvaluatedValue(null);
     }
   }, [value, isExpression]);
@@ -204,10 +229,20 @@ export function CalculatorInput({
 interface QuickAmountButtonsProps {
   amounts: number[];
   onSelect: (amount: number) => void;
+  /** Called when an expression button is clicked (e.g., "45/3") */
+  onExpressionClick?: (expression: string) => void;
   currency: string;
+  /** Show calculator expression example button */
+  showCalcExample?: boolean;
 }
 
-export function QuickAmountButtons({ amounts, onSelect, currency }: QuickAmountButtonsProps) {
+export function QuickAmountButtons({
+  amounts,
+  onSelect,
+  onExpressionClick,
+  currency,
+  showCalcExample = true,
+}: QuickAmountButtonsProps) {
   return (
     <div className="flex flex-wrap gap-2 mt-2">
       {amounts.map((amount) => (
@@ -215,8 +250,8 @@ export function QuickAmountButtons({ amounts, onSelect, currency }: QuickAmountB
           key={amount}
           type="button"
           onClick={() => onSelect(amount)}
-          className="px-3 py-1 text-sm rounded-full 
-            bg-gray-100 dark:bg-gray-700 
+          className="px-3 py-1 text-sm rounded-full
+            bg-gray-100 dark:bg-gray-700
             text-gray-700 dark:text-gray-300
             hover:bg-gray-200 dark:hover:bg-gray-600
             transition-colors"
@@ -224,6 +259,21 @@ export function QuickAmountButtons({ amounts, onSelect, currency }: QuickAmountB
           {currency}{amount}
         </button>
       ))}
+      
+      {/* Calculator expression example - same styling as other buttons */}
+      {showCalcExample && onExpressionClick && (
+        <button
+          type="button"
+          onClick={() => onExpressionClick('45/3')}
+          className="px-3 py-1 text-sm rounded-full
+            bg-gray-100 dark:bg-gray-700
+            text-gray-700 dark:text-gray-300
+            hover:bg-gray-200 dark:hover:bg-gray-600
+            transition-colors"
+        >
+          {currency}45/3
+        </button>
+      )}
     </div>
   );
 }

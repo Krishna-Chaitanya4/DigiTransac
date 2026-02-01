@@ -80,6 +80,11 @@ public class TransferService : ITransferService
             ? new List<TransactionSplit> { new() { LabelId = accountTransferLabel.Id, Amount = convertedAmount, Notes = null } }
             : request.Splits.Select(s => new TransactionSplit { LabelId = s.LabelId, Amount = convertedAmount, Notes = s.Notes }).ToList();
 
+        // Derive Date (UTC) from DateLocal + TimeLocal + DateTimezone
+        // This ensures Date is always consistent with local fields - no independent edits allowed
+        var (derivedDate, dateLocal, timeLocal, dateTimezone) = DateTimeHelper.NormalizeDateTimeFields(
+            request.Date, request.DateLocal, request.TimeLocal, request.DateTimezone);
+
         // Create source transaction (Send)
         var sourceTransaction = new Transaction
         {
@@ -88,10 +93,11 @@ public class TransferService : ITransferService
             Type = TransactionType.Send,
             Amount = request.Amount,
             Currency = sourceAccount.Currency,
-            Date = request.Date,
-            // Timezone-aware date fields (for global travel support)
-            DateLocal = request.DateLocal,
-            DateTimezone = request.DateTimezone,
+            Date = derivedDate,
+            // Timezone-aware date fields (source of truth for Date)
+            DateLocal = dateLocal,
+            TimeLocal = timeLocal,
+            DateTimezone = dateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -125,10 +131,11 @@ public class TransferService : ITransferService
             Type = TransactionType.Receive,
             Amount = convertedAmount,
             Currency = destinationAccount.Currency,
-            Date = request.Date,
-            // Timezone-aware date fields (for global travel support)
-            DateLocal = request.DateLocal,
-            DateTimezone = request.DateTimezone,
+            Date = derivedDate,
+            // Timezone-aware date fields (source of truth for Date)
+            DateLocal = dateLocal,
+            TimeLocal = timeLocal,
+            DateTimezone = dateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),

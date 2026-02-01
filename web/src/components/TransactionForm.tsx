@@ -184,6 +184,9 @@ export function TransactionForm({
   const [splits, setSplits] = useState<TransactionSplitRequest[]>([]);
   const [showSplits, setShowSplits] = useState(false);
   
+  // Calculator expression input state
+  const [expressionInput, setExpressionInput] = useState<string | undefined>(undefined);
+  
   // Advanced options state (time & timezone)
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [timeLocal, setTimeLocal] = useState(getCurrentTime());
@@ -544,10 +547,13 @@ export function TransactionForm({
                   currency={currencySymbol}
                   placeholder="0.00"
                   autoFocus={!editingTransaction}
+                  expressionInput={expressionInput}
+                  onExpressionInputConsumed={() => setExpressionInput(undefined)}
                 />
                 <QuickAmountButtons
                   amounts={[10, 20, 50, 100, 500]}
                   onSelect={setAmount}
+                  onExpressionClick={setExpressionInput}
                   currency={currencySymbol}
                 />
               </div>

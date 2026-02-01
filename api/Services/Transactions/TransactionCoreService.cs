@@ -272,6 +272,11 @@ public class TransactionCoreService : ITransactionCoreService
             source = requestedSource;
         }
 
+        // Derive Date (UTC) from DateLocal + TimeLocal + DateTimezone
+        // This ensures Date is always consistent with local fields - no independent edits allowed
+        var (derivedDate, dateLocal, timeLocal, dateTimezone) = DateTimeHelper.NormalizeDateTimeFields(
+            request.Date, request.DateLocal, request.TimeLocal, request.DateTimezone);
+
         var transaction = new Transaction
         {
             UserId = userId,
@@ -279,11 +284,11 @@ public class TransactionCoreService : ITransactionCoreService
             Type = type,
             Amount = request.Amount,
             Currency = account.Currency,
-            Date = request.Date,
-            // Timezone-aware date/time fields (for global travel support & advanced options)
-            DateLocal = request.DateLocal,
-            TimeLocal = request.TimeLocal ?? DateTime.UtcNow.ToString("HH:mm"), // Default to current time if not provided
-            DateTimezone = request.DateTimezone,
+            Date = derivedDate,
+            // Timezone-aware date/time fields (source of truth for Date)
+            DateLocal = dateLocal,
+            TimeLocal = timeLocal,
+            DateTimezone = dateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -433,16 +438,28 @@ public class TransactionCoreService : ITransactionCoreService
             transaction.Amount = request.Amount.Value;
         }
 
-        if (request.Date.HasValue)
+        // Update date/time fields and re-derive Date (UTC)
+        // DateLocal + TimeLocal + DateTimezone are the source of truth - Date is always derived
+        bool dateFieldsChanged = !string.IsNullOrEmpty(request.DateLocal) ||
+                                  !string.IsNullOrEmpty(request.TimeLocal) ||
+                                  !string.IsNullOrEmpty(request.DateTimezone) ||
+                                  request.Date.HasValue;
+
+        if (dateFieldsChanged)
         {
-            transaction.Date = request.Date.Value;
-            // Update timezone-aware date/time fields if provided
-            if (!string.IsNullOrEmpty(request.DateLocal))
-                transaction.DateLocal = request.DateLocal;
-            if (!string.IsNullOrEmpty(request.TimeLocal))
-                transaction.TimeLocal = request.TimeLocal;
-            if (!string.IsNullOrEmpty(request.DateTimezone))
-                transaction.DateTimezone = request.DateTimezone;
+            // Get current or updated values
+            var newDateLocal = request.DateLocal ?? transaction.DateLocal ?? transaction.Date.ToString("yyyy-MM-dd");
+            var newTimeLocal = request.TimeLocal ?? transaction.TimeLocal ?? "12:00";
+            var newDateTimezone = request.DateTimezone ?? transaction.DateTimezone ?? TimeZoneInfo.Local.Id;
+            var fallbackDate = request.Date ?? transaction.Date;
+
+            // Derive Date (UTC) from local fields
+            var derivedDate = DateTimeHelper.DeriveUtcDate(newDateLocal, newTimeLocal, newDateTimezone, fallbackDate);
+
+            transaction.Date = derivedDate;
+            transaction.DateLocal = newDateLocal;
+            transaction.TimeLocal = newTimeLocal;
+            transaction.DateTimezone = newDateTimezone;
         }
 
         if (request.Title != null)
@@ -609,4 +626,5 @@ public class TransactionCoreService : ITransactionCoreService
     {
         return await _transactionRepository.GetPendingCountAsync(userId);
     }
+
 }
