@@ -207,8 +207,8 @@ vi.mock('../hooks/useFocusTrap', () => ({
 // Mock currencyService
 vi.mock('../services/currencyService', () => ({
   getCurrencySymbol: (currency: string) => {
-    const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£' };
-    return symbols[currency] || '$';
+    const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹' };
+    return symbols[currency] || currency;
   },
 }));
 

@@ -351,8 +351,14 @@ public class BudgetService : IBudgetService
                 bool isRelevant = true;
                 if (budget.AccountIds.Any() && accountId != null && !budget.AccountIds.Contains(accountId))
                     isRelevant = false;
-                if (budget.LabelIds.Any() && labelIds != null && !budget.LabelIds.Intersect(labelIds).Any())
-                    isRelevant = false;
+                
+                // For label checking, expand budget label IDs to include all child categories
+                if (budget.LabelIds.Any() && labelIds != null)
+                {
+                    var expandedBudgetLabelIds = await ExpandLabelIdsAsync(userId, budget.LabelIds);
+                    if (!expandedBudgetLabelIds.Intersect(labelIds).Any())
+                        isRelevant = false;
+                }
 
                 if (!isRelevant) continue;
 
@@ -473,13 +479,20 @@ public class BudgetService : IBudgetService
     private async Task<List<Transaction>> GetBudgetTransactionsAsync(
         string userId, Budget budget, DateTime periodStart, DateTime periodEnd)
     {
+        // Expand label IDs to include all child categories (if folders are selected)
+        List<string>? expandedLabelIds = null;
+        if (budget.LabelIds.Any())
+        {
+            expandedLabelIds = await ExpandLabelIdsAsync(userId, budget.LabelIds);
+        }
+        
         // Build filter for expenses (Send transactions only)
         var filter = new TransactionFilterRequest(
             StartDate: periodStart,
             EndDate: periodEnd,
             AccountIds: budget.AccountIds.Any() ? budget.AccountIds : null,
             Types: new List<string> { "Send" },  // Only expenses
-            LabelIds: budget.LabelIds.Any() ? budget.LabelIds : null,
+            LabelIds: expandedLabelIds,
             TagIds: null,
             MinAmount: null,
             MaxAmount: null,
@@ -492,6 +505,48 @@ public class BudgetService : IBudgetService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
         return transactions;
+    }
+    
+    /// <summary>
+    /// Expands a list of label IDs to include all child category IDs.
+    /// If a folder is in the list, all categories underneath it (recursively) are included.
+    /// </summary>
+    private async Task<List<string>> ExpandLabelIdsAsync(string userId, List<string> labelIds)
+    {
+        var allLabels = await _labelRepository.GetByUserIdAsync(userId);
+        var labelDict = allLabels.ToDictionary(l => l.Id);
+        var expandedIds = new HashSet<string>(labelIds);
+        
+        // For each label ID, if it's a folder, add all child categories
+        foreach (var labelId in labelIds)
+        {
+            if (labelDict.TryGetValue(labelId, out var label) && label.Type == LabelType.Folder)
+            {
+                CollectChildCategoryIds(labelId, allLabels, expandedIds);
+            }
+        }
+        
+        return expandedIds.ToList();
+    }
+    
+    /// <summary>
+    /// Recursively collects all category IDs under a folder
+    /// </summary>
+    private void CollectChildCategoryIds(string parentId, List<Label> allLabels, HashSet<string> result)
+    {
+        var children = allLabels.Where(l => l.ParentId == parentId);
+        foreach (var child in children)
+        {
+            if (child.Type == LabelType.Category)
+            {
+                result.Add(child.Id);
+            }
+            // Always recurse into folders to find nested categories
+            if (child.Type == LabelType.Folder)
+            {
+                CollectChildCategoryIds(child.Id, allLabels, result);
+            }
+        }
     }
 
     private (DateTime Start, DateTime End) GetCurrentPeriodDates(Budget budget)

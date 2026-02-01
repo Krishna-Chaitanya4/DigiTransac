@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
 import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
-import { 
-  TransactionTypeSelector, 
-  TagTokenInput, 
-  RecurringSection, 
+import {
+  TransactionTypeSelector,
+  TagTokenInput,
+  RecurringSection,
   SplitCategoriesSection,
   LocationPicker,
   validateSplits,
 } from './transaction-form';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useCurrency } from '../context/CurrencyContext';
 import type {
   Transaction,
   TransactionType,
@@ -146,9 +147,13 @@ export function TransactionForm({
   const [splits, setSplits] = useState<TransactionSplitRequest[]>([]);
   const [showSplits, setShowSplits] = useState(false);
 
+  // Get user's primary currency for fallback
+  const { primaryCurrency } = useCurrency();
+
   // Derived values
   const selectedAccount = accounts.find(a => a.id === accountId);
-  const currencySymbol = selectedAccount ? getCurrencySymbol(selectedAccount.currency) : '$';
+  // Use selected account's currency symbol, or fall back to user's primary currency
+  const currencySymbol = getCurrencySymbol(selectedAccount?.currency || primaryCurrency);
   const categories = labels.filter(l => l.type === 'Category');
   const splitsValid = showSplits ? validateSplits(splits, amount) : true;
   const isNewTransaction = !editingTransaction;

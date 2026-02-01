@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 interface CalculatorInputProps {
   value: number;
   onChange: (value: number) => void;
-  currency?: string;
+  /** Currency symbol to display (e.g., '$', '₹', '€') */
+  currency: string;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -46,7 +47,7 @@ function evaluateExpression(expression: string): number | null {
 export function CalculatorInput({
   value,
   onChange,
-  currency = '$',
+  currency,
   placeholder = '0.00',
   className = '',
   disabled = false,
@@ -203,10 +204,10 @@ export function CalculatorInput({
 interface QuickAmountButtonsProps {
   amounts: number[];
   onSelect: (amount: number) => void;
-  currency?: string;
+  currency: string;
 }
 
-export function QuickAmountButtons({ amounts, onSelect, currency = '$' }: QuickAmountButtonsProps) {
+export function QuickAmountButtons({ amounts, onSelect, currency }: QuickAmountButtonsProps) {
   return (
     <div className="flex flex-wrap gap-2 mt-2">
       {amounts.map((amount) => (

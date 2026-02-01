@@ -3,6 +3,7 @@ import { queryKeys } from '../lib/queryClient';
 import {
   getTransactions,
   getTransactionSummary,
+  getAnalytics,
   createTransaction,
   updateTransaction,
   deleteTransaction,
@@ -22,6 +23,7 @@ import type {
   UpdateTransactionRequest,
   CounterpartyInfo,
 } from '../types/transactions';
+import type { TransactionAnalytics } from '../services/transactionService';
 
 // Hook for fetching transactions with filters
 export function useTransactions(filter: TransactionFilter, enabled = true) {
@@ -65,6 +67,21 @@ export function usePendingCount() {
     queryFn: getPendingCount,
     staleTime: 30 * 1000, // 30 seconds - check frequently
     refetchInterval: 30 * 1000, // Poll every 30 seconds
+  });
+}
+
+// Hook for fetching transaction analytics
+export function useTransactionAnalytics(
+  startDate?: string,
+  endDate?: string,
+  accountId?: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['transactions', 'analytics', { startDate, endDate, accountId }],
+    queryFn: () => getAnalytics(startDate, endDate, accountId),
+    staleTime: 5 * 60 * 1000, // 5 minutes - analytics don't need to be real-time
+    enabled,
   });
 }
 
@@ -371,4 +388,4 @@ export function useInvalidateTransactions() {
 }
 
 // Export types for convenience
-export type { Transaction, TransactionFilter, TransactionSummary, TransactionListResponse, CounterpartyInfo };
+export type { Transaction, TransactionFilter, TransactionSummary, TransactionListResponse, CounterpartyInfo, TransactionAnalytics };
