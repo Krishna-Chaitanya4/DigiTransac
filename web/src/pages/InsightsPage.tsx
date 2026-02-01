@@ -1165,7 +1165,7 @@ export default function InsightsPage() {
               <CollapsibleSection
                 key="trends"
                 id="trends"
-                title="Cash Flow Trend"
+                title="Monthly Cash Flow"
                 subtitle={analytics?.spendingTrend ? `Last ${Math.min(6, analytics.spendingTrend.length)} months` : undefined}
                 icon={
                   <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1176,11 +1176,11 @@ export default function InsightsPage() {
                   <div className="flex items-center gap-4 text-xs" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded-full bg-green-500" />
-                      <span className="text-gray-500 dark:text-gray-400">Income</span>
+                      <span className="text-gray-500 dark:text-gray-400">Money In</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded-full bg-red-500" />
-                      <span className="text-gray-500 dark:text-gray-400">Expenses</span>
+                      <span className="text-gray-500 dark:text-gray-400">Money Out</span>
                     </div>
                   </div>
                 }
@@ -1213,15 +1213,15 @@ export default function InsightsPage() {
                           <div key={trend.period} className="flex-1 flex flex-col items-center gap-1">
                             <div className="flex items-end gap-0.5 h-32 w-full">
                               <div
-                                className="flex-1 bg-green-500 rounded-t transition-all duration-300"
-                                style={{ height: `${creditsHeight}%`, minHeight: trend.credits > 0 ? '4px' : '0' }}
-                                title={`Income: ${formatCurrency(trend.credits, primaryCurrency)}`}
-                              />
-                              <div
-                                className="flex-1 bg-red-500 rounded-t transition-all duration-300"
-                                style={{ height: `${debitsHeight}%`, minHeight: trend.debits > 0 ? '4px' : '0' }}
-                                title={`Expenses: ${formatCurrency(trend.debits, primaryCurrency)}`}
-                              />
+                                        className="flex-1 bg-green-500 rounded-t transition-all duration-300"
+                                        style={{ height: `${creditsHeight}%`, minHeight: trend.credits > 0 ? '4px' : '0' }}
+                                        title={`Money In: ${formatCurrency(trend.credits, primaryCurrency)}`}
+                                      />
+                                      <div
+                                        className="flex-1 bg-red-500 rounded-t transition-all duration-300"
+                                        style={{ height: `${debitsHeight}%`, minHeight: trend.debits > 0 ? '4px' : '0' }}
+                                        title={`Money Out: ${formatCurrency(trend.debits, primaryCurrency)}`}
+                                      />
                             </div>
                             <span className="text-xs text-gray-500 dark:text-gray-400 truncate w-full text-center">
                               {trend.period.substring(5, 7)}/{trend.period.substring(2, 4)}
