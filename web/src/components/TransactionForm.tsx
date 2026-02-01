@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
 import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
@@ -12,6 +12,8 @@ import {
 } from './transaction-form';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useCurrency } from '../context/CurrencyContext';
+import { getCurrentPosition, reverseGeocode } from '../services/locationService';
+import { logger } from '../services/logger';
 import type {
   Transaction,
   TransactionType,
@@ -191,6 +193,9 @@ export function TransactionForm({
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [timeLocal, setTimeLocal] = useState(getCurrentTime());
   const [dateTimezone, setDateTimezone] = useState(getUserTimezone());
+  
+  // Track if we've already attempted auto-capture for this form session
+  const locationCaptureAttemptedRef = useRef(false);
 
   // Get user's primary currency for fallback
   const { primaryCurrency } = useCurrency();
@@ -285,9 +290,40 @@ export function TransactionForm({
         setShowAdvancedOptions(false);
         setTimeLocal(getCurrentTime());
         setDateTimezone(getUserTimezone());
+        
+        // Reset location capture tracking for new form session
+        locationCaptureAttemptedRef.current = false;
       }
     }
   }, [isOpen, editingTransaction, defaultAccountId, accounts, labels]);
+
+  // Auto-capture location when form opens for new transactions
+  useEffect(() => {
+    if (isOpen && isNewTransaction && autoLocationEnabled && !location && !locationCaptureAttemptedRef.current) {
+      locationCaptureAttemptedRef.current = true;
+      
+      // Silently capture location in the background
+      (async () => {
+        try {
+          const coords = await getCurrentPosition();
+          if (coords) {
+            const geoInfo = await reverseGeocode(coords);
+            setLocation({
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              placeName: geoInfo?.city || undefined,
+              city: geoInfo?.city,
+              country: geoInfo?.country,
+            });
+            setIncludeLocation(true);
+          }
+        } catch (error) {
+          // Silent fail for auto-capture - user can still add location manually
+          logger.info('Auto location capture failed:', error);
+        }
+      })();
+    }
+  }, [isOpen, isNewTransaction, autoLocationEnabled, location]);
 
   // Auto-select "To Account" for transfers
   useEffect(() => {
@@ -687,7 +723,7 @@ export function TransactionForm({
                   <LocationPicker
                     location={location}
                     onChange={handleLocationChange}
-                    autoCapture={isNewTransaction && autoLocationEnabled}
+                    autoCapture={false}
                   />
 
                   {/* Time & Timezone */}
