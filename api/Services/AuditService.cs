@@ -87,6 +87,26 @@ public interface IAuditService
     /// Get failed login count for an email in the specified time window
     /// </summary>
     Task<int> GetFailedLoginCountAsync(string email, TimeSpan window);
+    
+    /// <summary>
+    /// Log budget creation
+    /// </summary>
+    Task LogBudgetCreatedAsync(string userId, string budgetId, string budgetName, decimal amount, string currency);
+    
+    /// <summary>
+    /// Log budget update
+    /// </summary>
+    Task LogBudgetUpdatedAsync(string userId, string budgetId, string budgetName, Dictionary<string, object>? changes = null);
+    
+    /// <summary>
+    /// Log budget deletion
+    /// </summary>
+    Task LogBudgetDeletedAsync(string userId, string budgetId, string budgetName);
+    
+    /// <summary>
+    /// Log budget alert triggered
+    /// </summary>
+    Task LogBudgetAlertTriggeredAsync(string userId, string budgetId, string budgetName, decimal thresholdPercent, decimal actualPercent);
 }
 
 public class AuditService : IAuditService
@@ -305,6 +325,71 @@ public class AuditService : IAuditService
             description: description,
             userId: userId,
             details: details);
+    }
+    
+    public Task LogBudgetCreatedAsync(string userId, string budgetId, string budgetName, decimal amount, string currency)
+    {
+        return LogAsync(
+            AuditAction.BudgetCreated,
+            AuditCategory.FinancialOperation,
+            success: true,
+            description: $"Budget created: {budgetName} ({amount} {currency})",
+            userId: userId,
+            details: new Dictionary<string, object>
+            {
+                { "budgetId", budgetId },
+                { "budgetName", budgetName },
+                { "amount", amount },
+                { "currency", currency }
+            });
+    }
+    
+    public Task LogBudgetUpdatedAsync(string userId, string budgetId, string budgetName, Dictionary<string, object>? changes = null)
+    {
+        return LogAsync(
+            AuditAction.BudgetUpdated,
+            AuditCategory.FinancialOperation,
+            success: true,
+            description: $"Budget updated: {budgetName}",
+            userId: userId,
+            details: new Dictionary<string, object>
+            {
+                { "budgetId", budgetId },
+                { "budgetName", budgetName },
+                { "changes", changes ?? new Dictionary<string, object>() }
+            });
+    }
+    
+    public Task LogBudgetDeletedAsync(string userId, string budgetId, string budgetName)
+    {
+        return LogAsync(
+            AuditAction.BudgetDeleted,
+            AuditCategory.FinancialOperation,
+            success: true,
+            description: $"Budget deleted: {budgetName}",
+            userId: userId,
+            details: new Dictionary<string, object>
+            {
+                { "budgetId", budgetId },
+                { "budgetName", budgetName }
+            });
+    }
+    
+    public Task LogBudgetAlertTriggeredAsync(string userId, string budgetId, string budgetName, decimal thresholdPercent, decimal actualPercent)
+    {
+        return LogAsync(
+            AuditAction.BudgetAlertTriggered,
+            AuditCategory.FinancialOperation,
+            success: true,
+            description: $"Budget alert: {budgetName} at {actualPercent:F1}% (threshold: {thresholdPercent}%)",
+            userId: userId,
+            details: new Dictionary<string, object>
+            {
+                { "budgetId", budgetId },
+                { "budgetName", budgetName },
+                { "thresholdPercent", thresholdPercent },
+                { "actualPercent", actualPercent }
+            });
     }
 
     public Task<int> GetFailedLoginCountAsync(string email, TimeSpan window)

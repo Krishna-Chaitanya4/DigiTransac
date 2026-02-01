@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace DigiTransac.Api.Services.Transactions;
 
 /// <summary>
@@ -6,6 +8,65 @@ namespace DigiTransac.Api.Services.Transactions;
 /// </summary>
 public static class DateTimeHelper
 {
+    // Regex patterns for input validation
+    private static readonly Regex DateLocalPattern = new(@"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$", RegexOptions.Compiled);
+    private static readonly Regex TimeLocalPattern = new(@"^([01]\d|2[0-3]):([0-5]\d)$", RegexOptions.Compiled);
+    
+    /// <summary>
+    /// Validates DateLocal format (YYYY-MM-DD).
+    /// </summary>
+    /// <param name="dateLocal">Date string to validate</param>
+    /// <returns>True if valid format, false otherwise</returns>
+    public static bool IsValidDateLocal(string? dateLocal)
+    {
+        if (string.IsNullOrEmpty(dateLocal))
+            return false;
+        
+        return DateLocalPattern.IsMatch(dateLocal);
+    }
+    
+    /// <summary>
+    /// Validates TimeLocal format (HH:mm).
+    /// </summary>
+    /// <param name="timeLocal">Time string to validate</param>
+    /// <returns>True if valid format, false otherwise</returns>
+    public static bool IsValidTimeLocal(string? timeLocal)
+    {
+        if (string.IsNullOrEmpty(timeLocal))
+            return false;
+        
+        return TimeLocalPattern.IsMatch(timeLocal);
+    }
+    
+    /// <summary>
+    /// Validates and parses DateLocal, returning the parsed date or null if invalid.
+    /// </summary>
+    public static DateTime? TryParseDateLocal(string? dateLocal)
+    {
+        if (!IsValidDateLocal(dateLocal))
+            return null;
+        
+        if (DateTime.TryParseExact(dateLocal, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var date))
+            return date;
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Validates and parses TimeLocal, returning the (hour, minute) or null if invalid.
+    /// </summary>
+    public static (int Hour, int Minute)? TryParseTimeLocal(string? timeLocal)
+    {
+        if (!IsValidTimeLocal(timeLocal))
+            return null;
+        
+        var parts = timeLocal!.Split(':');
+        if (int.TryParse(parts[0], out var hour) && int.TryParse(parts[1], out var minute))
+            return (hour, minute);
+        
+        return null;
+    }
+
     /// <summary>
     /// Derives UTC DateTime from local date, time, and timezone.
     /// This ensures Date is always calculated from the local fields, preventing discrepancies.
@@ -23,24 +84,21 @@ public static class DateTimeHelper
 
         try
         {
-            // Parse the local date
-            if (!DateTime.TryParseExact(dateLocal, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var localDate))
+            // Parse the local date with validation
+            var parsedDate = TryParseDateLocal(dateLocal);
+            if (!parsedDate.HasValue)
             {
                 return fallbackDate;
             }
+            var localDate = parsedDate.Value;
 
-            // Parse time (HH:mm format) - default to noon if not provided
+            // Parse time (HH:mm format) with validation - default to noon if not provided/invalid
             int hour = 12, minute = 0;
-            if (!string.IsNullOrEmpty(timeLocal))
+            var parsedTime = TryParseTimeLocal(timeLocal);
+            if (parsedTime.HasValue)
             {
-                var timeParts = timeLocal.Split(':');
-                if (timeParts.Length >= 2 &&
-                    int.TryParse(timeParts[0], out var h) && h >= 0 && h < 24 &&
-                    int.TryParse(timeParts[1], out var m) && m >= 0 && m < 60)
-                {
-                    hour = h;
-                    minute = m;
-                }
+                hour = parsedTime.Value.Hour;
+                minute = parsedTime.Value.Minute;
             }
 
             var localDateTime = new DateTime(localDate.Year, localDate.Month, localDate.Day, hour, minute, 0, DateTimeKind.Unspecified);
@@ -73,11 +131,27 @@ public static class DateTimeHelper
         string? requestTimeLocal,
         string? requestDateTimezone)
     {
-        // Normalize DateLocal - use request date if not provided
-        var dateLocal = requestDateLocal ?? requestDate.ToString("yyyy-MM-dd");
+        // Validate and normalize DateLocal - use request date if not provided or invalid
+        string dateLocal;
+        if (IsValidDateLocal(requestDateLocal))
+        {
+            dateLocal = requestDateLocal!;
+        }
+        else
+        {
+            dateLocal = requestDate.ToString("yyyy-MM-dd");
+        }
         
-        // Normalize TimeLocal - use current time if not provided
-        var timeLocal = requestTimeLocal ?? DateTime.UtcNow.ToString("HH:mm");
+        // Validate and normalize TimeLocal - use current time if not provided or invalid
+        string timeLocal;
+        if (IsValidTimeLocal(requestTimeLocal))
+        {
+            timeLocal = requestTimeLocal!;
+        }
+        else
+        {
+            timeLocal = DateTime.UtcNow.ToString("HH:mm");
+        }
         
         // Normalize DateTimezone - use local timezone if not provided
         var dateTimezone = requestDateTimezone ?? TimeZoneInfo.Local.Id;
@@ -86,6 +160,29 @@ public static class DateTimeHelper
         var derivedDate = DeriveUtcDate(dateLocal, timeLocal, dateTimezone, requestDate);
         
         return (derivedDate, dateLocal, timeLocal, dateTimezone);
+    }
+    
+    /// <summary>
+    /// Validates date/time inputs and returns validation errors if any.
+    /// </summary>
+    /// <param name="dateLocal">DateLocal to validate</param>
+    /// <param name="timeLocal">TimeLocal to validate</param>
+    /// <returns>List of validation error messages (empty if all valid)</returns>
+    public static List<string> ValidateInputs(string? dateLocal, string? timeLocal)
+    {
+        var errors = new List<string>();
+        
+        if (!string.IsNullOrEmpty(dateLocal) && !IsValidDateLocal(dateLocal))
+        {
+            errors.Add("DateLocal must be in YYYY-MM-DD format (e.g., 2024-01-31)");
+        }
+        
+        if (!string.IsNullOrEmpty(timeLocal) && !IsValidTimeLocal(timeLocal))
+        {
+            errors.Add("TimeLocal must be in HH:mm format (e.g., 14:30)");
+        }
+        
+        return errors;
     }
 
     /// <summary>

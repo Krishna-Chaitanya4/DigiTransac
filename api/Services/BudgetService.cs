@@ -36,6 +36,7 @@ public class BudgetService : IBudgetService
     private readonly IUserRepository _userRepository;
     private readonly IExchangeRateService _exchangeRateService;
     private readonly INotificationService _notificationService;
+    private readonly IAuditService _auditService;
     private readonly ILogger<BudgetService> _logger;
 
     public BudgetService(
@@ -46,6 +47,7 @@ public class BudgetService : IBudgetService
         IUserRepository userRepository,
         IExchangeRateService exchangeRateService,
         INotificationService notificationService,
+        IAuditService auditService,
         ILogger<BudgetService> logger)
     {
         _budgetRepository = budgetRepository;
@@ -55,6 +57,7 @@ public class BudgetService : IBudgetService
         _userRepository = userRepository;
         _exchangeRateService = exchangeRateService;
         _notificationService = notificationService;
+        _auditService = auditService;
         _logger = logger;
     }
 
@@ -104,6 +107,9 @@ public class BudgetService : IBudgetService
         };
 
         await _budgetRepository.CreateAsync(budget);
+        
+        // Audit log the budget creation
+        await _auditService.LogBudgetCreatedAsync(userId, budget.Id, budget.Name, budget.Amount, budget.Currency);
 
         var response = await BuildBudgetResponseAsync(budget, userId);
         return (true, "Budget created successfully", response);
@@ -148,6 +154,13 @@ public class BudgetService : IBudgetService
 
         budget.UpdatedAt = DateTime.UtcNow;
         await _budgetRepository.UpdateAsync(budget);
+        
+        // Audit log the budget update
+        await _auditService.LogBudgetUpdatedAsync(userId, budget.Id, budget.Name, new Dictionary<string, object>
+        {
+            { "amount", budget.Amount },
+            { "isActive", budget.IsActive }
+        });
 
         var response = await BuildBudgetResponseAsync(budget, userId);
         return (true, "Budget updated successfully", response);
@@ -161,7 +174,12 @@ public class BudgetService : IBudgetService
             return (false, "Budget not found");
         }
 
+        var budgetName = budget.Name;
         await _budgetRepository.DeleteAsync(budgetId);
+        
+        // Audit log the budget deletion
+        await _auditService.LogBudgetDeletedAsync(userId, budgetId, budgetName);
+        
         _logger.LogInformation("Deleted budget {BudgetId} for user {UserId}", budgetId, userId);
         return (true, "Budget deleted successfully");
     }
@@ -405,6 +423,10 @@ public class BudgetService : IBudgetService
 
                         await _budgetRepository.CreateNotificationAsync(notification);
                         
+                        // Audit log the budget alert
+                        await _auditService.LogBudgetAlertTriggeredAsync(
+                            userId, budget.Id, budget.Name, alert.ThresholdPercent, (decimal)percentUsed);
+                        
                         // Send real-time notification
                         await _notificationService.SendBudgetAlertAsync(
                             userId,
@@ -551,21 +573,14 @@ public class BudgetService : IBudgetService
         }
         
         // Build filter for expenses (Send transactions only)
-        var filter = new TransactionFilterRequest(
-            StartDate: periodStart,
-            EndDate: periodEnd,
-            AccountIds: budget.AccountIds.Any() ? budget.AccountIds : null,
-            Types: new List<string> { "Send" },  // Only expenses
-            LabelIds: expandedLabelIds,
-            TagIds: null,
-            MinAmount: null,
-            MaxAmount: null,
-            SearchText: null,
-            Status: "Confirmed",  // Only confirmed transactions
-            IsRecurring: null,
-            Page: 1,
-            PageSize: 10000  // Get all for calculation
-        );
+        var filter = TransactionFilterRequest.Builder()
+            .WithDateRange(periodStart, periodEnd)
+            .WithAccounts(budget.AccountIds.Any() ? budget.AccountIds : null)
+            .WithTypes(new List<string> { "Send" })  // Only expenses
+            .WithLabels(expandedLabelIds)
+            .WithStatus("Confirmed")  // Only confirmed transactions
+            .WithPagination(1, 10000)  // Get all for calculation
+            .Build();
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
         return transactions;

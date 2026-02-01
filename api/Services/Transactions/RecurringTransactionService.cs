@@ -201,8 +201,7 @@ public class RecurringTransactionService : IRecurringTransactionService
         if (deleteFutureInstances)
         {
             // Delete future instances (transactions with parentTransactionId = this id and date >= today)
-            var filter = new TransactionFilterRequest(
-                DateTime.UtcNow.Date, null, null, null, null, null, null, null, null, null, null, 1, int.MaxValue);
+            var filter = TransactionFilterRequest.ForRecurring(DateTime.UtcNow.Date);
             var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
             foreach (var transaction in transactions.Where(t => t.ParentTransactionId == id))

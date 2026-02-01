@@ -139,10 +139,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 : primaryCurrency;
 
         // Get all transactions for the period
-        var filter = new TransactionFilterRequest(
-            startDate, endDate,
-            accountId != null ? new List<string> { accountId } : null,
-            null, null, null, null, null, null, null, null, null, null);
+        var filter = TransactionFilterRequest.ForAnalytics(
+            startDate ?? DateTime.MinValue,
+            endDate ?? DateTime.MaxValue,
+            accountId != null ? new List<string> { accountId } : null);
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
@@ -242,7 +242,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         string userId,
         DateTime? startDate,
         DateTime? endDate,
-        int limit = 10)
+        int page = 1,
+        int pageSize = 10)
     {
         var dek = await _mapperService.GetUserDekAsync(userId);
         var user = await _userRepository.GetByIdAsync(userId);
@@ -257,9 +258,11 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var counterpartyUsers = new Dictionary<string, User>();
 
         // Get transactions for the period
-        var filter = new TransactionFilterRequest(
-            startDate, endDate, null, null, null, null, null, null, null,
-            "Confirmed", null, null, null);
+        var filter = TransactionFilterRequest.Builder()
+            .WithDateRange(startDate, endDate)
+            .WithStatus("Confirmed")
+            .WithPagination(1, int.MaxValue)
+            .Build();
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
@@ -293,7 +296,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 : (t.Title ?? "Unknown");
 
         // Group by payee/counterparty
-        var counterpartyGroups = sendTransactions
+        var allCounterpartyGroups = sendTransactions
             .GroupBy(t => {
                 // Use counterparty user for P2P, otherwise decrypted payee name
                 if (!string.IsNullOrEmpty(t.CounterpartyUserId))
@@ -315,12 +318,19 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 };
             })
             .OrderByDescending(x => x.TotalAmount)
-            .Take(limit)
             .ToList();
 
-        var totalSpending = counterpartyGroups.Sum(x => x.TotalAmount);
+        var totalCount = allCounterpartyGroups.Count;
+        
+        // Apply pagination
+        var paginatedGroups = allCounterpartyGroups
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
 
-        var counterparties = counterpartyGroups.Select(x => new CounterpartySpending(
+        var totalSpending = allCounterpartyGroups.Sum(x => x.TotalAmount);
+
+        var counterparties = paginatedGroups.Select(x => new CounterpartySpending(
             x.Name,
             x.UserId,
             x.Type == "P2P" ? x.Name : null,
@@ -330,13 +340,15 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             x.Type
         )).ToList();
 
-        return new TopCounterpartiesResponse(counterparties, primaryCurrency);
+        return new TopCounterpartiesResponse(counterparties, primaryCurrency, page, pageSize, totalCount);
     }
 
     public async Task<SpendingByAccountResponse> GetSpendingByAccountAsync(
         string userId,
         DateTime? startDate,
-        DateTime? endDate)
+        DateTime? endDate,
+        int page = 1,
+        int pageSize = 50)
     {
         var user = await _userRepository.GetByIdAsync(userId);
         var primaryCurrency = user?.PrimaryCurrency ?? "USD";
@@ -347,16 +359,18 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var accountDict = accounts.ToDictionary(a => a.Id);
 
         // Get transactions for the period
-        var filter = new TransactionFilterRequest(
-            startDate, endDate, null, null, null, null, null, null, null,
-            "Confirmed", null, null, null);
+        var filter = TransactionFilterRequest.Builder()
+            .WithDateRange(startDate, endDate)
+            .WithStatus("Confirmed")
+            .WithPagination(1, int.MaxValue)
+            .Build();
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
         var actualTransactions = transactions.Where(t => !t.IsRecurringTemplate).ToList();
 
         // Group by account
-        var accountGroups = actualTransactions
+        var allAccountGroups = actualTransactions
             .Where(t => !string.IsNullOrEmpty(t.AccountId))
             .GroupBy(t => t.AccountId!)
             .Select(g => {
@@ -381,9 +395,16 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .OrderByDescending(x => x.TotalDebits)
             .ToList();
 
-        var totalDebits = accountGroups.Sum(x => x.TotalDebits);
+        var totalCount = allAccountGroups.Count;
+        var totalDebits = allAccountGroups.Sum(x => x.TotalDebits);
+        
+        // Apply pagination
+        var paginatedGroups = allAccountGroups
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
 
-        var accountSpending = accountGroups.Select(x => new AccountSpending(
+        var accountSpending = paginatedGroups.Select(x => new AccountSpending(
             x.AccountId,
             x.AccountName,
             x.AccountCurrency,
@@ -394,7 +415,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             totalDebits > 0 ? Math.Round(x.TotalDebits / totalDebits * 100, 1) : 0
         )).ToList();
 
-        return new SpendingByAccountResponse(accountSpending, primaryCurrency);
+        return new SpendingByAccountResponse(accountSpending, primaryCurrency, page, pageSize, totalCount);
     }
 
     public async Task<SpendingPatternsResponse> GetSpendingPatternsAsync(
@@ -411,9 +432,11 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .ToDictionary(a => a.Id);
 
         // Get transactions for the period
-        var filter = new TransactionFilterRequest(
-            startDate, endDate, null, null, null, null, null, null, null,
-            "Confirmed", null, null, null);
+        var filter = TransactionFilterRequest.Builder()
+            .WithDateRange(startDate, endDate)
+            .WithStatus("Confirmed")
+            .WithPagination(1, int.MaxValue)
+            .Build();
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
@@ -518,7 +541,9 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
     public async Task<SpendingAnomaliesResponse> GetSpendingAnomaliesAsync(
         string userId,
         DateTime? startDate,
-        DateTime? endDate)
+        DateTime? endDate,
+        int page = 1,
+        int pageSize = 10)
     {
         var dek = await _mapperService.GetUserDekAsync(userId);
         var user = await _userRepository.GetByIdAsync(userId);
@@ -532,9 +557,11 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .ToDictionary(l => l.Id);
 
         // Get transactions for the period (current period)
-        var filter = new TransactionFilterRequest(
-            startDate, endDate, null, null, null, null, null, null, null,
-            "Confirmed", null, null, null);
+        var filter = TransactionFilterRequest.Builder()
+            .WithDateRange(startDate, endDate)
+            .WithStatus("Confirmed")
+            .WithPagination(1, int.MaxValue)
+            .Build();
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
@@ -612,9 +639,11 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var historicalStart = (startDate ?? DateTime.UtcNow.AddMonths(-1)) - periodLength;
         var historicalEnd = startDate ?? DateTime.UtcNow.AddMonths(-1);
 
-        var historicalFilter = new TransactionFilterRequest(
-            historicalStart, historicalEnd, null, null, null, null, null, null, null,
-            "Confirmed", null, null, null);
+        var historicalFilter = TransactionFilterRequest.Builder()
+            .WithDateRange(historicalStart, historicalEnd)
+            .WithStatus("Confirmed")
+            .WithPagination(1, int.MaxValue)
+            .Build();
 
         var (historicalTransactions, _) = await _transactionRepository.GetFilteredAsync(userId, historicalFilter);
 
@@ -688,13 +717,20 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             }
         }
 
-        // Sort by severity and limit results
-        anomalies = anomalies
+        // Sort by severity
+        var sortedAnomalies = anomalies
             .OrderByDescending(a => a.Severity == "High" ? 3 : a.Severity == "Medium" ? 2 : 1)
             .ThenByDescending(a => a.Amount ?? 0)
-            .Take(10)
+            .ToList();
+        
+        var totalCount = sortedAnomalies.Count;
+        
+        // Apply pagination
+        var paginatedAnomalies = sortedAnomalies
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToList();
 
-        return new SpendingAnomaliesResponse(anomalies, primaryCurrency);
+        return new SpendingAnomaliesResponse(paginatedAnomalies, primaryCurrency, page, pageSize, totalCount);
     }
 }

@@ -63,6 +63,11 @@ public class TransactionRepository : ITransactionRepository
                 .Ascending(t => t.UserId)
                 .Descending(t => t.Date)),
             
+            // User + DateLocal for local date filtering (analytics, insights)
+            new(Builders<Transaction>.IndexKeys
+                .Ascending(t => t.UserId)
+                .Descending(t => t.DateLocal)),
+            
             // Account + Date for account-specific queries
             new(Builders<Transaction>.IndexKeys
                 .Ascending(t => t.AccountId)

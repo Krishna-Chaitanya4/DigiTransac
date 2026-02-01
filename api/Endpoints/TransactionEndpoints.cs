@@ -316,11 +316,13 @@ public static class TransactionEndpoints
         .Produces<ErrorResponse>(400);
 
         // Get analytics
+        // Cache analytics for 5 minutes to reduce load on expensive aggregate queries
         group.MapGet("/analytics", async (
             DateTime? startDate,
             DateTime? endDate,
             string? accountId,
             ClaimsPrincipal user,
+            HttpContext httpContext,
             ITransactionService transactionService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -328,6 +330,10 @@ public static class TransactionEndpoints
                 return Results.Unauthorized();
 
             var analytics = await transactionService.GetAnalyticsAsync(userId, startDate, endDate, accountId);
+            
+            // Set cache headers for analytics (5 minutes client-side, must-revalidate)
+            SetAnalyticsCacheHeaders(httpContext, TimeSpan.FromMinutes(5));
+            
             return Results.Ok(analytics);
         })
         .WithName("GetTransactionAnalytics")
@@ -337,15 +343,21 @@ public static class TransactionEndpoints
         group.MapGet("/analytics/counterparties", async (
             DateTime? startDate,
             DateTime? endDate,
-            int? limit,
+            int? page,
+            int? pageSize,
             ClaimsPrincipal user,
+            HttpContext httpContext,
             ITransactionAnalyticsService analyticsService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetTopCounterpartiesAsync(userId, startDate, endDate, limit ?? 10);
+            var result = await analyticsService.GetTopCounterpartiesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10);
+            
+            // Set cache headers (5 minutes)
+            SetAnalyticsCacheHeaders(httpContext, TimeSpan.FromMinutes(5));
+            
             return Results.Ok(result);
         })
         .WithName("GetTopCounterparties")
@@ -355,14 +367,21 @@ public static class TransactionEndpoints
         group.MapGet("/analytics/by-account", async (
             DateTime? startDate,
             DateTime? endDate,
+            int? page,
+            int? pageSize,
             ClaimsPrincipal user,
+            HttpContext httpContext,
             ITransactionAnalyticsService analyticsService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate);
+            var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 50);
+            
+            // Set cache headers (5 minutes)
+            SetAnalyticsCacheHeaders(httpContext, TimeSpan.FromMinutes(5));
+            
             return Results.Ok(result);
         })
         .WithName("GetSpendingByAccount")
@@ -373,6 +392,7 @@ public static class TransactionEndpoints
             DateTime? startDate,
             DateTime? endDate,
             ClaimsPrincipal user,
+            HttpContext httpContext,
             ITransactionAnalyticsService analyticsService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -380,6 +400,10 @@ public static class TransactionEndpoints
                 return Results.Unauthorized();
 
             var result = await analyticsService.GetSpendingPatternsAsync(userId, startDate, endDate);
+            
+            // Set cache headers (5 minutes)
+            SetAnalyticsCacheHeaders(httpContext, TimeSpan.FromMinutes(5));
+            
             return Results.Ok(result);
         })
         .WithName("GetSpendingPatterns")
@@ -389,14 +413,21 @@ public static class TransactionEndpoints
         group.MapGet("/analytics/anomalies", async (
             DateTime? startDate,
             DateTime? endDate,
+            int? page,
+            int? pageSize,
             ClaimsPrincipal user,
+            HttpContext httpContext,
             ITransactionAnalyticsService analyticsService) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetSpendingAnomaliesAsync(userId, startDate, endDate);
+            var result = await analyticsService.GetSpendingAnomaliesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10);
+            
+            // Set cache headers (5 minutes)
+            SetAnalyticsCacheHeaders(httpContext, TimeSpan.FromMinutes(5));
+            
             return Results.Ok(result);
         })
         .WithName("GetSpendingAnomalies")
@@ -549,5 +580,27 @@ public static class TransactionEndpoints
         .WithTags("Transactions", "Import")
         .Produces<BulkImportResponse>(200)
         .Produces<BulkImportResponse>(400);
+    }
+    
+    /// <summary>
+    /// Sets cache headers for analytics endpoints.
+    /// Uses private cache (user-specific data) with short duration for freshness.
+    /// </summary>
+    /// <param name="httpContext">The HTTP context</param>
+    /// <param name="duration">How long to cache the response</param>
+    private static void SetAnalyticsCacheHeaders(HttpContext httpContext, TimeSpan duration)
+    {
+        var response = httpContext.Response;
+        
+        // Cache-Control: private (user-specific), max-age, must-revalidate
+        response.Headers.CacheControl = $"private, max-age={(int)duration.TotalSeconds}, must-revalidate";
+        
+        // Add Vary header to ensure cache varies by Authorization header
+        response.Headers.Vary = "Authorization";
+        
+        // Set ETag based on current timestamp (changes when data might have changed)
+        // This allows clients to use If-None-Match for conditional requests
+        var etag = $"\"{DateTime.UtcNow.Ticks}\"";
+        response.Headers.ETag = etag;
     }
 }

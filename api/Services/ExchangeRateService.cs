@@ -28,6 +28,12 @@ public class ExchangeRateService : IExchangeRateService
     private const string RatesCacheKey = "exchange_rates";
     private const string CurrenciesCacheKey = "supported_currencies";
     private static readonly TimeSpan MemoryCacheDuration = TimeSpan.FromMinutes(30);
+    
+    // Rate limiting: prevent concurrent API calls (request coalescing)
+    private static readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
+    private static Task<ExchangeRateResponse>? _refreshTask;
+    private static DateTime _lastApiCall = DateTime.MinValue;
+    private static readonly TimeSpan _minApiInterval = TimeSpan.FromMinutes(1); // Minimum 1 minute between API calls
 
     public ExchangeRateService(
         IExchangeRateRepository exchangeRateRepository,
@@ -86,7 +92,50 @@ public class ExchangeRateService : IExchangeRateService
 
     public async Task<ExchangeRateResponse> RefreshRatesAsync()
     {
+        // Rate limiting with request coalescing
+        // If a refresh is already in progress, wait for it instead of making another API call
+        await _refreshSemaphore.WaitAsync();
+        try
+        {
+            // Check if we're being rate limited
+            var timeSinceLastCall = DateTime.UtcNow - _lastApiCall;
+            if (timeSinceLastCall < _minApiInterval)
+            {
+                _logger.LogInformation("Rate limited: waiting for {Seconds}s before next API call",
+                    (_minApiInterval - timeSinceLastCall).TotalSeconds);
+                
+                // Return cached data if available
+                var stored = await _exchangeRateRepository.GetLatestAsync();
+                if (stored != null)
+                {
+                    return MapToResponse(stored, null);
+                }
+                
+                // If no cached data, wait and retry
+                await Task.Delay(_minApiInterval - timeSinceLastCall);
+            }
+            
+            // If there's already a refresh in progress, reuse it
+            if (_refreshTask != null && !_refreshTask.IsCompleted)
+            {
+                _logger.LogDebug("Reusing in-progress refresh task");
+                return await _refreshTask;
+            }
+            
+            // Start a new refresh task
+            _refreshTask = RefreshRatesInternalAsync();
+            return await _refreshTask;
+        }
+        finally
+        {
+            _refreshSemaphore.Release();
+        }
+    }
+    
+    private async Task<ExchangeRateResponse> RefreshRatesInternalAsync()
+    {
         _logger.LogInformation("Fetching fresh exchange rates from API");
+        _lastApiCall = DateTime.UtcNow;
         
         string? json = null;
         

@@ -84,7 +84,227 @@ public record TransactionFilterRequest(
     List<string>? SearchAccountIds = null,
     List<string>? CounterpartyUserIds = null,  // Filter by counterparty users
     List<string>? SearchCounterpartyUserIds = null  // Search matched counterparty IDs
-);
+)
+{
+    /// <summary>
+    /// Creates a filter for simple date range queries with optional pagination.
+    /// </summary>
+    public static TransactionFilterRequest ForDateRange(
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        int page = 1,
+        int pageSize = 50)
+    {
+        return new TransactionFilterRequest(
+            startDate, endDate,
+            null, null, null, null, null, null, null, null, null,
+            page, pageSize);
+    }
+
+    /// <summary>
+    /// Creates a filter for analytics queries (no pagination, returns all matching).
+    /// </summary>
+    public static TransactionFilterRequest ForAnalytics(
+        DateTime startDate,
+        DateTime endDate,
+        List<string>? accountIds = null,
+        List<string>? types = null,
+        List<string>? labelIds = null)
+    {
+        return new TransactionFilterRequest(
+            startDate, endDate,
+            accountIds, types, labelIds,
+            null, null, null, null, null, null,
+            1, int.MaxValue);
+    }
+
+    /// <summary>
+    /// Creates a filter for budget spending calculations (expenses only).
+    /// </summary>
+    public static TransactionFilterRequest ForBudget(
+        DateTime periodStart,
+        DateTime periodEnd,
+        List<string>? accountIds = null,
+        List<string>? labelIds = null)
+    {
+        return new TransactionFilterRequest(
+            periodStart, periodEnd,
+            accountIds,
+            new List<string> { "Send" },  // Budget tracks expenses (Send type)
+            labelIds,
+            null, null, null, null, null, null,
+            1, int.MaxValue);
+    }
+
+    /// <summary>
+    /// Creates a filter for recurring transaction queries.
+    /// </summary>
+    public static TransactionFilterRequest ForRecurring(
+        DateTime? startDate = null,
+        int page = 1,
+        int pageSize = int.MaxValue)
+    {
+        return new TransactionFilterRequest(
+            startDate, null,
+            null, null, null, null, null, null, null, null, null,
+            page, pageSize);
+    }
+
+    /// <summary>
+    /// Creates an empty filter that returns all transactions with default pagination.
+    /// </summary>
+    public static TransactionFilterRequest Empty(int page = 1, int pageSize = 50)
+    {
+        return new TransactionFilterRequest(
+            null, null,
+            null, null, null, null, null, null, null, null, null,
+            page, pageSize);
+    }
+
+    /// <summary>
+    /// Creates a filter with full control over all parameters (builder-style).
+    /// </summary>
+    public static TransactionFilterRequestBuilder Builder() => new();
+}
+
+/// <summary>
+/// Fluent builder for TransactionFilterRequest for complex filtering scenarios.
+/// </summary>
+public class TransactionFilterRequestBuilder
+{
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private List<string>? _accountIds;
+    private List<string>? _types;
+    private List<string>? _labelIds;
+    private List<string>? _tagIds;
+    private decimal? _minAmount;
+    private decimal? _maxAmount;
+    private string? _searchText;
+    private string? _status;
+    private bool? _isRecurring;
+    private int? _page;
+    private int? _pageSize;
+    private bool? _hasLinkedTransaction;
+    private List<string>? _searchLabelIds;
+    private List<string>? _searchTagIds;
+    private List<string>? _searchAccountIds;
+    private List<string>? _counterpartyUserIds;
+    private List<string>? _searchCounterpartyUserIds;
+
+    public TransactionFilterRequestBuilder WithDateRange(DateTime? start, DateTime? end)
+    {
+        _startDate = start;
+        _endDate = end;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithAccounts(List<string>? accountIds)
+    {
+        _accountIds = accountIds;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithTypes(List<string>? types)
+    {
+        _types = types;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithLabels(List<string>? labelIds)
+    {
+        _labelIds = labelIds;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithTags(List<string>? tagIds)
+    {
+        _tagIds = tagIds;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithAmountRange(decimal? min, decimal? max)
+    {
+        _minAmount = min;
+        _maxAmount = max;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithSearch(string? searchText)
+    {
+        _searchText = searchText;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithStatus(string? status)
+    {
+        _status = status;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithRecurring(bool? isRecurring)
+    {
+        _isRecurring = isRecurring;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithPagination(int page, int pageSize)
+    {
+        _page = page;
+        _pageSize = pageSize;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithLinkedTransaction(bool? hasLinked)
+    {
+        _hasLinkedTransaction = hasLinked;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithSearchFilters(
+        List<string>? searchLabelIds = null,
+        List<string>? searchTagIds = null,
+        List<string>? searchAccountIds = null)
+    {
+        _searchLabelIds = searchLabelIds;
+        _searchTagIds = searchTagIds;
+        _searchAccountIds = searchAccountIds;
+        return this;
+    }
+
+    public TransactionFilterRequestBuilder WithCounterparties(
+        List<string>? counterpartyUserIds = null,
+        List<string>? searchCounterpartyUserIds = null)
+    {
+        _counterpartyUserIds = counterpartyUserIds;
+        _searchCounterpartyUserIds = searchCounterpartyUserIds;
+        return this;
+    }
+
+    public TransactionFilterRequest Build()
+    {
+        return new TransactionFilterRequest(
+            _startDate,
+            _endDate,
+            _accountIds,
+            _types,
+            _labelIds,
+            _tagIds,
+            _minAmount,
+            _maxAmount,
+            _searchText,
+            _status,
+            _isRecurring,
+            _page ?? 1,
+            _pageSize ?? 50,
+            _hasLinkedTransaction,
+            _searchLabelIds,
+            _searchTagIds,
+            _searchAccountIds,
+            _counterpartyUserIds,
+            _searchCounterpartyUserIds);
+    }
+}
 
 // Response DTOs
 public record TransactionSplitResponse(
@@ -260,7 +480,10 @@ public record AveragesByType(
 /// </summary>
 public record TopCounterpartiesResponse(
     List<CounterpartySpending> Counterparties,
-    string Currency
+    string Currency,
+    int? Page = null,
+    int? PageSize = null,
+    int? TotalCount = null
 );
 
 public record CounterpartySpending(
@@ -278,7 +501,10 @@ public record CounterpartySpending(
 /// </summary>
 public record SpendingByAccountResponse(
     List<AccountSpending> Accounts,
-    string Currency
+    string Currency,
+    int? Page = null,
+    int? PageSize = null,
+    int? TotalCount = null
 );
 
 public record AccountSpending(
@@ -322,7 +548,10 @@ public record HourOfDaySpending(
 /// </summary>
 public record SpendingAnomaliesResponse(
     List<SpendingAnomaly> Anomalies,
-    string Currency
+    string Currency,
+    int? Page = null,
+    int? PageSize = null,
+    int? TotalCount = null
 );
 
 public record SpendingAnomaly(

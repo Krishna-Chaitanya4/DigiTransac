@@ -31,7 +31,8 @@ public interface ITransactionAnalyticsService
         string userId,
         DateTime? startDate,
         DateTime? endDate,
-        int limit = 10);
+        int page = 1,
+        int pageSize = 10);
     
     /// <summary>
     /// Get spending breakdown by account
@@ -39,7 +40,9 @@ public interface ITransactionAnalyticsService
     Task<SpendingByAccountResponse> GetSpendingByAccountAsync(
         string userId,
         DateTime? startDate,
-        DateTime? endDate);
+        DateTime? endDate,
+        int page = 1,
+        int pageSize = 50);
     
     /// <summary>
     /// Get spending patterns by day of week and hour of day
@@ -55,5 +58,7 @@ public interface ITransactionAnalyticsService
     Task<SpendingAnomaliesResponse> GetSpendingAnomaliesAsync(
         string userId,
         DateTime? startDate,
-        DateTime? endDate);
+        DateTime? endDate,
+        int page = 1,
+        int pageSize = 10);
 }

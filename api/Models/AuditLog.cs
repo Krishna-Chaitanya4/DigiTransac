@@ -126,6 +126,12 @@ public enum AuditAction
     P2PTransactionAccepted,
     P2PTransactionRejected,
     
+    // Budget Operations
+    BudgetCreated,
+    BudgetUpdated,
+    BudgetDeleted,
+    BudgetAlertTriggered,
+    
     // Account Operations (Financial Accounts)
     FinancialAccountCreated,
     FinancialAccountUpdated,
