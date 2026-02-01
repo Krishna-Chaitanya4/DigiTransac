@@ -401,12 +401,13 @@ export function useInvalidateTransactions() {
 export function useTopCounterparties(
   startDate?: string,
   endDate?: string,
-  limit = 10,
+  pageSize = 10,
+  page = 1,
   enabled = true
 ) {
   return useQuery({
-    queryKey: ['transactions', 'analytics', 'counterparties', { startDate, endDate, limit }],
-    queryFn: () => getTopCounterparties(startDate, endDate, limit),
+    queryKey: ['transactions', 'analytics', 'counterparties', { startDate, endDate, page, pageSize }],
+    queryFn: () => getTopCounterparties(startDate, endDate, pageSize, page),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled,
   });

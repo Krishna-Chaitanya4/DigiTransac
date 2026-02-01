@@ -308,12 +308,14 @@ export async function getPendingCount(): Promise<number> {
 export async function getTopCounterparties(
   startDate?: string,
   endDate?: string,
-  limit = 10
+  pageSize = 10,
+  page = 1
 ): Promise<TopCounterpartiesResponse> {
   const params = new URLSearchParams();
   if (startDate) params.append('startDate', startDate);
   if (endDate) params.append('endDate', endDate);
-  params.append('limit', limit.toString());
+  params.append('page', page.toString());
+  params.append('pageSize', pageSize.toString());
   
   const query = params.toString();
   return apiClient.get<TopCounterpartiesResponse>(`/transactions/analytics/counterparties?${query}`);
