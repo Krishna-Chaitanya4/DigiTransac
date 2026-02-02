@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, ReactNode, DragEvent, memo } from 'react';
+import { useState, useMemo, useEffect, useCallback, ReactNode, DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';

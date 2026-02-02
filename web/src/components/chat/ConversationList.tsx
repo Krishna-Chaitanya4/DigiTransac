@@ -92,12 +92,24 @@ export const ConversationList = memo(function ConversationList({
 
   return (
     <>
+      {/* CSS-based responsive width - applies only on desktop */}
+      <style>{`
+        @media (min-width: 768px) {
+          [data-sidebar-width] {
+            width: ${sidebarWidth}px !important;
+            min-width: ${minWidth}px !important;
+            max-width: ${maxWidth}px !important;
+          }
+        }
+      `}</style>
       <div
         ref={sidebarRef}
-        className={`flex flex-col border-r border-gray-200 dark:border-gray-700 ${
-          selectedUserId ? 'hidden md:flex' : 'flex'
+        data-sidebar-width
+        className={`flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 h-full ${
+          selectedUserId
+            ? 'hidden md:flex' // Hidden on mobile when chat is open, visible on desktop
+            : 'flex w-full md:w-auto' // Full width on mobile, auto on desktop
         }`}
-        style={{ width: `${sidebarWidth}px`, minWidth: `${minWidth}px`, maxWidth: `${maxWidth}px` }}
       >
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">

@@ -20,6 +20,8 @@ export {
   useSpendingByAccount,
   useSpendingPatterns,
   useSpendingAnomalies,
+  useLocationInsights,
+  useTripGroups,
 } from './useTransactionQueries';
 
 // Account queries

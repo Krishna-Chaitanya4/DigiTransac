@@ -308,3 +308,75 @@ export interface SpendingAnomaly {
   payeeName?: string;
   detectedAt: string;
 }
+
+// ============ Location-based Analytics Types ============
+
+// Location Insights Response
+export interface LocationInsightsResponse {
+  topLocations: LocationSpendingCluster[];
+  nearbySpending?: LocationSpendingCluster;
+  totalSpendingWithLocation: number;
+  transactionsWithLocation: number;
+  totalTransactions: number;
+  currency: string;
+}
+
+export interface LocationSpendingCluster {
+  name: string;
+  latitude: number;
+  longitude: number;
+  city?: string;
+  country?: string;
+  totalAmount: number;
+  transactionCount: number;
+  percentage: number;
+  topCategory?: string;
+  topCategoryColor?: string;
+  averageAmount: number;
+  firstVisit?: string;
+  lastVisit?: string;
+}
+
+// ============ Trip Grouping Types ============
+
+// Trip Groups Response
+export interface TripGroupsResponse {
+  trips: TripGroup[];
+  totalTripSpending: number;
+  totalTripTransactions: number;
+  currency: string;
+}
+
+export interface TripGroup {
+  id: string;
+  name: string;  // "Tokyo Trip", "Paris Weekend"
+  city?: string;
+  country?: string;
+  centerLatitude: number;
+  centerLongitude: number;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  totalAmount: number;
+  transactionCount: number;
+  categoryBreakdown: TripCategoryBreakdown[];
+  dailyBreakdown: TripDaySpending[];
+  isHomeBase: boolean;
+}
+
+export interface TripCategoryBreakdown {
+  labelId: string;
+  labelName: string;
+  labelColor?: string;
+  labelIcon?: string;
+  amount: number;
+  transactionCount: number;
+  percentage: number;
+}
+
+export interface TripDaySpending {
+  date: string;
+  dayName: string;
+  amount: number;
+  transactionCount: number;
+}

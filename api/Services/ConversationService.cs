@@ -408,11 +408,24 @@ public class ConversationService : IConversationService
                 }
             }
             
-            // Derive IsSystemGenerated and SystemSource from Transaction.Source
-            var isSystemGenerated = tx?.Source is TransactionSource.Recurring 
-                                               or TransactionSource.Import 
-                                               or TransactionSource.Transfer;
-            var systemSource = isSystemGenerated ? tx?.Source.ToString() : null;
+            // Use ChatMessage's IsSystemGenerated and SystemSource fields (set by TransferService, etc.)
+            // Only fall back to deriving from Transaction.Source for backwards compatibility
+            bool isSystemGenerated;
+            string? systemSource;
+            
+            if (msg.IsSystemGenerated || !string.IsNullOrEmpty(msg.SystemSource))
+            {
+                // Use the ChatMessage's own fields (set explicitly by TransferService)
+                isSystemGenerated = msg.IsSystemGenerated;
+                systemSource = msg.SystemSource;
+            }
+            else
+            {
+                // Fall back to deriving from Transaction.Source for older transactions
+                isSystemGenerated = tx?.Source is TransactionSource.Recurring
+                                               or TransactionSource.Import;
+                systemSource = isSystemGenerated ? tx?.Source.ToString() : null;
+            }
             
             messages.Add(new ConversationMessage(
                 Id: msg.Id,

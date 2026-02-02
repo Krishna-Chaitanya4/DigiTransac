@@ -260,8 +260,8 @@ export function TransactionForm({
         // Set time/timezone from existing transaction
         setTimeLocal(editingTransaction.timeLocal || getCurrentTime());
         setDateTimezone(editingTransaction.dateTimezone || getUserTimezone());
-        // Show advanced options if they were customized
-        setShowAdvancedOptions(!!editingTransaction.timeLocal || !!editingTransaction.dateTimezone);
+        // Always start collapsed - user can expand if needed
+        setShowAdvancedOptions(false);
       } else {
         // Reset to defaults for new transaction
         const categoryLabels = labels.filter(l => l.type === 'Category');

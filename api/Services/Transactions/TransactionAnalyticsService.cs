@@ -733,4 +733,476 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         return new SpendingAnomaliesResponse(paginatedAnomalies, primaryCurrency, page, pageSize, totalCount);
     }
+
+    public async Task<LocationInsightsResponse> GetLocationInsightsAsync(
+        string userId,
+        DateTime? startDate,
+        DateTime? endDate,
+        double? latitude = null,
+        double? longitude = null,
+        double radiusKm = 1.0)
+    {
+        var dek = await _mapperService.GetUserDekAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse.Rates;
+
+        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
+            .ToDictionary(a => a.Id);
+        var labels = (await _labelRepository.GetByUserIdAsync(userId))
+            .ToDictionary(l => l.Id);
+
+        // Get transactions for the period
+        var filter = TransactionFilterRequest.Builder()
+            .WithDateRange(startDate, endDate)
+            .WithStatus("Confirmed")
+            .WithPagination(1, int.MaxValue)
+            .Build();
+
+        var (transactions, totalCount) = await _transactionRepository.GetFilteredAsync(userId, filter);
+
+        // Filter transactions with location data
+        var transactionsWithLocation = transactions
+            .Where(t => t.Location != null && !t.IsRecurringTemplate)
+            .ToList();
+
+        // Helper to get transaction currency
+        string GetTransactionCurrency(Transaction t) =>
+            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
+                ? acc.Currency
+                : primaryCurrency;
+
+        // Helper to decrypt longitude
+        double GetLongitude(TransactionLocation loc)
+        {
+            if (dek != null && !string.IsNullOrEmpty(loc.EncryptedLongitude))
+            {
+                var decrypted = _mapperService.DecryptIfNotEmpty(loc.EncryptedLongitude, dek);
+                if (double.TryParse(decrypted, out var lon))
+                    return lon;
+            }
+            return 0;
+        }
+
+        // Helper to decrypt place name
+        string? GetPlaceName(TransactionLocation loc)
+        {
+            if (dek != null && !string.IsNullOrEmpty(loc.EncryptedPlaceName))
+            {
+                return _mapperService.DecryptIfNotEmpty(loc.EncryptedPlaceName, dek);
+            }
+            return null;
+        }
+
+        // Helper to calculate distance using Haversine formula
+        double CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double EarthRadiusKm = 6371.0;
+            var dLat = ToRadians(lat2 - lat1);
+            var dLon = ToRadians(lon2 - lon1);
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return EarthRadiusKm * c;
+        }
+
+        double ToRadians(double degrees) => degrees * Math.PI / 180.0;
+
+        // Calculate total spending with location
+        var totalSpendingWithLocation = transactionsWithLocation
+            .Where(t => t.Type == TransactionType.Send)
+            .Sum(t => _exchangeRateService.Convert(
+                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+
+        // Group transactions by location (cluster nearby transactions within 500m)
+        var locationClusters = new List<(double Lat, double Lon, string Name, string? City, string? Country, List<Transaction> Transactions)>();
+        
+        foreach (var t in transactionsWithLocation)
+        {
+            var loc = t.Location!;
+            var locLon = GetLongitude(loc);
+            var locName = GetPlaceName(loc) ?? loc.City ?? "Unknown Location";
+            
+            var existingCluster = locationClusters.FirstOrDefault(c =>
+                CalculateDistanceKm(c.Lat, c.Lon, loc.Latitude, locLon) < 0.5);
+
+            if (existingCluster != default)
+            {
+                existingCluster.Transactions.Add(t);
+            }
+            else
+            {
+                locationClusters.Add((
+                    loc.Latitude,
+                    locLon,
+                    locName,
+                    loc.City,
+                    loc.Country,
+                    new List<Transaction> { t }
+                ));
+            }
+        }
+
+        // Build top locations
+        var topLocations = locationClusters
+            .Select(cluster => {
+                var sendTransactions = cluster.Transactions
+                    .Where(t => t.Type == TransactionType.Send)
+                    .ToList();
+                
+                var totalAmount = sendTransactions.Sum(t => _exchangeRateService.Convert(
+                    t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+
+                // Find top category at this location
+                var categoryAmounts = sendTransactions
+                    .SelectMany(t => t.Splits)
+                    .GroupBy(s => s.LabelId)
+                    .Select(g => new { LabelId = g.Key, Amount = g.Sum(s => s.Amount) })
+                    .OrderByDescending(x => x.Amount)
+                    .FirstOrDefault();
+
+                var topCategoryName = categoryAmounts?.LabelId != null &&
+                    labels.TryGetValue(categoryAmounts.LabelId, out var label)
+                    ? label.Name : null;
+                var topCategoryColor = categoryAmounts?.LabelId != null &&
+                    labels.TryGetValue(categoryAmounts.LabelId, out var labelForColor)
+                    ? labelForColor.Color : null;
+
+                return new LocationSpendingCluster(
+                    cluster.Name,
+                    cluster.Lat,
+                    cluster.Lon,
+                    cluster.City,
+                    cluster.Country,
+                    totalAmount,
+                    cluster.Transactions.Count,
+                    totalSpendingWithLocation > 0
+                        ? Math.Round(totalAmount / totalSpendingWithLocation * 100, 1)
+                        : 0,
+                    topCategoryName,
+                    topCategoryColor,
+                    cluster.Transactions.Count > 0
+                        ? Math.Round(totalAmount / cluster.Transactions.Count, 2)
+                        : 0,
+                    cluster.Transactions.Min(t => t.Date),
+                    cluster.Transactions.Max(t => t.Date)
+                );
+            })
+            .OrderByDescending(c => c.TotalAmount)
+            .Take(10)
+            .ToList();
+
+        // Calculate nearby spending if coordinates provided
+        LocationSpendingCluster? nearbySpending = null;
+        if (latitude.HasValue && longitude.HasValue)
+        {
+            var nearbyTransactions = transactionsWithLocation
+                .Where(t => {
+                    var locLon = GetLongitude(t.Location!);
+                    return CalculateDistanceKm(
+                        latitude.Value, longitude.Value,
+                        t.Location!.Latitude, locLon) <= radiusKm;
+                })
+                .ToList();
+
+            if (nearbyTransactions.Any())
+            {
+                var sendNearby = nearbyTransactions.Where(t => t.Type == TransactionType.Send).ToList();
+                var nearbyTotal = sendNearby.Sum(t => _exchangeRateService.Convert(
+                    t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+
+                // Get the most common location name
+                var locationName = nearbyTransactions
+                    .GroupBy(t => GetPlaceName(t.Location!) ?? t.Location!.City ?? "This Area")
+                    .OrderByDescending(g => g.Count())
+                    .First().Key;
+
+                // Find top category nearby
+                var nearbyCategoryAmounts = sendNearby
+                    .SelectMany(t => t.Splits)
+                    .GroupBy(s => s.LabelId)
+                    .Select(g => new { LabelId = g.Key, Amount = g.Sum(s => s.Amount) })
+                    .OrderByDescending(x => x.Amount)
+                    .FirstOrDefault();
+
+                var nearbyTopCategory = nearbyCategoryAmounts?.LabelId != null &&
+                    labels.TryGetValue(nearbyCategoryAmounts.LabelId, out var nearbyLabel)
+                    ? nearbyLabel.Name : null;
+                var nearbyTopCategoryColor = nearbyCategoryAmounts?.LabelId != null &&
+                    labels.TryGetValue(nearbyCategoryAmounts.LabelId, out var nearbyLabelColor)
+                    ? nearbyLabelColor.Color : null;
+
+                var nearbyCity = nearbyTransactions
+                    .Where(t => !string.IsNullOrEmpty(t.Location!.City))
+                    .GroupBy(t => t.Location!.City)
+                    .OrderByDescending(g => g.Count())
+                    .FirstOrDefault()?.Key;
+
+                var nearbyCountry = nearbyTransactions
+                    .Where(t => !string.IsNullOrEmpty(t.Location!.Country))
+                    .GroupBy(t => t.Location!.Country)
+                    .OrderByDescending(g => g.Count())
+                    .FirstOrDefault()?.Key;
+
+                nearbySpending = new LocationSpendingCluster(
+                    locationName,
+                    latitude.Value,
+                    longitude.Value,
+                    nearbyCity,
+                    nearbyCountry,
+                    nearbyTotal,
+                    nearbyTransactions.Count,
+                    totalSpendingWithLocation > 0
+                        ? Math.Round(nearbyTotal / totalSpendingWithLocation * 100, 1)
+                        : 0,
+                    nearbyTopCategory,
+                    nearbyTopCategoryColor,
+                    nearbyTransactions.Count > 0
+                        ? Math.Round(nearbyTotal / nearbyTransactions.Count, 2)
+                        : 0,
+                    nearbyTransactions.Min(t => t.Date),
+                    nearbyTransactions.Max(t => t.Date)
+                );
+            }
+        }
+
+        return new LocationInsightsResponse(
+            topLocations,
+            nearbySpending,
+            totalSpendingWithLocation,
+            transactionsWithLocation.Count,
+            totalCount,
+            primaryCurrency
+        );
+    }
+
+    public async Task<TripGroupsResponse> GetTripGroupsAsync(
+        string userId,
+        DateTime? startDate,
+        DateTime? endDate,
+        double? homeLatitude = null,
+        double? homeLongitude = null,
+        double minTripDistanceKm = 50.0)
+    {
+        var dek = await _mapperService.GetUserDekAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse.Rates;
+
+        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
+            .ToDictionary(a => a.Id);
+        var labels = (await _labelRepository.GetByUserIdAsync(userId))
+            .ToDictionary(l => l.Id);
+
+        // Get transactions for the period
+        var filter = TransactionFilterRequest.Builder()
+            .WithDateRange(startDate, endDate)
+            .WithStatus("Confirmed")
+            .WithPagination(1, int.MaxValue)
+            .Build();
+
+        var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
+
+        // Filter transactions with location data (Send type only for spending analysis)
+        var transactionsWithLocation = transactions
+            .Where(t => t.Location != null && !t.IsRecurringTemplate && t.Type == TransactionType.Send)
+            .OrderBy(t => t.Date)
+            .ToList();
+
+        if (!transactionsWithLocation.Any())
+        {
+            return new TripGroupsResponse(new List<TripGroup>(), 0, 0, primaryCurrency);
+        }
+
+        // Helper to get transaction currency
+        string GetTransactionCurrency(Transaction t) =>
+            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
+                ? acc.Currency
+                : primaryCurrency;
+
+        // Helper to decrypt longitude
+        double GetLongitude(TransactionLocation loc)
+        {
+            if (dek != null && !string.IsNullOrEmpty(loc.EncryptedLongitude))
+            {
+                var decrypted = _mapperService.DecryptIfNotEmpty(loc.EncryptedLongitude, dek);
+                if (double.TryParse(decrypted, out var lon))
+                    return lon;
+            }
+            return 0;
+        }
+
+        // Haversine distance calculation
+        double CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double EarthRadiusKm = 6371.0;
+            var dLat = (lat2 - lat1) * Math.PI / 180.0;
+            var dLon = (lon2 - lon1) * Math.PI / 180.0;
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return EarthRadiusKm * c;
+        }
+
+        // Group transactions by city/country to identify trip regions
+        var regionGroups = new Dictionary<string, List<Transaction>>();
+        
+        foreach (var t in transactionsWithLocation)
+        {
+            var loc = t.Location!;
+            var regionKey = !string.IsNullOrEmpty(loc.City)
+                ? $"{loc.City}, {loc.Country ?? "Unknown"}"
+                : loc.Country ?? "Unknown Region";
+            
+            if (!regionGroups.ContainsKey(regionKey))
+            {
+                regionGroups[regionKey] = new List<Transaction>();
+            }
+            regionGroups[regionKey].Add(t);
+        }
+
+        // Determine home base (most frequent location or user-provided)
+        double homeBaseLat = homeLatitude ?? 0;
+        double homeBaseLon = homeLongitude ?? 0;
+        string? homeRegion = null;
+
+        if (!homeLatitude.HasValue || !homeLongitude.HasValue)
+        {
+            // Find the region with most transactions - likely home base
+            var mostFrequentRegion = regionGroups
+                .OrderByDescending(g => g.Value.Count)
+                .FirstOrDefault();
+            
+            if (mostFrequentRegion.Value?.Any() == true)
+            {
+                var firstTxInRegion = mostFrequentRegion.Value.First();
+                homeBaseLat = firstTxInRegion.Location!.Latitude;
+                homeBaseLon = GetLongitude(firstTxInRegion.Location!);
+                homeRegion = mostFrequentRegion.Key;
+            }
+        }
+
+        // Build trip groups - group consecutive transactions by region
+        var tripGroups = new List<TripGroup>();
+        var tripIdCounter = 1;
+
+        foreach (var (regionKey, regionTransactions) in regionGroups.OrderBy(g => g.Value.Min(t => t.Date)))
+        {
+            if (regionTransactions.Count == 0) continue;
+
+            var firstTx = regionTransactions.First();
+            var centerLat = regionTransactions.Average(t => t.Location!.Latitude);
+            var centerLon = regionTransactions.Average(t => GetLongitude(t.Location!));
+            
+            // Check if this is home base
+            var distanceFromHome = CalculateDistanceKm(homeBaseLat, homeBaseLon, centerLat, centerLon);
+            var isHomeBase = regionKey == homeRegion || distanceFromHome < minTripDistanceKm;
+
+            // Get date range for this region
+            var regionStartDate = regionTransactions.Min(t => t.Date);
+            var regionEndDate = regionTransactions.Max(t => t.Date);
+            var durationDays = Math.Max(1, (int)(regionEndDate - regionStartDate).TotalDays + 1);
+
+            // Calculate total spending
+            var totalAmount = regionTransactions.Sum(t => _exchangeRateService.Convert(
+                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+
+            // Calculate category breakdown
+            var categoryTotals = regionTransactions
+                .SelectMany(t => t.Splits.Select(s => new {
+                    LabelId = s.LabelId,
+                    Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t), primaryCurrency, rates)
+                }))
+                .GroupBy(x => x.LabelId)
+                .Select(g => {
+                    var totalCat = g.Sum(x => x.Amount);
+                    labels.TryGetValue(g.Key, out var label);
+                    return new TripCategoryBreakdown(
+                        g.Key,
+                        label?.Name ?? "Unknown",
+                        label?.Color,
+                        label?.Icon,
+                        totalCat,
+                        g.Count(),
+                        totalAmount > 0 ? Math.Round(totalCat / totalAmount * 100, 1) : 0
+                    );
+                })
+                .OrderByDescending(c => c.Amount)
+                .ToList();
+
+            // Calculate daily breakdown
+            var dailyBreakdown = regionTransactions
+                .GroupBy(t => t.DateLocal ?? t.Date.ToString("yyyy-MM-dd"))
+                .OrderBy(g => g.Key)
+                .Select(g => new TripDaySpending(
+                    DateTime.TryParse(g.Key, out var d) ? d : g.First().Date,
+                    g.Key,
+                    g.Sum(t => _exchangeRateService.Convert(
+                        t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
+                    g.Count()
+                ))
+                .ToList();
+
+            // Generate trip name
+            var tripName = isHomeBase
+                ? $"Home ({regionKey})"
+                : durationDays == 1
+                    ? $"{regionKey} Trip"
+                    : durationDays <= 3
+                        ? $"{regionKey} Weekend"
+                        : $"{regionKey} Trip ({durationDays} days)";
+
+            var city = regionTransactions
+                .Where(t => !string.IsNullOrEmpty(t.Location!.City))
+                .Select(t => t.Location!.City)
+                .GroupBy(c => c)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault()?.Key;
+
+            var country = regionTransactions
+                .Where(t => !string.IsNullOrEmpty(t.Location!.Country))
+                .Select(t => t.Location!.Country)
+                .GroupBy(c => c)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault()?.Key;
+
+            tripGroups.Add(new TripGroup(
+                $"trip-{tripIdCounter++}",
+                tripName,
+                city,
+                country,
+                centerLat,
+                centerLon,
+                regionStartDate,
+                regionEndDate,
+                durationDays,
+                totalAmount,
+                regionTransactions.Count,
+                categoryTotals,
+                dailyBreakdown,
+                isHomeBase
+            ));
+        }
+
+        // Sort trips: non-home trips by date descending, then home at the end
+        var sortedTrips = tripGroups
+            .Where(t => !t.IsHomeBase)
+            .OrderByDescending(t => t.StartDate)
+            .Concat(tripGroups.Where(t => t.IsHomeBase))
+            .ToList();
+
+        var totalTripSpending = sortedTrips.Where(t => !t.IsHomeBase).Sum(t => t.TotalAmount);
+        var totalTripTransactions = sortedTrips.Where(t => !t.IsHomeBase).Sum(t => t.TransactionCount);
+
+        return new TripGroupsResponse(
+            sortedTrips,
+            totalTripSpending,
+            totalTripTransactions,
+            primaryCurrency
+        );
+    }
 }

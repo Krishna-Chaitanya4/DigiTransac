@@ -61,4 +61,32 @@ public interface ITransactionAnalyticsService
         DateTime? endDate,
         int page = 1,
         int pageSize = 10);
+    
+    /// <summary>
+    /// Get location-based spending insights.
+    /// If latitude/longitude provided, returns spending within radius of that point.
+    /// Otherwise, returns top spending locations.
+    /// </summary>
+    Task<LocationInsightsResponse> GetLocationInsightsAsync(
+        string userId,
+        DateTime? startDate,
+        DateTime? endDate,
+        double? latitude = null,
+        double? longitude = null,
+        double radiusKm = 1.0);
+    
+    /// <summary>
+    /// Detect trips based on geographic clustering of transactions.
+    /// Groups transactions by city/country and identifies travel periods.
+    /// </summary>
+    /// <param name="homeLatitude">User's home latitude (optional, for excluding home location)</param>
+    /// <param name="homeLongitude">User's home longitude (optional, for excluding home location)</param>
+    /// <param name="minTripDistanceKm">Minimum distance from home to consider a trip (default 50km)</param>
+    Task<TripGroupsResponse> GetTripGroupsAsync(
+        string userId,
+        DateTime? startDate,
+        DateTime? endDate,
+        double? homeLatitude = null,
+        double? homeLongitude = null,
+        double minTripDistanceKm = 50.0);
 }

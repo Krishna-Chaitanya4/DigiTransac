@@ -643,3 +643,91 @@ public record ImportPreviewRow(
     List<string> TagIds,     // Mapped tag IDs
     List<string> Errors      // Validation errors
 );
+
+// Location-based Analytics DTOs
+
+/// <summary>
+/// Location-based spending insights
+/// </summary>
+public record LocationInsightsResponse(
+    List<LocationSpendingCluster> TopLocations,
+    LocationSpendingCluster? NearbySpending,  // Spending near provided coordinates
+    decimal TotalSpendingWithLocation,
+    int TransactionsWithLocation,
+    int TotalTransactions,
+    string Currency
+);
+
+/// <summary>
+/// A cluster of spending at a geographic location
+/// </summary>
+public record LocationSpendingCluster(
+    string Name,              // Place name or city
+    double Latitude,
+    double Longitude,
+    string? City,
+    string? Country,
+    decimal TotalAmount,
+    int TransactionCount,
+    decimal Percentage,       // Percentage of total spending with location
+    string? TopCategory,      // Most spent category at this location
+    string? TopCategoryColor,
+    decimal AverageAmount,
+    DateTime? FirstVisit,     // Earliest transaction at this location
+    DateTime? LastVisit       // Most recent transaction at this location
+);
+
+// ============ Trip Grouping DTOs ============
+
+/// <summary>
+/// Response containing detected trips based on geographic clustering
+/// </summary>
+public record TripGroupsResponse(
+    List<TripGroup> Trips,
+    decimal TotalTripSpending,
+    int TotalTripTransactions,
+    string Currency
+);
+
+/// <summary>
+/// A detected trip - a cluster of transactions in a different geographic region
+/// </summary>
+public record TripGroup(
+    string Id,
+    string Name,                // Auto-generated name like "Tokyo Trip" or "Paris Weekend"
+    string? City,
+    string? Country,
+    double CenterLatitude,
+    double CenterLongitude,
+    DateTime StartDate,
+    DateTime EndDate,
+    int DurationDays,
+    decimal TotalAmount,
+    int TransactionCount,
+    List<TripCategoryBreakdown> CategoryBreakdown,
+    List<TripDaySpending> DailyBreakdown,
+    bool IsHomeBase              // True if this is the user's home location (not a trip)
+);
+
+/// <summary>
+/// Category breakdown for a trip
+/// </summary>
+public record TripCategoryBreakdown(
+    string LabelId,
+    string LabelName,
+    string? LabelColor,
+    string? LabelIcon,
+    decimal Amount,
+    int TransactionCount,
+    decimal Percentage
+);
+
+/// <summary>
+/// Daily spending breakdown for a trip
+/// </summary>
+public record TripDaySpending(
+    DateTime Date,
+    string DateLocal,           // YYYY-MM-DD format
+    decimal Amount,
+    int TransactionCount
+);

@@ -433,6 +433,68 @@ public static class TransactionEndpoints
         .WithName("GetSpendingAnomalies")
         .Produces<SpendingAnomaliesResponse>(200);
 
+        // Get location-based spending insights
+        group.MapGet("/analytics/locations", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            double? latitude,
+            double? longitude,
+            double? radiusKm,
+            ClaimsPrincipal user,
+            HttpContext httpContext,
+            ITransactionAnalyticsService analyticsService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await analyticsService.GetLocationInsightsAsync(
+                userId,
+                startDate,
+                endDate,
+                latitude,
+                longitude,
+                radiusKm ?? 1.0);
+            
+            // Set cache headers (5 minutes)
+            SetAnalyticsCacheHeaders(httpContext, TimeSpan.FromMinutes(5));
+            
+            return Results.Ok(result);
+        })
+        .WithName("GetLocationInsights")
+        .Produces<LocationInsightsResponse>(200);
+
+        // Get trip groups (travel spending analysis)
+        group.MapGet("/analytics/trips", async (
+            DateTime? startDate,
+            DateTime? endDate,
+            double? homeLatitude,
+            double? homeLongitude,
+            double? minTripDistanceKm,
+            ClaimsPrincipal user,
+            HttpContext httpContext,
+            ITransactionAnalyticsService analyticsService) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await analyticsService.GetTripGroupsAsync(
+                userId,
+                startDate,
+                endDate,
+                homeLatitude,
+                homeLongitude,
+                minTripDistanceKm ?? 50.0);
+            
+            // Set cache headers (5 minutes)
+            SetAnalyticsCacheHeaders(httpContext, TimeSpan.FromMinutes(5));
+            
+            return Results.Ok(result);
+        })
+        .WithName("GetTripGroups")
+        .Produces<TripGroupsResponse>(200);
+
         // Export transactions
         group.MapGet("/export", async (
             DateTime? startDate,

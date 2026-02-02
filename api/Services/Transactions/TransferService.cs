@@ -18,6 +18,7 @@ public class TransferService : ITransferService
     private readonly ITransactionRepository _transactionRepository;
     private readonly IAccountRepository _accountRepository;
     private readonly ILabelRepository _labelRepository;
+    private readonly IChatMessageRepository _chatMessageRepository;
     private readonly IExchangeRateService _exchangeRateService;
     private readonly IAccountBalanceService _accountBalanceService;
     private readonly ITransactionMapperService _mapperService;
@@ -28,6 +29,7 @@ public class TransferService : ITransferService
         ITransactionRepository transactionRepository,
         IAccountRepository accountRepository,
         ILabelRepository labelRepository,
+        IChatMessageRepository chatMessageRepository,
         IExchangeRateService exchangeRateService,
         IAccountBalanceService accountBalanceService,
         ITransactionMapperService mapperService,
@@ -37,6 +39,7 @@ public class TransferService : ITransferService
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
         _labelRepository = labelRepository;
+        _chatMessageRepository = chatMessageRepository;
         _exchangeRateService = exchangeRateService;
         _accountBalanceService = accountBalanceService;
         _mapperService = mapperService;
@@ -171,6 +174,43 @@ public class TransferService : ITransferService
             // Update destination account balance
             await _accountBalanceService.UpdateBalanceAsync(destinationAccount, TransactionType.Receive, convertedAmount, true, session);
         });
+
+        // Create chat messages for Personal chat (self-chat) so both Send and Receive appear in conversation
+        // Send transaction: user-initiated, appears on the right (not system-generated)
+        var sendChatMessage = new ChatMessage
+        {
+            SenderUserId = userId,
+            RecipientUserId = userId, // Self-chat for transfers
+            Type = ChatMessageType.Transaction,
+            TransactionId = sourceTransaction.Id,
+            Status = MessageStatus.Sent,
+            IsSystemGenerated = false, // User-initiated, appears on the right
+            SystemSource = SystemMessageSources.Transfer,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _chatMessageRepository.CreateAsync(sendChatMessage);
+        
+        // Receive transaction: system-generated response, appears on the left
+        var receiveChatMessage = new ChatMessage
+        {
+            SenderUserId = userId,
+            RecipientUserId = userId, // Self-chat for transfers
+            Type = ChatMessageType.Transaction,
+            TransactionId = destTransaction.Id,
+            Status = MessageStatus.Sent,
+            IsSystemGenerated = true, // System-generated, appears on the left
+            SystemSource = SystemMessageSources.Transfer,
+            CreatedAt = DateTime.UtcNow.AddMilliseconds(1) // Slightly after Send to ensure correct ordering
+        };
+
+        await _chatMessageRepository.CreateAsync(receiveChatMessage);
+        
+        // Link chat messages to transactions
+        sourceTransaction.ChatMessageId = sendChatMessage.Id;
+        destTransaction.ChatMessageId = receiveChatMessage.Id;
+        await _transactionRepository.UpdateAsync(sourceTransaction);
+        await _transactionRepository.UpdateAsync(destTransaction);
 
         // Publish TransferCompletedEvent
         await _publisher.Publish(new TransferCompletedEvent(

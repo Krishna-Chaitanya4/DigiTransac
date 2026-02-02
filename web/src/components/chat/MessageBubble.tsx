@@ -86,10 +86,32 @@ export const MessageBubble = memo(function MessageBubble({
   if (message.type === 'Transaction' && message.transaction) {
     const tx = message.transaction;
     const isSent = tx.transactionType === 'Send';
+    const isTransfer = message.systemSource === 'Transfer';
+    const isRecurring = message.systemSource === 'Recurring';
+    const isImport = message.systemSource === 'Import';
+    const isPending = tx.status === 'Pending';
+    const isDeclined = tx.status === 'Declined';
+    
+    // Get contextual emoji based on transaction source
+    const getSourceIcon = () => {
+      if (isTransfer) return '🔄';
+      if (isRecurring) return '🔁';
+      if (isImport) return '📥';
+      return null;
+    };
+    const sourceIcon = getSourceIcon();
     
     // In self-chat, positioning is based on isSystemGenerated (left = system, right = user-created)
     // In P2P chat, positioning is based on Send/Receive
     const isRightAligned = isSelfChat ? isMine : isSent;
+    
+    // Determine card background based on status
+    const getCardBackground = () => {
+      if (isDeclined) return 'bg-gradient-to-br from-gray-400 to-gray-500 text-white opacity-75';
+      if (isPending) return 'bg-gradient-to-br from-amber-400 to-orange-500 text-white';
+      if (isSent) return 'bg-gradient-to-br from-rose-500 to-red-600 text-white';
+      return 'bg-gradient-to-br from-emerald-500 to-green-600 text-white';
+    };
 
     return (
       <div
@@ -98,11 +120,7 @@ export const MessageBubble = memo(function MessageBubble({
       >
         <div className="relative">
           <div
-            className={`min-w-[120px] max-w-[180px] rounded-xl p-3 shadow-md ${
-              isSent
-                ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white'
-                : 'bg-gradient-to-br from-emerald-500 to-green-600 text-white'
-            }`}
+            className={`min-w-[130px] max-w-[190px] rounded-xl p-3 shadow-md ${getCardBackground()}`}
           >
             {/* Menu trigger */}
             <button
@@ -114,28 +132,58 @@ export const MessageBubble = memo(function MessageBubble({
               </svg>
             </button>
 
-            {/* Status badge */}
-            <div className="flex items-center justify-center gap-1 mb-1.5">
+            {/* Source icon + Status badges */}
+            <div className="flex items-center justify-center gap-1.5 mb-2 flex-wrap">
+              {/* Source emoji icon */}
+              {sourceIcon && (
+                <span className="text-lg">{sourceIcon}</span>
+              )}
+              
+              {/* Direction/Status badge */}
               <span
                 className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide ${
-                  isSent 
-                    ? 'bg-white/90 text-red-600' 
-                    : 'bg-white/90 text-green-600'
+                  isDeclined
+                    ? 'bg-white/90 text-gray-600'
+                    : isPending
+                      ? 'bg-white/90 text-amber-600'
+                      : isSent
+                        ? 'bg-white/90 text-red-600'
+                        : 'bg-white/90 text-green-600'
                 }`}
               >
-                {isSent ? '↑ Sent' : '↓ Received'}
+                {isDeclined ? '✗ Declined' : isPending ? '⏳ Pending' : isSent ? '↑ Sent' : '↓ Received'}
               </span>
-              {/* System-generated badge for self-chat */}
-              {isSelfChat && message.isSystemGenerated && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
-                  {message.systemSource || 'Auto'}
+              
+              {/* Source type badge */}
+              {isTransfer && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
+                  Transfer
+                </span>
+              )}
+              {isRecurring && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">
+                  Recurring
+                </span>
+              )}
+              {isImport && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-100 text-cyan-700">
+                  Import
                 </span>
               )}
             </div>
 
+            {/* Title if available */}
+            {tx.title && (
+              <div className="text-xs text-white/90 font-medium text-center mb-1 truncate">
+                {tx.title}
+              </div>
+            )}
+
             {/* Amount */}
             <div className="text-center">
-              <div className="text-xl font-bold tracking-tight">{formatChatCurrency(tx.amount, tx.currency)}</div>
+              <div className={`text-xl font-bold tracking-tight ${isDeclined ? 'line-through' : ''}`}>
+                {formatChatCurrency(tx.amount, tx.currency)}
+              </div>
               {/* Show converted amount if different currency */}
               {tx.currency && tx.currency !== primaryCurrency && (
                 <div className="text-xs text-white/80 mt-0.5">

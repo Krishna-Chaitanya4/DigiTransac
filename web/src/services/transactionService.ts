@@ -13,6 +13,8 @@ import type {
   SpendingByAccountResponse,
   SpendingPatternsResponse,
   SpendingAnomaliesResponse,
+  LocationInsightsResponse,
+  TripGroupsResponse,
 } from '../types/transactions';
 
 // Build query string from filter
@@ -358,4 +360,42 @@ export async function getSpendingAnomalies(
   
   const query = params.toString();
   return apiClient.get<SpendingAnomaliesResponse>(`/transactions/analytics/anomalies${query ? `?${query}` : ''}`);
+}
+
+// Get location-based spending insights
+export async function getLocationInsights(
+  startDate?: string,
+  endDate?: string,
+  latitude?: number,
+  longitude?: number,
+  radiusKm?: number
+): Promise<LocationInsightsResponse> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  if (latitude !== undefined) params.append('latitude', latitude.toString());
+  if (longitude !== undefined) params.append('longitude', longitude.toString());
+  if (radiusKm !== undefined) params.append('radiusKm', radiusKm.toString());
+  
+  const query = params.toString();
+  return apiClient.get<LocationInsightsResponse>(`/transactions/analytics/locations${query ? `?${query}` : ''}`);
+}
+
+// Get trip groups (travel spending analysis)
+export async function getTripGroups(
+  startDate?: string,
+  endDate?: string,
+  homeLatitude?: number,
+  homeLongitude?: number,
+  minTripDistanceKm?: number
+): Promise<TripGroupsResponse> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  if (homeLatitude !== undefined) params.append('homeLatitude', homeLatitude.toString());
+  if (homeLongitude !== undefined) params.append('homeLongitude', homeLongitude.toString());
+  if (minTripDistanceKm !== undefined) params.append('minTripDistanceKm', minTripDistanceKm.toString());
+  
+  const query = params.toString();
+  return apiClient.get<TripGroupsResponse>(`/transactions/analytics/trips${query ? `?${query}` : ''}`);
 }

@@ -21,7 +21,6 @@ import {
   MessageActionsMenu,
   NewChatModal,
   NetworkStatusBanner,
-  FloatingActionButton,
 } from '../components/chat';
 import { TransactionForm } from '../components/TransactionForm';
 import { logger } from '../services/logger';
@@ -491,8 +490,8 @@ export default function ChatsPage() {
   }
 
   return (
-    <div className="-m-4 sm:-m-6 lg:-m-8 flex h-[calc(100vh-4rem)] bg-white dark:bg-gray-900">
-      {/* Conversations sidebar */}
+  <div className="-m-4 sm:-m-6 lg:-m-8 flex h-[calc(100vh-4rem)] bg-white dark:bg-gray-900 relative overflow-hidden">
+    {/* Conversations sidebar */}
       <ConversationList
         conversations={conversations}
         selectedUserId={selectedUserId}
@@ -507,7 +506,11 @@ export default function ChatsPage() {
       />
 
       {/* Chat area */}
-      <div className={`flex-1 flex flex-col ${selectedUserId ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex flex-col transition-transform duration-300 ease-in-out ${
+        selectedUserId
+          ? 'flex absolute inset-0 md:relative md:inset-auto bg-white dark:bg-gray-900 z-10'
+          : 'hidden md:flex'
+      }`}>
         {selectedConversation ? (
           <>
             {/* Header - Enhanced with balance summary */}
@@ -717,14 +720,6 @@ export default function ChatsPage() {
         />
       )}
 
-      {/* Floating Action Button for quick transaction creation (mobile) */}
-      {selectedConversation && (
-        <FloatingActionButton
-          onCreateTransaction={() => setShowTransactionForm(true)}
-          hasAccounts={accounts.length > 0}
-          className="md:hidden" // Only show on mobile
-        />
-      )}
 
       {/* Network status banner */}
       <NetworkStatusBanner />

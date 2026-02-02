@@ -46,6 +46,7 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
   const [accountNumber, setAccountNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   
   // Currency dropdown state
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -70,6 +71,8 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
       setAccountNumber(editingAccount.accountNumber || '');
       setNotes(editingAccount.notes || '');
       setIncludeInNetWorth(editingAccount.includeInNetWorth);
+      // Always start collapsed - user can expand if needed
+      setShowAdvancedOptions(false);
     } else {
       setName('');
       setType('Bank');
@@ -80,6 +83,7 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
       setAccountNumber('');
       setNotes('');
       setIncludeInNetWorth(true);
+      setShowAdvancedOptions(false);
     }
   }, [editingAccount, isOpen, primaryCurrency]);
 
@@ -292,65 +296,89 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
                 </div>
               </div>
 
-              {/* Institution */}
-              <div>
-                <label htmlFor="institution" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Institution / Bank
-                </label>
-                <input
-                  type="text"
-                  id="institution"
-                  value={institution}
-                  onChange={(e) => setInstitution(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., HDFC Bank"
-                />
-              </div>
+              {/* Advanced Options Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400
+                  hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${showAdvancedOptions ? 'rotate-90' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+                Advanced options
+              </button>
 
-              {/* Account Number */}
-              <div>
-                <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Account Number (last 4 digits)
-                </label>
-                <input
-                  type="text"
-                  id="accountNumber"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., ****1234"
-                  maxLength={10}
-                />
-              </div>
+              {/* Advanced Options Section */}
+              {showAdvancedOptions && (
+                <div className="space-y-4 pt-2">
+                  {/* Institution */}
+                  <div>
+                    <label htmlFor="institution" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Institution / Bank
+                    </label>
+                    <input
+                      type="text"
+                      id="institution"
+                      value={institution}
+                      onChange={(e) => setInstitution(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="e.g., HDFC Bank"
+                    />
+                  </div>
 
-              {/* Notes */}
-              <div>
-                <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Optional notes..."
-                  rows={2}
-                />
-              </div>
+                  {/* Account Number */}
+                  <div>
+                    <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Account Number (last 4 digits)
+                    </label>
+                    <input
+                      type="text"
+                      id="accountNumber"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="e.g., ****1234"
+                      maxLength={10}
+                    />
+                  </div>
 
-              {/* Include in Net Worth */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="includeInNetWorth"
-                  checked={includeInNetWorth}
-                  onChange={(e) => setIncludeInNetWorth(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700"
-                />
-                <label htmlFor="includeInNetWorth" className="text-sm text-gray-700 dark:text-gray-300">
-                  Include in net worth calculation
-                </label>
-              </div>
+                  {/* Notes */}
+                  <div>
+                    <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Notes
+                    </label>
+                    <textarea
+                      id="notes"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Optional notes..."
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* Include in Net Worth */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeInNetWorth"
+                      checked={includeInNetWorth}
+                      onChange={(e) => setIncludeInNetWorth(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700"
+                    />
+                    <label htmlFor="includeInNetWorth" className="text-sm text-gray-700 dark:text-gray-300">
+                      Include in net worth calculation
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 mt-6">

@@ -902,7 +902,8 @@ public class P2PTransactionServiceTests
             LastSyncedAt: null,
             ChatMessageId: null,
             DateLocal: null,      // Timezone-aware date field
-            DateTimezone: null    // Timezone-aware date field
+            TimeLocal: null,      // Timezone-aware time field
+            DateTimezone: null    // Timezone field
         );
     }
 

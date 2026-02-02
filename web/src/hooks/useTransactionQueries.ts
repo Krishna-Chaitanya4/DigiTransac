@@ -17,6 +17,8 @@ import {
   getSpendingByAccount,
   getSpendingPatterns,
   getSpendingAnomalies,
+  getLocationInsights,
+  getTripGroups,
 } from '../services/transactionService';
 import type {
   Transaction,
@@ -30,6 +32,8 @@ import type {
   SpendingByAccountResponse,
   SpendingPatternsResponse,
   SpendingAnomaliesResponse,
+  LocationInsightsResponse,
+  TripGroupsResponse,
 } from '../types/transactions';
 import type { TransactionAnalytics } from '../services/transactionService';
 
@@ -455,6 +459,40 @@ export function useSpendingAnomalies(
   });
 }
 
+// Hook for fetching location-based spending insights
+export function useLocationInsights(
+  startDate?: string,
+  endDate?: string,
+  latitude?: number,
+  longitude?: number,
+  radiusKm?: number,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['transactions', 'analytics', 'locations', { startDate, endDate, latitude, longitude, radiusKm }],
+    queryFn: () => getLocationInsights(startDate, endDate, latitude, longitude, radiusKm),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
+  });
+}
+
+// Hook for fetching trip groups (travel spending analysis)
+export function useTripGroups(
+  startDate?: string,
+  endDate?: string,
+  homeLatitude?: number,
+  homeLongitude?: number,
+  minTripDistanceKm?: number,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['transactions', 'analytics', 'trips', { startDate, endDate, homeLatitude, homeLongitude, minTripDistanceKm }],
+    queryFn: () => getTripGroups(startDate, endDate, homeLatitude, homeLongitude, minTripDistanceKm),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
+  });
+}
+
 // Export types for convenience
 export type {
   Transaction,
@@ -467,4 +505,6 @@ export type {
   SpendingByAccountResponse,
   SpendingPatternsResponse,
   SpendingAnomaliesResponse,
+  LocationInsightsResponse,
+  TripGroupsResponse,
 };
