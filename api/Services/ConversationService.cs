@@ -146,6 +146,7 @@ public class ConversationService : IConversationService
     private readonly IUserRepository _userRepository;
     private readonly ITransactionService _transactionService;
     private readonly IExchangeRateService _exchangeRateService;
+    private readonly ILabelRepository _labelRepository;
 
     public ConversationService(
         IChatMessageRepository chatMessageRepository,
@@ -153,7 +154,8 @@ public class ConversationService : IConversationService
         IAccountRepository accountRepository,
         IUserRepository userRepository,
         ITransactionService transactionService,
-        IExchangeRateService exchangeRateService)
+        IExchangeRateService exchangeRateService,
+        ILabelRepository labelRepository)
     {
         _chatMessageRepository = chatMessageRepository;
         _transactionRepository = transactionRepository;
@@ -161,6 +163,45 @@ public class ConversationService : IConversationService
         _userRepository = userRepository;
         _transactionService = transactionService;
         _exchangeRateService = exchangeRateService;
+        _labelRepository = labelRepository;
+    }
+
+    /// <summary>
+    /// Get primary category info from transaction splits (Transaction model)
+    /// </summary>
+    private static TransactionCategoryInfo? GetPrimaryCategoryInfo(Transaction tx, Dictionary<string, Label> labelsById)
+    {
+        if (tx.Splits.Count == 0) return null;
+        
+        var primarySplit = tx.Splits[0];
+        if (string.IsNullOrEmpty(primarySplit.LabelId)) return null;
+        
+        if (!labelsById.TryGetValue(primarySplit.LabelId, out var label)) return null;
+        
+        return new TransactionCategoryInfo(
+            LabelId: label.Id,
+            Name: label.Name,
+            Icon: label.Icon,
+            Color: label.Color
+        );
+    }
+
+    /// <summary>
+    /// Get primary category info from transaction response splits (DTO)
+    /// </summary>
+    private static TransactionCategoryInfo? GetPrimaryCategoryInfo(TransactionResponse tx)
+    {
+        if (tx.Splits.Count == 0) return null;
+        
+        var primarySplit = tx.Splits[0];
+        if (string.IsNullOrEmpty(primarySplit.LabelId) || string.IsNullOrEmpty(primarySplit.LabelName)) return null;
+        
+        return new TransactionCategoryInfo(
+            LabelId: primarySplit.LabelId,
+            Name: primarySplit.LabelName,
+            Icon: primarySplit.LabelIcon,
+            Color: primarySplit.LabelColor
+        );
     }
 
     public async Task<ConversationListResponse> GetConversationsAsync(string userId)
@@ -368,6 +409,10 @@ public class ConversationService : IConversationService
         var accounts = (await _accountRepository.GetByUserIdAsync(userId, includeArchived: true))
             .ToDictionary(a => a.Id);
         
+        // Get user's labels for category display in transaction cards
+        var labels = (await _labelRepository.GetByUserIdAsync(userId))
+            .ToDictionary(l => l.Id);
+        
         // Build unified message list
         var messages = new List<ConversationMessage>();
         
@@ -403,7 +448,8 @@ public class ConversationService : IConversationService
                         Title: tx.Title,
                         Notes: null, // Don't expose notes in preview
                         Status: tx.Status.ToString(),
-                        AccountName: account?.Name
+                        AccountName: account?.Name,
+                        PrimaryCategory: GetPrimaryCategoryInfo(tx, labels)
                     );
                 }
             }
@@ -512,7 +558,8 @@ public class ConversationService : IConversationService
                     Title: tx.Title,
                     Notes: null,
                     Status: tx.Status.ToString(),
-                    AccountName: account?.Name
+                    AccountName: account?.Name,
+                    PrimaryCategory: GetPrimaryCategoryInfo(tx, labels)
                 );
                 
                 // Determine sender based on transaction type
@@ -733,8 +780,9 @@ public class ConversationService : IConversationService
             Date: transaction.Date,
             Title: transaction.Title,
             Notes: null,
-            Status: transaction.Status.ToString(),
-            AccountName: account?.Name
+            Status: transaction.Status,
+            AccountName: account?.Name,
+            PrimaryCategory: GetPrimaryCategoryInfo(transaction)
         );
         
         var response = new ConversationMessage(

@@ -22,6 +22,13 @@ export interface ConversationListResponse {
   totalUnreadCount: number;
 }
 
+export interface TransactionCategoryInfo {
+  labelId: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+}
+
 export interface TransactionMessageData {
   transactionId: string;
   transactionLinkId: string;
@@ -33,6 +40,7 @@ export interface TransactionMessageData {
   notes: string | null;
   status: 'Pending' | 'Confirmed' | 'Declined';
   accountName: string | null;
+  primaryCategory?: TransactionCategoryInfo | null;
 }
 
 export interface ReplyPreview {

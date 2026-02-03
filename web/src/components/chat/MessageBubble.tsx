@@ -179,6 +179,25 @@ export const MessageBubble = memo(function MessageBubble({
               </div>
             )}
 
+            {/* Category badge */}
+            {tx.primaryCategory && (
+              <div className="flex items-center justify-center gap-1 mb-1.5">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/20 text-white/90"
+                  style={tx.primaryCategory.color ? {
+                    backgroundColor: `${tx.primaryCategory.color}40`,
+                    borderColor: tx.primaryCategory.color,
+                    borderWidth: '1px'
+                  } : undefined}
+                >
+                  {tx.primaryCategory.icon && (
+                    <span className="text-xs">{tx.primaryCategory.icon}</span>
+                  )}
+                  <span className="truncate max-w-[80px]">{tx.primaryCategory.name}</span>
+                </span>
+              </div>
+            )}
+
             {/* Amount */}
             <div className="text-center">
               <div className={`text-xl font-bold tracking-tight ${isDeclined ? 'line-through' : ''}`}>

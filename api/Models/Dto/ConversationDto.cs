@@ -59,6 +59,16 @@ public record ReplyPreview(
 );
 
 /// <summary>
+/// Category info for transaction message display
+/// </summary>
+public record TransactionCategoryInfo(
+    string LabelId,
+    string Name,
+    string? Icon,
+    string? Color
+);
+
+/// <summary>
 /// Transaction data embedded in a conversation message
 /// </summary>
 public record TransactionMessageData(
@@ -71,7 +81,8 @@ public record TransactionMessageData(
     string? Title,
     string? Notes,
     string Status,            // "Pending", "Confirmed", "Declined"
-    string? AccountName       // The account used (null if pending)
+    string? AccountName,      // The account used (null if pending)
+    TransactionCategoryInfo? PrimaryCategory = null  // Primary category (first split)
 );
 
 public record ConversationDetailResponse(

@@ -5,9 +5,23 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTransactions, useLabels, useLocationInsights, useTripGroups } from '../hooks';
 import { useCurrency } from '../context/CurrencyContext';
+import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../services/currencyService';
 import { Transaction, TransactionLocation, TripGroup } from '../types/transactions';
 import { Link } from 'react-router-dom';
+import { MapSkeleton, TripListSkeleton, LocationListSkeleton, StatsBarSkeleton } from '../components/ui/Skeleton';
+
+// Map tile URLs for light and dark modes
+const MAP_TILES = {
+  light: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
+  dark: {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+};
 
 // Fix Leaflet default marker icon issue with webpack
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -178,6 +192,7 @@ function TripCard({ trip, currency, isSelected, onClick }: TripCardProps) {
 
 export default function SpendingMapPage() {
   const { primaryCurrency } = useCurrency();
+  const { resolvedTheme } = useTheme();
   const [dateFilter, setDateFilter] = useState<DateFilter>('last3Months');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -503,7 +518,12 @@ export default function SpendingMapPage() {
       )}
 
       {/* Stats Bar - Map Mode */}
-      {viewMode === 'map' && (
+      {viewMode === 'map' && isLoading && (
+        <div className="mb-4">
+          <StatsBarSkeleton count={4} />
+        </div>
+      )}
+      {viewMode === 'map' && !isLoading && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
           <div className="text-xs text-gray-500 dark:text-gray-400">Transactions</div>
@@ -533,7 +553,12 @@ export default function SpendingMapPage() {
       )}
       
       {/* Stats Bar - Trips Mode */}
-      {viewMode === 'trips' && tripGroups && (
+      {viewMode === 'trips' && isLoadingTrips && (
+        <div className="mb-4">
+          <StatsBarSkeleton count={4} />
+        </div>
+      )}
+      {viewMode === 'trips' && !isLoadingTrips && tripGroups && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
             <div className="text-xs text-gray-500 dark:text-gray-400">Trips Detected</div>
@@ -568,9 +593,7 @@ export default function SpendingMapPage() {
         {viewMode === 'map' && (
           <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {isLoading ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
+            <MapSkeleton />
           ) : filteredTransactions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 p-8">
               <svg className="w-16 h-16 mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -596,8 +619,9 @@ export default function SpendingMapPage() {
               className="z-0"
             >
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                key={resolvedTheme} // Force re-render when theme changes
+                attribution={MAP_TILES[resolvedTheme].attribution}
+                url={MAP_TILES[resolvedTheme].url}
               />
               
               <MapBoundsUpdater transactions={filteredTransactions} />
@@ -713,8 +737,8 @@ export default function SpendingMapPage() {
         {viewMode === 'trips' && (
           <div className="flex-1 overflow-hidden">
             {isLoadingTrips ? (
-              <div className="h-full flex items-center justify-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 h-full overflow-y-auto">
+                <TripListSkeleton />
               </div>
             ) : !tripGroups || tripGroups.trips.filter(t => !t.isHomeBase).length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 p-8">
@@ -769,7 +793,9 @@ export default function SpendingMapPage() {
           )}
           
           <div className="flex-1 overflow-y-auto">
-            {locationClusters.slice(0, 10).map((cluster, index) => (
+            {isLoading ? (
+              <LocationListSkeleton />
+            ) : locationClusters.slice(0, 10).map((cluster, index) => (
               <div
                 key={cluster.id}
                 className="p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer"
@@ -807,8 +833,7 @@ export default function SpendingMapPage() {
                 </div>
               </div>
             ))}
-            
-              {locationClusters.length === 0 && (
+              {!isLoading && locationClusters.length === 0 && (
                 <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
                   No locations to display
                 </div>
@@ -923,7 +948,7 @@ export default function SpendingMapPage() {
         )}
       </div>
       
-      {/* CSS for cluster icons */}
+      {/* CSS for cluster icons and dark mode popups */}
       <style>{`
         .custom-cluster-icon {
           background: transparent !important;
@@ -947,6 +972,42 @@ export default function SpendingMapPage() {
         }
         .leaflet-popup-content {
           margin: 12px;
+        }
+        /* Dark mode popup styles */
+        .dark .leaflet-popup-content-wrapper {
+          background-color: #1f2937;
+          color: #f3f4f6;
+        }
+        .dark .leaflet-popup-tip {
+          background-color: #1f2937;
+        }
+        .dark .leaflet-popup-content a {
+          color: #60a5fa;
+        }
+        .dark .leaflet-popup-content .text-gray-900 {
+          color: #f3f4f6;
+        }
+        .dark .leaflet-popup-content .text-gray-600 {
+          color: #9ca3af;
+        }
+        .dark .leaflet-popup-content .text-gray-500 {
+          color: #9ca3af;
+        }
+        /* Dark mode controls */
+        .dark .leaflet-control-zoom a {
+          background-color: #374151;
+          color: #f3f4f6;
+          border-color: #4b5563;
+        }
+        .dark .leaflet-control-zoom a:hover {
+          background-color: #4b5563;
+        }
+        .dark .leaflet-control-attribution {
+          background-color: rgba(31, 41, 55, 0.8);
+          color: #9ca3af;
+        }
+        .dark .leaflet-control-attribution a {
+          color: #60a5fa;
         }
       `}</style>
     </div>
