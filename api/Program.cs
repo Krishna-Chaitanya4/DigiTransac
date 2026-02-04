@@ -90,6 +90,146 @@ if (!string.IsNullOrEmpty(mongoDbName))
     builder.Configuration["MongoDb:DatabaseName"] = mongoDbName;
 }
 
+// =============================================================================
+// Environment Variable Validation
+// =============================================================================
+// Validate required configuration at startup to fail fast
+var validationErrors = new List<string>();
+var validationWarnings = new List<string>();
+
+// Required: JWT Secret Key (must be at least 32 characters for HS256)
+var jwtKeyValue = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKeyValue))
+{
+    validationErrors.Add("JWT_SECRET_KEY or Jwt:Key is required");
+}
+else if (jwtKeyValue.Length < 32)
+{
+    validationErrors.Add($"JWT_SECRET_KEY must be at least 32 characters (currently {jwtKeyValue.Length})");
+}
+
+// Required: MongoDB Connection String
+var mongoConnStr = builder.Configuration["MongoDb:ConnectionString"];
+if (string.IsNullOrWhiteSpace(mongoConnStr))
+{
+    validationErrors.Add("MONGODB_CONNECTION_STRING or MongoDb:ConnectionString is required");
+}
+
+// Required: MongoDB Database Name
+var mongoDbNameValue = builder.Configuration["MongoDb:DatabaseName"];
+if (string.IsNullOrWhiteSpace(mongoDbNameValue))
+{
+    validationErrors.Add("MONGODB_DATABASE_NAME or MongoDb:DatabaseName is required");
+}
+
+// Required for encryption: Encryption Key (must be valid base64, 32 bytes for AES-256)
+var encKeyValue = builder.Configuration["Encryption:Key"];
+if (string.IsNullOrWhiteSpace(encKeyValue))
+{
+    validationErrors.Add("ENCRYPTION_KEY or Encryption:Key is required");
+}
+else
+{
+    try
+    {
+        var keyBytes = Convert.FromBase64String(encKeyValue);
+        if (keyBytes.Length != 32)
+        {
+            validationErrors.Add($"ENCRYPTION_KEY must be 32 bytes (256 bits) when decoded, got {keyBytes.Length} bytes");
+        }
+    }
+    catch (FormatException)
+    {
+        validationErrors.Add("ENCRYPTION_KEY must be valid base64 encoded");
+    }
+}
+
+// Required for encryption: Key Encryption Key (KEK)
+var kekValue = builder.Configuration["Encryption:Kek"];
+if (string.IsNullOrWhiteSpace(kekValue))
+{
+    validationErrors.Add("ENCRYPTION_KEK or Encryption:Kek is required");
+}
+else
+{
+    try
+    {
+        var kekBytes = Convert.FromBase64String(kekValue);
+        if (kekBytes.Length != 32)
+        {
+            validationErrors.Add($"ENCRYPTION_KEK must be 32 bytes (256 bits) when decoded, got {kekBytes.Length} bytes");
+        }
+    }
+    catch (FormatException)
+    {
+        validationErrors.Add("ENCRYPTION_KEK must be valid base64 encoded");
+    }
+}
+
+// Optional: Email settings (warn if not configured)
+var emailSenderValue = builder.Configuration["Email:SenderEmail"];
+var emailPasswordValue = builder.Configuration["Email:AppPassword"];
+if (string.IsNullOrWhiteSpace(emailSenderValue) || string.IsNullOrWhiteSpace(emailPasswordValue))
+{
+    validationWarnings.Add("Email settings not configured - email functionality will be disabled");
+}
+else if (!emailSenderValue.Contains('@'))
+{
+    validationWarnings.Add("EMAIL_SENDER does not appear to be a valid email address");
+}
+
+// Optional: JWT Issuer and Audience (warn if using defaults)
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+if (string.IsNullOrWhiteSpace(jwtIssuer) || jwtIssuer == "DigiTransac")
+{
+    validationWarnings.Add("Using default JWT Issuer - consider setting a custom value in production");
+}
+if (string.IsNullOrWhiteSpace(jwtAudience) || jwtAudience == "DigiTransac")
+{
+    validationWarnings.Add("Using default JWT Audience - consider setting a custom value in production");
+}
+
+// Optional: CORS origins (warn if using localhost in production)
+var corsOriginsValue = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+if (!builder.Environment.IsDevelopment() && corsOriginsValue != null)
+{
+    if (corsOriginsValue.Any(o => o.Contains("localhost")))
+    {
+        validationWarnings.Add("CORS allows localhost origins in non-development environment");
+    }
+}
+
+// Log warnings
+foreach (var warning in validationWarnings)
+{
+    Log.Warning("Configuration Warning: {Warning}", warning);
+}
+
+// Fail fast on validation errors
+if (validationErrors.Count > 0)
+{
+    foreach (var error in validationErrors)
+    {
+        Log.Error("Configuration Error: {Error}", error);
+    }
+    
+    // In development, allow the app to start with warnings instead of failing
+    if (!builder.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException(
+            $"Application startup failed due to configuration errors:\n" +
+            string.Join("\n", validationErrors.Select(e => $"  - {e}")));
+    }
+    else
+    {
+        Log.Warning("Running in Development mode - proceeding despite configuration errors");
+    }
+}
+
+Log.Information("Environment validation completed: {ErrorCount} errors, {WarningCount} warnings",
+    validationErrors.Count, validationWarnings.Count);
+
 // Add settings
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDb"));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));

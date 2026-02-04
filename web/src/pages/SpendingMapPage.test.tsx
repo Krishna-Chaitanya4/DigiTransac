@@ -75,17 +75,23 @@ vi.mock('react-leaflet-cluster', () => ({
   ),
 }));
 
-vi.mock('leaflet', () => ({
-  icon: () => ({}),
-  divIcon: () => ({}),
-  latLngBounds: () => ({}),
-  Marker: {
-    prototype: {
-      options: {},
+vi.mock('leaflet', () => {
+  const mockL = {
+    icon: () => ({}),
+    divIcon: () => ({}),
+    latLngBounds: () => ({}),
+    Marker: {
+      prototype: {
+        options: {},
+      },
     },
-  },
-  point: () => ({}),
-}));
+    point: () => ({}),
+  };
+  return {
+    ...mockL,
+    default: mockL,
+  };
+});
 
 // Test wrapper with providers
 const createTestQueryClient = () =>

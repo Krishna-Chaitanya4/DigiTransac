@@ -210,7 +210,8 @@ describe('BudgetsPage', () => {
       });
       expect(screen.getByText('Total Budgeted')).toBeInTheDocument();
       expect(screen.getByText('Total Spent')).toBeInTheDocument();
-      expect(screen.getByText('Exceeded')).toBeInTheDocument();
+      // "Exceeded" appears both as a stat label and filter button, so use getAllByText
+      expect(screen.getAllByText('Exceeded').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -253,7 +254,8 @@ describe('BudgetsPage', () => {
       });
       expect(screen.getByText('On Track')).toBeInTheDocument();
       expect(screen.getByText('Warning')).toBeInTheDocument();
-      expect(screen.getByText('Exceeded')).toBeInTheDocument();
+      // "Exceeded" appears both as a stat label and filter button, so use getByRole
+      expect(screen.getByRole('button', { name: 'Exceeded' })).toBeInTheDocument();
     });
 
     it('should render search input', async () => {
@@ -275,8 +277,8 @@ describe('BudgetsPage', () => {
         expect(screen.getByText('Dining Out')).toBeInTheDocument();
       });
 
-      // Click "Exceeded" filter
-      const exceededButton = screen.getByText('Exceeded');
+      // Click "Exceeded" filter - use getByRole to target the button specifically
+      const exceededButton = screen.getByRole('button', { name: 'Exceeded' });
       fireEvent.click(exceededButton);
 
       // Only "Dining Out" should be visible as it's over budget (120%)
@@ -295,9 +297,10 @@ describe('BudgetsPage', () => {
       renderWithProviders(<BudgetsPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Exceeded')).toBeInTheDocument();
+        // Wait for budgets to load
+        expect(screen.getByText('Dining Out')).toBeInTheDocument();
       });
-      // There's 1 exceeded budget
+      // There's 1 exceeded budget - verify the count
       expect(screen.getByText('1')).toBeInTheDocument();
       expect(screen.getByText('Needs attention')).toBeInTheDocument();
     });
