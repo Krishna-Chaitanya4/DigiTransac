@@ -107,6 +107,51 @@ export default defineConfig({
             }
           },
           {
+            urlPattern: /^https?:\/\/.*\/api\/accounts/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'accounts-cache',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              },
+              networkTimeoutSeconds: 10,
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https?:\/\/.*\/api\/budgets/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'budgets-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 12 // 12 hours
+              },
+              networkTimeoutSeconds: 10,
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https?:\/\/.*\/api\/conversations/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'conversations-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              },
+              networkTimeoutSeconds: 10,
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
             urlPattern: /^https?:\/\/.*\/api\/dashboard/,
             handler: 'NetworkFirst',
             options: {
@@ -129,6 +174,50 @@ export default defineConfig({
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Map tiles - cached aggressively since they don't change
+          {
+            urlPattern: /^https:\/\/[a-z]\.tile\.openstreetmap\.org/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles-osm',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/[a-z]\.basemaps\.cartocdn\.com/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles-carto',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Location/Geocoding API responses
+          {
+            urlPattern: /^https:\/\/nominatim\.openstreetmap\.org/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'geocoding-cache',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               },
               cacheableResponse: {
                 statuses: [0, 200]

@@ -96,9 +96,23 @@ export { useFocusTrap } from './useFocusTrap';
 export { useInfiniteScroll } from './useInfiniteScroll';
 export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 export { useTransactionFilters } from './useTransactionFilters';
-export { useOnlineStatus, useOnlineStatusExtended, useOfflineQueue } from './useOffline';
+export {
+  useOnlineStatus,
+  useOnlineStatusExtended,
+  useOfflineQueue,
+  useOfflineLocations,
+  useOfflineMessages,
+  cacheLocations,
+  getCachedLocations,
+  clearOldCachedLocations,
+  cacheMessages,
+  getCachedMessages,
+} from './useOffline';
+export type { CachedLocation, CachedMessage, OfflineAction } from './useOffline';
 export { useModalState, useDeleteModalState } from './useModalState';
 export { usePullToRefresh } from './usePullToRefresh';
+export { useSwipeGesture } from './useSwipeGesture';
+export { usePinchZoom } from './usePinchZoom';
 
 // Re-export query keys for external use
 export { queryKeys } from '../lib/queryClient';

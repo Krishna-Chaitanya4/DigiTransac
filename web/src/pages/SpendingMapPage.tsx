@@ -10,6 +10,7 @@ import { formatCurrency } from '../services/currencyService';
 import { Transaction, TransactionLocation, TripGroup } from '../types/transactions';
 import { Link } from 'react-router-dom';
 import { MapSkeleton, TripListSkeleton, LocationListSkeleton, StatsBarSkeleton } from '../components/ui/Skeleton';
+import { MapErrorBoundary } from '../components/error';
 
 // Map tile URLs for light and dark modes
 const MAP_TILES = {
@@ -612,123 +613,125 @@ export default function SpendingMapPage() {
               </Link>
             </div>
           ) : (
-            <MapContainer
-              center={defaultCenter}
-              zoom={10}
-              style={{ height: '100%', width: '100%' }}
-              className="z-0"
-            >
-              <TileLayer
-                key={resolvedTheme} // Force re-render when theme changes
-                attribution={MAP_TILES[resolvedTheme].attribution}
-                url={MAP_TILES[resolvedTheme].url}
-              />
-              
-              <MapBoundsUpdater transactions={filteredTransactions} />
-              
-              {showHeatmap ? (
-                // Heatmap mode - show circles with size based on spending
-                <>
-                  {locationClusters.map(cluster => {
-                    const maxAmount = Math.max(...locationClusters.map(c => c.totalAmount));
-                    const radius = Math.max(20, Math.min(80, (cluster.totalAmount / maxAmount) * 80));
-                    
-                    return (
-                      <CircleMarker
-                        key={cluster.id}
-                        center={[cluster.latitude, cluster.longitude]}
-                        radius={radius}
-                        pathOptions={{
-                          color: cluster.primaryCategoryColor || '#EF4444',
-                          fillColor: cluster.primaryCategoryColor || '#EF4444',
-                          fillOpacity: 0.4,
-                          weight: 2,
-                        }}
+            <MapErrorBoundary>
+              <MapContainer
+                center={defaultCenter}
+                zoom={10}
+                style={{ height: '100%', width: '100%' }}
+                className="z-0"
+              >
+                <TileLayer
+                  key={resolvedTheme} // Force re-render when theme changes
+                  attribution={MAP_TILES[resolvedTheme].attribution}
+                  url={MAP_TILES[resolvedTheme].url}
+                />
+                
+                <MapBoundsUpdater transactions={filteredTransactions} />
+                
+                {showHeatmap ? (
+                  // Heatmap mode - show circles with size based on spending
+                  <>
+                    {locationClusters.map(cluster => {
+                      const maxAmount = Math.max(...locationClusters.map(c => c.totalAmount));
+                      const radius = Math.max(20, Math.min(80, (cluster.totalAmount / maxAmount) * 80));
+                      
+                      return (
+                        <CircleMarker
+                          key={cluster.id}
+                          center={[cluster.latitude, cluster.longitude]}
+                          radius={radius}
+                          pathOptions={{
+                            color: cluster.primaryCategoryColor || '#EF4444',
+                            fillColor: cluster.primaryCategoryColor || '#EF4444',
+                            fillOpacity: 0.4,
+                            weight: 2,
+                          }}
+                        >
+                          <Popup>
+                            <div className="min-w-[200px]">
+                              <div className="font-semibold text-gray-900">{cluster.name}</div>
+                              <div className="text-lg font-bold text-blue-600 mt-1">
+                                {formatCurrency(cluster.totalAmount, primaryCurrency)}
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                {cluster.transactionCount} transaction{cluster.transactionCount !== 1 ? 's' : ''}
+                              </div>
+                              {cluster.primaryCategory && (
+                                <div
+                                  className="inline-block px-2 py-0.5 rounded-full text-xs text-white mt-2"
+                                  style={{ backgroundColor: cluster.primaryCategoryColor }}
+                                >
+                                  {cluster.primaryCategory}
+                                </div>
+                              )}
+                            </div>
+                          </Popup>
+                        </CircleMarker>
+                      );
+                    })}
+                  </>
+                ) : (
+                  // Marker cluster mode
+                  <MarkerClusterGroup
+                    chunkedLoading
+                    iconCreateFunction={(cluster: { getChildCount: () => number }) => {
+                      const count = cluster.getChildCount();
+                      return L.divIcon({
+                        html: `<div class="cluster-icon">${count}</div>`,
+                        className: 'custom-cluster-icon',
+                        iconSize: L.point(40, 40, true),
+                      });
+                    }}
+                  >
+                    {filteredTransactions.map(transaction => (
+                      <Marker
+                        key={transaction.id}
+                        position={[transaction.location.latitude, transaction.location.longitude]}
+                        icon={createColoredIcon(getMarkerColor(transaction))}
                       >
                         <Popup>
                           <div className="min-w-[200px]">
-                            <div className="font-semibold text-gray-900">{cluster.name}</div>
+                            <div className="font-semibold text-gray-900">
+                              {transaction.payee || transaction.title || 'Transaction'}
+                            </div>
                             <div className="text-lg font-bold text-blue-600 mt-1">
-                              {formatCurrency(cluster.totalAmount, primaryCurrency)}
+                              {formatCurrency(transaction.amount, transaction.currency)}
                             </div>
                             <div className="text-sm text-gray-600 mt-1">
-                              {cluster.transactionCount} transaction{cluster.transactionCount !== 1 ? 's' : ''}
+                              {new Date(transaction.dateLocal || transaction.date).toLocaleDateString()}
                             </div>
-                            {cluster.primaryCategory && (
-                              <div
-                                className="inline-block px-2 py-0.5 rounded-full text-xs text-white mt-2"
-                                style={{ backgroundColor: cluster.primaryCategoryColor }}
-                              >
-                                {cluster.primaryCategory}
+                            {transaction.location.placeName && (
+                              <div className="text-sm text-gray-500 mt-1">
+                                📍 {transaction.location.placeName}
                               </div>
                             )}
+                            {transaction.splits.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {transaction.splits.slice(0, 3).map((split, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-block px-2 py-0.5 rounded-full text-xs text-white"
+                                    style={{ backgroundColor: labelColorMap[split.labelId]?.color || '#6B7280' }}
+                                  >
+                                    {labelColorMap[split.labelId]?.name || split.labelName || 'Category'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <Link
+                              to={`/transactions?id=${transaction.id}`}
+                              className="block mt-3 text-sm text-blue-600 hover:underline"
+                            >
+                              View Details →
+                            </Link>
                           </div>
                         </Popup>
-                      </CircleMarker>
-                    );
-                  })}
-                </>
-              ) : (
-                // Marker cluster mode
-                <MarkerClusterGroup
-                  chunkedLoading
-                  iconCreateFunction={(cluster: { getChildCount: () => number }) => {
-                    const count = cluster.getChildCount();
-                    return L.divIcon({
-                      html: `<div class="cluster-icon">${count}</div>`,
-                      className: 'custom-cluster-icon',
-                      iconSize: L.point(40, 40, true),
-                    });
-                  }}
-                >
-                  {filteredTransactions.map(transaction => (
-                    <Marker
-                      key={transaction.id}
-                      position={[transaction.location.latitude, transaction.location.longitude]}
-                      icon={createColoredIcon(getMarkerColor(transaction))}
-                    >
-                      <Popup>
-                        <div className="min-w-[200px]">
-                          <div className="font-semibold text-gray-900">
-                            {transaction.payee || transaction.title || 'Transaction'}
-                          </div>
-                          <div className="text-lg font-bold text-blue-600 mt-1">
-                            {formatCurrency(transaction.amount, transaction.currency)}
-                          </div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            {new Date(transaction.dateLocal || transaction.date).toLocaleDateString()}
-                          </div>
-                          {transaction.location.placeName && (
-                            <div className="text-sm text-gray-500 mt-1">
-                              📍 {transaction.location.placeName}
-                            </div>
-                          )}
-                          {transaction.splits.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {transaction.splits.slice(0, 3).map((split, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-block px-2 py-0.5 rounded-full text-xs text-white"
-                                  style={{ backgroundColor: labelColorMap[split.labelId]?.color || '#6B7280' }}
-                                >
-                                  {labelColorMap[split.labelId]?.name || split.labelName || 'Category'}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <Link
-                            to={`/transactions?id=${transaction.id}`}
-                            className="block mt-3 text-sm text-blue-600 hover:underline"
-                          >
-                            View Details →
-                          </Link>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                </MarkerClusterGroup>
-              )}
+                      </Marker>
+                    ))}
+                  </MarkerClusterGroup>
+                )}
               </MapContainer>
+            </MapErrorBoundary>
             )}
           </div>
         )}

@@ -8,6 +8,7 @@ import { BudgetCard } from '../components/budget';
 import { getDateRangeForPreset, formatDateToStartOfDay, formatDateToEndOfDay } from '../hooks/useTransactionFilters';
 import { DateRangePicker } from '../components/DatePicker';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ChartErrorBoundary } from '../components/error';
 
 type PeriodPreset = 'thisMonth' | 'lastMonth' | 'last3Months' | 'last6Months' | 'thisYear' | 'custom';
 
@@ -1161,7 +1162,7 @@ export default function InsightsPage() {
             
           case 'trends':
             return (
-              <WidgetWithErrorBoundary key="trends" name="Cash Flow Trend">
+              <ChartErrorBoundary key="trends" chartType="trend">
               <CollapsibleSection
                 key="trends"
                 id="trends"
@@ -1256,7 +1257,7 @@ export default function InsightsPage() {
                   </div>
                 )}
               </CollapsibleSection>
-              </WidgetWithErrorBoundary>
+              </ChartErrorBoundary>
             );
             
           case 'budgets':
@@ -1565,7 +1566,7 @@ export default function InsightsPage() {
             
           case 'patterns':
             return (
-              <WidgetWithErrorBoundary key="patterns" name="Spending Patterns">
+              <ChartErrorBoundary key="patterns" chartType="pattern">
               <CollapsibleSection
                 key="patterns"
                 id="patterns"
@@ -1715,7 +1716,7 @@ export default function InsightsPage() {
                   </div>
                 )}
               </CollapsibleSection>
-              </WidgetWithErrorBoundary>
+              </ChartErrorBoundary>
             );
             
           case 'anomalies':
