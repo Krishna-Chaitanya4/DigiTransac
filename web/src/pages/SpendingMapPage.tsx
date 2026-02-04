@@ -298,8 +298,11 @@ export default function SpendingMapPage() {
     return transactionsData.transactions.filter(
       (t): t is TransactionWithLocation =>
         t.location !== undefined &&
+        t.location !== null &&
         t.location.latitude !== undefined &&
+        t.location.latitude !== null &&
         t.location.longitude !== undefined &&
+        t.location.longitude !== null &&
         !t.isRecurringTemplate
     );
   }, [transactionsData]);
