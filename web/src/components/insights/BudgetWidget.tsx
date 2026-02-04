@@ -4,7 +4,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { WidgetWithErrorBoundary } from './WidgetWithErrorBoundary';
 import { BudgetCard } from '../budget';
 import type { SectionId } from './types';
-import type { Budget, BudgetSummary } from '../../types/budgets';
+import type { BudgetSummary } from '../../types/budgets';
 
 interface BudgetWidgetProps {
   budgetSummary: BudgetSummary | undefined;

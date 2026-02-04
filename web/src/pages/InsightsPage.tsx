@@ -3,6 +3,20 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { formatCurrency } from '../services/currencyService';
+
+// Helper to convert and format currency - ensures proper conversion from source to target currency
+const convertAndFormat = (
+  amount: number,
+  sourceCurrency: string | undefined,
+  targetCurrency: string,
+  convert: (amount: number, fromCurrency: string) => number
+): string => {
+  if (!sourceCurrency || sourceCurrency === targetCurrency) {
+    return formatCurrency(amount, targetCurrency);
+  }
+  const convertedAmount = convert(amount, sourceCurrency);
+  return formatCurrency(convertedAmount, targetCurrency);
+};
 import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies } from '../hooks';
 import { BudgetCard } from '../components/budget';
 import { getDateRangeForPreset, formatDateToStartOfDay, formatDateToEndOfDay } from '../hooks/useTransactionFilters';
@@ -305,7 +319,7 @@ type ViewMode = 'categorized' | 'cashflow';
 
 export default function InsightsPage() {
   const { user } = useAuth();
-  const { primaryCurrency } = useCurrency();
+  const { primaryCurrency, convert } = useCurrency();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodPreset>('thisMonth');
   const [viewMode, setViewMode] = useState<ViewMode>('categorized');
   
@@ -805,7 +819,7 @@ export default function InsightsPage() {
                   {isLoading ? (
                     <div className="h-9 w-28 bg-green-200 dark:bg-green-800 rounded animate-pulse mx-auto" />
                   ) : (
-                    formatCurrency(financialSummary.income, primaryCurrency)
+                    convertAndFormat(financialSummary.income, transactionSummary?.currency, primaryCurrency, convert)
                   )}
                 </div>
                 <div className="flex flex-col items-center gap-1 mt-2">
@@ -833,7 +847,7 @@ export default function InsightsPage() {
                   {isLoading ? (
                     <div className="h-9 w-28 bg-red-200 dark:bg-red-800 rounded animate-pulse mx-auto" />
                   ) : (
-                    formatCurrency(financialSummary.expenses, primaryCurrency)
+                    convertAndFormat(financialSummary.expenses, transactionSummary?.currency, primaryCurrency, convert)
                   )}
                 </div>
                 <div className="flex flex-col items-center gap-1 mt-2">
@@ -873,7 +887,7 @@ export default function InsightsPage() {
                   ) : (
                     <>
                       {financialSummary.netChange >= 0 ? '+' : ''}
-                      {formatCurrency(financialSummary.netChange, primaryCurrency)}
+                      {convertAndFormat(financialSummary.netChange, transactionSummary?.currency, primaryCurrency, convert)}
                     </>
                   )}
                 </div>
@@ -906,7 +920,7 @@ export default function InsightsPage() {
                   {isLoading ? (
                     <div className="h-9 w-28 bg-teal-200 dark:bg-teal-800 rounded animate-pulse mx-auto" />
                   ) : (
-                    formatCurrency(transactionSummary?.totalCredits ?? 0, primaryCurrency)
+                    convertAndFormat(transactionSummary?.totalCredits ?? 0, transactionSummary?.currency, primaryCurrency, convert)
                   )}
                 </div>
                 <div className="text-xs text-teal-600/70 dark:text-teal-400/70 mt-1">all credits received</div>
@@ -924,7 +938,7 @@ export default function InsightsPage() {
                   {isLoading ? (
                     <div className="h-9 w-28 bg-pink-200 dark:bg-pink-800 rounded animate-pulse mx-auto" />
                   ) : (
-                    formatCurrency(transactionSummary?.totalDebits ?? 0, primaryCurrency)
+                    convertAndFormat(transactionSummary?.totalDebits ?? 0, transactionSummary?.currency, primaryCurrency, convert)
                   )}
                 </div>
                 <div className="text-xs text-pink-600/70 dark:text-pink-400/70 mt-1">all debits sent</div>
@@ -954,7 +968,7 @@ export default function InsightsPage() {
                   ) : (
                     <>
                       {(transactionSummary?.netChange ?? 0) >= 0 ? '+' : ''}
-                      {formatCurrency(transactionSummary?.netChange ?? 0, primaryCurrency)}
+                      {convertAndFormat(transactionSummary?.netChange ?? 0, transactionSummary?.currency, primaryCurrency, convert)}
                     </>
                   )}
                 </div>
@@ -1049,7 +1063,7 @@ export default function InsightsPage() {
                                 {category.labelName}
                               </span>
                               <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                {formatCurrency(category.amount, primaryCurrency)}
+                                {convertAndFormat(category.amount, transactionSummary?.currency, primaryCurrency, convert)}
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -1128,7 +1142,7 @@ export default function InsightsPage() {
                                 {category.labelName}
                               </span>
                               <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                                {formatCurrency(category.amount, primaryCurrency)}
+                                {convertAndFormat(category.amount, transactionSummary?.currency, primaryCurrency, convert)}
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -1216,12 +1230,12 @@ export default function InsightsPage() {
                               <div
                                         className="flex-1 bg-green-500 rounded-t transition-all duration-300"
                                         style={{ height: `${creditsHeight}%`, minHeight: trend.credits > 0 ? '4px' : '0' }}
-                                        title={`Money In: ${formatCurrency(trend.credits, primaryCurrency)}`}
+                                        title={`Money In: ${convertAndFormat(trend.credits, transactionSummary?.currency, primaryCurrency, convert)}`}
                                       />
                                       <div
                                         className="flex-1 bg-red-500 rounded-t transition-all duration-300"
                                         style={{ height: `${debitsHeight}%`, minHeight: trend.debits > 0 ? '4px' : '0' }}
-                                        title={`Money Out: ${formatCurrency(trend.debits, primaryCurrency)}`}
+                                        title={`Money Out: ${convertAndFormat(trend.debits, transactionSummary?.currency, primaryCurrency, convert)}`}
                                       />
                             </div>
                             <span className="text-xs text-gray-500 dark:text-gray-400 truncate w-full text-center">
@@ -1237,13 +1251,13 @@ export default function InsightsPage() {
                       <div className="text-center">
                         <div className="text-sm text-gray-500 dark:text-gray-400">Daily Average</div>
                         <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          {formatCurrency(analytics.dailyAverage, primaryCurrency)}
+                          {convertAndFormat(analytics.dailyAverage, transactionSummary?.currency, primaryCurrency, convert)}
                         </div>
                       </div>
                       <div className="text-center">
                         <div className="text-sm text-gray-500 dark:text-gray-400">Monthly Average</div>
                         <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          {formatCurrency(analytics.monthlyAverage, primaryCurrency)}
+                          {convertAndFormat(analytics.monthlyAverage, transactionSummary?.currency, primaryCurrency, convert)}
                         </div>
                       </div>
                     </div>
@@ -1339,7 +1353,7 @@ export default function InsightsPage() {
                   <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <div className="text-sm text-green-600 dark:text-green-400 mb-1">Avg. Income</div>
                     <div className="text-xl font-bold text-green-700 dark:text-green-300">
-                      {formatCurrency(analytics.averagesByType.averageCredit, primaryCurrency)}
+                      {convertAndFormat(analytics.averagesByType.averageCredit, transactionSummary?.currency, primaryCurrency, convert)}
                     </div>
                     <div className="text-xs text-green-600 dark:text-green-400 mt-1">per transaction</div>
                     {prevAnalytics?.averagesByType && (
@@ -1356,7 +1370,7 @@ export default function InsightsPage() {
                   <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
                     <div className="text-sm text-red-600 dark:text-red-400 mb-1">Avg. Expense</div>
                     <div className="text-xl font-bold text-red-700 dark:text-red-300">
-                      {formatCurrency(analytics.averagesByType.averageDebit, primaryCurrency)}
+                      {convertAndFormat(analytics.averagesByType.averageDebit, transactionSummary?.currency, primaryCurrency, convert)}
                     </div>
                     <div className="text-xs text-red-600 dark:text-red-400 mt-1">per transaction</div>
                     {prevAnalytics?.averagesByType && (
@@ -1373,7 +1387,7 @@ export default function InsightsPage() {
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <div className="text-sm text-blue-600 dark:text-blue-400 mb-1">Avg. Transfer</div>
                     <div className="text-xl font-bold text-blue-700 dark:text-blue-300">
-                      {formatCurrency(analytics.averagesByType.averageTransfer, primaryCurrency)}
+                      {convertAndFormat(analytics.averagesByType.averageTransfer, transactionSummary?.currency, primaryCurrency, convert)}
                     </div>
                     <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">per transaction</div>
                     {prevAnalytics?.averagesByType && (
@@ -1438,13 +1452,13 @@ export default function InsightsPage() {
                                 {cp.name}
                               </span>
                               <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                {formatCurrency(cp.totalAmount, primaryCurrency)}
+                                {convertAndFormat(cp.totalAmount, counterparties?.currency, primaryCurrency, convert)}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                               <span>{cp.transactionCount} transaction{cp.transactionCount !== 1 ? 's' : ''}</span>
                               <span>•</span>
-                              <span>Avg: {formatCurrency(avgAmount, primaryCurrency)}</span>
+                              <span>Avg: {convertAndFormat(avgAmount, counterparties?.currency, primaryCurrency, convert)}</span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-400 dark:text-gray-500 w-6 text-right">
@@ -1457,9 +1471,11 @@ export default function InsightsPage() {
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500 dark:text-gray-400">Total from top payees</span>
                         <span className="font-semibold text-gray-900 dark:text-gray-100">
-                          {formatCurrency(
+                          {convertAndFormat(
                             counterparties.counterparties.reduce((sum, cp) => sum + cp.totalAmount, 0),
-                            primaryCurrency
+                            counterparties?.currency,
+                            primaryCurrency,
+                            convert
                           )}
                         </span>
                       </div>
@@ -1523,7 +1539,7 @@ export default function InsightsPage() {
                               {account.accountName}
                             </span>
                             <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                              {formatCurrency(account.totalDebits, primaryCurrency)}
+                              {convertAndFormat(account.totalDebits, spendingByAccount?.currency, primaryCurrency, convert)}
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -1544,9 +1560,11 @@ export default function InsightsPage() {
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500 dark:text-gray-400">Total spending</span>
                         <span className="font-semibold text-gray-900 dark:text-gray-100">
-                          {formatCurrency(
+                          {convertAndFormat(
                             spendingByAccount.accounts.reduce((sum, acc) => sum + acc.totalDebits, 0),
-                            primaryCurrency
+                            spendingByAccount?.currency,
+                            primaryCurrency,
+                            convert
                           )}
                         </span>
                       </div>
@@ -1606,14 +1624,14 @@ export default function InsightsPage() {
                                 >
                                   {barWidth > 20 && (
                                     <span className="text-xs text-white font-medium">
-                                      {formatCurrency(day.totalAmount, primaryCurrency)}
+                                      {convertAndFormat(day.totalAmount, spendingPatterns?.currency, primaryCurrency, convert)}
                                     </span>
                                   )}
                                 </div>
                               </div>
                               {barWidth <= 20 && (
                                 <span className="text-xs text-gray-600 dark:text-gray-400 w-16 text-right">
-                                  {formatCurrency(day.totalAmount, primaryCurrency)}
+                                  {convertAndFormat(day.totalAmount, spendingPatterns?.currency, primaryCurrency, convert)}
                                 </span>
                               )}
                             </div>
@@ -1662,14 +1680,14 @@ export default function InsightsPage() {
                                     >
                                       {barWidth > 25 && (
                                         <span className="text-xs text-white font-medium">
-                                          {formatCurrency(period.totalAmount, primaryCurrency)}
+                                          {convertAndFormat(period.totalAmount, spendingPatterns?.currency, primaryCurrency, convert)}
                                         </span>
                                       )}
                                     </div>
                                   </div>
                                   {barWidth <= 25 && (
                                     <span className="text-xs text-gray-600 dark:text-gray-400 w-16 text-right">
-                                      {formatCurrency(period.totalAmount, primaryCurrency)}
+                                      {convertAndFormat(period.totalAmount, spendingPatterns?.currency, primaryCurrency, convert)}
                                     </span>
                                   )}
                                 </div>
@@ -1793,8 +1811,8 @@ export default function InsightsPage() {
                           {anomaly.amount !== undefined && (
                             <div className="text-right ml-4">
                               <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                                {formatCurrency(anomaly.amount, primaryCurrency)}
-                              </div>
+                                  {convertAndFormat(anomaly.amount, anomalies?.currency, primaryCurrency, convert)}
+                                </div>
                             </div>
                           )}
                         </div>

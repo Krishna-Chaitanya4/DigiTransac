@@ -1,8 +1,7 @@
 import { z } from 'zod';
-import { 
-  objectIdSchema, 
+import {
+  objectIdSchema,
   positiveAmountSchema,
-  nonNegativeAmountSchema,
   currencyCodeSchema,
   hexColorSchema,
   emojiSchema

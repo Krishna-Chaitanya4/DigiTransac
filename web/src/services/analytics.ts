@@ -400,6 +400,9 @@ class AnalyticsService {
 // Export singleton instance
 export const analytics = new AnalyticsService();
 
+// Initialize analytics (call this in main.tsx)
+export const initAnalytics = () => analytics.init();
+
 // React hook for analytics
 export function useAnalytics() {
   return analytics;

@@ -192,7 +192,7 @@ function TripCard({ trip, currency, isSelected, onClick }: TripCardProps) {
 }
 
 export default function SpendingMapPage() {
-  const { primaryCurrency } = useCurrency();
+  const { primaryCurrency, convert } = useCurrency();
   const { resolvedTheme } = useTheme();
   const [dateFilter, setDateFilter] = useState<DateFilter>('last3Months');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -338,7 +338,9 @@ export default function SpendingMapPage() {
       }
       
       clusters[key].transactions.push(t);
-      clusters[key].totalAmount += t.amount;
+      // Convert amount to primary currency before summing
+      const convertedAmount = convert(t.amount, t.currency);
+      clusters[key].totalAmount += convertedAmount;
       clusters[key].transactionCount++;
     });
     
@@ -373,9 +375,12 @@ export default function SpendingMapPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [transactionsWithLocations, labelColorMap]);
   
-  // Calculate stats
+  // Calculate stats with currency conversion
   const stats = useMemo(() => {
-    const totalSpending = filteredTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const totalSpending = filteredTransactions.reduce((sum, t) => {
+      // Convert each transaction to primary currency
+      return sum + convert(t.amount, t.currency);
+    }, 0);
     const uniqueLocations = new Set(
       filteredTransactions.map(t => `${t.location.latitude},${t.location.longitude}`)
     ).size;
@@ -386,7 +391,7 @@ export default function SpendingMapPage() {
       uniqueLocations,
       topLocation: locationClusters[0],
     };
-  }, [filteredTransactions, locationClusters]);
+  }, [filteredTransactions, locationClusters, convert]);
   
   // Get marker color for transaction
   const getMarkerColor = useCallback((transaction: TransactionWithLocation): string => {

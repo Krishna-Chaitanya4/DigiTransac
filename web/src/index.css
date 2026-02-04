@@ -280,3 +280,296 @@ html.dark {
 .animate-fade-in {
   animation: fade-in 0.2s ease-out;
 }
+
+/* ============================================
+   PRINT STYLES
+   Optimized for printing financial reports
+   ============================================ */
+
+@media print {
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  /* Reset body for print */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.4;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide non-essential UI elements */
+  .no-print,
+  nav,
+  footer,
+  button:not(.print-button),
+  .mobile-nav,
+  .sidebar,
+  .fab,
+  .toast,
+  .modal-backdrop,
+  .dropdown,
+  .tooltip,
+  [data-tour],
+  .offline-indicator,
+  .install-prompt,
+  .dark-mode-toggle,
+  .search-bar,
+  .filter-panel {
+    display: none !important;
+  }
+
+  /* Remove shadows and rounded corners for cleaner print */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Ensure links are visible with their URLs */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 90%;
+    color: #666;
+  }
+
+  /* Don't show URLs for internal links */
+  a[href^="#"]:after,
+  a[href^="javascript:"]:after {
+    content: "";
+  }
+
+  /* Tables print nicely */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+
+  th {
+    background-color: #f5f5f5 !important;
+    font-weight: bold;
+  }
+
+  /* Transaction list styling */
+  .transaction-item {
+    border-bottom: 1px solid #ddd;
+    padding: 8px 0;
+    page-break-inside: avoid;
+  }
+
+  .transaction-amount {
+    font-weight: bold;
+  }
+
+  .transaction-amount.income {
+    color: #16a34a !important;
+  }
+
+  .transaction-amount.expense {
+    color: #dc2626 !important;
+  }
+
+  /* Charts - convert to summary text or hide */
+  .chart-container,
+  .recharts-wrapper,
+  canvas {
+    display: none !important;
+  }
+
+  .chart-print-summary {
+    display: block !important;
+  }
+
+  /* Account cards */
+  .account-card {
+    border: 1px solid #ddd;
+    padding: 12px;
+    margin-bottom: 8px;
+    page-break-inside: avoid;
+  }
+
+  /* Budget items */
+  .budget-item {
+    border: 1px solid #ddd;
+    padding: 12px;
+    margin-bottom: 8px;
+    page-break-inside: avoid;
+  }
+
+  .budget-progress-bar {
+    height: 8px;
+    background-color: #e5e5e5;
+    border: 1px solid #ccc;
+  }
+
+  .budget-progress-fill {
+    height: 100%;
+    background-color: #3b82f6 !important;
+  }
+
+  /* Headers */
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+    font-weight: bold;
+  }
+
+  h1 {
+    font-size: 20pt;
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-size: 16pt;
+    margin-bottom: 12px;
+  }
+
+  h3 {
+    font-size: 14pt;
+    margin-bottom: 8px;
+  }
+
+  /* Print header with app info */
+  .print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #000;
+  }
+
+  .print-header h1 {
+    margin: 0;
+    font-size: 24pt;
+  }
+
+  .print-header .print-date {
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Print footer with page numbers */
+  .print-footer {
+    display: block !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9pt;
+    color: #666;
+    padding: 8px;
+    border-top: 1px solid #ddd;
+  }
+
+  /* Insights summary for print */
+  .insights-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .insights-summary-item {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .insights-summary-label {
+    font-size: 10pt;
+    color: #666;
+  }
+
+  .insights-summary-value {
+    font-size: 16pt;
+    font-weight: bold;
+  }
+
+  /* Page breaks */
+  .page-break {
+    page-break-before: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure content fills the page width */
+  .container,
+  .main-content,
+  [class*="max-w-"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Category badges */
+  .category-badge {
+    border: 1px solid #000;
+    padding: 2px 6px;
+    font-size: 9pt;
+  }
+
+  /* Date groupings */
+  .date-group-header {
+    font-weight: bold;
+    border-bottom: 1px solid #000;
+    padding: 8px 0 4px;
+    margin-top: 16px;
+  }
+
+  /* Totals section */
+  .totals-section {
+    border-top: 2px solid #000;
+    padding-top: 12px;
+    margin-top: 24px;
+    font-weight: bold;
+  }
+
+  /* Map placeholder for print */
+  .map-container {
+    display: none !important;
+  }
+
+  .map-print-notice {
+    display: block !important;
+    border: 1px dashed #ccc;
+    padding: 24px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+  }
+}
+
+/* Print button visible only on screen */
+@media screen {
+  .print-header,
+  .print-footer,
+  .chart-print-summary,
+  .map-print-notice {
+    display: none !important;
+  }
+}
+
+/* Utility class to trigger print */
+.print-button {
+  cursor: pointer;
+}

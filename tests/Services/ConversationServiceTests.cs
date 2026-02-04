@@ -15,6 +15,7 @@ public class ConversationServiceTests
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<ITransactionService> _transactionServiceMock;
     private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
+    private readonly Mock<ILabelRepository> _labelRepositoryMock;
     private readonly ConversationService _conversationService;
     
     private const string TestUserId = "test-user-id";
@@ -28,6 +29,7 @@ public class ConversationServiceTests
         _userRepositoryMock = new Mock<IUserRepository>();
         _transactionServiceMock = new Mock<ITransactionService>();
         _exchangeRateServiceMock = new Mock<IExchangeRateService>();
+        _labelRepositoryMock = new Mock<ILabelRepository>();
 
         SetupDefaultMocks();
 
@@ -37,11 +39,16 @@ public class ConversationServiceTests
             _accountRepositoryMock.Object,
             _userRepositoryMock.Object,
             _transactionServiceMock.Object,
-            _exchangeRateServiceMock.Object);
+            _exchangeRateServiceMock.Object,
+            _labelRepositoryMock.Object);
     }
 
     private void SetupDefaultMocks()
     {
+        // Default label repository - returns empty list
+        _labelRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<Label>());
+
         // Default user with primary currency
         _userRepositoryMock.Setup(x => x.GetByIdAsync(TestUserId))
             .ReturnsAsync(new User { Id = TestUserId, Email = "test@example.com", FullName = "Test User", PrimaryCurrency = "USD" });
