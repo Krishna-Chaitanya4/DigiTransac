@@ -2,7 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PasswordInput from '../components/PasswordInput';
-import { ThemeToggle } from '../components/ThemeToggle';
+import { DarkModeToggle } from '../components/DarkModeToggle';
 import * as authService from '../services/authService';
 
 export default function LoginPage() {
@@ -136,7 +136,7 @@ export default function LoginPage() {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
           <div className="absolute top-4 right-4">
-            <ThemeToggle />
+            <DarkModeToggle size="sm" />
           </div>
           <div className="max-w-md w-full space-y-8">
             <div>
@@ -254,7 +254,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
         <div className="absolute top-4 right-4">
-          <ThemeToggle />
+          <DarkModeToggle size="sm" />
         </div>
         <div className="max-w-md w-full space-y-8">
           <div>
@@ -326,7 +326,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
       <div className="absolute top-4 right-4">
-        <ThemeToggle />
+        <DarkModeToggle size="sm" />
       </div>
       <div className="max-w-md w-full space-y-8">
         <div>

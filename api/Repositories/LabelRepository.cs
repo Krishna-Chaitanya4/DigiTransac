@@ -27,12 +27,38 @@ public class LabelRepository : ILabelRepository
     {
         _labels = mongoDbService.GetCollection<Label>("labels");
 
-        // Create indexes
-        var userIdIndex = Builders<Label>.IndexKeys.Ascending(l => l.UserId);
-        _labels.Indexes.CreateOne(new CreateIndexModel<Label>(userIdIndex));
+        // Create compound indexes for efficient queries
+        // Wrapped in try-catch to handle cases where indexes already exist with different names
+        try
+        {
+            var indexModels = new List<CreateIndexModel<Label>>
+            {
+                // UserId + Order for GetByUserIdAsync (most common query)
+                new(Builders<Label>.IndexKeys
+                    .Ascending(l => l.UserId)
+                    .Ascending(l => l.Order),
+                    new CreateIndexOptions { Name = "idx_userId_order" }),
+                
+                // UserId + ParentId for GetChildrenAsync and HasChildrenAsync
+                new(Builders<Label>.IndexKeys
+                    .Ascending(l => l.UserId)
+                    .Ascending(l => l.ParentId)
+                    .Ascending(l => l.Order),
+                    new CreateIndexOptions { Name = "idx_userId_parentId_order" }),
+                
+                // UserId + Type for filtering categories vs folders
+                new(Builders<Label>.IndexKeys
+                    .Ascending(l => l.UserId)
+                    .Ascending(l => l.Type),
+                    new CreateIndexOptions { Name = "idx_userId_type" })
+            };
 
-        var parentIdIndex = Builders<Label>.IndexKeys.Ascending(l => l.ParentId);
-        _labels.Indexes.CreateOne(new CreateIndexModel<Label>(parentIdIndex));
+            _labels.Indexes.CreateMany(indexModels);
+        }
+        catch (MongoCommandException)
+        {
+            // Indexes may already exist with different names - this is OK
+        }
     }
 
     public async Task<List<Label>> GetByUserIdAsync(string userId)

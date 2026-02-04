@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logger } from '../services/logger';
 import { useAuth } from '../context/AuthContext';
-import ThemeToggle from '../components/ThemeToggle';
+import { DarkModeToggle } from '../components/DarkModeToggle';
 import * as authService from '../services/authService';
 import PasswordInput from '../components/PasswordInput';
 import { 
@@ -205,7 +205,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
       <div className="absolute top-4 right-4">
-        <ThemeToggle />
+        <DarkModeToggle size="sm" />
       </div>
       <div className="max-w-md w-full space-y-8">
         {/* Progress indicator */}

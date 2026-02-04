@@ -25,12 +25,32 @@ public class AccountRepository : IAccountRepository
     {
         _accounts = mongoDbService.GetCollection<Account>("accounts");
 
-        // Create indexes
-        var userIdIndex = Builders<Account>.IndexKeys.Ascending(a => a.UserId);
-        _accounts.Indexes.CreateOne(new CreateIndexModel<Account>(userIdIndex));
+        // Create compound indexes for efficient queries
+        // Wrapped in try-catch to handle cases where indexes already exist with different names
+        try
+        {
+            var indexModels = new List<CreateIndexModel<Account>>
+            {
+                // UserId + IsArchived + Order for GetByUserIdAsync (most common query)
+                new(Builders<Account>.IndexKeys
+                    .Ascending(a => a.UserId)
+                    .Ascending(a => a.IsArchived)
+                    .Ascending(a => a.Order),
+                    new CreateIndexOptions { Name = "idx_userId_isArchived_order" }),
+                
+                // UserId + Type for type-based filtering
+                new(Builders<Account>.IndexKeys
+                    .Ascending(a => a.UserId)
+                    .Ascending(a => a.Type),
+                    new CreateIndexOptions { Name = "idx_userId_type" })
+            };
 
-        var typeIndex = Builders<Account>.IndexKeys.Ascending(a => a.Type);
-        _accounts.Indexes.CreateOne(new CreateIndexModel<Account>(typeIndex));
+            _accounts.Indexes.CreateMany(indexModels);
+        }
+        catch (MongoCommandException)
+        {
+            // Indexes may already exist with different names - this is OK
+        }
     }
 
     public async Task<List<Account>> GetByUserIdAsync(string userId, bool includeArchived = false)

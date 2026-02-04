@@ -56,38 +56,83 @@ public class TransactionRepository : ITransactionRepository
         _transactions = mongoDbService.GetCollection<Transaction>("transactions");
 
         // Create indexes for efficient queries
-        var indexModels = new List<CreateIndexModel<Transaction>>
+        // Wrapped in try-catch to handle cases where indexes already exist with different names
+        try
         {
-            // User + Date for listing transactions
-            new(Builders<Transaction>.IndexKeys
-                .Ascending(t => t.UserId)
-                .Descending(t => t.Date)),
-            
-            // User + DateLocal for local date filtering (analytics, insights)
-            new(Builders<Transaction>.IndexKeys
-                .Ascending(t => t.UserId)
-                .Descending(t => t.DateLocal)),
-            
-            // Account + Date for account-specific queries
-            new(Builders<Transaction>.IndexKeys
-                .Ascending(t => t.AccountId)
-                .Descending(t => t.Date)),
-            
-            // User + Type for filtering
-            new(Builders<Transaction>.IndexKeys
-                .Ascending(t => t.UserId)
-                .Ascending(t => t.Type)),
-            
-            // Recurring template lookup
-            new(Builders<Transaction>.IndexKeys
-                .Ascending(t => t.IsRecurringTemplate)
-                .Ascending(t => t.RecurringRule!.NextOccurrence)),
-            
-            // Linked transactions for transfers
-            new(Builders<Transaction>.IndexKeys.Ascending(t => t.LinkedTransactionId))
-        };
+            var indexModels = new List<CreateIndexModel<Transaction>>
+            {
+                // User + Date for listing transactions
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Descending(t => t.Date),
+                    new CreateIndexOptions { Name = "idx_userId_date" }),
+                
+                // User + DateLocal for local date filtering (analytics, insights)
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Descending(t => t.DateLocal),
+                    new CreateIndexOptions { Name = "idx_userId_dateLocal" }),
+                
+                // Account + Date for account-specific queries
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.AccountId)
+                    .Descending(t => t.Date),
+                    new CreateIndexOptions { Name = "idx_accountId_date" }),
+                
+                // User + Type for filtering
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Ascending(t => t.Type),
+                    new CreateIndexOptions { Name = "idx_userId_type" }),
+                
+                // User + Status for pending/confirmed filtering
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Ascending(t => t.Status)
+                    .Descending(t => t.Date),
+                    new CreateIndexOptions { Name = "idx_userId_status_date" }),
+                
+                // User + Account + Date for account-filtered listings
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Ascending(t => t.AccountId)
+                    .Descending(t => t.Date),
+                    new CreateIndexOptions { Name = "idx_userId_accountId_date" }),
+                
+                // User + CounterpartyUserId for P2P queries
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Ascending(t => t.CounterpartyUserId)
+                    .Descending(t => t.Date),
+                    new CreateIndexOptions { Name = "idx_userId_counterparty_date" }),
+                
+                // Recurring template lookup
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.IsRecurringTemplate)
+                    .Ascending(t => t.RecurringRule!.NextOccurrence),
+                    new CreateIndexOptions { Name = "idx_recurring_nextOccurrence" }),
+                
+                // Linked transactions for transfers
+                new(Builders<Transaction>.IndexKeys.Ascending(t => t.LinkedTransactionId),
+                    new CreateIndexOptions { Name = "idx_linkedTransactionId" }),
+                
+                // TransactionLinkId for P2P linking
+                new(Builders<Transaction>.IndexKeys.Ascending(t => t.TransactionLinkId),
+                    new CreateIndexOptions { Name = "idx_transactionLinkId" }),
+                
+                // Location.City for map queries (sparse - only indexed when location exists)
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Ascending("Location.City"),
+                    new CreateIndexOptions { Name = "idx_userId_location_city", Sparse = true })
+            };
 
-        _transactions.Indexes.CreateMany(indexModels);
+            _transactions.Indexes.CreateMany(indexModels);
+        }
+        catch (MongoCommandException)
+        {
+            // Indexes may already exist with different names - this is OK
+        }
     }
 
     public async Task<Transaction?> GetByIdAsync(string id)
