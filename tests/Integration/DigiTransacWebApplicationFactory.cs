@@ -55,6 +55,9 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("JWT_SECRET_KEY", TestJwtKey);
         Environment.SetEnvironmentVariable("MONGODB_CONNECTION_STRING", "mongodb://localhost:27017");
         Environment.SetEnvironmentVariable("MONGODB_DATABASE_NAME", "DigiTransac_Test");
+        
+        // Disable rate limiting for integration tests - must be set before Program.cs runs
+        Environment.SetEnvironmentVariable("DISABLE_RATE_LIMITING", "true");
     }
 
     public DigiTransacWebApplicationFactory()
