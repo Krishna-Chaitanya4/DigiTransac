@@ -221,6 +221,7 @@ jobs:
 
       # ────────────── Azure Login (OIDC) ──────────────
       - name: Azure Login
+        id: azure-login
         uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -295,7 +296,7 @@ jobs:
 
       - name: Azure Logout
         run: az logout
-        if: always()
+        if: always() && steps.azure-login.outcome == 'success'
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
   # │ STAGE 5: Verify Deployment                                                   │
