@@ -10,14 +10,13 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
-# Create non-root user for security
-RUN groupadd --gid 1000 app \
-    && useradd --uid 1000 --gid 1000 -m app \
-    && chown -R app:app /app
+# The .NET 9 aspnet image already has 'app' user/group created
+# Just ensure the app directory is owned by the app user
+RUN chown -R app:app /app
 
 COPY --from=build --chown=app:app /app/publish .
 
-# Switch to non-root user
+# Switch to non-root user (already exists in .NET 9 base image)
 USER app
 
 EXPOSE 8080
