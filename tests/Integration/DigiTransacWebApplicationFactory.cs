@@ -1,7 +1,10 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -171,6 +174,17 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(BudgetRepositoryMock.Object);
             services.AddSingleton(ExchangeRateRepositoryMock.Object);
             services.AddSingleton(ChatMessageRepositoryMock.Object);
+
+            // Disable rate limiting for integration tests by reconfiguring with very permissive limits
+            services.Configure<RateLimiterOptions>(options =>
+            {
+                // Replace global limiter with a very permissive one
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                    RateLimitPartition.GetNoLimiter("test"));
+                
+                // Clear all policies and replace with no-op limiters
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            });
 
             // Override the JWT bearer options to use our test key for token validation
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
