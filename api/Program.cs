@@ -814,8 +814,16 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Rate limiting middleware
-app.UseRateLimiter();
+// Rate limiting middleware (can be disabled for testing via DISABLE_RATE_LIMITING env var)
+var disableRateLimiting = Environment.GetEnvironmentVariable("DISABLE_RATE_LIMITING");
+if (!string.Equals(disableRateLimiting, "true", StringComparison.OrdinalIgnoreCase))
+{
+    app.UseRateLimiter();
+}
+else
+{
+    Log.Information("Rate limiting is disabled via DISABLE_RATE_LIMITING environment variable");
+}
 
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
