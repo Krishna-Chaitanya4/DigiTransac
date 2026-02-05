@@ -1,0 +1,76 @@
+# Percy Visual Regression Testing Configuration
+# 
+# Percy captures screenshots and compares them across builds
+# to detect unintended visual changes.
+#
+# Documentation: https://docs.percy.io/
+
+version: 2
+
+# Snapshot settings
+snapshot:
+  # Widths to capture (responsive breakpoints)
+  widths:
+    - 375   # Mobile
+    - 768   # Tablet
+    - 1280  # Desktop
+  
+  # Minimum height for snapshots
+  min-height: 1024
+  
+  # Enable JavaScript execution
+  enable-javascript: true
+  
+  # Wait for network idle before snapshot
+  network-idle-timeout: 250
+  
+  # Percy CSS to inject (hide dynamic content)
+  percy-css: |
+    /* Hide elements that change between runs */
+    [data-testid="timestamp"],
+    [data-testid="date"],
+    .animate-pulse,
+    .animate-spin,
+    .animate-bounce,
+    .skeleton {
+      visibility: hidden !important;
+    }
+    
+    /* Freeze animations */
+    *, *::before, *::after {
+      animation-duration: 0s !important;
+      animation-delay: 0s !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+    }
+    
+    /* Hide toast notifications */
+    [role="alert"],
+    .toast,
+    .notification {
+      display: none !important;
+    }
+
+# Discovery settings
+discovery:
+  # Allowed hostnames for asset discovery
+  allowed-hostnames:
+    - localhost
+    - 127.0.0.1
+  
+  # Disable cache for fresh assets
+  disable-cache: true
+  
+  # Network idle timeout
+  network-idle-timeout: 100
+
+# Storybook integration
+storybook:
+  # Include all stories by default
+  include: "**"
+  
+  # Exclude specific stories
+  exclude:
+    - "**/*Loading*"
+    - "**/*Skeleton*"
+    - "**/*Error*"

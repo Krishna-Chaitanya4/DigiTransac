@@ -1,0 +1,315 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "retry": "Reintentar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "add": "Agregar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "clear": "Limpiar",
+    "confirm": "Confirmar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "close": "Cerrar",
+    "yes": "Sí",
+    "no": "No",
+    "ok": "OK",
+    "submit": "Enviar",
+    "done": "Hecho",
+    "more": "Más",
+    "less": "Menos",
+    "all": "Todos",
+    "none": "Ninguno",
+    "noData": "No hay datos disponibles",
+    "selectOption": "Selecciona una opción"
+  },
+  "auth": {
+    "signIn": "Iniciar Sesión",
+    "signUp": "Registrarse",
+    "signOut": "Cerrar Sesión",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "fullName": "Nombre Completo",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "rememberMe": "Recordarme",
+    "noAccount": "¿No tienes cuenta?",
+    "haveAccount": "¿Ya tienes cuenta?",
+    "createAccount": "Crear Cuenta",
+    "resetPassword": "Restablecer Contraseña",
+    "sendResetCode": "Enviar Código",
+    "enterCode": "Ingresa el Código",
+    "newPassword": "Nueva Contraseña",
+    "verifyEmail": "Verificar Email",
+    "emailSent": "¡Email enviado! Revisa tu bandeja de entrada.",
+    "invalidCredentials": "Email o contraseña inválidos",
+    "passwordRequirements": "La contraseña debe tener al menos 8 caracteres con mayúsculas, minúsculas y números",
+    "twoFactor": {
+      "title": "Autenticación de Dos Factores",
+      "enterCode": "Ingresa el código de 6 dígitos de tu aplicación autenticadora",
+      "enable": "Activar 2FA",
+      "disable": "Desactivar 2FA",
+      "scanQR": "Escanea este código QR con tu aplicación autenticadora",
+      "backupCodes": "Códigos de Respaldo",
+      "saveBackupCodes": "Guarda estos códigos de respaldo en un lugar seguro"
+    }
+  },
+  "navigation": {
+    "dashboard": "Inicio",
+    "transactions": "Transacciones",
+    "accounts": "Cuentas",
+    "insights": "Estadísticas",
+    "budgets": "Presupuestos",
+    "chats": "Chats",
+    "settings": "Configuración",
+    "labels": "Categorías",
+    "map": "Mapa de Gastos"
+  },
+  "transactions": {
+    "title": "Transacciones",
+    "newTransaction": "Nueva Transacción",
+    "editTransaction": "Editar Transacción",
+    "deleteTransaction": "Eliminar Transacción",
+    "noTransactions": "Sin transacciones aún",
+    "addFirst": "Agrega tu primera transacción",
+    "type": {
+      "send": "Enviar",
+      "receive": "Recibir",
+      "transfer": "Transferir"
+    },
+    "status": {
+      "confirmed": "Confirmada",
+      "pending": "Pendiente",
+      "declined": "Rechazada"
+    },
+    "fields": {
+      "amount": "Monto",
+      "date": "Fecha",
+      "payee": "Destinatario",
+      "payer": "Pagador",
+      "category": "Categoría",
+      "account": "Cuenta",
+      "notes": "Notas",
+      "tags": "Etiquetas",
+      "location": "Ubicación",
+      "recurring": "Recurrente"
+    },
+    "recurring": {
+      "daily": "Diario",
+      "weekly": "Semanal",
+      "biweekly": "Quincenal",
+      "monthly": "Mensual",
+      "quarterly": "Trimestral",
+      "yearly": "Anual"
+    },
+    "filters": {
+      "all": "Todas",
+      "thisWeek": "Esta Semana",
+      "thisMonth": "Este Mes",
+      "custom": "Rango Personalizado"
+    },
+    "summary": {
+      "income": "Ingresos",
+      "expenses": "Gastos",
+      "netChange": "Cambio Neto",
+      "balance": "Balance"
+    },
+    "actions": {
+      "markConfirmed": "Marcar como Confirmada",
+      "markPending": "Marcar como Pendiente",
+      "duplicate": "Duplicar",
+      "export": "Exportar"
+    }
+  },
+  "accounts": {
+    "title": "Cuentas",
+    "newAccount": "Nueva Cuenta",
+    "editAccount": "Editar Cuenta",
+    "deleteAccount": "Eliminar Cuenta",
+    "noAccounts": "Sin cuentas aún",
+    "addFirst": "Agrega tu primera cuenta",
+    "types": {
+      "cash": "Efectivo",
+      "bank": "Cuenta Bancaria",
+      "creditCard": "Tarjeta de Crédito",
+      "investment": "Inversión",
+      "loan": "Préstamo",
+      "wallet": "Billetera Digital",
+      "other": "Otro"
+    },
+    "fields": {
+      "name": "Nombre de Cuenta",
+      "type": "Tipo de Cuenta",
+      "currency": "Moneda",
+      "balance": "Balance",
+      "description": "Descripción",
+      "creditLimit": "Límite de Crédito",
+      "interestRate": "Tasa de Interés"
+    },
+    "summary": {
+      "totalBalance": "Balance Total",
+      "assets": "Activos",
+      "liabilities": "Pasivos",
+      "netWorth": "Patrimonio Neto"
+    }
+  },
+  "budgets": {
+    "title": "Presupuestos",
+    "newBudget": "Nuevo Presupuesto",
+    "editBudget": "Editar Presupuesto",
+    "deleteBudget": "Eliminar Presupuesto",
+    "noBudgets": "Sin presupuestos aún",
+    "addFirst": "Crea tu primer presupuesto",
+    "periods": {
+      "weekly": "Semanal",
+      "monthly": "Mensual",
+      "quarterly": "Trimestral",
+      "yearly": "Anual",
+      "custom": "Personalizado"
+    },
+    "status": {
+      "onTrack": "En Línea",
+      "warning": "Advertencia",
+      "overBudget": "Sobre el Presupuesto"
+    },
+    "fields": {
+      "name": "Nombre del Presupuesto",
+      "amount": "Monto del Presupuesto",
+      "spent": "Gastado",
+      "remaining": "Restante",
+      "period": "Período",
+      "categories": "Categorías",
+      "accounts": "Cuentas"
+    },
+    "alerts": {
+      "threshold": "Umbral de Alerta",
+      "notify": "Notificar al exceder"
+    }
+  },
+  "insights": {
+    "title": "Estadísticas",
+    "periods": {
+      "7d": "7 Días",
+      "30d": "30 Días",
+      "90d": "90 Días",
+      "1y": "1 Año",
+      "all": "Todo el Tiempo"
+    },
+    "widgets": {
+      "cashFlow": "Flujo de Efectivo",
+      "categoryBreakdown": "Desglose por Categoría",
+      "spendingTrend": "Tendencia de Gastos",
+      "topPayees": "Principales Destinatarios",
+      "spendingByAccount": "Gastos por Cuenta",
+      "dayOfWeek": "Patrones por Día de la Semana",
+      "hourOfDay": "Patrones por Hora del Día",
+      "budgetProgress": "Progreso del Presupuesto",
+      "averages": "Promedios de Transacciones",
+      "anomalies": "Alertas de Gastos"
+    },
+    "metrics": {
+      "avgTransaction": "Transacción Promedio",
+      "largestExpense": "Mayor Gasto",
+      "mostFrequent": "Categoría Más Frecuente",
+      "savingsRate": "Tasa de Ahorro"
+    }
+  },
+  "chats": {
+    "title": "Chats",
+    "newChat": "Nuevo Chat",
+    "noChats": "Sin conversaciones aún",
+    "startChat": "Inicia una conversación",
+    "messagePlaceholder": "Escribe un mensaje...",
+    "send": "Enviar",
+    "searchContacts": "Buscar contactos por email",
+    "selectContact": "Selecciona un contacto",
+    "transactionSent": "Enviaste",
+    "transactionReceived": "Recibiste",
+    "viewInChat": "Ver en Chat",
+    "noMessages": "Sin mensajes aún"
+  },
+  "settings": {
+    "title": "Configuración",
+    "sections": {
+      "profile": "Perfil",
+      "appearance": "Apariencia",
+      "security": "Seguridad",
+      "notifications": "Notificaciones",
+      "data": "Datos y Privacidad",
+      "about": "Acerca de"
+    },
+    "profile": {
+      "fullName": "Nombre Completo",
+      "email": "Email",
+      "currency": "Moneda Principal",
+      "save": "Guardar Perfil"
+    },
+    "appearance": {
+      "theme": "Tema",
+      "darkMode": "Modo Oscuro",
+      "language": "Idioma",
+      "dateFormat": "Formato de Fecha",
+      "timeFormat": "Formato de Hora"
+    },
+    "security": {
+      "changePassword": "Cambiar Contraseña",
+      "twoFactor": "Autenticación de Dos Factores",
+      "sessions": "Sesiones Activas"
+    },
+    "notifications": {
+      "budgetAlerts": "Alertas de Presupuesto",
+      "transactionAlerts": "Alertas de Transacciones",
+      "chatMessages": "Mensajes de Chat",
+      "emailNotifications": "Notificaciones por Email"
+    }
+  },
+  "map": {
+    "title": "Mapa de Gastos",
+    "noLocations": "Sin datos de ubicación",
+    "enableLocation": "Habilitar seguimiento de ubicación",
+    "filters": {
+      "all": "Todas las Transacciones",
+      "category": "Por Categoría",
+      "dateRange": "Rango de Fechas"
+    },
+    "clusters": {
+      "total": "Gasto Total",
+      "transactions": "Transacciones",
+      "avgAmount": "Monto Promedio"
+    },
+    "trips": {
+      "title": "Viajes",
+      "noTrips": "No se detectaron viajes",
+      "duration": "Duración",
+      "spending": "Gastos"
+    }
+  },
+  "errors": {
+    "generic": "Algo salió mal. Por favor intenta de nuevo.",
+    "network": "Error de red. Por favor revisa tu conexión.",
+    "notFound": "Recurso no encontrado.",
+    "unauthorized": "No estás autorizado para realizar esta acción.",
+    "validation": "Por favor revisa tus datos e intenta de nuevo.",
+    "serverError": "Error del servidor. Por favor intenta más tarde."
+  },
+  "dates": {
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "thisWeek": "Esta Semana",
+    "lastWeek": "Semana Pasada",
+    "thisMonth": "Este Mes",
+    "lastMonth": "Mes Pasado",
+    "thisYear": "Este Año"
+  },
+  "currency": {
+    "formats": {
+      "short": "{{amount, currency}}",
+      "full": "{{amount}} {{code}}"
+    }
+  }
+}

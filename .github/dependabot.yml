@@ -1,65 +1,69 @@
 version: 2
 updates:
-  # Backend dependencies
-  - package-ecosystem: "npm"
-    directory: "/backend"
+  # .NET dependencies
+  - package-ecosystem: "nuget"
+    directory: "/api"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "09:00"
     open-pull-requests-limit: 5
-    groups:
-      production-dependencies:
-        patterns: ["*"]
-        exclude-patterns: ["@types/*", "typescript"]
-      development-dependencies:
-        dependency-type: "development"
+    commit-message:
+      prefix: "deps(api):"
     labels:
       - "dependencies"
-      - "backend"
-      - "automerge"
-    commit-message:
-      prefix: "chore(deps)"
-      include: "scope"
+      - "api"
 
-  # Frontend dependencies
+  # NPM dependencies for web
   - package-ecosystem: "npm"
-    directory: "/frontend"
+    directory: "/web"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "09:00"
     open-pull-requests-limit: 5
-    groups:
-      production-dependencies:
-        patterns: ["*"]
-        exclude-patterns: ["@types/*", "typescript"]
-      development-dependencies:
-        dependency-type: "development"
+    commit-message:
+      prefix: "deps(web):"
     labels:
       - "dependencies"
-      - "frontend"
-      - "automerge"
-    commit-message:
-      prefix: "chore(deps)"
-      include: "scope"
+      - "web"
+    groups:
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      testing:
+        patterns:
+          - "vitest"
+          - "@testing-library/*"
+          - "@vitest/*"
 
-  # GitHub Actions (less frequent)
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
-      day: "monday"
-    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "ci:"
     labels:
       - "dependencies"
-      - "github-actions"
+      - "ci"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/api"
+    schedule:
+      interval: "monthly"
     commit-message:
-      prefix: "chore(ci)"
-      interval: "weekly"
-      day: "monday"
+      prefix: "deps(docker):"
     labels:
       - "dependencies"
       - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/web"
+    schedule:
+      interval: "monthly"
     commit-message:
-      prefix: "chore(docker)"
+      prefix: "deps(docker):"
+    labels:
+      - "dependencies"
+      - "docker"

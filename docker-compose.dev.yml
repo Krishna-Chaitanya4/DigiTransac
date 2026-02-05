@@ -1,0 +1,43 @@
+# Docker Compose for local development with hot reload
+# Usage: docker compose -f docker-compose.dev.yml up
+
+services:
+  # MongoDB database
+  mongodb:
+    image: mongo:7
+    container_name: digitransac-mongodb-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_dev_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: DigiTransac
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Mongo Express - Database UI
+  mongo-express:
+    image: mongo-express
+    container_name: digitransac-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  mongodb_dev_data:
+    driver: local
+
+networks:
+  default:
+    name: digitransac-dev-network

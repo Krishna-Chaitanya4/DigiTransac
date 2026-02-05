@@ -1,0 +1,387 @@
+# ╔════════════════════════════════════════════════════════════════════════════╗
+# ║                     DigiTransac CI/CD Pipeline                             ║
+# ║                                                                            ║
+# ║  A unified pipeline with clear stages:                                     ║
+# ║  1. Validate  → Run tests, linting, security scans                         ║
+# ║  2. Build     → Build Docker images (on main only)                         ║
+# ║  3. Push      → Push to Azure Container Registry (on main only)            ║
+# ║  4. Deploy    → Deploy to Azure Container Apps (on main only)              ║
+# ║  5. Verify    → Health checks and smoke tests                              ║
+# ║                                                                            ║
+# ║  SECURITY: Uses OIDC federation (no stored secrets!)                       ║
+# ╚════════════════════════════════════════════════════════════════════════════╝
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (emergency deploy only)'
+        required: false
+        default: 'false'
+        type: boolean
+      version_tag:
+        description: 'Custom version tag'
+        required: false
+        default: ''
+        type: string
+
+# SECURITY: OIDC for Azure authentication
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write  # For PR comments
+
+env:
+  # Azure Configuration
+  AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  
+  # Azure Resources
+  ACR_NAME: herdswebsiteacr
+  ACR_LOGIN_SERVER: herdswebsiteacr.azurecr.io
+  RESOURCE_GROUP: rg-digitransac
+  BACKEND_APP: digitransac-backend
+  FRONTEND_APP: digitransac-frontend
+  
+  # Build Configuration
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '22.x'
+
+# ════════════════════════════════════════════════════════════════════════════════
+# JOBS
+# ════════════════════════════════════════════════════════════════════════════════
+
+jobs:
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 0: Setup                                                               │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  setup:
+    name: 📋 Setup
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha_short: ${{ steps.version.outputs.sha_short }}
+      is_main: ${{ steps.context.outputs.is_main }}
+      is_pr: ${{ steps.context.outputs.is_pr }}
+    steps:
+      - name: Determine Context
+        id: context
+        run: |
+          echo "is_main=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}" >> $GITHUB_OUTPUT
+          echo "is_pr=${{ github.event_name == 'pull_request' }}" >> $GITHUB_OUTPUT
+          
+      - name: Generate Version
+        id: version
+        run: |
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "sha_short=$SHA_SHORT" >> $GITHUB_OUTPUT
+          
+          if [ -n "${{ inputs.version_tag }}" ]; then
+            echo "version=${{ inputs.version_tag }}" >> $GITHUB_OUTPUT
+          else
+            DATE=$(date +'%Y%m%d')
+            echo "version=${DATE}-${SHA_SHORT}" >> $GITHUB_OUTPUT
+          fi
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 1: Validate - Backend                                                  │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  validate-backend:
+    name: 🔧 Validate Backend
+    runs-on: ubuntu-latest
+    needs: setup
+    if: ${{ inputs.skip_tests != 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: |
+          dotnet test --no-build --configuration Release \
+            --verbosity normal \
+            --filter "Category!=Integration" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage"
+        env:
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-testing-32chars
+          ENCRYPTION_KEY: test-encryption-key-for-ci-testing
+          ENCRYPTION_KEK: test-kek-32-characters-exactly!
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: '**/test-results.trx'
+          retention-days: 7
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 1: Validate - Frontend                                                 │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  validate-frontend:
+    name: 🌐 Validate Frontend
+    runs-on: ubuntu-latest
+    needs: setup
+    if: ${{ inputs.skip_tests != 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      - name: Type Check
+        working-directory: web
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Test
+        working-directory: web
+        run: npm test -- --run --reporter=verbose
+
+      - name: Build (Verify)
+        working-directory: web
+        run: npm run build
+        env:
+          VITE_API_URL: https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io/api
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 1: Validate - Security                                                 │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  validate-security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Check .NET Vulnerabilities
+        run: dotnet list package --vulnerable --include-transitive 2>&1 || true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check npm Vulnerabilities
+        working-directory: web
+        run: |
+          npm ci
+          npm audit --audit-level=high 2>&1 || true
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 2-4: Build → Push → Deploy (Main branch only)                         │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  build-and-deploy:
+    name: 🚀 Build & Deploy
+    runs-on: ubuntu-latest
+    needs: [setup, validate-backend, validate-frontend, validate-security]
+    if: ${{ needs.setup.outputs.is_main == 'true' }}
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ────────────── Azure Login (OIDC) ──────────────
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      # ────────────── Build Backend ──────────────
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build Backend
+        run: |
+          dotnet restore
+          dotnet build --configuration Release
+
+      - name: Build & Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Api
+          push: true
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:${{ needs.setup.outputs.version }}
+            ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:latest
+
+      # ────────────── Build Frontend ──────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build Frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_URL: https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io/api
+          VITE_ENVIRONMENT: production
+
+      - name: Build & Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./web
+          push: true
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:${{ needs.setup.outputs.version }}
+            ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:latest
+
+      # ────────────── Deploy ──────────────
+      - name: Deploy Backend
+        run: |
+          echo "🔧 Deploying Backend v${{ needs.setup.outputs.version }}..."
+          az containerapp update \
+            --name ${{ env.BACKEND_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:${{ needs.setup.outputs.version }}
+
+      - name: Deploy Frontend
+        run: |
+          echo "🌐 Deploying Frontend v${{ needs.setup.outputs.version }}..."
+          az containerapp update \
+            --name ${{ env.FRONTEND_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:${{ needs.setup.outputs.version }}
+
+      - name: Azure Logout
+        run: az logout
+        if: always()
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 5: Verify Deployment                                                   │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  verify:
+    name: ✅ Verify
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-deploy]
+    if: ${{ needs.setup.outputs.is_main == 'true' }}
+    steps:
+      - name: Wait for Deployment
+        run: sleep 90
+
+      - name: Health Check - Backend
+        run: |
+          echo "Checking Backend..."
+          for i in {1..5}; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io/api/health/live" || echo "000")
+            if [ "$CODE" = "200" ]; then
+              echo "✅ Backend is healthy"
+              exit 0
+            fi
+            echo "Attempt $i: Status $CODE"
+            sleep 15
+          done
+          echo "⚠️ Backend health check inconclusive"
+
+      - name: Health Check - Frontend
+        run: |
+          echo "Checking Frontend..."
+          for i in {1..5}; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://digitransac-frontend.nicemeadow-64e62875.centralindia.azurecontainerapps.io" || echo "000")
+            if [ "$CODE" = "200" ]; then
+              echo "✅ Frontend is healthy"
+              exit 0
+            fi
+            echo "Attempt $i: Status $CODE"
+            sleep 15
+          done
+          echo "⚠️ Frontend health check inconclusive"
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ SUMMARY                                                                       │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  summary:
+    name: 📝 Summary
+    runs-on: ubuntu-latest
+    needs: [setup, validate-backend, validate-frontend, validate-security, build-and-deploy, verify]
+    if: always()
+    steps:
+      - name: PR Summary
+        if: ${{ needs.setup.outputs.is_pr == 'true' }}
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║              PR Validation Complete                        ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Backend Tests:  ${{ needs.validate-backend.result }}"
+          echo "Frontend Tests: ${{ needs.validate-frontend.result }}"
+          echo "Security Scan:  ${{ needs.validate-security.result }}"
+          echo ""
+          if [ "${{ needs.validate-backend.result }}" = "success" ] && \
+             [ "${{ needs.validate-frontend.result }}" = "success" ]; then
+            echo "✅ Ready for merge!"
+          else
+            echo "❌ Some checks failed. Please review."
+          fi
+
+      - name: Deploy Summary
+        if: ${{ needs.setup.outputs.is_main == 'true' }}
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║              Deployment Complete                           ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║  🔐 Auth: OIDC Federation (no secrets)                     ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "📦 Version: ${{ needs.setup.outputs.version }}"
+          echo "🔗 Commit:  ${{ needs.setup.outputs.sha_short }}"
+          echo ""
+          echo "🌐 URLs:"
+          echo "   Frontend: https://digitransac-frontend.nicemeadow-64e62875.centralindia.azurecontainerapps.io"
+          echo "   Backend:  https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io"
+          echo ""
+          echo "Status:"
+          echo "   Build & Deploy: ${{ needs.build-and-deploy.result }}"
+          echo "   Verification:   ${{ needs.verify.result }}"

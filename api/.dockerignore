@@ -1,0 +1,38 @@
+# Build outputs
+bin/
+obj/
+
+# IDE and editor files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+*.md
+LICENSE
+
+# Test files
+*.Tests.csproj
+tests/
+
+# Local settings
+appsettings.Development.json
+appsettings.local.json
+
+# Logs
+logs/
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store

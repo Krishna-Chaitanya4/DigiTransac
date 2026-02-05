@@ -1,142 +1,514 @@
-# DigiTransac
+# DigiTransac - Personal Finance Tracker
 
-Modern transaction management application with AI-powered categorization, budget tracking, and analytics.
+<p align="center">
+  <img src="docs/images/logo.png" alt="DigiTransac Logo" width="200" />
+</p>
 
-## Features
+A full-stack personal finance management application with AI-powered insights, real-time chat, interactive spending maps, and comprehensive budget tracking.
 
-- Multi-user authentication (JWT)
-- Unlimited category nesting
-- Budget management with alerts
-- Recurring transactions
-- Analytics dashboard
-- PWA with offline support
-- Dark mode
+[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-3.6-47A248)](https://www.mongodb.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Tech Stack
+## ✨ Features
 
-- **Frontend**: React 18, TypeScript, Material-UI, Vite
-- **Backend**: Node.js, Express, TypeScript
-- **Database**: Azure DocumentDB M10 (FREE tier)
-- **Security**: Azure Key Vault, Managed Identity
-- **Infrastructure**: Docker, Azure Container Apps, GitHub Actions
+### Core Features
+- 💰 **Transaction Management** - Full CRUD with categories, labels, tags, and notes
+- 💳 **Multi-Account Support** - Bank accounts, credit cards, cash, investments
+- 🔄 **Account Transfers** - Transfer money between accounts with automatic reconciliation
+- 📅 **Recurring Transactions** - Set up automatic recurring income/expenses
+- 👥 **P2P Transactions** - Send and receive money from other users
+- 🏷️ **Labels & Tags** - Organize transactions with custom labels and tags
+- 💱 **Multi-Currency** - Real-time exchange rates with automatic conversion
 
-**Cost**: ₹50/month (~$0.60/month)
+### Analytics & Insights
+- 📊 **Spending Analytics** - Visual breakdowns by category, time period, account
+- 📈 **Budget Tracking** - Set monthly/weekly budgets with progress tracking
+- 🗺️ **Spending Map** - Interactive map showing where you spend money
+  - Category-based color coding
+  - Marker clustering for dense areas
+  - Heatmap visualization mode
+  - Location insights ("You spent ₹X near home")
+  - Trip grouping by geographic region
 
-## Quick Start
+### Communication
+- 💬 **Real-time Chat** - WhatsApp-style messaging interface
+  - Personal transaction journal (chat with yourself)
+  - P2P messaging with other users
+  - Transaction cards embedded in chat
+  - Mobile-responsive sliding panel design
+- 🔔 **Notifications** - Real-time updates via SignalR
+
+### Security
+- 🔐 **JWT Authentication** - Secure token-based authentication
+- 📱 **Two-Factor Authentication** - TOTP-based 2FA support
+- 🔒 **AES-256 Encryption** - Envelope encryption for sensitive data
+- ⚡ **Rate Limiting** - Per-user rate limiting for API protection
+
+## 🛠️ Tech Stack
+
+### Backend (./api)
+| Technology | Purpose |
+|------------|---------|
+| **.NET 9** | Web API framework with Minimal APIs |
+| **MongoDB 3.6** | NoSQL database with async driver |
+| **MediatR** | Domain events and CQRS patterns |
+| **FluentValidation** | Request validation |
+| **SignalR** | Real-time communication |
+| **Serilog** | Structured logging |
+| **OpenTelemetry** | Distributed tracing |
+| **Polly** | Resilience and transient fault handling |
+
+### Frontend (./web)
+| Technology | Purpose |
+|------------|---------|
+| **React 19** | UI framework with TypeScript |
+| **Vite 7** | Build tool and dev server |
+| **TanStack Query** | Server state management |
+| **Tailwind CSS 4** | Utility-first styling |
+| **React Router 7** | Client-side routing |
+| **Leaflet** | Interactive maps |
+| **SignalR Client** | Real-time updates |
+
+### Testing
+| Technology | Purpose |
+|------------|---------|
+| **xUnit** | Backend test framework |
+| **TestContainers** | MongoDB integration tests |
+| **Vitest** | Frontend unit tests |
+| **Playwright** | End-to-end testing |
+| **Storybook** | Component development |
+
+## 📁 Project Structure
+
+```
+DigiTransac/
+├── api/                          # .NET 9 Web API
+│   ├── Common/                   # Shared utilities (Result pattern)
+│   ├── Endpoints/                # Minimal API endpoints
+│   │   ├── AccountEndpoints.cs
+│   │   ├── AuthEndpoints.cs
+│   │   ├── BudgetEndpoints.cs
+│   │   ├── ConversationEndpoints.cs
+│   │   ├── CurrencyEndpoints.cs
+│   │   ├── LabelEndpoints.cs
+│   │   ├── TagEndpoints.cs
+│   │   ├── TransactionEndpoints.cs
+│   │   └── TwoFactorEndpoints.cs
+│   ├── EventHandlers/            # MediatR event handlers
+│   ├── Events/                   # Domain events
+│   ├── Extensions/               # DI and configuration extensions
+│   ├── Hubs/                     # SignalR hubs
+│   ├── Models/                   # Domain models and DTOs
+│   ├── Repositories/             # Data access layer
+│   ├── Services/                 # Business logic
+│   │   ├── Caching/              # Memory cache service
+│   │   ├── Transactions/         # Transaction service facade
+│   │   └── UnitOfWork/           # MongoDB transaction support
+│   ├── Settings/                 # Configuration classes
+│   └── Validators/               # FluentValidation validators
+├── web/                          # React frontend
+│   ├── src/
+│   │   ├── components/           # Reusable UI components
+│   │   │   ├── account/          # Account-related components
+│   │   │   ├── budget/           # Budget forms and cards
+│   │   │   ├── chat/             # Chat/messaging components
+│   │   │   ├── map/              # Spending map components
+│   │   │   └── transaction/      # Transaction forms and cards
+│   │   ├── context/              # React context providers
+│   │   ├── hooks/                # Custom React hooks
+│   │   ├── lib/                  # Query client, utilities
+│   │   ├── pages/                # Page components
+│   │   │   ├── AccountsPage.tsx
+│   │   │   ├── BudgetsPage.tsx
+│   │   │   ├── ChatsPage.tsx
+│   │   │   ├── InsightsPage.tsx
+│   │   │   ├── LabelsPage.tsx
+│   │   │   ├── SettingsPage.tsx
+│   │   │   ├── SpendingMapPage.tsx
+│   │   │   └── TransactionsPage.tsx
+│   │   ├── services/             # API client functions
+│   │   └── types/                # TypeScript types
+│   └── public/                   # Static assets
+├── tests/                        # Backend tests
+│   ├── Integration/              # Integration tests
+│   └── Services/                 # Unit tests
+├── docs/                         # Documentation
+└── docker-compose.yml            # Docker orchestration
+```
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 20+
-- Docker & Docker Compose
-- Azure account (for Key Vault & DocumentDB)
 
-### Local Development
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [Node.js 20+](https://nodejs.org/)
+- [MongoDB 7.0+](https://www.mongodb.com/try/download/community)
+- [Docker](https://www.docker.com/) (optional, for containerized setup)
+
+### Option 1: Local Development
+
+#### 1. Start MongoDB
 
 ```bash
-# 1. Clone repository
-git clone <repo-url>
-cd DigiTransac
+# Using Docker (recommended)
+docker run -d -p 27017:27017 --name mongodb mongo:7
 
-# 2. Login to Azure (for Key Vault access)
+# Or start local MongoDB service
+mongod
+```
+
+#### 2. Run the API
+
+```bash
+cd api
+cp appsettings.Development.example.json appsettings.Development.json
+# Edit appsettings.Development.json with your settings
+dotnet restore
+dotnet run
+```
+
+The API will be available at:
+- API: `http://localhost:5000`
+- Swagger UI: `http://localhost:5000/swagger`
+
+#### 3. Run the Frontend
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173`
+
+### Option 2: Docker Compose
+
+```bash
+# Development mode with hot reload
+docker-compose -f docker-compose.dev.yml up
+
+# Production mode
+docker-compose up -d
+```
+
+## 📡 API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/auth/register` | Register a new user |
+| POST | `/api/v1/auth/login` | Login and get JWT token |
+| GET | `/api/v1/auth/me` | Get current user profile |
+| POST | `/api/v1/auth/refresh` | Refresh access token |
+| POST | `/api/v1/auth/forgot-password` | Request password reset |
+| POST | `/api/v1/auth/reset-password` | Reset password with token |
+
+### Two-Factor Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/2fa/setup` | Initialize 2FA setup |
+| POST | `/api/v1/2fa/verify` | Verify 2FA code |
+| POST | `/api/v1/2fa/disable` | Disable 2FA |
+
+### Transactions
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/transactions` | List transactions (with filters) |
+| POST | `/api/v1/transactions` | Create a transaction |
+| GET | `/api/v1/transactions/{id}` | Get transaction by ID |
+| PUT | `/api/v1/transactions/{id}` | Update a transaction |
+| DELETE | `/api/v1/transactions/{id}` | Delete a transaction |
+| POST | `/api/v1/transactions/transfer` | Create account transfer |
+| POST | `/api/v1/transactions/recurring` | Create recurring transaction |
+| GET | `/api/v1/transactions/analytics` | Get spending analytics |
+| GET | `/api/v1/transactions/export` | Export transactions (CSV/JSON) |
+
+### Accounts
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/accounts` | List all accounts |
+| POST | `/api/v1/accounts` | Create an account |
+| GET | `/api/v1/accounts/{id}` | Get account by ID |
+| PUT | `/api/v1/accounts/{id}` | Update an account |
+| DELETE | `/api/v1/accounts/{id}` | Delete an account |
+| GET | `/api/v1/accounts/{id}/balance` | Get account balance |
+
+### Budgets
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/budgets` | List all budgets |
+| POST | `/api/v1/budgets` | Create a budget |
+| GET | `/api/v1/budgets/{id}` | Get budget by ID |
+| PUT | `/api/v1/budgets/{id}` | Update a budget |
+| DELETE | `/api/v1/budgets/{id}` | Delete a budget |
+
+### Conversations (Chat)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/conversations` | List conversations |
+| GET | `/api/v1/conversations/{userId}` | Get conversation with user |
+| POST | `/api/v1/conversations/message` | Send a message |
+| GET | `/api/v1/conversations/location-insights` | Get location-based insights |
+
+### Labels & Tags
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/labels` | List all labels |
+| POST | `/api/v1/labels` | Create a label |
+| GET | `/api/v1/tags` | List all tags |
+| POST | `/api/v1/tags` | Create a tag |
+
+### Currency
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/currencies` | List supported currencies |
+| GET | `/api/v1/currencies/rates` | Get exchange rates |
+| GET | `/api/v1/currencies/convert` | Convert between currencies |
+
+## 🧪 Testing
+
+### Backend Tests
+
+```bash
+cd tests
+
+# Run all tests
+dotnet test
+
+# Run unit tests only
+dotnet test --filter "Category!=Integration"
+
+# Run integration tests (requires Docker)
+dotnet test --filter "Category=Integration"
+
+# Run with coverage
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+### Frontend Tests
+
+```bash
+cd web
+
+# Run unit tests
+npm run test
+
+# Run with coverage
+npm run test:coverage
+
+# Run E2E tests
+npm run test:e2e
+
+# Run E2E tests with UI
+npm run test:e2e:ui
+```
+
+### Storybook
+
+```bash
+cd web
+npm run storybook
+```
+
+## 🔧 Configuration
+
+### API Configuration (appsettings.json)
+
+```json
+{
+  "MongoDb": {
+    "ConnectionString": "mongodb://localhost:27017",
+    "DatabaseName": "digitransac"
+  },
+  "Jwt": {
+    "Key": "YOUR_SECRET_KEY_MIN_32_CHARS",
+    "Issuer": "DigiTransac",
+    "Audience": "DigiTransac",
+    "ExpireMinutes": 60
+  },
+  "Encryption": {
+    "MasterKey": "YOUR_AES_256_MASTER_KEY"
+  },
+  "RateLimiting": {
+    "PermitLimit": 100,
+    "WindowSeconds": 60
+  }
+}
+```
+
+### Frontend Configuration
+
+The frontend uses Vite's proxy configuration to forward API requests. See `vite.config.ts`:
+
+```typescript
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://localhost:5000',
+      changeOrigin: true
+    }
+  }
+}
+```
+
+## 📱 Mobile Responsiveness
+
+DigiTransac is fully responsive with mobile-first design:
+
+- **Chat Interface**: WhatsApp-style sliding panels on mobile
+- **Navigation**: Bottom navigation on mobile, sidebar on desktop
+- **Spending Map**: Touch-friendly gestures and controls
+- **Forms**: Optimized input layouts for mobile keyboards
+
+## 🏗️ Architecture
+
+### Design Patterns
+
+1. **Facade Pattern** - `TransactionServiceFacade` provides unified API
+2. **Unit of Work** - MongoDB transaction management with fallback
+3. **Result Pattern** - Type-safe error handling without exceptions
+4. **Domain Events** - MediatR-based decoupled notifications
+5. **Repository Pattern** - Data access abstraction
+
+### Service Architecture
+
+```
+TransactionServiceFacade (implements ITransactionService)
+├── TransactionCoreService     - CRUD operations
+├── TransferService            - Account transfers
+├── RecurringTransactionService - Scheduled transactions
+├── TransactionAnalyticsService - Analytics and reporting
+├── TransactionExportService   - CSV/JSON export
+├── TransactionBatchService    - Bulk operations
+├── TransactionMapperService   - DTO mapping with encryption
+└── P2PTransactionService      - Peer-to-peer transactions
+```
+
+## 🚀 Deployment
+
+### Deployment Environments
+
+| Environment | Branch | URL Pattern |
+|-------------|--------|-------------|
+| Development | `develop` | `digitransac-*-dev.azurecontainerapps.io` |
+| Staging | `release/*` | `digitransac-*-staging.azurecontainerapps.io` |
+| Production | `main` | `digitransac-*-production.azurecontainerapps.io` |
+
+### Quick Start (Azure)
+
+```bash
+# 1. Login to Azure
 az login
 
-# 3. Setup environment
-cd backend
-cp .env.example .env
-# Edit .env with your Azure Key Vault URL
+# 2. Run infrastructure setup
+cd infrastructure
+chmod +x setup.sh
+./setup.sh dev eastus
 
-cd ../frontend
-cp .env.example .env
+# 3. Configure GitHub secrets (see output from setup.sh)
 
-# 4. Run with Docker
-cd ..
-docker-compose up --build
+# 4. Push to develop branch to trigger deployment
+git checkout develop
+git push origin develop
 ```
 
-**Access**:
-- Frontend: http://localhost:3000
-- Backend: http://localhost:5000
+### Production Checklist
 
-## Configuration
-
-### Backend Environment Variables
-
-```env
-# Azure Key Vault (stores all secrets)
-AZURE_KEY_VAULT_URL=https://digitransac-kv-3895.vault.azure.net/
-
-# Database
-MONGODB_DATABASE_NAME=DigiTransacDB
-
-# Server
-PORT=5000
-NODE_ENV=development
-
-# URLs
-CORS_ORIGIN=http://localhost:3000
-FRONTEND_URL=http://localhost:3000
-BACKEND_URL=http://localhost:5000
-```
-
-**Secrets in Key Vault**:
-- `MongoDB-ConnectionString`
-- `JWT-Secret`
-- `Master-Encryption-Key`
-
-### Frontend Environment Variables
-
-```env
-VITE_API_URL=http://localhost:5000/api
-```
-
-## Deployment
+- [ ] Update JWT secret key in Azure Key Vault
+- [ ] Configure MongoDB connection string (auto-generated)
+- [ ] Set up encryption master key in Key Vault
+- [ ] Configure CORS origins for your domains
+- [ ] Enable HTTPS (automatic with Container Apps)
+- [ ] Set up rate limiting (configured in API)
+- [ ] Configure Application Insights connection string
+- [ ] Set up health check endpoints (already configured)
+- [ ] Configure GitHub Actions secrets
+- [ ] Set up environment protection rules
 
 ### CI/CD Pipeline
 
-**Automatic deployment on PR merge to `main`**:
-1. Create feature branch
-2. Push changes
-3. Create Pull Request
-4. Merge → Auto-deploy to Azure
+We use GitHub Actions for continuous integration and deployment:
 
-### GitHub Secrets Setup
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   develop   │────▶│   CI Tests  │────▶│  Deploy Dev │
+└─────────────┘     └─────────────┘     └─────────────┘
 
-Run automated script:
-```powershell
-.\scripts\setup-github-secrets.ps1
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  release/*  │────▶│   CI Tests  │────▶│Deploy Stage │
+└─────────────┘     └─────────────┘     └─────────────┘
+
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│    main     │────▶│   CI Tests  │────▶│ Deploy Prod │
+└─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-Required secrets:
-- `AZURE_CREDENTIALS`
-- `AZURE_KEY_VAULT_URL`
-- `MONGODB_DATABASE_NAME`
-- `BACKEND_URL`, `FRONTEND_URL`, `CORS_ORIGIN`
+### GitFlow Branching Strategy
+
+```
+main (production)
+  │
+  ├── hotfix/critical-bug ─────────────────────────────┐
+  │                                                     │
+develop (development)                                   │
+  │                                                     │
+  ├── feature/new-feature                              │
+  │     └── Merged back to develop                     │
+  │                                                     │
+  ├── release/1.0.0 ──────────────────────────────────▶ main
+  │     └── Bug fixes only, then merge to main & develop
+```
+
+### Azure Resources
+
+The infrastructure creates:
+
+| Resource | Purpose |
+|----------|---------|
+| **Container Apps** | Hosts API and Web applications |
+| **Cosmos DB (MongoDB)** | Database (serverless for dev/staging) |
+| **Container Registry** | Docker image storage |
+| **Key Vault** | Secure secrets management |
+| **Log Analytics** | Centralized logging |
+| **Application Insights** | APM and telemetry |
 
 ### Manual Deployment
 
 ```bash
-# Build images
-docker build -t <acr>.azurecr.io/digitransac-backend:latest ./backend
-docker build -t <acr>.azurecr.io/digitransac-frontend:latest ./frontend
+# Build and push images manually
+az acr login --name crdigitransacdev
 
-# Push to ACR
-az acr login --name <acr>
-docker push <acr>.azurecr.io/digitransac-backend:latest
-docker push <acr>.azurecr.io/digitransac-frontend:latest
+docker build -t crdigitransacdev.azurecr.io/digitransac-api:latest ./Api
+docker push crdigitransacdev.azurecr.io/digitransac-api:latest
+
+docker build -t crdigitransacdev.azurecr.io/digitransac-web:latest ./web
+docker push crdigitransacdev.azurecr.io/digitransac-web:latest
+
+# Update Container Apps
+az containerapp update --name digitransac-api-dev --resource-group rg-digitransac-dev --image crdigitransacdev.azurecr.io/digitransac-api:latest
+az containerapp update --name digitransac-web-dev --resource-group rg-digitransac-dev --image crdigitransacdev.azurecr.io/digitransac-web:latest
 ```
 
-## Security
+📚 **For detailed deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**
 
-- **Azure Key Vault**: All secrets centralized
-- **Managed Identity**: Passwordless authentication
-- **JWT Authentication**: Secure user sessions
-- **TLS 1.2+**: Encrypted communication
-- **RBAC**: Role-based access control
-- **Multi-stage Docker**: Minimal attack surface
+## 📄 License
 
-## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-MIT
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📞 Support
+
+For support, please open an issue in the GitHub repository or contact the maintainers.
 
 ---
 
-See [DEV-GUIDE.md](DEV-GUIDE.md) for detailed development documentation.
+Made with ❤️ by the DigiTransac team

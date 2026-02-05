@@ -1,55 +1,69 @@
-version: '3.8'
-
-# This docker-compose is for LOCAL PRODUCTION TESTING ONLY
-# For daily development, use: npm run dev (faster, easier debugging)
-# Use this to test production builds before pushing to GitHub
-
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: digitransac-backend
+  # MongoDB database
+  mongodb:
+    image: mongo:7
+    container_name: digitransac-mongodb
+    restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
     environment:
-      - NODE_ENV=production
-      - PORT=5000
-      - AZURE_KEY_VAULT_URL=${AZURE_KEY_VAULT_URL}
-      - MONGODB_DATABASE_NAME=${MONGODB_DATABASE_NAME}
-      # For local testing, ensure you're logged in: az login
-    networks:
-      - digitransac-network
-    restart: unless-stopped
+      MONGO_INITDB_DATABASE: DigiTransac
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  frontend:
+  # .NET API
+  api:
     build:
-      context: ./frontend
+      context: ./api
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://localhost:5000/api
-    container_name: digitransac-frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - digitransac-network
+    container_name: digitransac-api
     restart: unless-stopped
+    ports:
+      - "5172:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      MONGODB_CONNECTION_STRING: mongodb://mongodb:27017
+      MONGODB_DATABASE_NAME: DigiTransac
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-at-least-32-chars}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-super-secret-encryption-key}
+      ENCRYPTION_KEK: ${ENCRYPTION_KEK:-your-super-secret-kek-32chars}
+      EMAIL_SENDER: ${EMAIL_SENDER:-}
+      EMAIL_APP_PASSWORD: ${EMAIL_APP_PASSWORD:-}
+    depends_on:
+      mongodb:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+
+  # React/Vite frontend
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: digitransac-web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mongodb_data:
+    driver: local
 
 networks:
-  digitransac-network:
-    driver: bridge
+  default:
+    name: digitransac-network

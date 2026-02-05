@@ -1,0 +1,315 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "filter": "Filter",
+    "clear": "Clear",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "submit": "Submit",
+    "done": "Done",
+    "more": "More",
+    "less": "Less",
+    "all": "All",
+    "none": "None",
+    "noData": "No data available",
+    "selectOption": "Select an option"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "fullName": "Full Name",
+    "forgotPassword": "Forgot Password?",
+    "rememberMe": "Remember me",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "createAccount": "Create Account",
+    "resetPassword": "Reset Password",
+    "sendResetCode": "Send Reset Code",
+    "enterCode": "Enter Code",
+    "newPassword": "New Password",
+    "verifyEmail": "Verify Email",
+    "emailSent": "Email sent! Check your inbox.",
+    "invalidCredentials": "Invalid email or password",
+    "passwordRequirements": "Password must be at least 8 characters with uppercase, lowercase, and numbers",
+    "twoFactor": {
+      "title": "Two-Factor Authentication",
+      "enterCode": "Enter the 6-digit code from your authenticator app",
+      "enable": "Enable 2FA",
+      "disable": "Disable 2FA",
+      "scanQR": "Scan this QR code with your authenticator app",
+      "backupCodes": "Backup Codes",
+      "saveBackupCodes": "Save these backup codes in a safe place"
+    }
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "transactions": "Transactions",
+    "accounts": "Accounts",
+    "insights": "Insights",
+    "budgets": "Budgets",
+    "chats": "Chats",
+    "settings": "Settings",
+    "labels": "Categories",
+    "map": "Spending Map"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "newTransaction": "New Transaction",
+    "editTransaction": "Edit Transaction",
+    "deleteTransaction": "Delete Transaction",
+    "noTransactions": "No transactions yet",
+    "addFirst": "Add your first transaction",
+    "type": {
+      "send": "Send",
+      "receive": "Receive",
+      "transfer": "Transfer"
+    },
+    "status": {
+      "confirmed": "Confirmed",
+      "pending": "Pending",
+      "declined": "Declined"
+    },
+    "fields": {
+      "amount": "Amount",
+      "date": "Date",
+      "payee": "Payee",
+      "payer": "Payer",
+      "category": "Category",
+      "account": "Account",
+      "notes": "Notes",
+      "tags": "Tags",
+      "location": "Location",
+      "recurring": "Recurring"
+    },
+    "recurring": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "biweekly": "Every 2 weeks",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "yearly": "Yearly"
+    },
+    "filters": {
+      "all": "All",
+      "thisWeek": "This Week",
+      "thisMonth": "This Month",
+      "custom": "Custom Range"
+    },
+    "summary": {
+      "income": "Income",
+      "expenses": "Expenses",
+      "netChange": "Net Change",
+      "balance": "Balance"
+    },
+    "actions": {
+      "markConfirmed": "Mark as Confirmed",
+      "markPending": "Mark as Pending",
+      "duplicate": "Duplicate",
+      "export": "Export"
+    }
+  },
+  "accounts": {
+    "title": "Accounts",
+    "newAccount": "New Account",
+    "editAccount": "Edit Account",
+    "deleteAccount": "Delete Account",
+    "noAccounts": "No accounts yet",
+    "addFirst": "Add your first account",
+    "types": {
+      "cash": "Cash",
+      "bank": "Bank Account",
+      "creditCard": "Credit Card",
+      "investment": "Investment",
+      "loan": "Loan",
+      "wallet": "Digital Wallet",
+      "other": "Other"
+    },
+    "fields": {
+      "name": "Account Name",
+      "type": "Account Type",
+      "currency": "Currency",
+      "balance": "Balance",
+      "description": "Description",
+      "creditLimit": "Credit Limit",
+      "interestRate": "Interest Rate"
+    },
+    "summary": {
+      "totalBalance": "Total Balance",
+      "assets": "Assets",
+      "liabilities": "Liabilities",
+      "netWorth": "Net Worth"
+    }
+  },
+  "budgets": {
+    "title": "Budgets",
+    "newBudget": "New Budget",
+    "editBudget": "Edit Budget",
+    "deleteBudget": "Delete Budget",
+    "noBudgets": "No budgets yet",
+    "addFirst": "Create your first budget",
+    "periods": {
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "yearly": "Yearly",
+      "custom": "Custom"
+    },
+    "status": {
+      "onTrack": "On Track",
+      "warning": "Warning",
+      "overBudget": "Over Budget"
+    },
+    "fields": {
+      "name": "Budget Name",
+      "amount": "Budget Amount",
+      "spent": "Spent",
+      "remaining": "Remaining",
+      "period": "Period",
+      "categories": "Categories",
+      "accounts": "Accounts"
+    },
+    "alerts": {
+      "threshold": "Alert Threshold",
+      "notify": "Notify when exceeded"
+    }
+  },
+  "insights": {
+    "title": "Insights",
+    "periods": {
+      "7d": "7 Days",
+      "30d": "30 Days",
+      "90d": "90 Days",
+      "1y": "1 Year",
+      "all": "All Time"
+    },
+    "widgets": {
+      "cashFlow": "Cash Flow",
+      "categoryBreakdown": "Category Breakdown",
+      "spendingTrend": "Spending Trend",
+      "topPayees": "Top Payees",
+      "spendingByAccount": "Spending by Account",
+      "dayOfWeek": "Day of Week Patterns",
+      "hourOfDay": "Time of Day Patterns",
+      "budgetProgress": "Budget Progress",
+      "averages": "Transaction Averages",
+      "anomalies": "Spending Alerts"
+    },
+    "metrics": {
+      "avgTransaction": "Avg. Transaction",
+      "largestExpense": "Largest Expense",
+      "mostFrequent": "Most Frequent Category",
+      "savingsRate": "Savings Rate"
+    }
+  },
+  "chats": {
+    "title": "Chats",
+    "newChat": "New Chat",
+    "noChats": "No conversations yet",
+    "startChat": "Start a conversation",
+    "messagePlaceholder": "Type a message...",
+    "send": "Send",
+    "searchContacts": "Search contacts by email",
+    "selectContact": "Select a contact",
+    "transactionSent": "You sent",
+    "transactionReceived": "You received",
+    "viewInChat": "View in Chat",
+    "noMessages": "No messages yet"
+  },
+  "settings": {
+    "title": "Settings",
+    "sections": {
+      "profile": "Profile",
+      "appearance": "Appearance",
+      "security": "Security",
+      "notifications": "Notifications",
+      "data": "Data & Privacy",
+      "about": "About"
+    },
+    "profile": {
+      "fullName": "Full Name",
+      "email": "Email",
+      "currency": "Primary Currency",
+      "save": "Save Profile"
+    },
+    "appearance": {
+      "theme": "Theme",
+      "darkMode": "Dark Mode",
+      "language": "Language",
+      "dateFormat": "Date Format",
+      "timeFormat": "Time Format"
+    },
+    "security": {
+      "changePassword": "Change Password",
+      "twoFactor": "Two-Factor Authentication",
+      "sessions": "Active Sessions"
+    },
+    "notifications": {
+      "budgetAlerts": "Budget Alerts",
+      "transactionAlerts": "Transaction Alerts",
+      "chatMessages": "Chat Messages",
+      "emailNotifications": "Email Notifications"
+    }
+  },
+  "map": {
+    "title": "Spending Map",
+    "noLocations": "No location data",
+    "enableLocation": "Enable location tracking",
+    "filters": {
+      "all": "All Transactions",
+      "category": "By Category",
+      "dateRange": "Date Range"
+    },
+    "clusters": {
+      "total": "Total Spending",
+      "transactions": "Transactions",
+      "avgAmount": "Average Amount"
+    },
+    "trips": {
+      "title": "Trips",
+      "noTrips": "No trips detected",
+      "duration": "Duration",
+      "spending": "Spending"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Network error. Please check your connection.",
+    "notFound": "Resource not found.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "validation": "Please check your input and try again.",
+    "serverError": "Server error. Please try again later."
+  },
+  "dates": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "thisWeek": "This Week",
+    "lastWeek": "Last Week",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month",
+    "thisYear": "This Year"
+  },
+  "currency": {
+    "formats": {
+      "short": "{{amount, currency}}",
+      "full": "{{amount}} {{code}}"
+    }
+  }
+}
