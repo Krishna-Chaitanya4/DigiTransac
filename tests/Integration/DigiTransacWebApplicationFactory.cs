@@ -76,7 +76,19 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
                 ["MongoDb:DatabaseName"] = "DigiTransac_Test",
                 ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
                 ["Encryption:Kek"] = Convert.ToBase64String(new byte[32]),
-                ["Encryption:Provider"] = "Local"
+                ["Encryption:Provider"] = "Local",
+                // Disable rate limiting for integration tests by setting very high limits
+                ["RateLimit:PermitLimit"] = "10000",
+                ["RateLimit:WindowSeconds"] = "1",
+                ["RateLimit:QueueLimit"] = "1000",
+                ["RateLimit:AuthPermitLimit"] = "10000",
+                ["RateLimit:AuthWindowSeconds"] = "1",
+                ["RateLimit:SensitivePermitLimit"] = "10000",
+                ["RateLimit:SensitiveWindowSeconds"] = "1",
+                ["RateLimit:UserPermitLimit"] = "10000",
+                ["RateLimit:UserWindowSeconds"] = "1",
+                ["RateLimit:TransactionPermitLimit"] = "10000",
+                ["RateLimit:TransactionWindowSeconds"] = "1"
             });
         });
 
