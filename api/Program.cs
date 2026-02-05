@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
+using Azure.Identity;
 using DigiTransac.Api.Endpoints;
 using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Hubs;
@@ -46,6 +47,50 @@ builder.Host.UseSerilog();
 
 // Add environment variables as configuration source (highest priority)
 builder.Configuration.AddEnvironmentVariables();
+
+// =============================================================================
+// Azure Key Vault Configuration (for production)
+// =============================================================================
+// If AZURE_KEY_VAULT_URL is set, load secrets from Azure Key Vault
+// This uses DefaultAzureCredential which supports:
+// - Managed Identity (in Azure Container Apps)
+// - Azure CLI credentials (local development)
+// - Environment variables (for CI/CD)
+var keyVaultUrl = Environment.GetEnvironmentVariable("AZURE_KEY_VAULT_URL");
+if (!string.IsNullOrEmpty(keyVaultUrl))
+{
+    try
+    {
+        Log.Information("Loading configuration from Azure Key Vault: {KeyVaultUrl}", keyVaultUrl);
+        
+        var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+        {
+            // Exclude credentials that won't work in production container environment
+            ExcludeInteractiveBrowserCredential = true,
+            ExcludeVisualStudioCodeCredential = true,
+            ExcludeVisualStudioCredential = true,
+        });
+        
+        builder.Configuration.AddAzureKeyVault(
+            new Uri(keyVaultUrl),
+            credential,
+            new Azure.Extensions.AspNetCore.Configuration.Secrets.AzureKeyVaultConfigurationOptions
+            {
+                // Reload secrets every 5 minutes
+                ReloadInterval = TimeSpan.FromMinutes(5)
+            });
+        
+        Log.Information("Successfully connected to Azure Key Vault");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to connect to Azure Key Vault. Falling back to environment variables.");
+    }
+}
+else
+{
+    Log.Information("AZURE_KEY_VAULT_URL not set. Using environment variables for configuration.");
+}
 
 // Override settings with environment variables where applicable
 var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");

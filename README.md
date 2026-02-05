@@ -388,25 +388,110 @@ TransactionServiceFacade (implements ITransactionService)
 
 ## 🚀 Deployment
 
+### Deployment Environments
+
+| Environment | Branch | URL Pattern |
+|-------------|--------|-------------|
+| Development | `develop` | `digitransac-*-dev.azurecontainerapps.io` |
+| Staging | `release/*` | `digitransac-*-staging.azurecontainerapps.io` |
+| Production | `main` | `digitransac-*-production.azurecontainerapps.io` |
+
+### Quick Start (Azure)
+
+```bash
+# 1. Login to Azure
+az login
+
+# 2. Run infrastructure setup
+cd infrastructure
+chmod +x setup.sh
+./setup.sh dev eastus
+
+# 3. Configure GitHub secrets (see output from setup.sh)
+
+# 4. Push to develop branch to trigger deployment
+git checkout develop
+git push origin develop
+```
+
 ### Production Checklist
 
-- [ ] Update JWT secret key
-- [ ] Configure MongoDB connection string
-- [ ] Set up encryption master key
-- [ ] Configure CORS origins
-- [ ] Enable HTTPS
-- [ ] Set up rate limiting
-- [ ] Configure OpenTelemetry exporter
-- [ ] Set up health check endpoints
+- [ ] Update JWT secret key in Azure Key Vault
+- [ ] Configure MongoDB connection string (auto-generated)
+- [ ] Set up encryption master key in Key Vault
+- [ ] Configure CORS origins for your domains
+- [ ] Enable HTTPS (automatic with Container Apps)
+- [ ] Set up rate limiting (configured in API)
+- [ ] Configure Application Insights connection string
+- [ ] Set up health check endpoints (already configured)
+- [ ] Configure GitHub Actions secrets
+- [ ] Set up environment protection rules
 
-### Azure Deployment
+### CI/CD Pipeline
 
-For Azure deployment:
-1. Use Azure Cosmos DB with MongoDB API
-2. Store secrets in Azure Key Vault
-3. Deploy API to Azure App Service
-4. Deploy frontend to Azure Static Web Apps
-5. Configure Application Insights for monitoring
+We use GitHub Actions for continuous integration and deployment:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   develop   │────▶│   CI Tests  │────▶│  Deploy Dev │
+└─────────────┘     └─────────────┘     └─────────────┘
+
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  release/*  │────▶│   CI Tests  │────▶│Deploy Stage │
+└─────────────┘     └─────────────┘     └─────────────┘
+
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│    main     │────▶│   CI Tests  │────▶│ Deploy Prod │
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+### GitFlow Branching Strategy
+
+```
+main (production)
+  │
+  ├── hotfix/critical-bug ─────────────────────────────┐
+  │                                                     │
+develop (development)                                   │
+  │                                                     │
+  ├── feature/new-feature                              │
+  │     └── Merged back to develop                     │
+  │                                                     │
+  ├── release/1.0.0 ──────────────────────────────────▶ main
+  │     └── Bug fixes only, then merge to main & develop
+```
+
+### Azure Resources
+
+The infrastructure creates:
+
+| Resource | Purpose |
+|----------|---------|
+| **Container Apps** | Hosts API and Web applications |
+| **Cosmos DB (MongoDB)** | Database (serverless for dev/staging) |
+| **Container Registry** | Docker image storage |
+| **Key Vault** | Secure secrets management |
+| **Log Analytics** | Centralized logging |
+| **Application Insights** | APM and telemetry |
+
+### Manual Deployment
+
+```bash
+# Build and push images manually
+az acr login --name crdigitransacdev
+
+docker build -t crdigitransacdev.azurecr.io/digitransac-api:latest ./Api
+docker push crdigitransacdev.azurecr.io/digitransac-api:latest
+
+docker build -t crdigitransacdev.azurecr.io/digitransac-web:latest ./web
+docker push crdigitransacdev.azurecr.io/digitransac-web:latest
+
+# Update Container Apps
+az containerapp update --name digitransac-api-dev --resource-group rg-digitransac-dev --image crdigitransacdev.azurecr.io/digitransac-api:latest
+az containerapp update --name digitransac-web-dev --resource-group rg-digitransac-dev --image crdigitransacdev.azurecr.io/digitransac-web:latest
+```
+
+📚 **For detailed deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**
 
 ## 📄 License
 
