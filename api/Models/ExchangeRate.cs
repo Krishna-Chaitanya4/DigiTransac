@@ -7,6 +7,7 @@ namespace DigiTransac.Api.Models;
 /// Stores exchange rates with a base currency.
 /// All rates are stored relative to a single base currency (USD by default from the API).
 /// </summary>
+[BsonIgnoreExtraElements]
 public class ExchangeRate
 {
     [BsonId]

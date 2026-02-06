@@ -6,6 +6,7 @@ namespace DigiTransac.Api.Models;
 /// <summary>
 /// Represents an audit log entry for tracking security-sensitive operations.
 /// </summary>
+[BsonIgnoreExtraElements]
 public class AuditLog
 {
     [BsonId]
