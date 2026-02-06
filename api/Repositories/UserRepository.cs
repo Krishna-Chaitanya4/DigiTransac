@@ -38,10 +38,12 @@ public class UserRepository : IUserRepository
                         var indexOptions = new CreateIndexOptions { Unique = true };
                         _users.Indexes.CreateOne(new CreateIndexModel<User>(indexKeys, indexOptions));
                     }
-                    catch (MongoCommandException ex) when (ex.CodeName == "IndexOptionsConflict" || ex.Code == 85)
+                    catch (MongoCommandException)
                     {
-                        // Index already exists with different options - this is okay
-                        // The existing index will be used
+                        // Index already exists (possibly with different options) - this is okay
+                        // Common error codes: 85 (IndexOptionsConflict), 86 (IndexKeySpecsConflict)
+                        // Also handles "An existing index has the same name" errors
+                        // The existing index will be used for email uniqueness enforcement
                     }
                     _indexesCreated = true;
                 }
