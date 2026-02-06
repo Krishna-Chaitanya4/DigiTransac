@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace DigiTransac.Api.Models;
 
+[BsonIgnoreExtraElements]
 public class User
 {
     [BsonId]
