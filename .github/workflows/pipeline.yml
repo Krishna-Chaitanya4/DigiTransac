@@ -171,7 +171,7 @@ jobs:
       - name: Lint
         working-directory: web
         run: npm run lint
-        continue-on-error: true
+        # Lint errors will fail the build - warnings are allowed
 
       - name: Test
         working-directory: web
@@ -200,7 +200,41 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Check .NET Vulnerabilities
-        run: dotnet list package --vulnerable --include-transitive 2>&1 || true
+        id: dotnet-vuln
+        run: |
+          echo "### .NET Vulnerability Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Capture vulnerable packages
+          OUTPUT=$(dotnet list package --vulnerable --include-transitive 2>&1) || true
+          
+          # Check for actual vulnerabilities (not just warnings)
+          if echo "$OUTPUT" | grep -q "has the following vulnerable packages"; then
+            echo "⚠️ **Vulnerable packages found:**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "::warning::Vulnerable .NET packages detected - review recommended"
+          else
+            echo "✅ No vulnerable packages found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check .NET Outdated Packages
+        run: |
+          echo "### .NET Outdated Packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          OUTPUT=$(dotnet list package --outdated 2>&1) || true
+          
+          if echo "$OUTPUT" | grep -q ">"; then
+            echo "📦 **Outdated packages detected:**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$OUTPUT" | grep -E "^   > |Top-level" >> $GITHUB_STEP_SUMMARY || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "::notice::Consider updating outdated .NET packages"
+          else
+            echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -208,10 +242,90 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Check npm Vulnerabilities
+        id: npm-vuln
         working-directory: web
         run: |
           npm ci
-          npm audit --audit-level=high 2>&1 || true
+          
+          echo "### npm Vulnerability Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Run audit and capture output
+          set +e
+          AUDIT_OUTPUT=$(npm audit --json 2>&1)
+          AUDIT_EXIT=$?
+          set -e
+          
+          # Parse JSON for summary
+          CRITICAL=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.critical // 0')
+          HIGH=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.high // 0')
+          MODERATE=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.moderate // 0')
+          LOW=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.low // 0')
+          
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Moderate | $MODERATE |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟢 Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+          
+          # Fail only on critical vulnerabilities
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo ""
+            echo "❌ **Critical vulnerabilities found - must be fixed!**" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Critical npm vulnerabilities detected - fix required"
+            npm audit --audit-level=critical
+            exit 1
+          elif [ "$HIGH" -gt 0 ]; then
+            echo ""
+            echo "⚠️ **High vulnerabilities found - review recommended**" >> $GITHUB_STEP_SUMMARY
+            echo "::warning::High npm vulnerabilities detected - review recommended"
+          else
+            echo ""
+            echo "✅ No critical or high vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check npm Outdated Packages
+        working-directory: web
+        run: |
+          echo "### npm Outdated Packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check for outdated packages
+          set +e
+          OUTDATED=$(npm outdated --json 2>&1)
+          set -e
+          
+          # Count outdated packages
+          COUNT=$(echo "$OUTDATED" | jq 'length // 0')
+          
+          if [ "$COUNT" -gt 0 ]; then
+            echo "📦 **$COUNT outdated packages:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Package | Current | Wanted | Latest |" >> $GITHUB_STEP_SUMMARY
+            echo "|---------|---------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse and display outdated packages
+            echo "$OUTDATED" | jq -r 'to_entries[] | "| \(.key) | \(.value.current) | \(.value.wanted) | \(.value.latest) |"' >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            
+            echo "::notice::$COUNT npm packages have updates available"
+          else
+            echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: License Check
+        working-directory: web
+        run: |
+          echo "### License Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Install license-checker if not available
+          npx license-checker --summary --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;Unlicense;WTFPL" 2>&1 || {
+            echo "⚠️ Some packages have non-standard licenses - manual review may be needed" >> $GITHUB_STEP_SUMMARY
+            echo "::notice::License compliance check had warnings - review recommended"
+          }
+          
+          echo "✅ License check completed" >> $GITHUB_STEP_SUMMARY
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
   # │ STAGE 2-4: Build → Push → Deploy (Main branch only)                         │
@@ -365,6 +479,28 @@ jobs:
       - name: PR Summary
         if: ${{ needs.setup.outputs.is_pr == 'true' }}
         run: |
+          echo "## 📋 PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔧 Backend Tests | ${{ needs.validate-backend.result == 'success' && '✅ Passed' || needs.validate-backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 Frontend Tests | ${{ needs.validate-frontend.result == 'success' && '✅ Passed' || needs.validate-frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔒 Security Scan | ${{ needs.validate-security.result == 'success' && '✅ Passed' || needs.validate-security.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.validate-backend.result }}" = "success" ] && \
+             [ "${{ needs.validate-frontend.result }}" = "success" ] && \
+             [ "${{ needs.validate-security.result }}" = "success" ]; then
+            echo "### ✅ Ready for merge!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All validations passed. This PR can be safely merged." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Some checks failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed checks above before merging." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo ""
           echo "╔════════════════════════════════════════════════════════════╗"
           echo "║              PR Validation Complete                        ║"
           echo "╚════════════════════════════════════════════════════════════╝"
@@ -372,17 +508,32 @@ jobs:
           echo "Backend Tests:  ${{ needs.validate-backend.result }}"
           echo "Frontend Tests: ${{ needs.validate-frontend.result }}"
           echo "Security Scan:  ${{ needs.validate-security.result }}"
-          echo ""
-          if [ "${{ needs.validate-backend.result }}" = "success" ] && \
-             [ "${{ needs.validate-frontend.result }}" = "success" ]; then
-            echo "✅ Ready for merge!"
-          else
-            echo "❌ Some checks failed. Please review."
-          fi
 
       - name: Deploy Summary
         if: ${{ needs.setup.outputs.is_main == 'true' }}
         run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Version | \`${{ needs.setup.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔗 Commit | \`${{ needs.setup.outputs.sha_short }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔐 Auth | OIDC Federation |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Application URLs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend:** ${{ env.FRONTEND_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend:** ${{ env.BACKEND_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Custom Domain:** https://digitransac.com" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build & Deploy | ${{ needs.build-and-deploy.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Health Checks | ${{ needs.verify.result == 'success' && '✅ Healthy' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          
+          echo ""
           echo "╔════════════════════════════════════════════════════════════╗"
           echo "║              Deployment Complete                           ║"
           echo "╠════════════════════════════════════════════════════════════╣"
