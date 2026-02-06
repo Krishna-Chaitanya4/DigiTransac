@@ -18,15 +18,35 @@ public interface IUserRepository
 public class UserRepository : IUserRepository
 {
     private readonly IMongoCollection<User> _users;
+    private static bool _indexesCreated = false;
+    private static readonly object _indexLock = new();
 
     public UserRepository(IMongoDbService mongoDbService)
     {
         _users = mongoDbService.GetCollection<User>("users");
 
-        // Create unique index on email
-        var indexKeys = Builders<User>.IndexKeys.Ascending(u => u.Email);
-        var indexOptions = new CreateIndexOptions { Unique = true };
-        _users.Indexes.CreateOne(new CreateIndexModel<User>(indexKeys, indexOptions));
+        // Create unique index on email (only once per application lifecycle)
+        if (!_indexesCreated)
+        {
+            lock (_indexLock)
+            {
+                if (!_indexesCreated)
+                {
+                    try
+                    {
+                        var indexKeys = Builders<User>.IndexKeys.Ascending(u => u.Email);
+                        var indexOptions = new CreateIndexOptions { Unique = true };
+                        _users.Indexes.CreateOne(new CreateIndexModel<User>(indexKeys, indexOptions));
+                    }
+                    catch (MongoCommandException ex) when (ex.CodeName == "IndexOptionsConflict" || ex.Code == 85)
+                    {
+                        // Index already exists with different options - this is okay
+                        // The existing index will be used
+                    }
+                    _indexesCreated = true;
+                }
+            }
+        }
     }
 
     public async Task<User?> GetByEmailAsync(string email)
