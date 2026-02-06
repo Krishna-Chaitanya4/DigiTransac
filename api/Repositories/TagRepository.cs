@@ -26,15 +26,29 @@ public class TagRepository : ITagRepository
         _tags = mongoDbService.GetCollection<Tag>("tags");
 
         // Create indexes
-        var userIdIndex = Builders<Tag>.IndexKeys.Ascending(t => t.UserId);
-        _tags.Indexes.CreateOne(new CreateIndexModel<Tag>(userIdIndex));
+        // Wrapped in try-catch to handle cases where indexes already exist with different names/options
+        try
+        {
+            var indexModels = new List<CreateIndexModel<Tag>>
+            {
+                // UserId for basic user filtering
+                new(Builders<Tag>.IndexKeys.Ascending(t => t.UserId),
+                    new CreateIndexOptions { Name = "idx_userId" }),
+                
+                // Unique index on name per user (for tag name uniqueness within a user's tags)
+                new(Builders<Tag>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Ascending(t => t.Name),
+                    new CreateIndexOptions { Name = "idx_userId_name_unique", Unique = true })
+            };
 
-        // Unique index on name per user
-        var uniqueNameIndex = Builders<Tag>.IndexKeys
-            .Ascending(t => t.UserId)
-            .Ascending(t => t.Name);
-        var indexOptions = new CreateIndexOptions { Unique = true };
-        _tags.Indexes.CreateOne(new CreateIndexModel<Tag>(uniqueNameIndex, indexOptions));
+            _tags.Indexes.CreateMany(indexModels);
+        }
+        catch (MongoCommandException)
+        {
+            // Indexes may already exist with different names/options - this is OK
+            // The existing indexes will be used
+        }
     }
 
     public async Task<List<Tag>> GetByUserIdAsync(string userId)
