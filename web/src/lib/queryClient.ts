@@ -2,14 +2,24 @@ import { QueryClient, MutationCache, QueryCache } from '@tanstack/react-query';
 import { toast } from '../components/ToastProvider';
 import { logger } from '../services/logger';
 
+// Type for API errors with response data
+interface ApiError extends Error {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 /**
  * Extract a user-friendly error message from various error types
  */
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     // Handle API errors with response data
-    if ('response' in error && typeof (error as any).response?.data?.message === 'string') {
-      return (error as any).response.data.message;
+    const apiError = error as ApiError;
+    if (apiError.response?.data?.message && typeof apiError.response.data.message === 'string') {
+      return apiError.response.data.message;
     }
     return error.message;
   }

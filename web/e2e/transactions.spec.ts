@@ -118,8 +118,6 @@ test.describe('Transactions Page', () => {
       // Wait for transactions to load
       await page.waitForTimeout(1000);
 
-      // Check for date headers (Today, Yesterday, or date format)
-      const dateHeaders = page.locator('h3, [data-testid="date-header"]');
       // At least check structure exists
       await expect(page.locator('[data-transaction-id], [class*="transaction"]').first()).toBeVisible({ timeout: 5000 }).catch(() => {
         // If no transactions, check for empty state
@@ -371,11 +369,8 @@ test.describe('Keyboard Navigation', () => {
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
 
-    // Focused element should still be within the dialog
-    const focusedElement = await page.locator(':focus');
-    const dialog = page.getByRole('dialog');
-    
     // Check if focused element is inside dialog
+    const dialog = page.getByRole('dialog');
     const isInsideDialog = await dialog.locator(':focus').count() > 0;
     expect(isInsideDialog).toBe(true);
   });

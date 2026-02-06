@@ -17,9 +17,10 @@ test.describe('PWA Features', () => {
     await page.waitForTimeout(2000);
     
     // Check if service worker is registered
-    const _swRegistrations = await context.serviceWorkers();
+    const swRegistrations = await context.serviceWorkers();
     // In dev mode, SW might not be fully active
     // This test mainly verifies no errors occur
+    expect(swRegistrations).toBeDefined();
   });
 
   test('should show install prompt elements', async ({ page }) => {

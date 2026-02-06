@@ -156,6 +156,10 @@ export default function ChatsPage() {
   // Track the default type for the transaction form
   const [formDefaultType, setFormDefaultType] = useState<'Send' | 'Receive' | 'Transfer' | undefined>(undefined);
 
+  // Transaction form modal - declared before the useEffect that uses it
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [transactionFormError, setTransactionFormError] = useState<string | null>(null);
+
   // Open transaction form when pending action and conversation is ready
   useEffect(() => {
     if (pendingTransactionAction && selectedConversation) {
@@ -212,10 +216,6 @@ export default function ChatsPage() {
 
   // New chat modal
   const [showNewChatModal, setShowNewChatModal] = useState(false);
-
-  // Transaction form modal
-  const [showTransactionForm, setShowTransactionForm] = useState(false);
-  const [transactionFormError, setTransactionFormError] = useState<string | null>(null);
 
   // Is self-chat (for Transfer option and special message positioning)
   // Use the API flag if available, fallback to email comparison for backward compatibility
@@ -283,6 +283,14 @@ export default function ChatsPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  // Close search bar - defined before handlers that use it
+  const closeSearchBar = useCallback(() => {
+    setShowSearchBar(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setCurrentSearchIndex(0);
+  }, []);
+
   // Select conversation handler
   const handleSelectConversation = useCallback((userId: string) => {
     setSelectedUserId(userId);
@@ -290,7 +298,7 @@ export default function ChatsPage() {
     setReplyTo(null);
     setEditingMessage(null);
     closeSearchBar();
-  }, []);
+  }, [closeSearchBar]);
 
   // Send message
   const handleSendMessage = useCallback(async () => {
@@ -399,13 +407,6 @@ export default function ChatsPage() {
     [searchResults, currentSearchIndex]
   );
 
-  // Close search bar
-  const closeSearchBar = useCallback(() => {
-    setShowSearchBar(false);
-    setSearchQuery('');
-    setSearchResults([]);
-    setCurrentSearchIndex(0);
-  }, []);
 
   // Handle menu open
   const handleMenuOpen = useCallback(

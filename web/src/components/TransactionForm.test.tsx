@@ -122,7 +122,7 @@ vi.mock('./transaction-form', () => ({
       )}
     </div>
   ),
-  TagTokenInput: ({ tags, selectedTagIds, onToggleTag, onCreateTag }: {
+  TagTokenInput: ({ tags, selectedTagIds, onToggleTag }: {
     tags: Tag[];
     selectedTagIds: string[];
     onToggleTag: (id: string) => void;
@@ -171,7 +171,7 @@ vi.mock('./transaction-form', () => ({
       )}
     </div>
   ),
-  SplitCategoriesSection: ({ splits, onSplitsChange, categories, amount, currencySymbol, onCancelSplit }: {
+  SplitCategoriesSection: ({ splits, amount, currencySymbol, onCancelSplit }: {
     splits: { labelId: string; amount: number; notes?: string }[];
     onSplitsChange: (val: { labelId: string; amount: number; notes?: string }[]) => void;
     categories: Label[];
@@ -185,10 +185,10 @@ vi.mock('./transaction-form', () => ({
       <span>Splits: {splits.length}</span>
     </div>
   ),
-  LocationPicker: ({ location, onChange, autoCapture }: {
+  LocationPicker: ({ location, onChange }: {
     location: { latitude: number; longitude: number } | null;
     onChange: (loc: { latitude: number; longitude: number } | null, include: boolean) => void;
-    autoCapture: boolean;
+    autoCapture?: boolean;
   }) => (
     <div data-testid="location-picker">
       <button 
@@ -223,7 +223,7 @@ vi.mock('../context/CurrencyContext', () => ({
   useCurrency: () => ({
     primaryCurrency: 'USD',
     formatCurrency: (amount: number, currency: string) => `${currency} ${amount}`,
-    formatInPrimaryCurrency: (amount: number, fromCurrency: string) => `USD ${amount}`,
+    formatInPrimaryCurrency: (amount: number, _fromCurrency: string) => `USD ${amount}`,
     convert: (amount: number) => amount,
     exchangeRates: {},
     isLoading: false,

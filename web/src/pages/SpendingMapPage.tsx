@@ -361,7 +361,7 @@ export default function SpendingMapPage() {
     });
     
     return Object.values(clusters).sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [filteredTransactions, labelColorMap]);
+  }, [filteredTransactions, labelColorMap, convert]);
   
   // Get unique categories from transactions
   const availableCategories = useMemo(() => {
