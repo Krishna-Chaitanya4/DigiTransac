@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useCurrency } from '../context/CurrencyContext';
+import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import {
   useAccounts,
   useAccountSummary,
@@ -207,7 +208,11 @@ export default function AccountsPage() {
   }
 
   return (
-    <div>
+    <PullToRefreshContainer
+      onRefresh={async () => {
+        await invalidateAccounts();
+      }}
+    >
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Accounts</h1>
         <button
@@ -360,6 +365,6 @@ export default function AccountsPage() {
         account={adjustingAccount}
         isLoading={isSubmitting}
       />
-    </div>
+    </PullToRefreshContainer>
   );
 }

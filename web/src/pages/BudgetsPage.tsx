@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import {
   useBudgets,
   useCreateBudget,
@@ -6,6 +7,7 @@ import {
   useDeleteBudget,
   useLabels,
   useAccounts,
+  useInvalidateBudgets,
 } from '../hooks';
 import { BudgetForm } from '../components/budget';
 import { useCurrency } from '../context/CurrencyContext';
@@ -200,6 +202,7 @@ export default function BudgetsPage() {
   const { data: budgetSummary, isLoading } = useBudgets(true);
   const { data: labels = [] } = useLabels();
   const { data: accounts = [] } = useAccounts();
+  const invalidateBudgets = useInvalidateBudgets();
   
   // Mutations
   const createBudget = useCreateBudget();
@@ -295,7 +298,12 @@ export default function BudgetsPage() {
   const overallProgress = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;
 
   return (
-    <div className="space-y-6">
+    <PullToRefreshContainer
+      onRefresh={async () => {
+        await invalidateBudgets();
+      }}
+      className="space-y-6"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -472,6 +480,6 @@ export default function BudgetsPage() {
         isLoading={createBudget.isPending || updateBudget.isPending}
         error={formError}
       />
-    </div>
+    </PullToRefreshContainer>
   );
 }
