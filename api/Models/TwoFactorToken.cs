@@ -8,6 +8,7 @@ namespace DigiTransac.Api.Models;
 /// After successful password verification, this token is created
 /// and must be exchanged along with a valid TOTP code to get access tokens.
 /// </summary>
+[BsonIgnoreExtraElements]
 public class TwoFactorToken
 {
     [BsonId]

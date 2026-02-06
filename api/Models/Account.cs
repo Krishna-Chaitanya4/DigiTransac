@@ -13,6 +13,7 @@ public enum AccountType
     Loan
 }
 
+[BsonIgnoreExtraElements]
 public class Account
 {
     [BsonId]

@@ -9,6 +9,7 @@ public enum LabelType
     Category
 }
 
+[BsonIgnoreExtraElements]
 public class Label
 {
     [BsonId]
