@@ -54,6 +54,9 @@ env:
   BACKEND_URL: ${{ vars.BACKEND_URL || 'https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io' }}
   FRONTEND_URL: ${{ vars.FRONTEND_URL || 'https://digitransac-frontend.nicemeadow-64e62875.centralindia.azurecontainerapps.io' }}
   
+  # Custom domains (comma-separated list of allowed CORS origins)
+  CUSTOM_DOMAINS: ${{ vars.CUSTOM_DOMAINS || 'https://digitransac.com,https://www.digitransac.com' }}
+  
   # Build Configuration
   DOTNET_VERSION: '9.0.x'
   NODE_VERSION: '22.x'
@@ -287,11 +290,14 @@ jobs:
       - name: Deploy Backend
         run: |
           echo "🔧 Deploying Backend v${{ needs.setup.outputs.version }}..."
+          # Include both Azure Container Apps URL and custom domains for CORS
+          CORS_ORIGINS="${{ env.FRONTEND_URL }},${{ env.CUSTOM_DOMAINS }}"
+          echo "CORS Origins: $CORS_ORIGINS"
           az containerapp update \
             --name ${{ env.BACKEND_APP }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:${{ needs.setup.outputs.version }} \
-            --set-env-vars "CORS_ALLOWED_ORIGINS=${{ env.FRONTEND_URL }}"
+            --set-env-vars "CORS_ALLOWED_ORIGINS=$CORS_ORIGINS"
 
       - name: Deploy Frontend
         run: |
