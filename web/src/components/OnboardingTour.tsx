@@ -126,13 +126,19 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
     }
   }, [currentStep, currentTourStep.target]);
 
+  const handleComplete = useCallback(() => {
+    localStorage.setItem(TOUR_STORAGE_KEY, TOUR_VERSION);
+    setIsVisible(false);
+    onComplete?.();
+  }, [onComplete]);
+
   const handleNext = useCallback(() => {
     if (currentStep < tourSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       handleComplete();
     }
-  }, [currentStep]);
+  }, [currentStep, handleComplete]);
 
   const handlePrevious = useCallback(() => {
     if (currentStep > 0) {
@@ -142,13 +148,7 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
 
   const handleSkip = useCallback(() => {
     handleComplete();
-  }, []);
-
-  const handleComplete = useCallback(() => {
-    localStorage.setItem(TOUR_STORAGE_KEY, TOUR_VERSION);
-    setIsVisible(false);
-    onComplete?.();
-  }, [onComplete]);
+  }, [handleComplete]);
 
   // Keyboard navigation
   useEffect(() => {

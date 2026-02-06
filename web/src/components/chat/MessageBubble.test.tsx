@@ -14,7 +14,7 @@ vi.mock('../../context/CurrencyContext', () => ({
   useCurrency: () => ({
     primaryCurrency: 'USD',
     formatCurrency: (amount: number, currency: string) => `${currency} ${amount}`,
-    formatInPrimaryCurrency: (amount: number, fromCurrency: string) => `USD ${amount}`,
+    formatInPrimaryCurrency: (amount: number, _fromCurrency: string) => `USD ${amount}`,
     convert: (amount: number) => amount,
     exchangeRates: {},
     isLoading: false,

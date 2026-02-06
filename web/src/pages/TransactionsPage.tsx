@@ -172,7 +172,11 @@ export default function TransactionsPage() {
 
   // React Query for summary (without pagination)
   const summaryFilter = useMemo(() => {
+    // Omit pagination fields for summary query
     const { page, pageSize, ...rest } = fullFilter;
+    // Use void to suppress unused variable warnings
+    void page;
+    void pageSize;
     return rest;
   }, [fullFilter]);
   

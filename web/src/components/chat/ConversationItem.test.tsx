@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ConversationItem } from './ConversationItem';
 import type { ConversationSummary } from '../../types/conversations';
@@ -6,7 +6,7 @@ import type { ConversationSummary } from '../../types/conversations';
 // Mock the conversationService
 vi.mock('../../services/conversationService', () => ({
   getDisplayName: (name: string | null, email: string) => name || email.split('@')[0],
-  formatRelativeTime: (dateString: string) => '5m',
+  formatRelativeTime: (_dateString: string) => '5m',
 }));
 
 // Helper to create mock conversation

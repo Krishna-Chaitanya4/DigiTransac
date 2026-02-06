@@ -330,7 +330,7 @@ export default function InsightsPage() {
       if (saved) {
         return new Set(JSON.parse(saved) as SectionId[]);
       }
-    } catch (e) {
+    } catch {
       // Ignore parse errors
     }
     return new Set<SectionId>();
@@ -364,7 +364,7 @@ export default function InsightsPage() {
           return parsed;
         }
       }
-    } catch (e) {
+    } catch {
       // Ignore parse errors
     }
     return DEFAULT_WIDGET_ORDER;

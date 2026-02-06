@@ -49,12 +49,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   // Listen for global toast events (for use outside React components)
   useEffect(() => {
-    const handleToastEvent = (event: CustomEvent<{ type: ToastType; message: string; duration?: number }>) => {
-      addToast(event.detail.type, event.detail.message, event.detail.duration);
+    const handleToastEvent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ type: ToastType; message: string; duration?: number }>;
+      addToast(customEvent.detail.type, customEvent.detail.message, customEvent.detail.duration);
     };
 
-    window.addEventListener('toast' as any, handleToastEvent);
-    return () => window.removeEventListener('toast' as any, handleToastEvent);
+    window.addEventListener('toast', handleToastEvent);
+    return () => window.removeEventListener('toast', handleToastEvent);
   }, [addToast]);
 
   return (

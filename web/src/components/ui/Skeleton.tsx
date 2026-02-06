@@ -80,14 +80,16 @@ export const MapSkeleton = memo(function MapSkeleton() {
  * Skeleton for a chat message
  */
 export const ChatMessageSkeleton = memo(function ChatMessageSkeleton({ isFromMe = false }: { isFromMe?: boolean }) {
+  // Use static width to avoid Math.random() during render (impure function)
+  const width = isFromMe ? 150 : 180;
   return (
     <div className={`flex ${isFromMe ? 'justify-end' : 'justify-start'} mb-3`}>
       <div className={`max-w-xs ${isFromMe ? 'items-end' : 'items-start'}`}>
-        <Skeleton 
-          variant="rounded" 
+        <Skeleton
+          variant="rounded"
           className={`${isFromMe ? 'bg-blue-300 dark:bg-blue-700' : 'bg-gray-200 dark:bg-gray-700'}`}
-          width={Math.random() * 100 + 100} 
-          height={40} 
+          width={width}
+          height={40}
         />
         <Skeleton variant="text" className="mt-1" width={60} height={12} />
       </div>

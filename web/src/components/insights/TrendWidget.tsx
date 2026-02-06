@@ -72,9 +72,9 @@ export function TrendWidget({
       >
         {isLoading ? (
           <div className="h-48 flex items-end gap-2 pt-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+            {[80, 120, 60, 100, 90, 110].map((height, i) => (
               <div key={i} className="flex-1 flex flex-col gap-1">
-                <div className="bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ height: `${Math.random() * 100 + 50}px` }} />
+                <div className="bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ height: `${height}px` }} />
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
               </div>
             ))}

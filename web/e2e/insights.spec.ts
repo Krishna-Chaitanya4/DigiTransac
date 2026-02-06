@@ -45,9 +45,6 @@ test.describe('Insights Page', () => {
     });
 
     test('should update data when period changes', async ({ page }) => {
-      // Get initial content
-      const initialText = await page.textContent('main');
-      
       // Change period
       const ninetyDayBtn = page.getByRole('button', { name: /90d|quarter/i });
       if (await ninetyDayBtn.isVisible()) {
@@ -67,9 +64,6 @@ test.describe('Insights Page', () => {
       const sectionHeader = page.locator('[data-testid="section-header"], h2, h3').first();
       
       if (await sectionHeader.isVisible()) {
-        // Get initial visibility of content
-        const sectionContent = sectionHeader.locator('~ div, + div').first();
-        
         // Try clicking to collapse
         await sectionHeader.click();
         await page.waitForTimeout(300);

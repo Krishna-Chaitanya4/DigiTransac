@@ -218,58 +218,60 @@ export const TransactionList: Story = {
   },
 };
 
-// Interactive deletion demo
-export const InteractiveDemo: Story = {
-  render: () => {
-    const [items, setItems] = useState([
-      { id: 1, name: 'Item 1', confirmed: false },
-      { id: 2, name: 'Item 2', confirmed: false },
-      { id: 3, name: 'Item 3', confirmed: false },
-    ]);
+// Interactive deletion demo component
+function InteractiveDemoComponent() {
+  const [items, setItems] = useState([
+    { id: 1, name: 'Item 1', confirmed: false },
+    { id: 2, name: 'Item 2', confirmed: false },
+    { id: 3, name: 'Item 3', confirmed: false },
+  ]);
 
-    const handleConfirm = (id: number) => {
-      setItems(items.map(item => 
-        item.id === id ? { ...item, confirmed: true } : item
-      ));
-    };
+  const handleConfirm = (id: number) => {
+    setItems(items.map(item =>
+      item.id === id ? { ...item, confirmed: true } : item
+    ));
+  };
 
-    const handleDelete = (id: number) => {
-      setItems(items.filter(item => item.id !== id));
-    };
+  const handleDelete = (id: number) => {
+    setItems(items.filter(item => item.id !== id));
+  };
 
-    return (
-      <div className="space-y-2">
-        <p className="text-sm text-gray-500 mb-4">
-          Swipe right to confirm, left to delete
-        </p>
-        {items.map((item) => (
-          <SwipeableRow
-            key={item.id}
-            onSwipeRight={() => handleConfirm(item.id)}
-            onSwipeLeft={() => handleDelete(item.id)}
-            rightContent={<SwipeActionIcon icon="✓" label="Confirm" />}
-            leftContent={<SwipeActionIcon icon="🗑️" label="Delete" />}
-          >
-            <div className={`p-4 border rounded-lg transition-colors ${
-              item.confirmed 
-                ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' 
-                : 'bg-white dark:bg-gray-800'
-            }`}>
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{item.name}</span>
-                {item.confirmed && (
-                  <span className="text-green-600 dark:text-green-400 text-sm">✓ Confirmed</span>
-                )}
-              </div>
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-gray-500 mb-4">
+        Swipe right to confirm, left to delete
+      </p>
+      {items.map((item) => (
+        <SwipeableRow
+          key={item.id}
+          onSwipeRight={() => handleConfirm(item.id)}
+          onSwipeLeft={() => handleDelete(item.id)}
+          rightContent={<SwipeActionIcon icon="✓" label="Confirm" />}
+          leftContent={<SwipeActionIcon icon="🗑️" label="Delete" />}
+        >
+          <div className={`p-4 border rounded-lg transition-colors ${
+            item.confirmed
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
+              : 'bg-white dark:bg-gray-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{item.name}</span>
+              {item.confirmed && (
+                <span className="text-green-600 dark:text-green-400 text-sm">✓ Confirmed</span>
+              )}
             </div>
-          </SwipeableRow>
-        ))}
-        {items.length === 0 && (
-          <p className="text-center text-gray-400 py-8">All items deleted!</p>
-        )}
-      </div>
-    );
-  },
+          </div>
+        </SwipeableRow>
+      ))}
+      {items.length === 0 && (
+        <p className="text-center text-gray-400 py-8">All items deleted!</p>
+      )}
+    </div>
+  );
+}
+
+export const InteractiveDemo: Story = {
+  render: () => <InteractiveDemoComponent />,
 };
 
 // Custom threshold
