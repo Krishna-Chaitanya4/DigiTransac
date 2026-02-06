@@ -10,6 +10,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build argument for API URL (baked into the build at compile time)
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build the application
 RUN npm run build
 
@@ -23,17 +27,9 @@ RUN rm -rf ./*
 # Copy built assets from builder
 COPY --from=build /app/dist .
 
-# Copy nginx configuration template
-COPY nginx.conf /etc/nginx/nginx.conf.template
-
-# Environment variable for API URL (defaults to localhost for development)
-ENV API_URL=http://localhost:5000
-
-# Install gettext for envsubst
-RUN apk add --no-cache gettext
+# Copy nginx configuration (static - no envsubst needed)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-# Use envsubst to replace only API_URL (not nginx variables like $host, $uri, etc.)
-# Then start nginx
-CMD ["/bin/sh", "-c", "envsubst '${API_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+CMD ["nginx", "-g", "daemon off;"]

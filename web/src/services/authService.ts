@@ -1,6 +1,7 @@
 import { AuthResponse, ApiError, VerificationResponse } from '../types/auth';
 
-const API_BASE_URL = '/api';
+// Use environment variable for API URL in production, fallback to /api for development (Vite proxy)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Re-export for backward compatibility
 export { getStoredAccessToken } from './tokenStorage';

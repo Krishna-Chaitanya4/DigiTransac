@@ -1,7 +1,8 @@
 // Global API client with session expiration handling
 import { getStoredAccessToken } from './tokenStorage';
 
-const API_BASE_URL = '/api';
+// Use environment variable for API URL in production, fallback to /api for development (Vite proxy)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Event for session expiration
 export const SESSION_EXPIRED_EVENT = 'session-expired';

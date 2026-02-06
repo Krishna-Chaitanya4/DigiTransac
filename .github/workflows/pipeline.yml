@@ -277,6 +277,8 @@ jobs:
         with:
           context: ./web
           push: true
+          build-args: |
+            VITE_API_URL=${{ env.BACKEND_URL }}/api
           tags: |
             ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:${{ needs.setup.outputs.version }}
             ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:latest
@@ -297,8 +299,7 @@ jobs:
           az containerapp update \
             --name ${{ env.FRONTEND_APP }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:${{ needs.setup.outputs.version }} \
-            --set-env-vars "API_URL=${{ env.BACKEND_URL }}"
+            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:${{ needs.setup.outputs.version }}
 
       - name: Azure Logout
         run: az logout

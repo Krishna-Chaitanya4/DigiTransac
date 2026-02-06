@@ -48,18 +48,24 @@ vi.mock('./DatePicker', () => ({
     value: string;
     onChange: (val: string) => void;
     maxDate?: Date;
-  }) => (
-    <div>
-      <label>{label}</label>
-      <input
-        data-testid="date-picker"
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        max={maxDate?.toISOString().split('T')[0]}
-      />
-    </div>
-  ),
+  }) => {
+    // Format maxDate as local date string (YYYY-MM-DD) to match how the form sets the date
+    const formatLocalDate = (d: Date): string => {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    return (
+      <div>
+        <label>{label}</label>
+        <input
+          data-testid="date-picker"
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          max={maxDate ? formatLocalDate(maxDate) : undefined}
+        />
+      </div>
+    );
+  },
 }));
 
 // Mock SearchableCategoryDropdown
