@@ -23,9 +23,14 @@ RUN rm -rf ./*
 # Copy built assets from builder
 COPY --from=build /app/dist .
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration template (will be processed at runtime)
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+
+# Environment variable for API URL (defaults to localhost for development)
+ENV API_URL=http://localhost:5000
 
 EXPOSE 80
 
+# Use envsubst to replace environment variables in nginx config at startup
+# The nginx:alpine image supports templates in /etc/nginx/templates/ automatically
 CMD ["nginx", "-g", "daemon off;"]

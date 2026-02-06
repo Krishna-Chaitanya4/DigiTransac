@@ -44,11 +44,15 @@ env:
   AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
   
   # Azure Resources
-  ACR_NAME: herdswebsiteacr
-  ACR_LOGIN_SERVER: herdswebsiteacr.azurecr.io
-  RESOURCE_GROUP: rg-digitransac
-  BACKEND_APP: digitransac-backend
-  FRONTEND_APP: digitransac-frontend
+  ACR_NAME: ${{ vars.ACR_NAME || 'herdswebsiteacr' }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'herdswebsiteacr.azurecr.io' }}
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP || 'rg-digitransac' }}
+  BACKEND_APP: ${{ vars.BACKEND_APP || 'digitransac-backend' }}
+  FRONTEND_APP: ${{ vars.FRONTEND_APP || 'digitransac-frontend' }}
+  
+  # Application URLs (configurable via GitHub Variables)
+  BACKEND_URL: ${{ vars.BACKEND_URL || 'https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io' }}
+  FRONTEND_URL: ${{ vars.FRONTEND_URL || 'https://digitransac-frontend.nicemeadow-64e62875.centralindia.azurecontainerapps.io' }}
   
   # Build Configuration
   DOTNET_VERSION: '9.0.x'
@@ -174,7 +178,7 @@ jobs:
         working-directory: web
         run: npm run build
         env:
-          VITE_API_URL: https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io/api
+          VITE_API_URL: ${{ env.BACKEND_URL }}/api
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
   # │ STAGE 1: Validate - Security                                                 │
@@ -265,7 +269,7 @@ jobs:
           npm ci
           npm run build
         env:
-          VITE_API_URL: https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io/api
+          VITE_API_URL: ${{ env.BACKEND_URL }}/api
           VITE_ENVIRONMENT: production
 
       - name: Build & Push Frontend Image
@@ -284,7 +288,8 @@ jobs:
           az containerapp update \
             --name ${{ env.BACKEND_APP }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:${{ needs.setup.outputs.version }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:${{ needs.setup.outputs.version }} \
+            --set-env-vars "CORS_ALLOWED_ORIGINS=${{ env.FRONTEND_URL }}"
 
       - name: Deploy Frontend
         run: |
@@ -292,7 +297,8 @@ jobs:
           az containerapp update \
             --name ${{ env.FRONTEND_APP }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:${{ needs.setup.outputs.version }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-frontend:${{ needs.setup.outputs.version }} \
+            --set-env-vars "API_URL=${{ env.BACKEND_URL }}"
 
       - name: Azure Logout
         run: az logout
@@ -315,7 +321,7 @@ jobs:
           echo "Checking Backend..."
           for i in {1..5}; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io/api/health/live" || echo "000")
+              "${{ env.BACKEND_URL }}/api/health/live" || echo "000")
             if [ "$CODE" = "200" ]; then
               echo "✅ Backend is healthy"
               exit 0
@@ -330,7 +336,7 @@ jobs:
           echo "Checking Frontend..."
           for i in {1..5}; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://digitransac-frontend.nicemeadow-64e62875.centralindia.azurecontainerapps.io" || echo "000")
+              "${{ env.FRONTEND_URL }}" || echo "000")
             if [ "$CODE" = "200" ]; then
               echo "✅ Frontend is healthy"
               exit 0
@@ -380,8 +386,8 @@ jobs:
           echo "🔗 Commit:  ${{ needs.setup.outputs.sha_short }}"
           echo ""
           echo "🌐 URLs:"
-          echo "   Frontend: https://digitransac-frontend.nicemeadow-64e62875.centralindia.azurecontainerapps.io"
-          echo "   Backend:  https://digitransac-backend.nicemeadow-64e62875.centralindia.azurecontainerapps.io"
+          echo "   Frontend: ${{ env.FRONTEND_URL }}"
+          echo "   Backend:  ${{ env.BACKEND_URL }}"
           echo ""
           echo "Status:"
           echo "   Build & Deploy: ${{ needs.build-and-deploy.result }}"
