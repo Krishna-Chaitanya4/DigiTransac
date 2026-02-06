@@ -1,109 +1,159 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-interface UsePullToRefreshOptions {
+interface PullToRefreshOptions {
+  /** Callback to execute when pull threshold is reached */
   onRefresh: () => Promise<void>;
-  threshold?: number; // Distance in pixels to trigger refresh (default: 80)
-  resistance?: number; // Resistance factor for pull (default: 2.5)
-  disabled?: boolean;
+  /** Distance in pixels to pull before triggering refresh (default: 80) */
+  threshold?: number;
+  /** Maximum pull distance in pixels (default: 150) */
+  maxPull?: number;
+  /** Whether pull-to-refresh is enabled (default: true) */
+  enabled?: boolean;
 }
 
-interface UsePullToRefreshReturn {
+interface PullToRefreshState {
+  isPulling: boolean;
   pullDistance: number;
   isRefreshing: boolean;
-  isPulling: boolean;
-  handlers: {
-    onTouchStart: (e: React.TouchEvent) => void;
-    onTouchMove: (e: React.TouchEvent) => void;
-    onTouchEnd: () => void;
-  };
 }
 
 /**
- * Hook for pull-to-refresh functionality on mobile
- * Provides smooth, native-feeling pull-to-refresh experience
+ * Custom hook for pull-to-refresh functionality on mobile devices.
+ * Attach the returned ref to a scrollable container element.
+ * 
+ * @example
+ * ```tsx
+ * const { ref, isPulling, pullDistance, isRefreshing, PullIndicator } = usePullToRefresh({
+ *   onRefresh: async () => {
+ *     await queryClient.invalidateQueries(['transactions']);
+ *   },
+ * });
+ * 
+ * return (
+ *   <div ref={ref} className="overflow-auto h-full">
+ *     <PullIndicator />
+ *     {content}
+ *   </div>
+ * );
+ * ```
  */
 export function usePullToRefresh({
   onRefresh,
   threshold = 80,
-  resistance = 2.5,
-  disabled = false,
-}: UsePullToRefreshOptions): UsePullToRefreshReturn {
-  const [pullDistance, setPullDistance] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isPulling, setIsPulling] = useState(false);
+  maxPull = 150,
+  enabled = true,
+}: PullToRefreshOptions) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startY = useRef<number>(0);
+  const currentY = useRef<number>(0);
   
-  const startY = useRef(0);
-  const currentY = useRef(0);
-  const containerRef = useRef<HTMLElement | null>(null);
+  const [state, setState] = useState<PullToRefreshState>({
+    isPulling: false,
+    pullDistance: 0,
+    isRefreshing: false,
+  });
 
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      if (disabled || isRefreshing) return;
-      
-      // Only trigger if at top of scroll container
-      const target = e.currentTarget as HTMLElement;
-      if (target.scrollTop > 0) return;
-      
-      containerRef.current = target;
-      startY.current = e.touches[0].clientY;
-      setIsPulling(true);
-    },
-    [disabled, isRefreshing]
-  );
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    if (!enabled || state.isRefreshing) return;
+    
+    const container = containerRef.current;
+    if (!container) return;
+    
+    // Only start pull if at the top of the scroll container
+    if (container.scrollTop > 0) return;
+    
+    startY.current = e.touches[0].clientY;
+    currentY.current = e.touches[0].clientY;
+  }, [enabled, state.isRefreshing]);
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (!isPulling || disabled || isRefreshing) return;
-      
-      currentY.current = e.touches[0].clientY;
-      const delta = currentY.current - startY.current;
-      
-      // Only allow pull down
-      if (delta > 0) {
-        // Apply resistance to make it feel natural
-        const distance = Math.min(delta / resistance, threshold * 1.5);
-        setPullDistance(distance);
-      }
-    },
-    [isPulling, disabled, isRefreshing, resistance, threshold]
-  );
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!enabled || state.isRefreshing) return;
+    if (startY.current === 0) return;
+    
+    const container = containerRef.current;
+    if (!container) return;
+    
+    // Only continue if at top of container
+    if (container.scrollTop > 0) {
+      startY.current = 0;
+      setState(s => ({ ...s, isPulling: false, pullDistance: 0 }));
+      return;
+    }
+    
+    currentY.current = e.touches[0].clientY;
+    const deltaY = currentY.current - startY.current;
+    
+    // Only pull down, not up
+    if (deltaY < 0) {
+      startY.current = 0;
+      setState(s => ({ ...s, isPulling: false, pullDistance: 0 }));
+      return;
+    }
+    
+    // Apply resistance - the further you pull, the harder it gets
+    const resistance = 0.5;
+    const pullDistance = Math.min(deltaY * resistance, maxPull);
+    
+    if (pullDistance > 10) {
+      // Prevent scrolling while pulling
+      e.preventDefault();
+      setState(s => ({ ...s, isPulling: true, pullDistance }));
+    }
+  }, [enabled, maxPull, state.isRefreshing]);
 
   const handleTouchEnd = useCallback(async () => {
-    if (!isPulling) return;
+    if (!enabled || state.isRefreshing) return;
+    if (!state.isPulling) {
+      startY.current = 0;
+      return;
+    }
     
-    setIsPulling(false);
+    startY.current = 0;
+    currentY.current = 0;
     
-    if (pullDistance >= threshold && !isRefreshing) {
-      setIsRefreshing(true);
+    if (state.pullDistance >= threshold) {
+      // Trigger refresh
+      setState(s => ({ ...s, isPulling: false, pullDistance: threshold, isRefreshing: true }));
+      
       try {
         await onRefresh();
       } finally {
-        setIsRefreshing(false);
-        setPullDistance(0);
+        setState({ isPulling: false, pullDistance: 0, isRefreshing: false });
       }
     } else {
-      // Animate back to 0
-      setPullDistance(0);
+      // Didn't reach threshold, spring back
+      setState({ isPulling: false, pullDistance: 0, isRefreshing: false });
     }
-  }, [isPulling, pullDistance, threshold, isRefreshing, onRefresh]);
+  }, [enabled, onRefresh, state.isPulling, state.pullDistance, state.isRefreshing, threshold]);
 
-  // Clean up on unmount
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !enabled) return;
+    
+    // Use passive: false for touchmove to allow preventDefault
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+    
     return () => {
-      containerRef.current = null;
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, []);
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd, enabled]);
+
+  // Calculate progress (0 to 1)
+  const progress = Math.min(state.pullDistance / threshold, 1);
+  const isReadyToRefresh = progress >= 1;
 
   return {
-    pullDistance,
-    isRefreshing,
-    isPulling,
-    handlers: {
-      onTouchStart: handleTouchStart,
-      onTouchMove: handleTouchMove,
-      onTouchEnd: handleTouchEnd,
-    },
+    ref: containerRef,
+    isPulling: state.isPulling,
+    pullDistance: state.pullDistance,
+    isRefreshing: state.isRefreshing,
+    progress,
+    isReadyToRefresh,
   };
 }
-
-export default usePullToRefresh;

@@ -7,6 +7,7 @@ import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
 import { PendingIndicator } from '../components/PendingIndicator';
 import { ToastContainer, useToast } from '../components/Toast';
+import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
@@ -909,11 +910,16 @@ export default function TransactionsPage() {
         onClose={() => setIsFilterOpen(false)}
       />
 
-      {/* Transaction List */}
-      <div 
+      {/* Transaction List with Pull-to-Refresh */}
+      <div
         ref={listRef}
         className="flex-1 overflow-y-auto min-h-0"
       >
+        <PullToRefreshContainer
+          onRefresh={async () => {
+            await invalidateTransactions();
+          }}
+        >
         <TransactionList
           transactions={transactions}
           accounts={accounts}
@@ -941,12 +947,13 @@ export default function TransactionsPage() {
           </div>
         )}
         
-        {/* End of List */}
-        {!isLoading && !hasMore && transactions.length > 0 && (
-          <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
-            {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} • End of list
-          </div>
-        )}
+          {/* End of List */}
+          {!isLoading && !hasMore && transactions.length > 0 && (
+            <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+              {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} • End of list
+            </div>
+          )}
+        </PullToRefreshContainer>
       </div>
 
       {/* Bulk Actions Bar */}
