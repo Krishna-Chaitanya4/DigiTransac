@@ -236,6 +236,48 @@ jobs:
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Check Critically Outdated .NET Packages
+        run: |
+          echo "### 🚨 Critical .NET Package Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get outdated packages in a parseable format
+          OUTPUT=$(dotnet list package --outdated --format json 2>/dev/null) || OUTPUT="{}"
+          
+          # Check for packages that are 2+ major versions behind
+          CRITICAL_OUTDATED=""
+          
+          # Parse JSON and check major version differences
+          # For each project's top-level packages
+          PACKAGES=$(echo "$OUTPUT" | jq -r '.projects[]?.frameworks[]?.topLevelPackages[]? | "\(.id)|\(.resolvedVersion)|\(.latestVersion)"' 2>/dev/null || echo "")
+          
+          while IFS='|' read -r PKG_NAME CURRENT_VER LATEST_VER; do
+            if [ -z "$PKG_NAME" ]; then continue; fi
+            
+            # Extract major versions (handle versions like "1.2.3" or "1.2.3-preview")
+            CURRENT_MAJOR=$(echo "$CURRENT_VER" | grep -oE '^[0-9]+' || echo "0")
+            LATEST_MAJOR=$(echo "$LATEST_VER" | grep -oE '^[0-9]+' || echo "0")
+            
+            # Calculate version difference
+            DIFF=$((LATEST_MAJOR - CURRENT_MAJOR))
+            
+            if [ "$DIFF" -ge 2 ]; then
+              CRITICAL_OUTDATED="$CRITICAL_OUTDATED\n- $PKG_NAME: $CURRENT_VER → $LATEST_VER (${DIFF} major versions behind)"
+            fi
+          done <<< "$PACKAGES"
+          
+          if [ -n "$CRITICAL_OUTDATED" ]; then
+            echo "❌ **Critically outdated packages found (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo -e "$CRITICAL_OUTDATED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Critically outdated .NET packages detected - update required"
+            echo -e "$CRITICAL_OUTDATED"
+            exit 1
+          else
+            echo "✅ No critically outdated packages (all within 1 major version)" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -311,6 +353,50 @@ jobs:
             echo "::notice::$COUNT npm packages have updates available"
           else
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check Critically Outdated npm Packages
+        working-directory: web
+        run: |
+          echo "### 🚨 Critical npm Package Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check for outdated packages
+          set +e
+          OUTDATED=$(npm outdated --json 2>&1)
+          set -e
+          
+          # Check for packages that are 2+ major versions behind
+          CRITICAL_OUTDATED=""
+          
+          # Parse JSON and check major version differences
+          PACKAGES=$(echo "$OUTDATED" | jq -r 'to_entries[] | "\(.key)|\(.value.current)|\(.value.latest)"' 2>/dev/null || echo "")
+          
+          while IFS='|' read -r PKG_NAME CURRENT_VER LATEST_VER; do
+            if [ -z "$PKG_NAME" ]; then continue; fi
+            
+            # Extract major versions (handle versions like "1.2.3" or "1.2.3-beta.1")
+            CURRENT_MAJOR=$(echo "$CURRENT_VER" | grep -oE '^[0-9]+' || echo "0")
+            LATEST_MAJOR=$(echo "$LATEST_VER" | grep -oE '^[0-9]+' || echo "0")
+            
+            # Calculate version difference
+            DIFF=$((LATEST_MAJOR - CURRENT_MAJOR))
+            
+            if [ "$DIFF" -ge 2 ]; then
+              CRITICAL_OUTDATED="$CRITICAL_OUTDATED\n- $PKG_NAME: $CURRENT_VER → $LATEST_VER (${DIFF} major versions behind)"
+            fi
+          done <<< "$PACKAGES"
+          
+          if [ -n "$CRITICAL_OUTDATED" ]; then
+            echo "❌ **Critically outdated packages found (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo -e "$CRITICAL_OUTDATED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Critically outdated npm packages detected - update required"
+            echo -e "$CRITICAL_OUTDATED"
+            exit 1
+          else
+            echo "✅ No critically outdated packages (all within 1 major version)" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: License Check
