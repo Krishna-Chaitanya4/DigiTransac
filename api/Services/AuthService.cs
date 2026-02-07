@@ -58,6 +58,11 @@ public class AuthService : IAuthService
     private readonly IKeyManagementService _keyManagementService;
     private readonly IAuditService _auditService;
     private readonly IChatMessageRepository _chatMessageRepository;
+    private readonly ITransactionRepository _transactionRepository;
+    private readonly IAccountRepository _accountRepository;
+    private readonly ILabelRepository _labelRepository;
+    private readonly ITagRepository _tagRepository;
+    private readonly IBudgetRepository _budgetRepository;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -72,6 +77,11 @@ public class AuthService : IAuthService
         IKeyManagementService keyManagementService,
         IAuditService auditService,
         IChatMessageRepository chatMessageRepository,
+        ITransactionRepository transactionRepository,
+        IAccountRepository accountRepository,
+        ILabelRepository labelRepository,
+        ITagRepository tagRepository,
+        IBudgetRepository budgetRepository,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
     {
@@ -85,6 +95,11 @@ public class AuthService : IAuthService
         _keyManagementService = keyManagementService;
         _auditService = auditService;
         _chatMessageRepository = chatMessageRepository;
+        _transactionRepository = transactionRepository;
+        _accountRepository = accountRepository;
+        _labelRepository = labelRepository;
+        _tagRepository = tagRepository;
+        _budgetRepository = budgetRepository;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
     }
@@ -452,13 +467,43 @@ public class AuthService : IAuthService
         // Delete all associated data
         _logger.LogInformation("Deleting all data for user: {Email}", userEmail);
 
-        // 1. Delete all refresh tokens for the user
+        // 1. Delete all transactions for the user
+        await _transactionRepository.DeleteAllByUserIdAsync(userId);
+        _logger.LogInformation("Deleted transactions for user: {UserId}", userId);
+
+        // 2. Delete all accounts for the user
+        await _accountRepository.DeleteAllByUserIdAsync(userId);
+        _logger.LogInformation("Deleted accounts for user: {UserId}", userId);
+
+        // 3. Delete all labels for the user
+        await _labelRepository.DeleteAllByUserIdAsync(userId);
+        _logger.LogInformation("Deleted labels for user: {UserId}", userId);
+
+        // 4. Delete all tags for the user
+        await _tagRepository.DeleteAllByUserIdAsync(userId);
+        _logger.LogInformation("Deleted tags for user: {UserId}", userId);
+
+        // 5. Delete all budgets for the user
+        await _budgetRepository.DeleteAllByUserIdAsync(userId);
+        _logger.LogInformation("Deleted budgets for user: {UserId}", userId);
+
+        // 6. Delete all chat messages for the user (both sent and received)
+        await _chatMessageRepository.DeleteAllByUserIdAsync(userId);
+        _logger.LogInformation("Deleted chat messages for user: {UserId}", userId);
+
+        // 7. Delete all refresh tokens for the user
         await _refreshTokenRepository.DeleteByUserIdAsync(userId);
+        _logger.LogInformation("Deleted refresh tokens for user: {UserId}", userId);
 
-        // 2. Delete all email verifications for the user
+        // 8. Delete all two-factor tokens for the user
+        await _twoFactorTokenRepository.DeleteAllByUserIdAsync(userId);
+        _logger.LogInformation("Deleted two-factor tokens for user: {UserId}", userId);
+
+        // 9. Delete all email verifications for the user
         await _emailVerificationRepository.DeleteAllByEmailAsync(userEmail);
+        _logger.LogInformation("Deleted email verifications for user: {UserId}", userId);
 
-        // 3. Delete the user record
+        // 10. Delete the user record
         var deleted = await _userRepository.DeleteAsync(userId);
         if (!deleted)
         {
@@ -474,7 +519,7 @@ public class AuthService : IAuthService
             return (false, "Failed to delete account");
         }
 
-        _logger.LogInformation("Account deleted successfully: {Email}", userEmail);
+        _logger.LogInformation("Account deleted successfully with all associated data: {Email}", userEmail);
         
         // Audit log for successful account deletion
         await _auditService.LogAccountDeletedAsync(userId, userEmail);

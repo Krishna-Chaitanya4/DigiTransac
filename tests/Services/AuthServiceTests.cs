@@ -22,6 +22,11 @@ public class AuthServiceTests
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
     private readonly Mock<IAuditService> _auditServiceMock;
     private readonly Mock<IChatMessageRepository> _chatMessageRepositoryMock;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
+    private readonly Mock<IAccountRepository> _accountRepositoryMock;
+    private readonly Mock<ILabelRepository> _labelRepositoryMock;
+    private readonly Mock<ITagRepository> _tagRepositoryMock;
+    private readonly Mock<IBudgetRepository> _budgetRepositoryMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
     private readonly AuthService _authService;
@@ -39,6 +44,11 @@ public class AuthServiceTests
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
         _auditServiceMock = new Mock<IAuditService>();
         _chatMessageRepositoryMock = new Mock<IChatMessageRepository>();
+        _transactionRepositoryMock = new Mock<ITransactionRepository>();
+        _accountRepositoryMock = new Mock<IAccountRepository>();
+        _labelRepositoryMock = new Mock<ILabelRepository>();
+        _tagRepositoryMock = new Mock<ITagRepository>();
+        _budgetRepositoryMock = new Mock<IBudgetRepository>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
         {
@@ -77,6 +87,11 @@ public class AuthServiceTests
             _keyManagementServiceMock.Object,
             _auditServiceMock.Object,
             _chatMessageRepositoryMock.Object,
+            _transactionRepositoryMock.Object,
+            _accountRepositoryMock.Object,
+            _labelRepositoryMock.Object,
+            _tagRepositoryMock.Object,
+            _budgetRepositoryMock.Object,
             _jwtSettings,
             _loggerMock.Object
         );
