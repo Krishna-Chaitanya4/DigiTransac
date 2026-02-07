@@ -23,6 +23,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using Microsoft.OpenApi;
 using System.Reflection;
 
 // Configure Serilog
@@ -656,7 +657,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     // API Information
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    c.SwaggerDoc("v1", new OpenApiInfo
     {
         Version = "v1",
         Title = "DigiTransac API",
@@ -695,13 +696,13 @@ Include the token in the Authorization header: `Bearer {token}`
 | 429 | Too Many Requests - rate limited |
 | 500 | Internal Server Error |
 ",
-        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        Contact = new OpenApiContact
         {
             Name = "DigiTransac Support",
             Email = "support@digitransac.app",
             Url = new Uri("https://github.com/digitransac/api")
         },
-        License = new Microsoft.OpenApi.Models.OpenApiLicense
+        License = new OpenApiLicense
         {
             Name = "MIT License",
             Url = new Uri("https://opensource.org/licenses/MIT")
@@ -709,7 +710,7 @@ Include the token in the Authorization header: `Bearer {token}`
     });
 
     // Security scheme for JWT Bearer authentication
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
         Description = @"JWT Authorization header using the Bearer scheme.
@@ -722,25 +723,19 @@ To obtain a token:
 1. Call `POST /api/auth/login` with valid credentials
 2. Copy the `accessToken` from the response
 3. Click the **Authorize** button and paste it",
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header
+        In = ParameterLocation.Header
     });
     
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    // In Swashbuckle 10.x with Microsoft.OpenApi 2.x, use the delegate-based AddSecurityRequirement
+    c.AddSecurityRequirement((doc) =>
     {
-        {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+        var requirement = new OpenApiSecurityRequirement();
+        var schemeReference = new OpenApiSecuritySchemeReference("Bearer", doc);
+        requirement[schemeReference] = new List<string>();
+        return requirement;
     });
 
     // Include XML comments for documentation
