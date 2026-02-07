@@ -7,7 +7,6 @@ interface MessageInputProps {
   onMessageChange: (value: string) => void;
   onSend: () => void;
   isSending: boolean;
-  hasAccounts: boolean;
   onOpenTransactionForm: () => void;
   // Reply state
   replyTo: ConversationMessage | null;
@@ -26,7 +25,6 @@ export const MessageInput = memo(function MessageInput({
   onMessageChange,
   onSend,
   isSending,
-  hasAccounts,
   onOpenTransactionForm,
   replyTo,
   onCancelReply,
@@ -150,8 +148,7 @@ export const MessageInput = memo(function MessageInput({
             ) : (
               <button
                 onClick={onOpenTransactionForm}
-                disabled={!hasAccounts}
-                className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full hover:from-blue-600 hover:to-purple-700 transition-all shadow-sm"
                 title="New transaction"
               >
                 <span className="w-5 h-5 flex items-center justify-center font-bold text-sm">₹</span>

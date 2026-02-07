@@ -57,6 +57,7 @@ public class AuthService : IAuthService
     private readonly ITwoFactorService _twoFactorService;
     private readonly IKeyManagementService _keyManagementService;
     private readonly IAuditService _auditService;
+    private readonly IChatMessageRepository _chatMessageRepository;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -70,6 +71,7 @@ public class AuthService : IAuthService
         ITwoFactorService twoFactorService,
         IKeyManagementService keyManagementService,
         IAuditService auditService,
+        IChatMessageRepository chatMessageRepository,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
     {
@@ -82,6 +84,7 @@ public class AuthService : IAuthService
         _twoFactorService = twoFactorService;
         _keyManagementService = keyManagementService;
         _auditService = auditService;
+        _chatMessageRepository = chatMessageRepository;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
     }
@@ -213,6 +216,15 @@ public class AuthService : IAuthService
 
         // Create default labels for the new user
         await _labelService.CreateDefaultLabelsAsync(user.Id);
+
+        // Create welcome message in Personal conversation (self-chat)
+        // This ensures the Personal conversation is always visible for new users
+        await _chatMessageRepository.CreateSystemMessageAsync(
+            userId: user.Id,
+            counterpartyUserId: user.Id, // Self-chat: sender and recipient are the same
+            content: "👋 Welcome to DigiTransac! This is your personal space for notes, reminders, and tracking transactions that don't involve other DigiTransac users.",
+            systemSource: "Registration"
+        );
 
         // Clean up verification record
         await _emailVerificationRepository.DeleteByEmailAsync(request.Email, VerificationPurpose.Registration);

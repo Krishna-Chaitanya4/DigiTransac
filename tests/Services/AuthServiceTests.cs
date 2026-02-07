@@ -21,6 +21,7 @@ public class AuthServiceTests
     private readonly Mock<ITwoFactorService> _twoFactorServiceMock;
     private readonly Mock<IKeyManagementService> _keyManagementServiceMock;
     private readonly Mock<IAuditService> _auditServiceMock;
+    private readonly Mock<IChatMessageRepository> _chatMessageRepositoryMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
     private readonly AuthService _authService;
@@ -37,6 +38,7 @@ public class AuthServiceTests
         _twoFactorServiceMock = new Mock<ITwoFactorService>();
         _keyManagementServiceMock = new Mock<IKeyManagementService>();
         _auditServiceMock = new Mock<IAuditService>();
+        _chatMessageRepositoryMock = new Mock<IChatMessageRepository>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
         {
@@ -59,6 +61,11 @@ public class AuthServiceTests
         _refreshTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<RefreshToken>()))
             .ReturnsAsync((RefreshToken t) => t);
 
+        // Setup chat message repository for welcome message creation
+        _chatMessageRepositoryMock.Setup(x => x.CreateSystemMessageAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(new ChatMessage());
+
         _authService = new AuthService(
             _userRepositoryMock.Object,
             _emailVerificationRepositoryMock.Object,
@@ -69,6 +76,7 @@ public class AuthServiceTests
             _twoFactorServiceMock.Object,
             _keyManagementServiceMock.Object,
             _auditServiceMock.Object,
+            _chatMessageRepositoryMock.Object,
             _jwtSettings,
             _loggerMock.Object
         );

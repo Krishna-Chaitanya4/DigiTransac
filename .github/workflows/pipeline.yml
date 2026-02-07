@@ -197,8 +197,9 @@ jobs:
             if [[ $PR_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
               echo "✅ Version format is valid (semver)" >> $GITHUB_STEP_SUMMARY
             else
-              echo "⚠️ Version format may not be valid semver" >> $GITHUB_STEP_SUMMARY
-              echo "::warning::VERSION file should follow semver format (e.g., 1.2.3)"
+              echo "❌ Version format is NOT valid semver" >> $GITHUB_STEP_SUMMARY
+              echo "::error::VERSION file must follow semver format (e.g., 1.2.3)"
+              exit 1
             fi
             
             # Check if VERSION was changed in this PR
@@ -206,15 +207,21 @@ jobs:
             
             if [ "$VERSION_CHANGED" -eq "0" ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "ℹ️ **VERSION file was not updated in this PR**" >> $GITHUB_STEP_SUMMARY
+              echo "❌ **VERSION file was not updated in this PR**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Consider bumping the version when preparing a release:" >> $GITHUB_STEP_SUMMARY
+              echo "**You MUST bump the version for every PR.** Choose the appropriate bump:" >> $GITHUB_STEP_SUMMARY
               echo "- **MAJOR** (X.0.0): Breaking API changes, database migrations" >> $GITHUB_STEP_SUMMARY
               echo "- **MINOR** (0.X.0): New features (non-breaking)" >> $GITHUB_STEP_SUMMARY
               echo "- **PATCH** (0.0.X): Bug fixes, minor updates" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Current version:** \`$PR_VERSION\`" >> $GITHUB_STEP_SUMMARY
-              echo "::notice::VERSION file unchanged - bump version when preparing a release"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "To fix this:" >> $GITHUB_STEP_SUMMARY
+              echo "1. Edit the \`VERSION\` file in the project root" >> $GITHUB_STEP_SUMMARY
+              echo "2. Increment the version number (e.g., $PR_VERSION → next version)" >> $GITHUB_STEP_SUMMARY
+              echo "3. Commit and push the change" >> $GITHUB_STEP_SUMMARY
+              echo "::error::VERSION file must be updated for every PR. Deployment blocked."
+              exit 1
             else
               # Get the base version for comparison
               git show $BASE_SHA:VERSION > /tmp/base_version 2>/dev/null || echo "0.0.0" > /tmp/base_version
@@ -224,8 +231,9 @@ jobs:
               echo "**Version change:** \`$BASE_VERSION\` → \`$PR_VERSION\`" >> $GITHUB_STEP_SUMMARY
               
               if [ "$BASE_VERSION" = "$PR_VERSION" ]; then
-                echo "⚠️ VERSION file was modified but version number is the same" >> $GITHUB_STEP_SUMMARY
-                echo "::warning::VERSION file modified but version unchanged"
+                echo "❌ VERSION file was modified but version number is the same" >> $GITHUB_STEP_SUMMARY
+                echo "::error::VERSION file must be incremented, not just modified"
+                exit 1
               else
                 # Compare versions to ensure it's bumped up, not down
                 BASE_MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
@@ -242,14 +250,16 @@ jobs:
                    ([ "$PR_MAJOR" -eq "$BASE_MAJOR" ] && [ "$PR_MINOR" -eq "$BASE_MINOR" ] && [ "$PR_PATCH" -gt "$BASE_PATCH" ]); then
                   echo "✅ Version bumped correctly" >> $GITHUB_STEP_SUMMARY
                 else
-                  echo "⚠️ Version may have been decreased or not properly bumped" >> $GITHUB_STEP_SUMMARY
-                  echo "::warning::VERSION should be higher than base branch version"
+                  echo "❌ Version was decreased or not properly bumped" >> $GITHUB_STEP_SUMMARY
+                  echo "::error::VERSION must be higher than base branch version ($BASE_VERSION)"
+                  exit 1
                 fi
               fi
             fi
           else
-            echo "⚠️ VERSION file not found" >> $GITHUB_STEP_SUMMARY
-            echo "::warning::Consider adding a VERSION file for release tracking"
+            echo "❌ VERSION file not found" >> $GITHUB_STEP_SUMMARY
+            echo "::error::VERSION file is required - create a VERSION file with semver format (e.g., 1.0.0)"
+            exit 1
           fi
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
