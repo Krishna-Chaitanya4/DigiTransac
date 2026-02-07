@@ -140,16 +140,21 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       console.log('Chat Message:', notification);
       optionsRef.current.onChatMessage?.(notification);
       
-      // Invalidate chat queries
-      queryClient.invalidateQueries({ queryKey: ['chatMessages'] });
+      // Invalidate conversation detail for this sender
+      // This ensures real-time message updates in the active conversation
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
+      // Also invalidate the conversations list to update previews
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
     });
 
     connection.on('NewChatMessage', (notification: ChatMessageNotification) => {
       console.log('New Chat Message:', notification);
       optionsRef.current.onNewChatMessage?.(notification);
       
-      // Invalidate conversations list
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // Invalidate conversation detail for this sender
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
+      // Invalidate conversations list to show new message in sidebar
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
     });
 
     connection.on('PendingCount', (notification: PendingCountNotification) => {
