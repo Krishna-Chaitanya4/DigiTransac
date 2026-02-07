@@ -2,11 +2,13 @@
 # ║                     DigiTransac CI/CD Pipeline                             ║
 # ║                                                                            ║
 # ║  A unified pipeline with clear stages:                                     ║
-# ║  1. Validate  → Run tests, linting, security scans                         ║
+# ║  0. Setup     → Determine context, read VERSION file                       ║
+# ║  1. Validate  → CHANGELOG check, tests, linting, security scans            ║
 # ║  2. Build     → Build Docker images (on main only)                         ║
 # ║  3. Push      → Push to Azure Container Registry (on main only)            ║
 # ║  4. Deploy    → Deploy to Azure Container Apps (on main only)              ║
 # ║  5. Verify    → Health checks and smoke tests                              ║
+# ║  6. Release   → Create git tag for semantic version (on main only)         ║
 # ║                                                                            ║
 # ║  SECURITY: Uses OIDC federation (no stored secrets!)                       ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -34,7 +36,7 @@ on:
 # SECURITY: OIDC for Azure authentication
 permissions:
   id-token: write
-  contents: read
+  contents: write  # For creating release tags
   pull-requests: write  # For PR comments
 
 env:
@@ -75,10 +77,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      semver: ${{ steps.version.outputs.semver }}
       sha_short: ${{ steps.version.outputs.sha_short }}
       is_main: ${{ steps.context.outputs.is_main }}
       is_pr: ${{ steps.context.outputs.is_pr }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Determine Context
         id: context
         run: |
@@ -91,11 +97,159 @@ jobs:
           SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "sha_short=$SHA_SHORT" >> $GITHUB_OUTPUT
           
+          # Read semantic version from VERSION file
+          if [ -f "VERSION" ]; then
+            SEMVER=$(cat VERSION | tr -d '[:space:]')
+            echo "semver=$SEMVER" >> $GITHUB_OUTPUT
+          else
+            echo "semver=0.0.0" >> $GITHUB_OUTPUT
+          fi
+          
           if [ -n "${{ inputs.version_tag }}" ]; then
             echo "version=${{ inputs.version_tag }}" >> $GITHUB_OUTPUT
           else
             DATE=$(date +'%Y%m%d')
             echo "version=${DATE}-${SHA_SHORT}" >> $GITHUB_OUTPUT
+          fi
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 1: Validate - CHANGELOG (PR only)                                      │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  validate-changelog:
+    name: 📝 Validate CHANGELOG
+    runs-on: ubuntu-latest
+    needs: setup
+    if: ${{ needs.setup.outputs.is_pr == 'true' }}
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CHANGELOG Updated
+        run: |
+          echo "### 📝 CHANGELOG Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get the base branch (usually main)
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          
+          # Check if CHANGELOG.md was modified in this PR
+          CHANGELOG_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -c "CHANGELOG.md" || echo "0")
+          
+          if [ "$CHANGELOG_CHANGED" -eq "0" ]; then
+            echo "❌ **CHANGELOG.md was not updated in this PR**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please update the \`[Unreleased]\` section of CHANGELOG.md with your changes." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Example format:" >> $GITHUB_STEP_SUMMARY
+            echo '```markdown' >> $GITHUB_STEP_SUMMARY
+            echo "## [Unreleased]" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Added" >> $GITHUB_STEP_SUMMARY
+            echo "- New feature description" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Changed" >> $GITHUB_STEP_SUMMARY
+            echo "- Changed behavior description" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Fixed" >> $GITHUB_STEP_SUMMARY
+            echo "- Bug fix description" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "See [Keep a Changelog](https://keepachangelog.com/) for format guidelines." >> $GITHUB_STEP_SUMMARY
+            echo "::error::CHANGELOG.md must be updated for every PR"
+            exit 1
+          fi
+          
+          # Check if [Unreleased] section exists and has content
+          if ! grep -q "## \[Unreleased\]" CHANGELOG.md; then
+            echo "⚠️ **Missing [Unreleased] section in CHANGELOG.md**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please add an \`[Unreleased]\` section at the top of the changelog." >> $GITHUB_STEP_SUMMARY
+            echo "::warning::CHANGELOG.md should have an [Unreleased] section"
+          else
+            echo "✅ CHANGELOG.md has been updated" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Show the changes to CHANGELOG.md
+            echo "**Changes to CHANGELOG.md:**" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            git diff $BASE_SHA $HEAD_SHA -- CHANGELOG.md | head -50 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check VERSION File
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 VERSION File" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get the base branch (usually main)
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          
+          if [ -f "VERSION" ]; then
+            PR_VERSION=$(cat VERSION | tr -d '[:space:]')
+            echo "PR version: \`$PR_VERSION\`" >> $GITHUB_STEP_SUMMARY
+            
+            # Validate semver format
+            if [[ $PR_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+              echo "✅ Version format is valid (semver)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ Version format may not be valid semver" >> $GITHUB_STEP_SUMMARY
+              echo "::warning::VERSION file should follow semver format (e.g., 1.2.3)"
+            fi
+            
+            # Check if VERSION was changed in this PR
+            VERSION_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -c "^VERSION$" || echo "0")
+            
+            if [ "$VERSION_CHANGED" -eq "0" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "ℹ️ **VERSION file was not updated in this PR**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Consider bumping the version when preparing a release:" >> $GITHUB_STEP_SUMMARY
+              echo "- **MAJOR** (X.0.0): Breaking API changes, database migrations" >> $GITHUB_STEP_SUMMARY
+              echo "- **MINOR** (0.X.0): New features (non-breaking)" >> $GITHUB_STEP_SUMMARY
+              echo "- **PATCH** (0.0.X): Bug fixes, minor updates" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Current version:** \`$PR_VERSION\`" >> $GITHUB_STEP_SUMMARY
+              echo "::notice::VERSION file unchanged - bump version when preparing a release"
+            else
+              # Get the base version for comparison
+              git show $BASE_SHA:VERSION > /tmp/base_version 2>/dev/null || echo "0.0.0" > /tmp/base_version
+              BASE_VERSION=$(cat /tmp/base_version | tr -d '[:space:]')
+              
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Version change:** \`$BASE_VERSION\` → \`$PR_VERSION\`" >> $GITHUB_STEP_SUMMARY
+              
+              if [ "$BASE_VERSION" = "$PR_VERSION" ]; then
+                echo "⚠️ VERSION file was modified but version number is the same" >> $GITHUB_STEP_SUMMARY
+                echo "::warning::VERSION file modified but version unchanged"
+              else
+                # Compare versions to ensure it's bumped up, not down
+                BASE_MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+                BASE_MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+                BASE_PATCH=$(echo "$BASE_VERSION" | cut -d. -f3 | cut -d- -f1)
+                
+                PR_MAJOR=$(echo "$PR_VERSION" | cut -d. -f1)
+                PR_MINOR=$(echo "$PR_VERSION" | cut -d. -f2)
+                PR_PATCH=$(echo "$PR_VERSION" | cut -d. -f3 | cut -d- -f1)
+                
+                # Check if version increased
+                if [ "$PR_MAJOR" -gt "$BASE_MAJOR" ] || \
+                   ([ "$PR_MAJOR" -eq "$BASE_MAJOR" ] && [ "$PR_MINOR" -gt "$BASE_MINOR" ]) || \
+                   ([ "$PR_MAJOR" -eq "$BASE_MAJOR" ] && [ "$PR_MINOR" -eq "$BASE_MINOR" ] && [ "$PR_PATCH" -gt "$BASE_PATCH" ]); then
+                  echo "✅ Version bumped correctly" >> $GITHUB_STEP_SUMMARY
+                else
+                  echo "⚠️ Version may have been decreased or not properly bumped" >> $GITHUB_STEP_SUMMARY
+                  echo "::warning::VERSION should be higher than base branch version"
+                fi
+              fi
+            fi
+          else
+            echo "⚠️ VERSION file not found" >> $GITHUB_STEP_SUMMARY
+            echo "::warning::Consider adding a VERSION file for release tracking"
           fi
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -236,16 +390,17 @@ jobs:
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Check Critically Outdated .NET Packages
+      - name: Check Outdated .NET Packages (Major Versions)
         run: |
-          echo "### 🚨 Critical .NET Package Check" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 .NET Package Version Check" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Get outdated packages in a parseable format
           OUTPUT=$(dotnet list package --outdated --format json 2>/dev/null) || OUTPUT="{}"
           
-          # Check for packages that are 2+ major versions behind
-          CRITICAL_OUTDATED=""
+          # Check for packages by major version difference
+          CRITICAL_OUTDATED=""  # 2+ major versions behind (FAIL)
+          WARNING_OUTDATED=""   # 1 major version behind (WARN)
           
           # Parse JSON and check major version differences
           # For each project's top-level packages
@@ -263,19 +418,35 @@ jobs:
             
             if [ "$DIFF" -ge 2 ]; then
               CRITICAL_OUTDATED="$CRITICAL_OUTDATED\n- $PKG_NAME: $CURRENT_VER → $LATEST_VER (${DIFF} major versions behind)"
+            elif [ "$DIFF" -eq 1 ]; then
+              WARNING_OUTDATED="$WARNING_OUTDATED\n- $PKG_NAME: $CURRENT_VER → $LATEST_VER (1 major version behind)"
             fi
           done <<< "$PACKAGES"
           
+          # Report warnings (1 major version behind)
+          if [ -n "$WARNING_OUTDATED" ]; then
+            echo "⚠️ **Packages 1 major version behind:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo -e "$WARNING_OUTDATED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "::warning::Some .NET packages are 1 major version behind - consider updating"
+          fi
+          
+          # Report and fail on critical (2+ major versions behind)
           if [ -n "$CRITICAL_OUTDATED" ]; then
-            echo "❌ **Critically outdated packages found (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Critically outdated packages (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo -e "$CRITICAL_OUTDATED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "::error::Critically outdated .NET packages detected - update required"
             echo -e "$CRITICAL_OUTDATED"
             exit 1
-          else
-            echo "✅ No critically outdated packages (all within 1 major version)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -z "$WARNING_OUTDATED" ] && [ -z "$CRITICAL_OUTDATED" ]; then
+            echo "✅ All packages are current (within minor/patch versions)" >> $GITHUB_STEP_SUMMARY
+          elif [ -z "$CRITICAL_OUTDATED" ]; then
+            echo "✅ No critically outdated packages (none 2+ major versions behind)" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Setup Node.js
@@ -355,10 +526,10 @@ jobs:
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Check Critically Outdated npm Packages
+      - name: Check Outdated npm Packages (Major Versions)
         working-directory: web
         run: |
-          echo "### 🚨 Critical npm Package Check" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 npm Package Version Check" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Check for outdated packages
@@ -366,8 +537,9 @@ jobs:
           OUTDATED=$(npm outdated --json 2>&1)
           set -e
           
-          # Check for packages that are 2+ major versions behind
-          CRITICAL_OUTDATED=""
+          # Check for packages by major version difference
+          CRITICAL_OUTDATED=""  # 2+ major versions behind (FAIL)
+          WARNING_OUTDATED=""   # 1 major version behind (WARN)
           
           # Parse JSON and check major version differences
           PACKAGES=$(echo "$OUTDATED" | jq -r 'to_entries[] | "\(.key)|\(.value.current)|\(.value.latest)"' 2>/dev/null || echo "")
@@ -384,19 +556,35 @@ jobs:
             
             if [ "$DIFF" -ge 2 ]; then
               CRITICAL_OUTDATED="$CRITICAL_OUTDATED\n- $PKG_NAME: $CURRENT_VER → $LATEST_VER (${DIFF} major versions behind)"
+            elif [ "$DIFF" -eq 1 ]; then
+              WARNING_OUTDATED="$WARNING_OUTDATED\n- $PKG_NAME: $CURRENT_VER → $LATEST_VER (1 major version behind)"
             fi
           done <<< "$PACKAGES"
           
+          # Report warnings (1 major version behind)
+          if [ -n "$WARNING_OUTDATED" ]; then
+            echo "⚠️ **Packages 1 major version behind:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo -e "$WARNING_OUTDATED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "::warning::Some npm packages are 1 major version behind - consider updating"
+          fi
+          
+          # Report and fail on critical (2+ major versions behind)
           if [ -n "$CRITICAL_OUTDATED" ]; then
-            echo "❌ **Critically outdated packages found (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Critically outdated packages (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo -e "$CRITICAL_OUTDATED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "::error::Critically outdated npm packages detected - update required"
             echo -e "$CRITICAL_OUTDATED"
             exit 1
-          else
-            echo "✅ No critically outdated packages (all within 1 major version)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -z "$WARNING_OUTDATED" ] && [ -z "$CRITICAL_OUTDATED" ]; then
+            echo "✅ All packages are current (within minor/patch versions)" >> $GITHUB_STEP_SUMMARY
+          elif [ -z "$CRITICAL_OUTDATED" ]; then
+            echo "✅ No critically outdated packages (none 2+ major versions behind)" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: License Check
@@ -554,12 +742,76 @@ jobs:
           echo "⚠️ Frontend health check inconclusive"
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ STAGE 6: Create Release Tag (Main branch only)                               │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  create-release-tag:
+    name: 🏷️ Create Release Tag
+    runs-on: ubuntu-latest
+    needs: [setup, verify]
+    if: ${{ needs.setup.outputs.is_main == 'true' && needs.verify.result == 'success' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if Tag Exists
+        id: check-tag
+        run: |
+          VERSION="${{ needs.setup.outputs.semver }}"
+          TAG="v$VERSION"
+          
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag $TAG already exists, skipping creation"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag $TAG does not exist, will create"
+          fi
+
+      - name: Create Git Tag
+        if: steps.check-tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ needs.setup.outputs.semver }}"
+          TAG="v$VERSION"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create annotated tag with changelog excerpt
+          git tag -a "$TAG" -m "Release $TAG
+
+          Deployed: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          Commit: ${{ github.sha }}
+          Build: ${{ needs.setup.outputs.version }}
+          
+          See CHANGELOG.md for details."
+          
+          git push origin "$TAG"
+          
+          echo "### 🏷️ Release Tag Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ needs.setup.outputs.sha_short }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build:** \`${{ needs.setup.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Tag Already Exists
+        if: steps.check-tag.outputs.exists == 'true'
+        run: |
+          VERSION="${{ needs.setup.outputs.semver }}"
+          TAG="v$VERSION"
+          
+          echo "### ℹ️ Release Tag" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tag \`$TAG\` already exists. To create a new release, update the VERSION file." >> $GITHUB_STEP_SUMMARY
+
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
   # │ SUMMARY                                                                       │
   # └──────────────────────────────────────────────────────────────────────────────┘
   summary:
     name: 📝 Summary
     runs-on: ubuntu-latest
-    needs: [setup, validate-backend, validate-frontend, validate-security, build-and-deploy, verify]
+    needs: [setup, validate-backend, validate-frontend, validate-security, validate-changelog, build-and-deploy, verify, create-release-tag]
     if: always()
     steps:
       - name: PR Summary
@@ -569,14 +821,19 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📝 CHANGELOG | ${{ needs.validate-changelog.result == 'success' && '✅ Updated' || needs.validate-changelog.result == 'skipped' && '⏭️ Skipped' || '❌ Not Updated' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔧 Backend Tests | ${{ needs.validate-backend.result == 'success' && '✅ Passed' || needs.validate-backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌐 Frontend Tests | ${{ needs.validate-frontend.result == 'success' && '✅ Passed' || needs.validate-frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔒 Security Scan | ${{ needs.validate-security.result == 'success' && '✅ Passed' || needs.validate-security.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          # Check if changelog validation passed (or was skipped for non-code PRs)
+          CHANGELOG_OK="${{ needs.validate-changelog.result == 'success' || needs.validate-changelog.result == 'skipped' }}"
+          
           if [ "${{ needs.validate-backend.result }}" = "success" ] && \
              [ "${{ needs.validate-frontend.result }}" = "success" ] && \
-             [ "${{ needs.validate-security.result }}" = "success" ]; then
+             [ "${{ needs.validate-security.result }}" = "success" ] && \
+             [ "$CHANGELOG_OK" = "true" ]; then
             echo "### ✅ Ready for merge!" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "All validations passed. This PR can be safely merged." >> $GITHUB_STEP_SUMMARY
@@ -591,6 +848,7 @@ jobs:
           echo "║              PR Validation Complete                        ║"
           echo "╚════════════════════════════════════════════════════════════╝"
           echo ""
+          echo "CHANGELOG:      ${{ needs.validate-changelog.result }}"
           echo "Backend Tests:  ${{ needs.validate-backend.result }}"
           echo "Frontend Tests: ${{ needs.validate-frontend.result }}"
           echo "Security Scan:  ${{ needs.validate-security.result }}"
@@ -602,7 +860,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 📦 Version | \`${{ needs.setup.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Version | \`${{ needs.setup.outputs.semver }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏷️ Build | \`${{ needs.setup.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔗 Commit | \`${{ needs.setup.outputs.sha_short }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔐 Auth | OIDC Federation |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -618,15 +877,18 @@ jobs:
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Build & Deploy | ${{ needs.build-and-deploy.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Health Checks | ${{ needs.verify.result == 'success' && '✅ Healthy' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release Tag | ${{ needs.create-release-tag.result == 'success' && '✅ Created' || needs.create-release-tag.result == 'skipped' && '⏭️ Skipped' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
           
           echo ""
           echo "╔════════════════════════════════════════════════════════════╗"
           echo "║              Deployment Complete                           ║"
           echo "╠════════════════════════════════════════════════════════════╣"
           echo "║  🔐 Auth: OIDC Federation (no secrets)                     ║"
+          echo "║  🏷️ Tag:  v${{ needs.setup.outputs.semver }}                              ║"
           echo "╚════════════════════════════════════════════════════════════╝"
           echo ""
-          echo "📦 Version: ${{ needs.setup.outputs.version }}"
+          echo "📦 Version: ${{ needs.setup.outputs.semver }}"
+          echo "🏷️ Build:   ${{ needs.setup.outputs.version }}"
           echo "🔗 Commit:  ${{ needs.setup.outputs.sha_short }}"
           echo ""
           echo "🌐 URLs:"
