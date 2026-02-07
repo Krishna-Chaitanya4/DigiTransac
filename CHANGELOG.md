@@ -22,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-02-07
+
+### Added
+- **Personal Conversation on Registration**: New users now see a welcome message in their Personal chat
+- **Mandatory VERSION Bump**: CI/CD pipeline now enforces VERSION file updates in PRs
+
+### Fixed
+- **Location Detection in Production**: Added BigDataCloud and ipapi.co to CSP connect-src
+- Reverse geocoding now works correctly in Azure deployment
+- **Pay Button UX**: Users can now click Pay button in chats without having accounts first
+- Shows helpful message with link to create account when no accounts exist
+
+## [1.1.1] - 2026-02-06
+
 ### Added
 - Pull-to-refresh for mobile users (#80)
 - **PWA Pull-to-Refresh on All Data Pages**:

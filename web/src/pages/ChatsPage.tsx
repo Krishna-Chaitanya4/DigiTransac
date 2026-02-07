@@ -638,7 +638,6 @@ export default function ChatsPage() {
               onMessageChange={setMessageInput}
               onSend={handleSendMessage}
               isSending={sendMessageMutation.isPending}
-              hasAccounts={accounts.length > 0}
               onOpenTransactionForm={() => setShowTransactionForm(true)}
               replyTo={replyTo}
               onCancelReply={() => setReplyTo(null)}
