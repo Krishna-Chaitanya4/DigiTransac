@@ -65,6 +65,11 @@ public interface IChatMessageRepository
     /// Create a system-generated activity message (e.g., "Transaction confirmed")
     /// </summary>
     Task<ChatMessage> CreateSystemMessageAsync(string userId, string counterpartyUserId, string content, string systemSource, string? transactionId = null);
+
+    /// <summary>
+    /// Delete all messages where the user is sender or recipient (for account deletion)
+    /// </summary>
+    Task<bool> DeleteAllByUserIdAsync(string userId);
 }
 
 public class ChatMessageRepository : IChatMessageRepository
@@ -335,5 +340,17 @@ public class ChatMessageRepository : IChatMessageRepository
 
         await _chatMessages.InsertOneAsync(message);
         return message;
+    }
+
+    public async Task<bool> DeleteAllByUserIdAsync(string userId)
+    {
+        // Delete all messages where user is either sender or recipient
+        var filter = Builders<ChatMessage>.Filter.Or(
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, userId),
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId)
+        );
+        
+        var result = await _chatMessages.DeleteManyAsync(filter);
+        return result.DeletedCount > 0;
     }
 }

@@ -15,6 +15,7 @@ public interface IBudgetRepository
     Task<List<Budget>> GetByUserIdAsync(string userId, bool? isActive = null);
     Task<Budget> UpdateAsync(Budget budget);
     Task<bool> DeleteAsync(string id);
+    Task<bool> DeleteAllByUserIdAsync(string userId);
     
     // Notifications
     Task<BudgetNotification> CreateNotificationAsync(BudgetNotification notification);
@@ -23,6 +24,7 @@ public interface IBudgetRepository
     Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId);
     Task<bool> MarkAllNotificationsAsReadAsync(string userId);
     Task<bool> DeleteOldNotificationsAsync(DateTime olderThan);
+    Task<bool> DeleteAllNotificationsByUserIdAsync(string userId);
 }
 
 /// <summary>
@@ -151,6 +153,27 @@ public class BudgetRepository : IBudgetRepository
             return true;
         }
         return false;
+    }
+
+    public async Task<bool> DeleteAllByUserIdAsync(string userId)
+    {
+        // Delete all budgets for the user
+        var budgetResult = await _budgets.DeleteManyAsync(b => b.UserId == userId);
+        
+        // Also delete all notifications for the user
+        var notificationResult = await _notifications.DeleteManyAsync(n => n.UserId == userId);
+        
+        _logger.LogInformation("Deleted {BudgetCount} budgets and {NotificationCount} notifications for user {UserId}",
+            budgetResult.DeletedCount, notificationResult.DeletedCount, userId);
+        
+        return budgetResult.DeletedCount > 0 || notificationResult.DeletedCount > 0;
+    }
+
+    public async Task<bool> DeleteAllNotificationsByUserIdAsync(string userId)
+    {
+        var result = await _notifications.DeleteManyAsync(n => n.UserId == userId);
+        _logger.LogInformation("Deleted {Count} notifications for user {UserId}", result.DeletedCount, userId);
+        return result.DeletedCount > 0;
     }
 
     // Notification methods

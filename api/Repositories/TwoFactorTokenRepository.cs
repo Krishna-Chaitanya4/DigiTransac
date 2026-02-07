@@ -10,6 +10,7 @@ public interface ITwoFactorTokenRepository
     Task<TwoFactorToken> CreateAsync(TwoFactorToken twoFactorToken);
     Task MarkAsUsedAsync(string id);
     Task DeleteByUserIdAsync(string userId);
+    Task DeleteAllByUserIdAsync(string userId);
     Task SetEmailOtpAsync(string id, string emailOtpCode);
 }
 
@@ -65,5 +66,11 @@ public class TwoFactorTokenRepository : ITwoFactorTokenRepository
     public async Task DeleteByUserIdAsync(string userId)
     {
         await _tokens.DeleteManyAsync(t => t.UserId == userId);
+    }
+
+    public async Task DeleteAllByUserIdAsync(string userId)
+    {
+        // Alias for DeleteByUserIdAsync for consistency
+        await DeleteByUserIdAsync(userId);
     }
 }
