@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-02-07
+
+### Fixed
+- **XML Documentation Warnings**: Added missing param tags for `GetTripGroupsAsync` method
+  - Resolves 3 CS1573 compiler warnings
+  - API project now builds with 0 warnings
+
 ## [1.1.3] - 2026-02-07
 
 ### Fixed
