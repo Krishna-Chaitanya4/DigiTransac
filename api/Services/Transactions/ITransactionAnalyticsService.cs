@@ -79,6 +79,9 @@ public interface ITransactionAnalyticsService
     /// Detect trips based on geographic clustering of transactions.
     /// Groups transactions by city/country and identifies travel periods.
     /// </summary>
+    /// <param name="userId">The user's unique identifier</param>
+    /// <param name="startDate">Start date filter (optional)</param>
+    /// <param name="endDate">End date filter (optional)</param>
     /// <param name="homeLatitude">User's home latitude (optional, for excluding home location)</param>
     /// <param name="homeLongitude">User's home longitude (optional, for excluding home location)</param>
     /// <param name="minTripDistanceKm">Minimum distance from home to consider a trip (default 50km)</param>
