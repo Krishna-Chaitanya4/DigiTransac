@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.2] - 2026-02-07
+
+### Added
+- **Personal Conversation Always Visible**: New users now see a "Personal" conversation with a welcome message immediately after registration
+  - Welcome message explains the Personal chat's purpose: notes, reminders, and tracking transactions with non-DigiTransac users
+  - System-generated message is marked with `systemSource: "Registration"`
+
+### Changed
+- **Mandatory VERSION Bump**: CI/CD pipeline now enforces VERSION file updates for every PR
+  - PRs without VERSION changes will be blocked from merging
+  - VERSION must follow semver format (e.g., 1.2.3)
+  - Version must be incremented (not just modified)
+  - Version must be higher than base branch version
+  - Clear error messages guide developers on fixing version issues
+
 All notable changes to DigiTransac will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
