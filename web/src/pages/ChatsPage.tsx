@@ -504,6 +504,9 @@ export default function ChatsPage() {
         onResizeReset={() => setSidebarWidth(SIDEBAR_CONSTANTS.DEFAULT_WIDTH)}
         sidebarWidth={sidebarWidth}
         onWidthChange={setSidebarWidth}
+        onRefresh={async () => {
+          invalidateList();
+        }}
       />
 
       {/* Chat area */}

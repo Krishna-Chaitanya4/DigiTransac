@@ -147,6 +147,10 @@ vi.mock('../hooks', () => ({
     data: mockAnomalies,
     isLoading: false
   })),
+  // Invalidation hooks for pull-to-refresh
+  useInvalidateTransactions: vi.fn(() => vi.fn(() => Promise.resolve())),
+  useInvalidateBudgets: vi.fn(() => vi.fn(() => Promise.resolve())),
+  useInvalidateLabels: vi.fn(() => vi.fn(() => Promise.resolve())),
 }));
 
 vi.mock('../context/AuthContext', () => ({
