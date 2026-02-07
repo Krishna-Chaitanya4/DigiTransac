@@ -349,8 +349,16 @@ describe('locationService', () => {
     });
 
     it('should return USD when geolocation fails', async () => {
+      // Mock with proper GeolocationPositionError constants
       mockGetCurrentPosition.mockImplementation((_, error) => {
-        error({ code: 1, message: 'Permission denied' });
+        const geoError = {
+          code: 1, // PERMISSION_DENIED
+          message: 'Permission denied',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        };
+        error(geoError);
       });
 
       const result = await detectCurrencyFromLocation();
@@ -359,6 +367,7 @@ describe('locationService', () => {
         currency: 'USD',
         country: null,
         detected: false,
+        failureReason: 'permission_denied',
       });
     });
 
@@ -377,6 +386,7 @@ describe('locationService', () => {
         currency: 'USD',
         country: null,
         detected: false,
+        failureReason: 'reverse_geocode_failed',
       });
     });
 

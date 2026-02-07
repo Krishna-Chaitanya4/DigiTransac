@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BsonIgnoreExtraElements added to all MongoDB models for schema resilience (#78)
 - Include custom domains in CORS_ALLOWED_ORIGINS during deployment (#75)
 - Location permission errors now show helpful guidance instead of generic "Failed to get location"
+- **Currency Detection Improvement**: Registration page now shows specific failure reasons (timeout, network, reverse geocode failure) instead of incorrectly showing "permission denied"
 
 ## [1.0.0] - 2026-02-01
 

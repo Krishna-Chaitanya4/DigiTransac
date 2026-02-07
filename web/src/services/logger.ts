@@ -11,7 +11,7 @@
  *   logger.error('Something failed', error);
  */
 
-import { captureException } from './sentry';
+import { captureException, addBreadcrumb } from './sentry';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -53,12 +53,16 @@ export const logger: Logger = {
     if (shouldLog('info')) {
       console.info(formatMessage('info', message), ...args);
     }
+    // Always add breadcrumb for Sentry (helps debug production issues)
+    addBreadcrumb(message, 'app', args.length > 0 ? { data: args[0] } : undefined);
   },
 
   warn: (message: string, ...args: unknown[]) => {
     if (shouldLog('warn')) {
       console.warn(formatMessage('warn', message), ...args);
     }
+    // Always add breadcrumb for Sentry (helps debug production issues)
+    addBreadcrumb(message, 'warning', args.length > 0 ? { data: args[0] } : undefined);
   },
 
   error: (message: string, ...args: unknown[]) => {

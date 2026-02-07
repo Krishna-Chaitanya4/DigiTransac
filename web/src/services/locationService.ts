@@ -165,28 +165,135 @@ export function getCurrencyFromCountry(countryCode: string): string {
 }
 
 /**
- * Detect user's currency based on GPS location
- * This is the main function to call
+ * Detection failure reasons
  */
-export async function detectCurrencyFromLocation(): Promise<{
+export type DetectionFailureReason =
+  | 'geolocation_not_supported'
+  | 'permission_denied'
+  | 'position_unavailable'
+  | 'timeout'
+  | 'reverse_geocode_failed'
+  | 'country_not_found'
+  | 'unknown_error';
+
+/**
+ * Result of currency detection
+ */
+export interface CurrencyDetectionResult {
   currency: string;
   country: string | null;
   detected: boolean;
+  failureReason?: DetectionFailureReason;
+}
+
+/**
+ * Request and get current GPS coordinates with detailed error information
+ * Returns coordinates or error details
+ */
+export async function getCurrentPositionWithDetails(): Promise<{
+  coords: LocationCoordinates | null;
+  error?: DetectionFailureReason;
 }> {
+  if (!isGeolocationSupported()) {
+    logger.warn('Geolocation is not supported by this browser');
+    return { coords: null, error: 'geolocation_not_supported' };
+  }
+
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        logger.info('Geolocation success:', {
+          lat: position.coords.latitude.toFixed(4),
+          lng: position.coords.longitude.toFixed(4),
+        });
+        resolve({
+          coords: {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          },
+        });
+      },
+      (error) => {
+        logger.warn('Geolocation error:', {
+          code: error.code,
+          message: error.message,
+        });
+        
+        // Map error codes to our failure reasons
+        let failureReason: DetectionFailureReason;
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            failureReason = 'permission_denied';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            failureReason = 'position_unavailable';
+            break;
+          case error.TIMEOUT:
+            failureReason = 'timeout';
+            break;
+          default:
+            failureReason = 'unknown_error';
+        }
+        
+        resolve({ coords: null, error: failureReason });
+      },
+      {
+        enableHighAccuracy: false, // Don't need high accuracy, just country level
+        timeout: 15000, // Increased to 15 seconds for slower connections
+        maximumAge: 300000, // Cache for 5 minutes
+      }
+    );
+  });
+}
+
+/**
+ * Detect user's currency based on GPS location
+ * This is the main function to call
+ * Returns detailed information about success/failure
+ */
+export async function detectCurrencyFromLocation(): Promise<CurrencyDetectionResult> {
   try {
-    const coords = await getCurrentPosition();
+    const { coords, error: positionError } = await getCurrentPositionWithDetails();
     
     if (!coords) {
-      return { currency: DEFAULT_CURRENCY, country: null, detected: false };
+      logger.warn('Currency detection failed: could not get position', { reason: positionError });
+      return {
+        currency: DEFAULT_CURRENCY,
+        country: null,
+        detected: false,
+        failureReason: positionError,
+      };
     }
 
     const locationInfo = await reverseGeocode(coords);
     
-    if (!locationInfo || !locationInfo.countryCode) {
-      return { currency: DEFAULT_CURRENCY, country: null, detected: false };
+    if (!locationInfo) {
+      logger.warn('Currency detection failed: reverse geocode returned null');
+      return {
+        currency: DEFAULT_CURRENCY,
+        country: null,
+        detected: false,
+        failureReason: 'reverse_geocode_failed',
+      };
+    }
+    
+    if (!locationInfo.countryCode) {
+      logger.warn('Currency detection failed: no country code in response', locationInfo);
+      return {
+        currency: DEFAULT_CURRENCY,
+        country: locationInfo.country || null,
+        detected: false,
+        failureReason: 'country_not_found',
+      };
     }
 
     const currency = getCurrencyFromCountry(locationInfo.countryCode);
+    
+    logger.info('Currency detection success:', {
+      country: locationInfo.country,
+      countryCode: locationInfo.countryCode,
+      currency,
+    });
     
     return {
       currency,
@@ -195,7 +302,12 @@ export async function detectCurrencyFromLocation(): Promise<{
     };
   } catch (error) {
     logger.error('Failed to detect currency from location:', error);
-    return { currency: DEFAULT_CURRENCY, country: null, detected: false };
+    return {
+      currency: DEFAULT_CURRENCY,
+      country: null,
+      detected: false,
+      failureReason: 'unknown_error',
+    };
   }
 }
 
