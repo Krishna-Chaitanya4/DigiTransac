@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using FluentValidation;
+using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models.Dto;
+using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
 
 namespace DigiTransac.Api.Endpoints;
@@ -63,7 +65,9 @@ public static class ConversationEndpoints
             string counterpartyUserId,
             SendMessageRequest request,
             ClaimsPrincipal user,
-            IConversationService conversationService) =>
+            IConversationService conversationService,
+            INotificationService notificationService,
+            IUserRepository userRepository) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -74,6 +78,22 @@ public static class ConversationEndpoints
             
             if (!success)
                 return Results.BadRequest(new ErrorResponse(message));
+
+            // Send real-time notification to recipient
+            if (chatMessage != null && userId != counterpartyUserId)
+            {
+                var sender = await userRepository.GetByIdAsync(userId);
+                var notification = new ChatMessageNotification(
+                    MessageId: chatMessage.Id,
+                    SenderId: userId,
+                    SenderName: sender?.FullName ?? sender?.Email,
+                    MessageType: chatMessage.Type,
+                    Content: chatMessage.Content,
+                    TransactionId: null,
+                    SentAt: chatMessage.CreatedAt
+                );
+                await notificationService.NotifyChatMessageAsync(userId, counterpartyUserId, notification);
+            }
 
             return Results.Ok(chatMessage);
         })
@@ -87,7 +107,9 @@ public static class ConversationEndpoints
             SendMoneyRequest request,
             ClaimsPrincipal user,
             IConversationService conversationService,
-            IValidator<SendMoneyRequest> validator) =>
+            IValidator<SendMoneyRequest> validator,
+            INotificationService notificationService,
+            IUserRepository userRepository) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -102,6 +124,22 @@ public static class ConversationEndpoints
             
             if (!success)
                 return Results.BadRequest(new ErrorResponse(message));
+
+            // Send real-time notification to recipient
+            if (chatMessage != null)
+            {
+                var sender = await userRepository.GetByIdAsync(userId);
+                var notification = new ChatMessageNotification(
+                    MessageId: chatMessage.Id,
+                    SenderId: userId,
+                    SenderName: sender?.FullName ?? sender?.Email,
+                    MessageType: chatMessage.Type,
+                    Content: null, // Transaction messages don't have text content
+                    TransactionId: chatMessage.Transaction?.TransactionId,
+                    SentAt: chatMessage.CreatedAt
+                );
+                await notificationService.NotifyChatMessageAsync(userId, counterpartyUserId, notification);
+            }
 
             return Results.Ok(chatMessage);
         })

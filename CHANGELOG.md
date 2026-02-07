@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-02-07
+
+### Fixed
+- **Real-time Chat Messages**: Messages now appear instantly for recipients without manual refresh
+  - Backend: Added SignalR notification calls when sending text messages and money
+  - Frontend: Fixed query key mismatch in notification handlers to properly invalidate conversation caches
+  - Users in the same conversation now receive messages in real-time via WebSocket
+
 ## [1.1.4] - 2026-02-07
 
 ### Fixed
