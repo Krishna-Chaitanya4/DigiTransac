@@ -3,7 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, CircleMarker } from 're
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useTransactions, useLabels, useLocationInsights, useTripGroups } from '../hooks';
+import { useTransactions, useLabels, useLocationInsights, useTripGroups, useInvalidateTransactions, useInvalidateLabels } from '../hooks';
+import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useCurrency } from '../context/CurrencyContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../services/currencyService';
@@ -278,6 +279,18 @@ export default function SpendingMapPage() {
     true // enabled
   );
   
+  // Invalidation hooks for pull-to-refresh
+  const invalidateTransactions = useInvalidateTransactions();
+  const invalidateLabels = useInvalidateLabels();
+  
+  // Handle refresh - invalidate transactions and labels
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      invalidateTransactions(),
+      invalidateLabels(),
+    ]);
+  }, [invalidateTransactions, invalidateLabels]);
+  
   // Create label color map
   const labelColorMap = useMemo(() => {
     const map: Record<string, { color: string; name: string; icon?: string }> = {};
@@ -413,7 +426,7 @@ export default function SpendingMapPage() {
   }, [filteredTransactions]);
 
   return (
-    <div className="h-full flex flex-col">
+    <PullToRefreshContainer onRefresh={handleRefresh} className="h-full flex flex-col">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div>
@@ -1021,6 +1034,6 @@ export default function SpendingMapPage() {
           color: #60a5fa;
         }
       `}</style>
-    </div>
+    </PullToRefreshContainer>
   );
 }

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Pull-to-refresh for mobile users (#80)
+- **PWA Pull-to-Refresh on All Data Pages**:
+  - Chats page conversation list
+  - Insights dashboard (refreshes all analytics data)
+  - Labels page (refreshes categories and tags)
+  - Spending Map page (refreshes transaction locations and trips)
 - Comprehensive security checks in CI/CD pipeline (#79)
 - Critical outdated package check in pipeline (fails on 2+ major versions behind)
 - Warning for packages 1+ major versions behind
@@ -25,11 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Serilog.AspNetCore from 9.0.0 to 10.0.0
 - Updated Azure.Identity from 1.13.2 to 1.17.1
 - Updated Azure.Security.KeyVault.Secrets from 4.7.0 to 4.8.0
+- Improved LocationPicker error messages with actionable guidance
 
 ### Fixed
 - MongoDB index conflict in TagRepository (#81)
 - BsonIgnoreExtraElements added to all MongoDB models for schema resilience (#78)
 - Include custom domains in CORS_ALLOWED_ORIGINS during deployment (#75)
+- Location permission errors now show helpful guidance instead of generic "Failed to get location"
+- **Currency Detection Improvement**: Registration page now shows specific failure reasons (timeout, network, reverse geocode failure) instead of incorrectly showing "permission denied"
 
 ## [1.0.0] - 2026-02-01
 

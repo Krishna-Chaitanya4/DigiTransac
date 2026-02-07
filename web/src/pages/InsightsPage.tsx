@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { formatCurrency } from '../services/currencyService';
+import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 
 // Helper to convert and format currency - ensures proper conversion from source to target currency
 const convertAndFormat = (
@@ -17,7 +18,7 @@ const convertAndFormat = (
   const convertedAmount = convert(amount, sourceCurrency);
   return formatCurrency(convertedAmount, targetCurrency);
 };
-import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies } from '../hooks';
+import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies, useInvalidateTransactions, useInvalidateBudgets, useInvalidateLabels } from '../hooks';
 import { BudgetCard } from '../components/budget';
 import { getDateRangeForPreset, formatDateToStartOfDay, formatDateToEndOfDay } from '../hooks/useTransactionFilters';
 import { DateRangePicker } from '../components/DatePicker';
@@ -571,6 +572,20 @@ export default function InsightsPage() {
     formatDate(periodStart),
     formatDate(periodEnd)
   );
+  
+  // Invalidation hooks for pull-to-refresh
+  const invalidateTransactions = useInvalidateTransactions();
+  const invalidateBudgets = useInvalidateBudgets();
+  const invalidateLabels = useInvalidateLabels();
+  
+  // Handle refresh - invalidate all queries
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      invalidateTransactions(),
+      invalidateBudgets(),
+      invalidateLabels(),
+    ]);
+  }, [invalidateTransactions, invalidateBudgets, invalidateLabels]);
 
   // Calculate true income/expense from category breakdown
   const financialSummary = useMemo(() => {
@@ -685,7 +700,7 @@ export default function InsightsPage() {
   const isOrderCustomized = JSON.stringify(widgetOrder) !== JSON.stringify(DEFAULT_WIDGET_ORDER);
 
   return (
-    <div>
+    <PullToRefreshContainer onRefresh={handleRefresh}>
       {/* Header with Period Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
@@ -1845,6 +1860,6 @@ export default function InsightsPage() {
             return null;
         }
       })}
-    </div>
+    </PullToRefreshContainer>
   );
 }

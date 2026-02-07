@@ -5,10 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { DarkModeToggle } from '../components/DarkModeToggle';
 import * as authService from '../services/authService';
 import PasswordInput from '../components/PasswordInput';
-import { 
-  detectCurrencyFromLocation, 
+import {
+  detectCurrencyFromLocation,
   checkLocationPermission,
-  isGeolocationSupported 
+  isGeolocationSupported,
+  DetectionFailureReason,
 } from '../services/locationService';
 import { 
   getSupportedCurrencies, 
@@ -19,7 +20,7 @@ import {
 
 type Step = 'email' | 'verify' | 'complete';
 
-type LocationStatus = 'idle' | 'requesting' | 'detected' | 'denied' | 'manual';
+type LocationStatus = 'idle' | 'requesting' | 'detected' | 'failed' | 'manual';
 
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>('email');
@@ -37,6 +38,7 @@ export default function RegisterPage() {
   const [primaryCurrency, setPrimaryCurrency] = useState('');
   const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
+  const [locationFailureReason, setLocationFailureReason] = useState<DetectionFailureReason | null>(null);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [currencySearch, setCurrencySearch] = useState('');
   const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
@@ -64,15 +66,17 @@ export default function RegisterPage() {
     
     if (!isGeolocationSupported()) {
       setLocationStatus('manual');
+      setLocationFailureReason('geolocation_not_supported');
       setPrimaryCurrency('USD');
       return;
     }
 
-    // Check if already granted
+    // Check if already denied
     const permission = await checkLocationPermission();
     
     if (permission === 'denied') {
-      setLocationStatus('denied');
+      setLocationStatus('failed');
+      setLocationFailureReason('permission_denied');
       setPrimaryCurrency('USD');
       return;
     }
@@ -85,8 +89,10 @@ export default function RegisterPage() {
       setPrimaryCurrency(result.currency);
       setDetectedCountry(result.country);
       setLocationStatus('detected');
+      setLocationFailureReason(null);
     } else {
-      setLocationStatus('denied');
+      setLocationStatus('failed');
+      setLocationFailureReason(result.failureReason || 'unknown_error');
       setPrimaryCurrency('USD');
     }
   }, []);
@@ -386,7 +392,26 @@ export default function RegisterPage() {
                   </div>
                 )}
                 
-                {(locationStatus === 'denied' || locationStatus === 'manual') && (
+                {locationStatus === 'failed' && (
+                  <div className="mb-2">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">
+                      {locationFailureReason === 'permission_denied'
+                        ? '📍 Location access was denied'
+                        : locationFailureReason === 'timeout'
+                        ? '⏱️ Location detection timed out'
+                        : locationFailureReason === 'position_unavailable'
+                        ? '📍 Could not determine your location'
+                        : locationFailureReason === 'reverse_geocode_failed'
+                        ? '🌐 Could not identify your country'
+                        : '⚠️ Location detection failed'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Select your preferred currency manually
+                    </p>
+                  </div>
+                )}
+                
+                {locationStatus === 'manual' && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     Select your preferred currency for displaying totals
                   </p>

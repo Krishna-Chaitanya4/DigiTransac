@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { TransactionLocationRequest } from '../../types/transactions';
-import { getCurrentPosition, reverseGeocode, searchPlaces, type PlaceSearchResult } from '../../services/locationService';
+import { getCurrentPosition, reverseGeocode, searchPlaces, checkLocationPermission, isGeolocationSupported, type PlaceSearchResult } from '../../services/locationService';
 import { logger } from '../../services/logger';
 
 interface LocationPickerProps {
@@ -108,6 +108,23 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading,
   const captureLocation = async () => {
     setIsLoadingLocation(true);
     setLocationError(null);
+    
+    // Check if geolocation is supported
+    if (!isGeolocationSupported()) {
+      setLocationError('Location is not supported by your browser. Please enter location manually.');
+      setIsLoadingLocation(false);
+      return;
+    }
+    
+    // Check permission status first
+    const permissionStatus = await checkLocationPermission();
+    
+    if (permissionStatus === 'denied') {
+      setLocationError('Location access was denied. Please enable it in your browser settings and try again.');
+      setIsLoadingLocation(false);
+      return;
+    }
+    
     try {
       const coords = await getCurrentPosition();
       if (coords) {
@@ -119,10 +136,19 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading,
           city: geoInfo?.city,
           country: geoInfo?.country,
         }, true);
+        setLocationError(null);
+      } else {
+        // Permission might have been denied during the request
+        const newStatus = await checkLocationPermission();
+        if (newStatus === 'denied') {
+          setLocationError('Location access was denied. Please enable it in your browser settings and try again.');
+        } else {
+          setLocationError('Could not get location. Please try again or enter manually.');
+        }
       }
     } catch (error) {
       logger.error('Failed to capture location:', error);
-      setLocationError('Failed to get location');
+      setLocationError('Failed to get location. Please try again or enter manually.');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -286,10 +312,29 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading,
         </div>
       )}
       
-      {/* Location error */}
-      {locationError && !location && !manualLocationMode && (
-        <p className="mt-1 text-sm text-red-500 dark:text-red-400">{locationError}</p>
-      )}
+      {/* Location error with helpful guidance */}
+    {locationError && !location && !manualLocationMode && (
+      <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+        <div className="flex items-start gap-2">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm text-amber-700 dark:text-amber-300">{locationError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationError(null);
+                setManualLocationMode(true);
+              }}
+              className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Enter location manually instead →
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
       
       {/* Location display */}
       {location && (

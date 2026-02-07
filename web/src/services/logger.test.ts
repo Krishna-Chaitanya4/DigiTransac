@@ -4,6 +4,7 @@ import { logger } from './logger';
 // Mock the sentry module
 vi.mock('./sentry', () => ({
   captureException: vi.fn(),
+  addBreadcrumb: vi.fn(),
 }));
 
 import { captureException } from './sentry';

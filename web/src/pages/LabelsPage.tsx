@@ -1,14 +1,28 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import CategoriesTab from '../components/CategoriesTab';
 import TagsTab from '../components/TagsTab';
+import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
+import { useInvalidateLabels, useInvalidateTags } from '../hooks';
 
 type Tab = 'categories' | 'tags';
 
 export default function LabelsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('categories');
+  
+  // Invalidation hooks for pull-to-refresh
+  const invalidateLabels = useInvalidateLabels();
+  const invalidateTags = useInvalidateTags();
+  
+  // Handle refresh - invalidate labels and tags
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      invalidateLabels(),
+      invalidateTags(),
+    ]);
+  }, [invalidateLabels, invalidateTags]);
 
   return (
-    <div>
+    <PullToRefreshContainer onRefresh={handleRefresh}>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Labels</h1>
       
       {/* Tabs */}
@@ -39,6 +53,6 @@ export default function LabelsPage() {
 
       {/* Tab Content */}
       {activeTab === 'categories' ? <CategoriesTab /> : <TagsTab />}
-    </div>
+    </PullToRefreshContainer>
   );
 }
