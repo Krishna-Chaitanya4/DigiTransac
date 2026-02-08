@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DigiTransac.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -153,12 +154,17 @@ public interface INotificationService
 public class NotificationService : INotificationService
 {
     private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly IWebPushService? _webPushService;
     private readonly ILogger<NotificationService> _logger;
 
-    public NotificationService(IHubContext<NotificationHub> hubContext, ILogger<NotificationService> logger)
+    public NotificationService(
+        IHubContext<NotificationHub> hubContext,
+        ILogger<NotificationService> logger,
+        IWebPushService? webPushService = null)
     {
         _hubContext = hubContext;
         _logger = logger;
+        _webPushService = webPushService;
     }
 
     public async Task NotifyUserAsync(string userId, string method, object payload)
@@ -205,12 +211,36 @@ public class NotificationService : INotificationService
 
     public async Task NotifyChatMessageAsync(string userId1, string userId2, ChatMessageNotification notification)
     {
-        // Send to conversation group and also directly to the recipient
+        // Send to conversation group and also directly to the recipient via SignalR (real-time in-app)
         await NotifyConversationAsync(userId1, userId2, "ChatMessage", notification);
         
-        // Also send direct notification to recipient user
+        // Also send direct notification to recipient user via SignalR
         var recipientId = notification.SenderId == userId1 ? userId2 : userId1;
         await NotifyUserAsync(recipientId, "NewChatMessage", notification);
+        
+        // Send web push notification to recipient (for when app is closed/background)
+        if (_webPushService != null)
+        {
+            try
+            {
+                var pushPayload = new PushNotificationPayload(
+                    Title: notification.SenderName ?? "New Message",
+                    Body: notification.MessageType == "money"
+                        ? $"{notification.SenderName ?? "Someone"} sent you money!"
+                        : notification.Content ?? "You have a new message",
+                    Icon: "/icons/icon-192x192.png",
+                    Badge: "/icons/icon-72x72.png",
+                    Tag: $"chat-{notification.SenderId}",
+                    Url: $"/chats?userId={notification.SenderId}"
+                );
+                
+                await _webPushService.SendToUserAsync(recipientId, pushPayload);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send web push notification for chat message");
+            }
+        }
     }
     
     public async Task SendBudgetAlertAsync(

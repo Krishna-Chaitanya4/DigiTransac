@@ -303,6 +303,7 @@ builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
 builder.Services.AddSingleton<IChatMessageRepository, ChatMessageRepository>();
 builder.Services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddSingleton<IBudgetRepository, BudgetRepository>();
+builder.Services.AddSingleton<IPushSubscriptionRepository, PushSubscriptionRepository>();
 
 // Add HttpClient for external API calls with resilience policies (Circuit Breaker + Retry)
 // Create a logger factory for Polly to use
@@ -405,7 +406,10 @@ builder.Services.AddSignalR(options =>
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
 });
 
-// Add notification service for SignalR
+// Add Web Push service for background notifications
+builder.Services.AddSingleton<IWebPushService, WebPushService>();
+
+// Add notification service for SignalR (with optional WebPush integration)
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Background services
@@ -894,6 +898,7 @@ app.MapCurrencyEndpoints();
 app.MapTransactionEndpoints();
 app.MapConversationEndpoints();
 app.MapBudgetEndpoints();
+app.MapPushEndpoints();
 
 // Map SignalR hub
 app.MapHub<NotificationHub>("/hubs/notifications");

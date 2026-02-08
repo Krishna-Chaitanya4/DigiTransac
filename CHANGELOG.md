@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-02-08
+
+### Added
+- **PWA Push Notifications**: Receive chat message notifications even when app is closed
+  - Backend: Web Push API integration with VAPID authentication
+  - Backend: Push subscription management endpoints (`/api/push/*`)
+  - Backend: Automatic push notification on new chat messages
+  - Frontend: Custom service worker with push notification handlers
+  - Frontend: Push notification settings in Settings page with toggle
+  - Frontend: Test notification feature to verify push is working
+  - Works on mobile and desktop browsers that support Web Push API
+  - Notifications include sender name, message preview, and deep link to conversation
+
 ## [1.1.5] - 2026-02-07
 
 ### Fixed
