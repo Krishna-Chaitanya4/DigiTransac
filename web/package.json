@@ -26,7 +26,7 @@
     "@tanstack/react-virtual": "^3.13.18",
     "@types/leaflet": "^1.9.21",
     "date-fns": "^4.1.0",
-    "emoji-picker-react": "^4.16.1",
+    "emoji-picker-react": "^4.18.0",
     "i18next": "^25.8.1",
     "i18next-browser-languagedetector": "^8.2.0",
     "leaflet": "^1.9.4",
