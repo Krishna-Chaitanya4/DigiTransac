@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.7] - 2026-02-09
+## [1.1.8] - 2026-02-09
 
 ### Added
 - **PWA Push Notifications**: Receive chat message notifications even when app is closed
@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Frontend: Test notification feature to verify push is working
   - Works on mobile and desktop browsers that support Web Push API
   - Notifications include sender name, message preview, and deep link to conversation
+
+## [1.1.7] - 2026-02-09
+
+### Added
+- **Balance Adjustment Audit Trail**: Balance adjustments now create a message in the Personal conversation
+  - Messages are system-generated and linked to the adjustment transaction
+  - Format: "Balance Adjustment: HDFC Bank +₹1,000.00 → ₹15,000.00"
+  - Provides audit trail for all balance changes in the user's chat history
+
+### Improved
+- **Conversation List Transaction Display**: Enhanced conversation item preview
+  - Transaction preview colors now match direction:
+    - "Sent ₹X" shows in RED (money out)
+    - "Received ₹X" shows in GREEN (money in)
+    - Other transactions show in BLUE
+  - For P2P chats: Shows sent/received totals with colored arrows
+    - ↑ Red = amount sent, ↓ Green = amount received
+  - Uses currency formatting with proper symbols
 
 ## [1.1.6] - 2026-02-09
 
