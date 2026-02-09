@@ -17,6 +17,7 @@ public class AccountServiceTests
     private readonly Mock<IDekCacheService> _dekCacheServiceMock;
     private readonly Mock<IEncryptionService> _encryptionServiceMock;
     private readonly Mock<ILabelService> _labelServiceMock;
+    private readonly Mock<IChatMessageRepository> _chatMessageRepositoryMock;
     private readonly AccountService _accountService;
     private const string TestUserId = "test-user-id";
     private readonly byte[] _testDek = new byte[32];
@@ -31,6 +32,7 @@ public class AccountServiceTests
         _dekCacheServiceMock = new Mock<IDekCacheService>();
         _encryptionServiceMock = new Mock<IEncryptionService>();
         _labelServiceMock = new Mock<ILabelService>();
+        _chatMessageRepositoryMock = new Mock<IChatMessageRepository>();
         
         // Setup encryption service to pass through values (no-op for tests)
         _encryptionServiceMock.Setup(x => x.Encrypt(It.IsAny<string>(), It.IsAny<byte[]>()))
@@ -89,7 +91,8 @@ public class AccountServiceTests
             _keyManagementServiceMock.Object,
             _dekCacheServiceMock.Object,
             _encryptionServiceMock.Object,
-            _labelServiceMock.Object);
+            _labelServiceMock.Object,
+            _chatMessageRepositoryMock.Object);
     }
 
     #region GetAllAsync Tests
