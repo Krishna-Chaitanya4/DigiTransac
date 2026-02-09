@@ -91,15 +91,23 @@ public class WebPushService : IWebPushService
         }
 
         // Initialize the push client with VAPID authentication
-        _pushClient = new PushServiceClient();
-        _pushClient.DefaultAuthentication = new VapidAuthentication(
-            _settings.PublicKey,
-            _settings.PrivateKey)
+        try
         {
-            Subject = _settings.Subject
-        };
+            _pushClient = new PushServiceClient();
+            _pushClient.DefaultAuthentication = new VapidAuthentication(
+                _settings.PublicKey,
+                _settings.PrivateKey)
+            {
+                Subject = _settings.Subject
+            };
 
-        _logger.LogInformation("WebPush service initialized with VAPID authentication");
+            _logger.LogInformation("WebPush service initialized with VAPID authentication");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "WebPush VAPID keys are invalid. Push notifications will be disabled.");
+            _pushClient = null!;
+        }
     }
 
     public string GetPublicKey()
