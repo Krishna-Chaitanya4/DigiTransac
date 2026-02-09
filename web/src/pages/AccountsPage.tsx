@@ -299,10 +299,21 @@ export default function AccountsPage() {
                   </h2>
                   <span
                     className={`text-lg font-semibold ${
-                      config.isLiability ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+                      config.isLiability
+                        ? typeTotal > 0
+                          ? 'text-red-600 dark:text-red-400'    // Liability with debt = red
+                          : 'text-green-600 dark:text-green-400' // Liability paid off = green
+                        : typeTotal >= 0
+                        ? 'text-green-600 dark:text-green-400'  // Asset with money = green
+                        : 'text-red-600 dark:text-red-400'      // Asset overdraft = red
                     }`}
                   >
-                    {formatCurrencyWithCode(typeTotal, summary?.primaryCurrency || 'INR')}
+                    {/* For liabilities: show as negative (money owed)
+                        For assets: show as-is (negative for overdraft) */}
+                    {formatCurrencyWithCode(
+                      config.isLiability ? -Math.abs(typeTotal) : typeTotal,
+                      summary?.primaryCurrency || 'INR'
+                    )}
                   </span>
                 </div>
 

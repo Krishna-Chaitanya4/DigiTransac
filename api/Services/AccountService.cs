@@ -138,6 +138,8 @@ public class AccountService : IAccountService
 
         // Assets: Bank, Cash, DigitalWallet, Investment
         // Liabilities: CreditCard, Loan
+        // Note: Liability accounts with positive balance = you owe money (liability)
+        //       Liability accounts with negative balance = overpayment (effectively an asset)
         var liabilityTypes = new[] { AccountType.CreditCard, AccountType.Loan };
         
         var balancesByType = new Dictionary<string, decimal>();
@@ -166,19 +168,39 @@ public class AccountService : IAccountService
                 
                 // Convert to primary currency for type totals
                 var convertedBalance = _exchangeRateService.Convert(
-                    account.CurrentBalance, 
-                    currency, 
-                    primaryCurrency, 
+                    account.CurrentBalance,
+                    currency,
+                    primaryCurrency,
                     rates);
                 balancesByType[typeName] += convertedBalance;
 
                 if (liabilityTypes.Contains(account.Type))
                 {
-                    liabilities += Math.Abs(account.CurrentBalance);
+                    // For liability accounts:
+                    // - Positive balance = debt (liability) - e.g., you owe $500 on credit card
+                    // - Negative balance = overpayment/credit (effectively an asset)
+                    if (account.CurrentBalance > 0)
+                    {
+                        liabilities += account.CurrentBalance;
+                    }
+                    else
+                    {
+                        // Negative balance on liability = credit/overpayment = asset
+                        assets += Math.Abs(account.CurrentBalance);
+                    }
                 }
                 else
                 {
-                    assets += account.CurrentBalance;
+                    // For asset accounts: positive = asset, negative = overdraft (liability)
+                    if (account.CurrentBalance >= 0)
+                    {
+                        assets += account.CurrentBalance;
+                    }
+                    else
+                    {
+                        // Negative balance on asset account = overdraft = liability
+                        liabilities += Math.Abs(account.CurrentBalance);
+                    }
                 }
             }
 
@@ -361,11 +383,37 @@ public class AccountService : IAccountService
             ? "Balance adjustment"
             : $"Balance adjustment: {request.Notes}";
 
+        // Determine transaction type based on account type and balance change
+        // For liability accounts (CreditCard, Loan):
+        //   - Balance increases (more debt) → Send (you spent money)
+        //   - Balance decreases (less debt) → Receive (you paid back)
+        // For asset accounts (Bank, Cash, etc.):
+        //   - Balance increases → Receive (money came in)
+        //   - Balance decreases → Send (money went out)
+        var liabilityTypes = new[] { AccountType.CreditCard, AccountType.Loan };
+        var isLiability = liabilityTypes.Contains(account.Type);
+        
+        TransactionType transactionType;
+        if (isLiability)
+        {
+            // For liability accounts, invert the logic:
+            // Increasing debt (positive difference) = spending = Send
+            // Decreasing debt (negative difference) = payment = Receive
+            transactionType = difference > 0 ? TransactionType.Send : TransactionType.Receive;
+        }
+        else
+        {
+            // For asset accounts, standard logic:
+            // Positive difference = money in = Receive
+            // Negative difference = money out = Send
+            transactionType = difference > 0 ? TransactionType.Receive : TransactionType.Send;
+        }
+
         var transaction = new Transaction
         {
             UserId = userId,
             AccountId = id,
-            Type = difference > 0 ? TransactionType.Receive : TransactionType.Send,
+            Type = transactionType,
             Amount = Math.Abs(difference),
             Currency = account.Currency,
             Date = DateTime.UtcNow,

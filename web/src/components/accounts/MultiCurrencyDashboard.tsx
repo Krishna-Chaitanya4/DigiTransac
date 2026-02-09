@@ -9,6 +9,7 @@ import { memo, useMemo, useState } from 'react';
 import { useCurrency } from '../../context/CurrencyContext';
 import { getCurrencySymbol } from '../../services/currencyService';
 import type { Account } from '../../services/accountService';
+import { accountTypeConfig } from '../../services/accountService';
 
 interface CurrencyBreakdown {
   currency: string;
@@ -219,9 +220,14 @@ export const MultiCurrencyDashboard = memo(function MultiCurrencyDashboard({
         </div>
         <div className="text-center">
           <p className="text-2xl font-bold">
-            {accounts.filter(a => a.currentBalance > 0).length}
+            {accounts.filter(a => {
+              // For liability accounts, "good" means zero or negative balance (paid off)
+              // For asset accounts, "good" means positive balance
+              const isLiability = accountTypeConfig[a.type]?.isLiability ?? false;
+              return isLiability ? a.currentBalance <= 0 : a.currentBalance > 0;
+            }).length}
           </p>
-          <p className="text-xs opacity-75">Positive</p>
+          <p className="text-xs opacity-75">In Good Standing</p>
         </div>
       </div>
     </div>
