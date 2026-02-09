@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Account, formatCurrency } from '../../services/accountService';
+import { Account, formatCurrency, accountTypeConfig } from '../../services/accountService';
 import { getCurrencySymbol } from '../../services/currencyService';
 
 interface AdjustBalanceModalProps {
@@ -67,7 +67,13 @@ export function AdjustBalanceModal({ isOpen, onClose, onSubmit, account, isLoadi
                   />
                 </div>
                 {difference !== 0 && (
-                  <p className={`mt-1 text-sm ${difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  <p className={`mt-1 text-sm ${(() => {
+                    const isLiability = accountTypeConfig[account.type]?.isLiability ?? false;
+                    // For liabilities: positive diff (more debt) = red, negative diff (less debt) = green
+                    // For assets: positive diff = green, negative diff = red
+                    const isPositive = isLiability ? difference < 0 : difference > 0;
+                    return isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                  })()}`}>
                     {difference > 0 ? '+' : ''}{formatCurrency(difference, account.currency)}
                   </p>
                 )}

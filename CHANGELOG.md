@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-02-09
+
+### Fixed
+- **Liability Account Balance Calculations**: Fixed incorrect balance handling for credit cards and loans
+  - Backend (`AdjustBalanceAsync`): Now creates correct transaction types for liability accounts
+    - Increasing debt (e.g., 500→4000) creates `Send` transaction (money spent)
+    - Decreasing debt (e.g., 500→400) creates `Receive` transaction (payment made)
+  - Backend (`GetSummaryAsync`): Properly categorizes negative liability balances
+    - Negative balance on credit card (overpayment) now correctly counted as asset
+    - Negative balance on bank account (overdraft) now correctly counted as liability
+  - Net worth calculation now handles edge cases correctly
+- **Consistent Balance Color Coding**: Unified color scheme across all account types
+  - `AdjustBalanceModal`: Balance difference shows contextually appropriate colors for liability accounts
+  - `AccountCard`: Now shows consistent green/red coloring for all account types
+  - `AccountsPage`: Account type totals now show green/red colors with appropriate signs
+  - `AccountSummaryCard`: Liabilities now display with negative sign (−) for clarity
+  - `MultiCurrencyDashboard`: "In Good Standing" count now correctly evaluates liability accounts
+    - 🟢 Green = Good (positive balance on assets, paid-off liabilities)
+    - 🔴 Red = Bad (overdraft on assets, debt on liabilities)
+    - Shows negative sign (−) for liabilities with debt and assets with overdraft
+
 ## [1.1.5] - 2026-02-07
 
 ### Fixed
