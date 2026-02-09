@@ -91,13 +91,18 @@ export function formatCurrency(amount: number, currencyCode: string = 'INR'): st
   // Determine decimal places based on currency
   const fractionDigits = upperCode === 'JPY' || upperCode === 'KRW' ? 0 : 2;
   
-  // Format the number with proper locale formatting
-  const formattedNumber = amount.toLocaleString(config?.locale || 'en-US', {
+  // Handle negative numbers: place sign before currency symbol
+  const isNegative = amount < 0;
+  const absAmount = Math.abs(amount);
+  
+  // Format the number with proper locale formatting (always positive)
+  const formattedNumber = absAmount.toLocaleString(config?.locale || 'en-US', {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   });
   
-  return `${symbol}${formattedNumber}`;
+  // Return with proper sign placement: -₹5,000 not ₹-5,000
+  return isNegative ? `−${symbol}${formattedNumber}` : `${symbol}${formattedNumber}`;
 }
 
 export function getCurrencySymbol(currencyCode: string): string {

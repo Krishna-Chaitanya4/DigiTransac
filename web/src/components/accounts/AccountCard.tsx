@@ -129,11 +129,11 @@ export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArch
             className={`text-2xl font-bold ${
               config.isLiability
                 ? account.currentBalance > 0
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-green-600 dark:text-green-400'
+                  ? 'text-red-600 dark:text-red-400'    // Liability with debt = bad (red)
+                  : 'text-green-600 dark:text-green-400' // Liability paid off/overpayment = good (green)
                 : account.currentBalance >= 0
-                ? 'text-gray-900 dark:text-gray-100'
-                : 'text-red-600 dark:text-red-400'
+                ? 'text-green-600 dark:text-green-400'  // Asset with money = good (green)
+                : 'text-red-600 dark:text-red-400'      // Asset overdraft = bad (red)
             }`}
           >
             {formatCurrency(account.currentBalance, account.currency)}
