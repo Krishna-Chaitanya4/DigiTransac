@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { ConversationSummary } from '../../types/conversations';
 import { getDisplayName, formatRelativeTime } from '../../services/conversationService';
+import { formatCurrency } from '../../services/currencyService';
 
 interface ConversationItemProps {
   conversation: ConversationSummary;
@@ -17,6 +18,18 @@ export const ConversationItem = memo(function ConversationItem({
   const displayName = isSelfChat
     ? 'Personal'
     : getDisplayName(conversation.counterpartyName, conversation.counterpartyEmail);
+
+  // Determine if last message was a transaction type
+  const isTransactionPreview = conversation.lastMessageType === 'Transaction';
+  
+  // Determine transaction preview color based on direction (Sent = red, Received = green)
+  const previewText = conversation.lastMessagePreview ?? '';
+  const isSentTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('sent');
+  const isReceivedTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('received');
+  
+  // Check if we have transaction totals to show
+  const hasTransactions = (conversation.totalSent ?? 0) > 0 || (conversation.totalReceived ?? 0) > 0;
+  const currency = conversation.primaryCurrency ?? 'INR';
 
   return (
     <button
@@ -49,9 +62,36 @@ export const ConversationItem = memo(function ConversationItem({
           </span>
         </div>
 
-        <p className="text-sm text-gray-600 dark:text-gray-400 truncate mt-0.5">
+        {/* Last message preview - enhanced for transactions with directional colors */}
+        <p className={`text-sm truncate mt-0.5 ${
+          isSentTransaction
+            ? 'text-red-500 dark:text-red-400 font-medium'
+            : isReceivedTransaction
+              ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+              : isTransactionPreview
+                ? 'text-blue-600 dark:text-blue-400 font-medium'
+                : 'text-gray-600 dark:text-gray-400'
+        }`}>
           {conversation.lastMessagePreview || 'No messages yet'}
         </p>
+
+        {/* Transaction totals - show for non-self chats with transactions */}
+        {!isSelfChat && hasTransactions && (
+          <div className="flex items-center gap-3 mt-1 text-xs">
+            {(conversation.totalSent ?? 0) > 0 && (
+              <span className="text-red-500 dark:text-red-400 flex items-center gap-1">
+                <span>↑</span>
+                <span>{formatCurrency(conversation.totalSent ?? 0, currency)}</span>
+              </span>
+            )}
+            {(conversation.totalReceived ?? 0) > 0 && (
+              <span className="text-green-500 dark:text-green-400 flex items-center gap-1">
+                <span>↓</span>
+                <span>{formatCurrency(conversation.totalReceived ?? 0, currency)}</span>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Unread badge */}

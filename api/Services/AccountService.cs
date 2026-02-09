@@ -4,6 +4,34 @@ using DigiTransac.Api.Repositories;
 
 namespace DigiTransac.Api.Services;
 
+/// <summary>
+/// Utility class for formatting currency amounts in chat messages.
+/// Uses CurrencyConfig from ExchangeRate.cs as the single source of truth.
+/// </summary>
+internal static class AccountCurrencyFormatter
+{
+    /// <summary>
+    /// Get the symbol for a currency code
+    /// </summary>
+    public static string GetSymbol(string currencyCode)
+    {
+        if (string.IsNullOrEmpty(currencyCode))
+            return "";
+            
+        var currencyInfo = CurrencyConfig.GetCurrency(currencyCode);
+        return currencyInfo.Symbol;
+    }
+    
+    /// <summary>
+    /// Format an amount with its currency symbol
+    /// </summary>
+    public static string Format(decimal amount, string currencyCode)
+    {
+        var symbol = GetSymbol(currencyCode);
+        return $"{symbol}{amount:N2}";
+    }
+}
+
 public interface IAccountService
 {
     Task<List<AccountResponse>> GetAllAsync(string userId, bool includeArchived = false);
@@ -27,6 +55,7 @@ public class AccountService : IAccountService
     private readonly IDekCacheService _dekCacheService;
     private readonly IEncryptionService _encryptionService;
     private readonly ILabelService _labelService;
+    private readonly IChatMessageRepository _chatMessageRepository;
 
     public AccountService(
         IAccountRepository accountRepository,
@@ -36,7 +65,8 @@ public class AccountService : IAccountService
         IKeyManagementService keyManagementService,
         IDekCacheService dekCacheService,
         IEncryptionService encryptionService,
-        ILabelService labelService)
+        ILabelService labelService,
+        IChatMessageRepository chatMessageRepository)
     {
         _accountRepository = accountRepository;
         _transactionRepository = transactionRepository;
@@ -46,6 +76,7 @@ public class AccountService : IAccountService
         _dekCacheService = dekCacheService;
         _encryptionService = encryptionService;
         _labelService = labelService;
+        _chatMessageRepository = chatMessageRepository;
     }
 
     private async Task<byte[]?> GetUserDekAsync(string userId)
@@ -438,6 +469,22 @@ public class AccountService : IAccountService
         account.CurrentBalance = request.NewBalance;
         account.UpdatedAt = DateTime.UtcNow;
         await _accountRepository.UpdateAsync(account);
+
+        // Create a chat message in the personal conversation for audit trail
+        // Format: "Balance Adjustment: HDFC Bank +₹1,000.00 → ₹15,000.00"
+        var formattedDifference = difference > 0
+            ? $"+{AccountCurrencyFormatter.Format(difference, account.Currency)}"
+            : $"-{AccountCurrencyFormatter.Format(Math.Abs(difference), account.Currency)}";
+        var formattedNewBalance = AccountCurrencyFormatter.Format(request.NewBalance, account.Currency);
+        var chatContent = $"Balance Adjustment: {account.Name} {formattedDifference} → {formattedNewBalance}";
+        
+        await _chatMessageRepository.CreateSystemMessageAsync(
+            userId: userId,
+            counterpartyUserId: userId, // Self-chat (personal conversation)
+            content: chatContent,
+            systemSource: "BalanceAdjustment",
+            transactionId: transaction.Id
+        );
 
         return (true, "Balance adjusted successfully");
     }
