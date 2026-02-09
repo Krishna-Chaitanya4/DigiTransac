@@ -8,7 +8,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Use injectManifest for custom service worker with push notification support
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
+      injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'robots.txt'],
       manifest: {
         name: 'DigiTransac - Digital Finance Tracker',
@@ -71,163 +76,12 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        // Cache static assets
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        // Runtime caching for API calls
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/.*\/api\/transactions/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'transactions-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              },
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/labels/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'labels-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-              },
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/accounts/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'accounts-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              },
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/budgets/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'budgets-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 12 // 12 hours
-              },
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/conversations/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'conversations-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              },
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/dashboard/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'dashboard-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 // 1 hour
-              },
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/api\.qrserver\.com/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'qr-code-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          // Map tiles - cached aggressively since they don't change
-          {
-            urlPattern: /^https:\/\/[a-z]\.tile\.openstreetmap\.org/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'map-tiles-osm',
-              expiration: {
-                maxEntries: 500,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/[a-z]\.basemaps\.cartocdn\.com/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'map-tiles-carto',
-              expiration: {
-                maxEntries: 500,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          // Location/Geocoding API responses
-          {
-            urlPattern: /^https:\/\/nominatim\.openstreetmap\.org/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'geocoding-cache',
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
       },
       devOptions: {
-        enabled: true
+        enabled: true,
+        type: 'module'
       }
     }),
     // Bundle analysis - generates stats.html after build
