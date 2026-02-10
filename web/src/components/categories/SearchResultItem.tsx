@@ -38,7 +38,7 @@ export function SearchResultItem({ label, path, onEdit, onDelete }: SearchResult
       )}
       {/* Only show edit/delete for non-system labels */}
       {!isSystem && (
-        <div className="hidden group-hover:flex items-center gap-1">
+        <div className="flex md:opacity-0 md:group-hover:opacity-100 items-center gap-1 transition-opacity">
           <button
             onClick={() => onEdit(label)}
             className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"

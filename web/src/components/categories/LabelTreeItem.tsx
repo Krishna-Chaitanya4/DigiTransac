@@ -69,8 +69,8 @@ export function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expa
           />
         )}
 
-        {/* Actions */}
-        <div className="hidden group-hover:flex items-center gap-1">
+        {/* Actions - visible on mobile, hover on desktop */}
+        <div className="flex md:opacity-0 md:group-hover:opacity-100 items-center gap-1 transition-opacity">
           {isFolder && (
             <>
               <button
