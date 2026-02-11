@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 
@@ -12,9 +13,9 @@ public interface ITransactionService
     // Core CRUD operations
     Task<TransactionResponse?> GetByIdAsync(string id, string userId);
     Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter);
-    Task<(bool Success, string Message, TransactionResponse? Transaction)> CreateAsync(string userId, CreateTransactionRequest request);
-    Task<(bool Success, string Message, TransactionResponse? Transaction)> UpdateAsync(string id, string userId, UpdateTransactionRequest request);
-    Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
+    Task<Result<TransactionResponse>> CreateAsync(string userId, CreateTransactionRequest request);
+    Task<Result<TransactionResponse>> UpdateAsync(string id, string userId, UpdateTransactionRequest request);
+    Task<Result> DeleteAsync(string id, string userId);
     
     // Recurring transactions
     Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId);

@@ -1,48 +1,22 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
+using DigiTransac.Api.Services.Transactions;
 
 namespace DigiTransac.Api.Services;
 
-/// <summary>
-/// Utility class for formatting currency amounts in chat messages.
-/// Uses CurrencyConfig from ExchangeRate.cs as the single source of truth.
-/// </summary>
-internal static class AccountCurrencyFormatter
-{
-    /// <summary>
-    /// Get the symbol for a currency code
-    /// </summary>
-    public static string GetSymbol(string currencyCode)
-    {
-        if (string.IsNullOrEmpty(currencyCode))
-            return "";
-            
-        var currencyInfo = CurrencyConfig.GetCurrency(currencyCode);
-        return currencyInfo.Symbol;
-    }
-    
-    /// <summary>
-    /// Format an amount with its currency symbol
-    /// </summary>
-    public static string Format(decimal amount, string currencyCode)
-    {
-        var symbol = GetSymbol(currencyCode);
-        return $"{symbol}{amount:N2}";
-    }
-}
-
 public interface IAccountService
 {
-    Task<List<AccountResponse>> GetAllAsync(string userId, bool includeArchived = false);
-    Task<AccountResponse?> GetByIdAsync(string id, string userId);
-    Task<AccountSummaryResponse> GetSummaryAsync(string userId);
-    Task<(bool Success, string Message, AccountResponse? Account)> CreateAsync(string userId, CreateAccountRequest request);
-    Task<(bool Success, string Message, AccountResponse? Account)> UpdateAsync(string id, string userId, UpdateAccountRequest request);
-    Task<(bool Success, string Message)> AdjustBalanceAsync(string id, string userId, AdjustBalanceRequest request);
-    Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderAccountsRequest request);
-    Task<(bool Success, string Message)> SetDefaultAsync(string id, string userId);
-    Task<(bool Success, string Message, string ErrorType)> DeleteAsync(string id, string userId);
+    Task<List<AccountResponse>> GetAllAsync(string userId, bool includeArchived = false, CancellationToken ct = default);
+    Task<AccountResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<AccountSummaryResponse> GetSummaryAsync(string userId, CancellationToken ct = default);
+    Task<Result<AccountResponse>> CreateAsync(string userId, CreateAccountRequest request, CancellationToken ct = default);
+    Task<Result<AccountResponse>> UpdateAsync(string id, string userId, UpdateAccountRequest request, CancellationToken ct = default);
+    Task<Result> AdjustBalanceAsync(string id, string userId, AdjustBalanceRequest request, CancellationToken ct = default);
+    Task<Result> ReorderAsync(string userId, ReorderAccountsRequest request, CancellationToken ct = default);
+    Task<Result> SetDefaultAsync(string id, string userId, CancellationToken ct = default);
+    Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default);
 }
 
 public class AccountService : IAccountService
@@ -51,9 +25,7 @@ public class AccountService : IAccountService
     private readonly ITransactionRepository _transactionRepository;
     private readonly IUserRepository _userRepository;
     private readonly IExchangeRateService _exchangeRateService;
-    private readonly IKeyManagementService _keyManagementService;
-    private readonly IDekCacheService _dekCacheService;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ITransactionMapperService _mapperService;
     private readonly ILabelService _labelService;
     private readonly IChatMessageRepository _chatMessageRepository;
 
@@ -62,9 +34,7 @@ public class AccountService : IAccountService
         ITransactionRepository transactionRepository,
         IUserRepository userRepository,
         IExchangeRateService exchangeRateService,
-        IKeyManagementService keyManagementService,
-        IDekCacheService dekCacheService,
-        IEncryptionService encryptionService,
+        ITransactionMapperService mapperService,
         ILabelService labelService,
         IChatMessageRepository chatMessageRepository)
     {
@@ -72,70 +42,15 @@ public class AccountService : IAccountService
         _transactionRepository = transactionRepository;
         _userRepository = userRepository;
         _exchangeRateService = exchangeRateService;
-        _keyManagementService = keyManagementService;
-        _dekCacheService = dekCacheService;
-        _encryptionService = encryptionService;
+        _mapperService = mapperService;
         _labelService = labelService;
         _chatMessageRepository = chatMessageRepository;
     }
 
-    private async Task<byte[]?> GetUserDekAsync(string userId)
+    public async Task<List<AccountResponse>> GetAllAsync(string userId, bool includeArchived = false, CancellationToken ct = default)
     {
-        // Try cache first
-        var cachedDek = _dekCacheService.GetDek(userId);
-        if (cachedDek != null)
-        {
-            return cachedDek;
-        }
-
-        // Get user from database
-        var user = await _userRepository.GetByIdAsync(userId);
-        if (user == null)
-        {
-            return null;
-        }
-
-        // If user doesn't have a DEK, generate one (migration for existing users)
-        if (user.WrappedDek == null)
-        {
-            var newDek = _keyManagementService.GenerateDek();
-            var wrappedDek = await _keyManagementService.WrapKeyAsync(newDek);
-            user.WrappedDek = wrappedDek;
-            await _userRepository.UpdateAsync(user);
-            _dekCacheService.SetDek(userId, newDek);
-            return newDek;
-        }
-
-        // Unwrap and cache
-        var dek = await _keyManagementService.UnwrapKeyAsync(user.WrappedDek);
-        _dekCacheService.SetDek(userId, dek);
-        return dek;
-    }
-
-    private string? EncryptIfNotEmpty(string? value, byte[] dek)
-    {
-        if (string.IsNullOrEmpty(value)) return value;
-        return _encryptionService.Encrypt(value, dek);
-    }
-
-    private string? DecryptIfNotEmpty(string? value, byte[] dek)
-    {
-        if (string.IsNullOrEmpty(value)) return value;
-        try
-        {
-            return _encryptionService.Decrypt(value, dek);
-        }
-        catch
-        {
-            // Return original value if decryption fails (legacy unencrypted data)
-            return value;
-        }
-    }
-
-    public async Task<List<AccountResponse>> GetAllAsync(string userId, bool includeArchived = false)
-    {
-        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived);
-        var dek = await GetUserDekAsync(userId);
+        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived, ct);
+        var dek = await _mapperService.GetUserDekAsync(userId);
         
         // Batch get transaction counts for all accounts
         var accountIds = accounts.Select(a => a.Id).ToList();
@@ -144,19 +59,19 @@ public class AccountService : IAccountService
         return accounts.Select(a => MapToResponse(a, transactionCounts.GetValueOrDefault(a.Id, 0), dek)).ToList();
     }
 
-    public async Task<AccountResponse?> GetByIdAsync(string id, string userId)
+    public async Task<AccountResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
+        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (account == null) return null;
         
-        var dek = await GetUserDekAsync(userId);
+        var dek = await _mapperService.GetUserDekAsync(userId);
         var transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
         return MapToResponse(account, transactionCount, dek);
     }
 
-    public async Task<AccountSummaryResponse> GetSummaryAsync(string userId)
+    public async Task<AccountSummaryResponse> GetSummaryAsync(string userId, CancellationToken ct = default)
     {
-        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: false);
+        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: false, ct);
         var includedAccounts = accounts.Where(a => a.IncludeInNetWorth).ToList();
         
         // Get user's primary currency preference
@@ -266,25 +181,19 @@ public class AccountService : IAccountService
         );
     }
 
-    public async Task<(bool Success, string Message, AccountResponse? Account)> CreateAsync(string userId, CreateAccountRequest request)
+    public async Task<Result<AccountResponse>> CreateAsync(string userId, CreateAccountRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return (false, "Account name is required", null);
-        }
+            return Error.Validation("Account name is required");
 
         if (!Enum.TryParse<AccountType>(request.Type, true, out var accountType))
-        {
-            return (false, "Invalid account type", null);
-        }
+            return Error.Validation("Invalid account type");
 
         // Check for duplicate account name
-        if (await _accountRepository.ExistsByNameAsync(request.Name, userId))
-        {
-            return (false, "An account with this name already exists", null);
-        }
+        if (await _accountRepository.ExistsByNameAsync(request.Name, userId, ct))
+            return Error.Conflict("An account with this name already exists");
 
-        var count = await _accountRepository.GetCountByUserIdAsync(userId);
+        var count = await _accountRepository.GetCountByUserIdAsync(userId, ct);
 
         // Get user's primary currency if not specified
         var currency = request.Currency;
@@ -295,7 +204,7 @@ public class AccountService : IAccountService
         }
 
         // Get user's DEK for encryption
-        var dek = await GetUserDekAsync(userId);
+        var dek = await _mapperService.GetUserDekAsync(userId);
 
         var account = new Account
         {
@@ -309,11 +218,11 @@ public class AccountService : IAccountService
             CurrentBalance = request.InitialBalance ?? 0,
             Institution = request.Institution,
             // Encrypt sensitive fields with server-managed DEK
-            AccountNumber = dek != null 
-                ? EncryptIfNotEmpty(request.AccountNumber, dek)
+            AccountNumber = dek != null
+                ? _mapperService.EncryptIfNotEmpty(request.AccountNumber, dek)
                 : request.AccountNumber,
-            Notes = dek != null 
-                ? EncryptIfNotEmpty(request.Notes, dek)
+            Notes = dek != null
+                ? _mapperService.EncryptIfNotEmpty(request.Notes, dek)
                 : request.Notes,
             IncludeInNetWorth = request.IncludeInNetWorth ?? true,
             Order = count,
@@ -321,28 +230,24 @@ public class AccountService : IAccountService
             UpdatedAt = DateTime.UtcNow
         };
 
-        await _accountRepository.CreateAsync(account);
+        await _accountRepository.CreateAsync(account, ct);
         // New account has 0 transactions
-        return (true, "Account created successfully", MapToResponse(account, 0, dek));
+        return MapToResponse(account, 0, dek);
     }
 
-    public async Task<(bool Success, string Message, AccountResponse? Account)> UpdateAsync(string id, string userId, UpdateAccountRequest request)
+    public async Task<Result<AccountResponse>> UpdateAsync(string id, string userId, UpdateAccountRequest request, CancellationToken ct = default)
     {
-        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
+        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (account == null)
-        {
-            return (false, "Account not found", null);
-        }
+            return DomainErrors.Account.NotFound(id);
 
         // Get user's DEK for encryption
-        var dek = await GetUserDekAsync(userId);
+        var dek = await _mapperService.GetUserDekAsync(userId);
 
         if (request.Name != null)
         {
             if (string.IsNullOrWhiteSpace(request.Name))
-            {
-                return (false, "Account name cannot be empty", null);
-            }
+                return Error.Validation("Account name cannot be empty");
             account.Name = request.Name.Trim();
         }
 
@@ -355,9 +260,7 @@ public class AccountService : IAccountService
         {
             transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
             if (transactionCount > 0)
-            {
-                return (false, $"Currency cannot be changed. This account has {transactionCount} transaction(s). Archive this account and create a new one instead.", null);
-            }
+                return Error.Validation($"Currency cannot be changed. This account has {transactionCount} transaction(s). Archive this account and create a new one instead.");
             account.Currency = request.Currency;
         }
         
@@ -365,51 +268,47 @@ public class AccountService : IAccountService
         // Encrypt sensitive fields with server-managed DEK on update
         if (request.AccountNumber != null)
         {
-            account.AccountNumber = dek != null 
-                ? EncryptIfNotEmpty(request.AccountNumber, dek)
+            account.AccountNumber = dek != null
+                ? _mapperService.EncryptIfNotEmpty(request.AccountNumber, dek)
                 : request.AccountNumber;
         }
         if (request.Notes != null)
         {
-            account.Notes = dek != null 
-                ? EncryptIfNotEmpty(request.Notes, dek)
+            account.Notes = dek != null
+                ? _mapperService.EncryptIfNotEmpty(request.Notes, dek)
                 : request.Notes;
         }
         if (request.IsArchived.HasValue) account.IsArchived = request.IsArchived.Value;
         if (request.IncludeInNetWorth.HasValue) account.IncludeInNetWorth = request.IncludeInNetWorth.Value;
         if (request.Order.HasValue) account.Order = request.Order.Value;
 
-        await _accountRepository.UpdateAsync(account);
+        await _accountRepository.UpdateAsync(account, ct: ct);
         
         // Get transaction count for the updated response (if not already fetched)
         if (transactionCount == 0)
         {
             transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
         }
-        return (true, "Account updated successfully", MapToResponse(account, transactionCount, dek));
+        return MapToResponse(account, transactionCount, dek);
     }
 
-    public async Task<(bool Success, string Message)> AdjustBalanceAsync(string id, string userId, AdjustBalanceRequest request)
+    public async Task<Result> AdjustBalanceAsync(string id, string userId, AdjustBalanceRequest request, CancellationToken ct = default)
     {
-        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
+        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (account == null)
-        {
-            return (false, "Account not found");
-        }
+            return DomainErrors.Account.NotFound(id);
 
         var difference = request.NewBalance - account.CurrentBalance;
         
         // If there's no change, just return success
         if (difference == 0)
-        {
-            return (true, "Balance is already at the requested value");
-        }
+            return Result.Success();
 
         // Get or create the "Balance Adjustment" system category
-        var adjustmentCategory = await _labelService.GetOrCreateAdjustmentsCategoryAsync(userId);
+        var adjustmentCategory = await _labelService.GetOrCreateAdjustmentsCategoryAsync(userId, ct);
 
         // Create an adjustment transaction to maintain data integrity
-        var dek = await GetUserDekAsync(userId);
+        var dek = await _mapperService.GetUserDekAsync(userId);
         var adjustmentNotes = string.IsNullOrWhiteSpace(request.Notes)
             ? "Balance adjustment"
             : $"Balance adjustment: {request.Notes}";
@@ -449,7 +348,7 @@ public class AccountService : IAccountService
             Currency = account.Currency,
             Date = DateTime.UtcNow,
             Title = "Balance Adjustment",
-            EncryptedNotes = dek != null ? EncryptIfNotEmpty(adjustmentNotes, dek) : adjustmentNotes,
+            EncryptedNotes = dek != null ? _mapperService.EncryptIfNotEmpty(adjustmentNotes, dek) : adjustmentNotes,
             Status = TransactionStatus.Confirmed,
             Splits = new List<TransactionSplit>
             {
@@ -468,14 +367,14 @@ public class AccountService : IAccountService
         // Update account balance
         account.CurrentBalance = request.NewBalance;
         account.UpdatedAt = DateTime.UtcNow;
-        await _accountRepository.UpdateAsync(account);
+        await _accountRepository.UpdateAsync(account, ct: ct);
 
         // Create a chat message in the personal conversation for audit trail
         // Format: "Balance Adjustment: HDFC Bank +₹1,000.00 → ₹15,000.00"
         var formattedDifference = difference > 0
-            ? $"+{AccountCurrencyFormatter.Format(difference, account.Currency)}"
-            : $"-{AccountCurrencyFormatter.Format(Math.Abs(difference), account.Currency)}";
-        var formattedNewBalance = AccountCurrencyFormatter.Format(request.NewBalance, account.Currency);
+            ? $"+{CurrencyFormatter.Format(difference, account.Currency)}"
+            : $"-{CurrencyFormatter.Format(Math.Abs(difference), account.Currency)}";
+        var formattedNewBalance = CurrencyFormatter.Format(request.NewBalance, account.Currency);
         var chatContent = $"Balance Adjustment: {account.Name} {formattedDifference} → {formattedNewBalance}";
         
         await _chatMessageRepository.CreateSystemMessageAsync(
@@ -486,71 +385,56 @@ public class AccountService : IAccountService
             transactionId: transaction.Id
         );
 
-        return (true, "Balance adjusted successfully");
+        return Result.Success();
     }
 
-    public async Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderAccountsRequest request)
+    public async Task<Result> ReorderAsync(string userId, ReorderAccountsRequest request, CancellationToken ct = default)
     {
-        foreach (var item in request.Items)
-        {
-            var account = await _accountRepository.GetByIdAndUserIdAsync(item.Id, userId);
-            if (account != null)
-            {
-                account.Order = item.Order;
-                await _accountRepository.UpdateAsync(account);
-            }
-        }
+        var orderMap = request.Items.ToDictionary(item => item.Id, item => item.Order);
+        await _accountRepository.BulkUpdateOrderAsync(userId, orderMap, ct);
 
-        return (true, "Accounts reordered successfully");
+        return Result.Success();
     }
 
-    public async Task<(bool Success, string Message)> SetDefaultAsync(string id, string userId)
+    public async Task<Result> SetDefaultAsync(string id, string userId, CancellationToken ct = default)
     {
-        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
+        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (account == null)
-        {
-            return (false, "Account not found");
-        }
+            return DomainErrors.Account.NotFound(id);
 
         if (account.IsArchived)
-        {
-            return (false, "Cannot set archived account as default");
-        }
+            return DomainErrors.Account.Archived;
 
         // Clear existing default
-        var allAccounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: false);
+        var allAccounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: false, ct);
         foreach (var acc in allAccounts.Where(a => a.IsDefault))
         {
             acc.IsDefault = false;
             acc.UpdatedAt = DateTime.UtcNow;
-            await _accountRepository.UpdateAsync(acc);
+            await _accountRepository.UpdateAsync(acc, ct: ct);
         }
 
         // Set new default
         account.IsDefault = true;
         account.UpdatedAt = DateTime.UtcNow;
-        await _accountRepository.UpdateAsync(account);
+        await _accountRepository.UpdateAsync(account, ct: ct);
 
-        return (true, "Default account set successfully");
+        return Result.Success();
     }
 
-    public async Task<(bool Success, string Message, string ErrorType)> DeleteAsync(string id, string userId)
+    public async Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default)
     {
-        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId);
+        var account = await _accountRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (account == null)
-        {
-            return (false, "Account not found", "NotFound");
-        }
+            return DomainErrors.Account.NotFound(id);
 
         // Check if account has transactions - block deletion if so
         var transactionCount = await _transactionRepository.GetCountByAccountIdAsync(id, userId);
         if (transactionCount > 0)
-        {
-            return (false, $"Cannot delete account with {transactionCount} transaction(s). Archive it instead to preserve your transaction history.", "HasTransactions");
-        }
+            return DomainErrors.Account.HasTransactions(transactionCount);
 
-        await _accountRepository.DeleteAsync(id, userId);
-        return (true, "Account deleted successfully", "");
+        await _accountRepository.DeleteAsync(id, userId, ct);
+        return Result.Success();
     }
 
     private AccountResponse MapToResponse(Account account, int transactionCount, byte[]? dek = null)
@@ -559,11 +443,11 @@ public class AccountService : IAccountService
         var canEditCurrency = transactionCount == 0;
         
         // Decrypt sensitive fields with server-managed DEK if available
-        var accountNumber = dek != null 
-            ? DecryptIfNotEmpty(account.AccountNumber, dek) 
+        var accountNumber = dek != null
+            ? _mapperService.DecryptIfNotEmpty(account.AccountNumber, dek)
             : account.AccountNumber;
-        var notes = dek != null 
-            ? DecryptIfNotEmpty(account.Notes, dek) 
+        var notes = dek != null
+            ? _mapperService.DecryptIfNotEmpty(account.Notes, dek)
             : account.Notes;
         
         return new AccountResponse(

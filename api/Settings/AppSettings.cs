@@ -4,6 +4,66 @@ public class MongoDbSettings
 {
     public string ConnectionString { get; set; } = null!;
     public string DatabaseName { get; set; } = null!;
+
+    /// <summary>
+    /// Maximum number of connections in the connection pool.
+    /// MongoDB driver default is 100.
+    /// </summary>
+    public int MaxConnectionPoolSize { get; set; } = 100;
+
+    /// <summary>
+    /// Minimum number of connections maintained in the pool.
+    /// MongoDB driver default is 0.
+    /// </summary>
+    public int MinConnectionPoolSize { get; set; } = 10;
+
+    /// <summary>
+    /// Maximum time (in seconds) a thread will wait for a connection to become available.
+    /// MongoDB driver default is 120 seconds.
+    /// </summary>
+    public int WaitQueueTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Maximum time (in seconds) a connection can remain idle before being removed.
+    /// MongoDB driver default is 600 seconds (10 minutes).
+    /// </summary>
+    public int MaxConnectionIdleTimeSeconds { get; set; } = 600;
+
+    /// <summary>
+    /// Maximum time (in seconds) a connection can be open.
+    /// MongoDB driver default is 1800 seconds (30 minutes).
+    /// </summary>
+    public int MaxConnectionLifeTimeSeconds { get; set; } = 1800;
+
+    /// <summary>
+    /// Connection timeout in seconds. How long to wait for a connection to be established.
+    /// MongoDB driver default is 30 seconds.
+    /// </summary>
+    public int ConnectTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Socket timeout in seconds for read/write operations.
+    /// MongoDB driver default is 0 (no timeout).
+    /// </summary>
+    public int SocketTimeoutSeconds { get; set; } = 0;
+
+    /// <summary>
+    /// Server selection timeout in seconds.
+    /// MongoDB driver default is 30 seconds.
+    /// </summary>
+    public int ServerSelectionTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Enable command-level retry for transient failures.
+    /// MongoDB driver default is true.
+    /// </summary>
+    public bool RetryWrites { get; set; } = true;
+
+    /// <summary>
+    /// Enable retry for read operations.
+    /// MongoDB driver default is true.
+    /// </summary>
+    public bool RetryReads { get; set; } = true;
 }
 
 public class JwtSettings

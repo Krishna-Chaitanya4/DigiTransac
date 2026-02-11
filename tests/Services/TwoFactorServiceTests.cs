@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
@@ -113,11 +114,10 @@ public class TwoFactorServiceTests
         var validCode = totp.ComputeTotp();
 
         // Act
-        var (success, message) = await _twoFactorService.EnableTwoFactorAsync(user.Id, validCode);
+        var result = await _twoFactorService.EnableTwoFactorAsync(user.Id, validCode);
 
         // Assert
-        success.Should().BeTrue();
-        message.Should().Contain("enabled");
+        result.IsSuccess.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.UpdateAsync(It.Is<User>(u => u.TwoFactorEnabled == true)), Times.Once);
     }
 
@@ -136,10 +136,10 @@ public class TwoFactorServiceTests
         _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id)).ReturnsAsync(user);
 
         // Act
-        var (success, message) = await _twoFactorService.EnableTwoFactorAsync(user.Id, "000000");
+        var result = await _twoFactorService.EnableTwoFactorAsync(user.Id, "000000");
 
         // Assert
-        success.Should().BeFalse();
+        result.IsFailure.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<User>()), Times.Never);
     }
 
@@ -158,10 +158,10 @@ public class TwoFactorServiceTests
         _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id)).ReturnsAsync(user);
 
         // Act
-        var (success, message) = await _twoFactorService.EnableTwoFactorAsync(user.Id, "123456");
+        var result = await _twoFactorService.EnableTwoFactorAsync(user.Id, "123456");
 
         // Assert
-        success.Should().BeFalse();
+        result.IsFailure.Should().BeTrue();
     }
 
     #endregion
@@ -186,11 +186,10 @@ public class TwoFactorServiceTests
         _userRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 
         // Act
-        var (success, message) = await _twoFactorService.DisableTwoFactorAsync(user.Id, password);
+        var result = await _twoFactorService.DisableTwoFactorAsync(user.Id, password);
 
         // Assert
-        success.Should().BeTrue();
-        message.Should().Contain("disabled");
+        result.IsSuccess.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.UpdateAsync(It.Is<User>(u => 
             u.TwoFactorEnabled == false && u.TwoFactorSecret == null)), Times.Once);
     }
@@ -211,10 +210,10 @@ public class TwoFactorServiceTests
         _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id)).ReturnsAsync(user);
 
         // Act
-        var (success, message) = await _twoFactorService.DisableTwoFactorAsync(user.Id, "WrongPassword");
+        var result = await _twoFactorService.DisableTwoFactorAsync(user.Id, "WrongPassword");
 
         // Assert
-        success.Should().BeFalse();
+        result.IsFailure.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<User>()), Times.Never);
     }
 
@@ -233,10 +232,10 @@ public class TwoFactorServiceTests
         _userRepositoryMock.Setup(x => x.GetByIdAsync(user.Id)).ReturnsAsync(user);
 
         // Act
-        var (success, message) = await _twoFactorService.DisableTwoFactorAsync(user.Id, "Password123!");
+        var result = await _twoFactorService.DisableTwoFactorAsync(user.Id, "Password123!");
 
         // Assert
-        success.Should().BeFalse();
+        result.IsFailure.Should().BeTrue();
     }
 
     #endregion

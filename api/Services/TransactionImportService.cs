@@ -2,6 +2,7 @@ using System.Globalization;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
+using DigiTransac.Api.Services.Transactions;
 
 namespace DigiTransac.Api.Services;
 
@@ -40,9 +41,7 @@ public class TransactionImportService : ITransactionImportService
     private readonly ITagRepository _tagRepository;
     private readonly ILabelService _labelService;
     private readonly ITagService _tagService;
-    private readonly IEncryptionService _encryptionService;
-    private readonly IKeyManagementService _keyManagementService;
-    private readonly IUserRepository _userRepository;
+    private readonly ITransactionMapperService _mapperService;
     private readonly ILogger<TransactionImportService> _logger;
 
     // Constants for import limits
@@ -58,9 +57,7 @@ public class TransactionImportService : ITransactionImportService
         ITagRepository tagRepository,
         ILabelService labelService,
         ITagService tagService,
-        IEncryptionService encryptionService,
-        IKeyManagementService keyManagementService,
-        IUserRepository userRepository,
+        ITransactionMapperService mapperService,
         ILogger<TransactionImportService> logger)
     {
         _transactionRepository = transactionRepository;
@@ -69,9 +66,7 @@ public class TransactionImportService : ITransactionImportService
         _tagRepository = tagRepository;
         _labelService = labelService;
         _tagService = tagService;
-        _encryptionService = encryptionService;
-        _keyManagementService = keyManagementService;
-        _userRepository = userRepository;
+        _mapperService = mapperService;
         _logger = logger;
     }
 
@@ -273,9 +268,9 @@ public class TransactionImportService : ITransactionImportService
                     Icon: "📁",
                     Color: "#6B7280"
                 ));
-                if (result.Success && result.Label != null)
+                if (result.IsSuccess)
                 {
-                    labelMap[labelName.ToLowerInvariant()] = result.Label.Id;
+                    labelMap[labelName.ToLowerInvariant()] = result.Value.Id;
                     createdLabels.Add(labelName);
                 }
             }
@@ -299,9 +294,9 @@ public class TransactionImportService : ITransactionImportService
                     Name: tagName,
                     Color: "#6B7280"
                 ));
-                if (result.Success && result.Tag != null)
+                if (result.IsSuccess)
                 {
-                    tagMap[tagName.ToLowerInvariant()] = result.Tag.Id;
+                    tagMap[tagName.ToLowerInvariant()] = result.Value.Id;
                     createdTags.Add(tagName);
                 }
             }
@@ -312,18 +307,17 @@ public class TransactionImportService : ITransactionImportService
             ? await GetExistingTransactionsForDuplicateCheck(userId, request.AccountId)
             : new List<Transaction>();
 
-        // Get user's DEK for encryption
-        var user = await _userRepository.GetByIdAsync(userId);
-        byte[]? dek = null;
-        if (user?.WrappedDek != null)
-        {
-            dek = await _keyManagementService.UnwrapKeyAsync(user.WrappedDek);
-        }
+        // Get user's DEK for encryption via centralized mapper service
+        var dek = await _mapperService.GetUserDekAsync(userId);
 
         var results = new List<ImportResult>();
         int successCount = 0;
         int failedCount = 0;
         int skippedDuplicates = 0;
+
+        // Pre-fetch labels once for default label resolution (avoids N+1 in CreateTransaction)
+        var allLabels = await _labelRepository.GetByUserIdAsync(userId);
+        var defaultLabel = allLabels.FirstOrDefault(l => l.Type == LabelType.Category);
 
         for (int i = 0; i < request.Transactions.Count; i++)
         {
@@ -348,8 +342,8 @@ public class TransactionImportService : ITransactionImportService
 
             try
             {
-                var transaction = await CreateTransaction(userId, request.AccountId, account.Currency, 
-                    row, labelMap, tagMap, dek, request.DateTimezone);
+                var transaction = await CreateTransaction(userId, request.AccountId, account.Currency,
+                    row, labelMap, tagMap, dek, request.DateTimezone, defaultLabel);
                 
                 successCount++;
                 results.Add(new ImportResult(rowNumber, true, transaction.Id, null));
@@ -805,14 +799,15 @@ public class TransactionImportService : ITransactionImportService
     }
 
     private async Task<Transaction> CreateTransaction(
-        string userId, 
-        string accountId, 
+        string userId,
+        string accountId,
         string currency,
         ImportTransactionRequest row,
         Dictionary<string, string> labelMap,
         Dictionary<string, string> tagMap,
         byte[]? dek,
-        string? timezone)
+        string? timezone,
+        Label? defaultLabel = null)
     {
         var date = DateTime.ParseExact(row.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture);
         
@@ -835,20 +830,15 @@ public class TransactionImportService : ITransactionImportService
             }
         }
 
-        // If no label mapped, get or create a default one
-        if (splits.Count == 0)
+        // If no label mapped, use the pre-fetched default label (avoids N+1)
+        if (splits.Count == 0 && defaultLabel != null)
         {
-            var labels = await _labelRepository.GetByUserIdAsync(userId);
-            var defaultLabel = labels.FirstOrDefault(l => l.Type == LabelType.Category);
-            if (defaultLabel != null)
+            splits.Add(new TransactionSplit
             {
-                splits.Add(new TransactionSplit
-                {
-                    LabelId = defaultLabel.Id,
-                    Amount = row.Amount,
-                    Notes = null
-                });
-            }
+                LabelId = defaultLabel.Id,
+                Amount = row.Amount,
+                Notes = null
+            });
         }
 
         // Map tags
@@ -865,15 +855,9 @@ public class TransactionImportService : ITransactionImportService
             }
         }
 
-        // Encrypt sensitive fields if DEK is available
-        string? encryptedPayee = null;
-        string? encryptedNotes = null;
-        
-        if (dek != null)
-        {
-            encryptedPayee = _encryptionService.EncryptIfNotEmpty(row.Payee, dek);
-            encryptedNotes = _encryptionService.EncryptIfNotEmpty(row.Notes, dek);
-        }
+        // Encrypt sensitive fields via centralized mapper service
+        string? encryptedPayee = dek != null ? _mapperService.EncryptIfNotEmpty(row.Payee, dek) : null;
+        string? encryptedNotes = dek != null ? _mapperService.EncryptIfNotEmpty(row.Notes, dek) : null;
 
         // Create transaction
         var transaction = new Transaction

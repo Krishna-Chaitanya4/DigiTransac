@@ -1,95 +1,78 @@
 namespace DigiTransac.Api.Services.Caching;
 
 /// <summary>
-/// Abstraction for caching operations.
-/// Supports cache-aside pattern with automatic refresh.
+/// Abstraction for caching operations with support for tags, pattern-based removal,
+/// and configurable expiration. Implementations include in-memory (MemoryCacheService)
+/// and distributed Redis (RedisCacheService).
 /// </summary>
 public interface ICacheService
 {
     /// <summary>
-    /// Gets an item from cache, or creates it using the factory if not present.
-    /// </summary>
-    Task<T?> GetOrCreateAsync<T>(
-        string key, 
-        Func<Task<T>> factory, 
-        CacheOptions? options = null,
-        CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Gets an item from cache by key.
+    /// Gets a cached value by key, returning default if not found or expired.
     /// </summary>
     Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
-    /// Sets an item in cache.
+    /// Sets a value in cache with the specified options.
     /// </summary>
     Task SetAsync<T>(string key, T value, CacheOptions? options = null, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
-    /// Removes an item from cache.
+    /// Gets or creates a cached value. If the key exists, returns the cached value.
+    /// If not, calls the factory to create the value, caches it, and returns it.
+    /// </summary>
+    Task<T?> GetOrCreateAsync<T>(string key, Func<Task<T>> factory, CacheOptions? options = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a specific key from cache.
     /// </summary>
     Task RemoveAsync(string key, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
-    /// Removes all items matching a pattern (e.g., "user:123:*").
+    /// Removes all keys matching a glob pattern (e.g., "user:123:*").
     /// </summary>
     Task RemoveByPatternAsync(string pattern, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
-    /// Invalidates cache entries by tag.
+    /// Invalidates all cache entries associated with the given tag.
     /// </summary>
     Task InvalidateByTagAsync(string tag, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
-/// Options for cache entries
+/// Options for configuring cache entry behavior.
 /// </summary>
-public record CacheOptions
+public class CacheOptions
 {
     /// <summary>
-    /// How long the item should be cached
+    /// Absolute expiration relative to now. Defaults to 5 minutes if not set.
     /// </summary>
-    public TimeSpan? AbsoluteExpiration { get; init; }
-    
-    /// <summary>
-    /// Sliding expiration - resets each time the item is accessed
-    /// </summary>
-    public TimeSpan? SlidingExpiration { get; init; }
-    
-    /// <summary>
-    /// Tags for cache invalidation
-    /// </summary>
-    public string[]? Tags { get; init; }
-    
-    /// <summary>
-    /// Size of the cache entry (for memory cache)
-    /// </summary>
-    public int Size { get; init; } = 1;
-    
-    // Preset options for common scenarios
-    public static CacheOptions Short => new() { AbsoluteExpiration = TimeSpan.FromSeconds(30) };
-    public static CacheOptions Medium => new() { AbsoluteExpiration = TimeSpan.FromMinutes(2) };
-    public static CacheOptions Long => new() { AbsoluteExpiration = TimeSpan.FromMinutes(10) };
-    public static CacheOptions ExchangeRates => new() { AbsoluteExpiration = TimeSpan.FromMinutes(5), Tags = new[] { "exchange-rates" } };
-    
-    public static CacheOptions ForUser(string userId) => new() 
-    { 
-        AbsoluteExpiration = TimeSpan.FromMinutes(2),
-        Tags = new[] { $"user:{userId}" }
-    };
-}
+    public TimeSpan? AbsoluteExpiration { get; set; }
 
-/// <summary>
-/// Cache key generator for consistent key naming
-/// </summary>
-public static class CacheKeys
-{
-    public static string UserLabels(string userId) => $"labels:user:{userId}";
-    public static string UserTags(string userId) => $"tags:user:{userId}";
-    public static string UserAccounts(string userId) => $"accounts:user:{userId}";
-    public static string UserAccountsWithArchived(string userId) => $"accounts:user:{userId}:all";
-    public static string Transaction(string id) => $"transaction:{id}";
-    public static string UserDek(string userId) => $"dek:user:{userId}";
-    public static string ExchangeRates => "exchange-rates:latest";
-    public static string UserTransactionSummary(string userId, string filterHash) => $"summary:user:{userId}:{filterHash}";
+    /// <summary>
+    /// Sliding expiration — the entry expires if not accessed within this duration.
+    /// </summary>
+    public TimeSpan? SlidingExpiration { get; set; }
+
+    /// <summary>
+    /// Size of the cache entry (for memory-constrained caches). Defaults to 1.
+    /// </summary>
+    public long? Size { get; set; }
+
+    /// <summary>
+    /// Tags for group-based invalidation (e.g., "user:123", "transactions").
+    /// </summary>
+    public IEnumerable<string>? Tags { get; set; }
+
+    /// <summary>
+    /// Creates cache options with a simple absolute expiration.
+    /// </summary>
+    public static CacheOptions WithExpiration(TimeSpan expiration, params string[] tags)
+    {
+        return new CacheOptions
+        {
+            AbsoluteExpiration = expiration,
+            Tags = tags.Length > 0 ? tags : null
+        };
+    }
 }

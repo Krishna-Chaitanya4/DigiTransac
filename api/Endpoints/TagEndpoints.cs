@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FluentValidation;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -15,7 +16,7 @@ public static class TagEndpoints
             .RequireAuthorization();
 
         // Get all tags
-        group.MapGet("/", async (ClaimsPrincipal user, ITagService tagService) =>
+        group.MapGet("/", async (ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -23,7 +24,7 @@ public static class TagEndpoints
                 return Results.Unauthorized();
             }
 
-            var tags = await tagService.GetAllAsync(userId);
+            var tags = await tagService.GetAllAsync(userId, ct);
             return Results.Ok(tags);
         })
         .WithName("GetTags")
@@ -31,7 +32,7 @@ public static class TagEndpoints
         .CacheOutput("StaticData");
 
         // Get single tag
-        group.MapGet("/{id}", async (string id, ClaimsPrincipal user, ITagService tagService) =>
+        group.MapGet("/{id}", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -39,7 +40,7 @@ public static class TagEndpoints
                 return Results.Unauthorized();
             }
 
-            var tag = await tagService.GetByIdAsync(id, userId);
+            var tag = await tagService.GetByIdAsync(id, userId, ct);
             if (tag == null)
             {
                 return Results.NotFound(new ErrorResponse("Tag not found"));
@@ -52,7 +53,7 @@ public static class TagEndpoints
         .Produces<ErrorResponse>(404);
 
         // Create tag
-        group.MapPost("/", async (CreateTagRequest request, ClaimsPrincipal user, ITagService tagService, IValidator<CreateTagRequest> validator) =>
+        group.MapPost("/", async (CreateTagRequest request, ClaimsPrincipal user, ITagService tagService, IValidator<CreateTagRequest> validator, CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -63,20 +64,15 @@ public static class TagEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message, tag) = await tagService.CreateAsync(userId, request);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
-
-            return Results.Created($"/api/tags/{tag!.Id}", tag);
+            var result = await tagService.CreateAsync(userId, request, ct);
+            return result.ToApiResult(tag => Results.Created($"/api/tags/{tag.Id}", tag));
         })
         .WithName("CreateTag")
         .Produces<TagResponse>(201)
         .Produces<ErrorResponse>(400);
 
         // Update tag
-        group.MapPut("/{id}", async (string id, UpdateTagRequest request, ClaimsPrincipal user, ITagService tagService, IValidator<UpdateTagRequest> validator) =>
+        group.MapPut("/{id}", async (string id, UpdateTagRequest request, ClaimsPrincipal user, ITagService tagService, IValidator<UpdateTagRequest> validator, CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -87,20 +83,15 @@ public static class TagEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message, tag) = await tagService.UpdateAsync(id, userId, request);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
-
-            return Results.Ok(tag);
+            var result = await tagService.UpdateAsync(id, userId, request, ct);
+            return result.ToApiResult();
         })
         .WithName("UpdateTag")
         .Produces<TagResponse>(200)
         .Produces<ErrorResponse>(400);
 
         // Delete tag
-        group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, ITagService tagService) =>
+        group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -108,20 +99,18 @@ public static class TagEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message) = await tagService.DeleteAsync(id, userId);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
+            var result = await tagService.DeleteAsync(id, userId, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Tag deleted successfully" });
         })
         .WithName("DeleteTag")
         .Produces(200)
         .Produces<ErrorResponse>(400);
 
         // Get transaction count for a tag
-        group.MapGet("/{id}/transaction-count", async (string id, ClaimsPrincipal user, ITagService tagService) =>
+        group.MapGet("/{id}/transaction-count", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -129,14 +118,14 @@ public static class TagEndpoints
                 return Results.Unauthorized();
             }
 
-            var count = await tagService.GetTransactionCountAsync(id, userId);
+            var count = await tagService.GetTransactionCountAsync(id, userId, ct);
             return Results.Ok(new { transactionCount = count });
         })
         .WithName("GetTagTransactionCount")
         .Produces(200);
 
         // Delete tag with confirmation (removes from all transactions)
-        group.MapDelete("/{id}/confirmed", async (string id, ClaimsPrincipal user, ITagService tagService) =>
+        group.MapDelete("/{id}/confirmed", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -144,13 +133,8 @@ public static class TagEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message, transactionCount) = await tagService.DeleteWithConfirmationAsync(id, userId, confirmed: true);
-            if (!success)
-            {
-                return Results.BadRequest(new { message, transactionCount });
-            }
-
-            return Results.Ok(new { message, transactionCount });
+            var result = await tagService.DeleteWithConfirmationAsync(id, userId, confirmed: true, ct: ct);
+            return result.ToApiResult(r => Results.Ok(new { r.Message, r.TransactionCount }));
         })
         .WithName("DeleteTagConfirmed")
         .Produces(200)

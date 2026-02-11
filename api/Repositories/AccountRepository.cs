@@ -6,15 +6,16 @@ namespace DigiTransac.Api.Repositories;
 
 public interface IAccountRepository
 {
-    Task<List<Account>> GetByUserIdAsync(string userId, bool includeArchived = false);
-    Task<Account?> GetByIdAsync(string id);
-    Task<Account?> GetByIdAndUserIdAsync(string id, string userId);
-    Task<bool> ExistsByNameAsync(string name, string userId);
-    Task<Account> CreateAsync(Account account);
-    Task UpdateAsync(Account account, IClientSessionHandle? session = null);
-    Task<bool> DeleteAsync(string id, string userId);
-    Task<bool> DeleteAllByUserIdAsync(string userId);
-    Task<int> GetCountByUserIdAsync(string userId);
+    Task<List<Account>> GetByUserIdAsync(string userId, bool includeArchived = false, CancellationToken ct = default);
+    Task<Account?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<Account?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<bool> ExistsByNameAsync(string name, string userId, CancellationToken ct = default);
+    Task<Account> CreateAsync(Account account, CancellationToken ct = default);
+    Task UpdateAsync(Account account, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string id, string userId, CancellationToken ct = default);
+    Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
+    Task<int> GetCountByUserIdAsync(string userId, CancellationToken ct = default);
+    Task BulkUpdateOrderAsync(string userId, Dictionary<string, int> orderMap, CancellationToken ct = default);
 }
 
 public class AccountRepository : IAccountRepository
@@ -53,7 +54,7 @@ public class AccountRepository : IAccountRepository
         }
     }
 
-    public async Task<List<Account>> GetByUserIdAsync(string userId, bool includeArchived = false)
+    public async Task<List<Account>> GetByUserIdAsync(string userId, bool includeArchived = false, CancellationToken ct = default)
     {
         var filter = Builders<Account>.Filter.Eq(a => a.UserId, userId);
         
@@ -68,57 +69,74 @@ public class AccountRepository : IAccountRepository
         return await _accounts.Find(filter)
             .SortBy(a => a.Order)
             .ThenBy(a => a.Name)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<Account?> GetByIdAsync(string id)
+    public async Task<Account?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        return await _accounts.Find(a => a.Id == id).FirstOrDefaultAsync();
+        return await _accounts.Find(a => a.Id == id).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Account?> GetByIdAndUserIdAsync(string id, string userId)
+    public async Task<Account?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        return await _accounts.Find(a => a.Id == id && a.UserId == userId).FirstOrDefaultAsync();
+        return await _accounts.Find(a => a.Id == id && a.UserId == userId).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<bool> ExistsByNameAsync(string name, string userId)
+    public async Task<bool> ExistsByNameAsync(string name, string userId, CancellationToken ct = default)
     {
         var normalizedName = name.Trim().ToLowerInvariant();
         return await _accounts.Find(a =>
             a.UserId == userId &&
             a.Name.ToLowerInvariant() == normalizedName
-        ).AnyAsync();
+        ).AnyAsync(ct);
     }
 
-    public async Task<Account> CreateAsync(Account account)
+    public async Task<Account> CreateAsync(Account account, CancellationToken ct = default)
     {
-        await _accounts.InsertOneAsync(account);
+        await _accounts.InsertOneAsync(account, options: null, ct);
         return account;
     }
 
-    public async Task UpdateAsync(Account account, IClientSessionHandle? session = null)
+    public async Task UpdateAsync(Account account, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         account.UpdatedAt = DateTime.UtcNow;
         if (session != null)
-            await _accounts.ReplaceOneAsync(session, a => a.Id == account.Id && a.UserId == account.UserId, account);
+            await _accounts.ReplaceOneAsync(session, a => a.Id == account.Id && a.UserId == account.UserId, account, options: (ReplaceOptions?)null, ct);
         else
-            await _accounts.ReplaceOneAsync(a => a.Id == account.Id && a.UserId == account.UserId, account);
+            await _accounts.ReplaceOneAsync(a => a.Id == account.Id && a.UserId == account.UserId, account, options: (ReplaceOptions?)null, ct);
     }
 
-    public async Task<bool> DeleteAsync(string id, string userId)
+    public async Task<bool> DeleteAsync(string id, string userId, CancellationToken ct = default)
     {
-        var result = await _accounts.DeleteOneAsync(a => a.Id == id && a.UserId == userId);
+        var result = await _accounts.DeleteOneAsync(a => a.Id == id && a.UserId == userId, ct);
         return result.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteAllByUserIdAsync(string userId)
+    public async Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        var result = await _accounts.DeleteManyAsync(a => a.UserId == userId);
+        var result = await _accounts.DeleteManyAsync(a => a.UserId == userId, ct);
         return result.DeletedCount > 0;
     }
 
-    public async Task<int> GetCountByUserIdAsync(string userId)
+    public async Task<int> GetCountByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        return (int)await _accounts.CountDocumentsAsync(a => a.UserId == userId);
+        return (int)await _accounts.CountDocumentsAsync(a => a.UserId == userId, options: null, ct);
+    }
+
+    public async Task BulkUpdateOrderAsync(string userId, Dictionary<string, int> orderMap, CancellationToken ct = default)
+    {
+        if (orderMap.Count == 0) return;
+
+        var bulkOps = orderMap.Select(kvp =>
+            new UpdateOneModel<Account>(
+                Builders<Account>.Filter.And(
+                    Builders<Account>.Filter.Eq(a => a.Id, kvp.Key),
+                    Builders<Account>.Filter.Eq(a => a.UserId, userId)),
+                Builders<Account>.Update
+                    .Set(a => a.Order, kvp.Value)
+                    .Set(a => a.UpdatedAt, DateTime.UtcNow))
+        ).ToList<WriteModel<Account>>();
+
+        await _accounts.BulkWriteAsync(bulkOps, options: null, ct);
     }
 }

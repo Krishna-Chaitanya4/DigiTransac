@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -152,17 +153,17 @@ public class LabelServiceTests
     {
         // Arrange
         var request = new CreateLabelRequest("Test Folder", null, "Folder", null, null);
-        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>()))
-            .ReturnsAsync((Label l) => l);
+        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Label l, CancellationToken _) => l);
 
         // Act
         var result = await _labelService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Label.Should().NotBeNull();
-        result.Label!.Name.Should().Be("Test Folder");
-        result.Label.Type.Should().Be("Folder");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Name.Should().Be("Test Folder");
+        result.Value.Type.Should().Be("Folder");
     }
 
     [Fact]
@@ -175,8 +176,8 @@ public class LabelServiceTests
         var result = await _labelService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Name is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Name is required");
     }
 
     [Fact]
@@ -189,8 +190,8 @@ public class LabelServiceTests
         var result = await _labelService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Name is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Name is required");
     }
 
     [Fact]
@@ -203,8 +204,8 @@ public class LabelServiceTests
         var result = await _labelService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Invalid type");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Invalid type");
     }
 
     [Fact]
@@ -214,8 +215,8 @@ public class LabelServiceTests
         var parentFolder = new Label { Id = "parent", UserId = TestUserId, Name = "Parent", Type = LabelType.Folder };
         _labelRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("parent", TestUserId))
             .ReturnsAsync(parentFolder);
-        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>()))
-            .ReturnsAsync((Label l) => l);
+        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Label l, CancellationToken _) => l);
 
         var request = new CreateLabelRequest("Child", "parent", "Category", null, null);
 
@@ -223,8 +224,8 @@ public class LabelServiceTests
         var result = await _labelService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Label!.ParentId.Should().Be("parent");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ParentId.Should().Be("parent");
     }
 
     [Fact]
@@ -240,8 +241,8 @@ public class LabelServiceTests
         var result = await _labelService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Parent not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("was not found");
     }
 
     [Fact]
@@ -258,8 +259,8 @@ public class LabelServiceTests
         var result = await _labelService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Parent must be a folder");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Parent must be a folder");
     }
 
     #endregion
@@ -282,8 +283,8 @@ public class LabelServiceTests
         var result = await _labelService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Label!.Name.Should().Be("New Name");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Name.Should().Be("New Name");
     }
 
     [Fact]
@@ -299,8 +300,8 @@ public class LabelServiceTests
         var result = await _labelService.UpdateAsync("nonexistent", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Label not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("was not found");
     }
 
     [Fact]
@@ -317,8 +318,8 @@ public class LabelServiceTests
         var result = await _labelService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Name is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Name is required");
     }
 
     [Fact]
@@ -335,8 +336,8 @@ public class LabelServiceTests
         var result = await _labelService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Cannot set label as its own parent");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Cannot set label as its own parent");
     }
 
     #endregion
@@ -359,7 +360,7 @@ public class LabelServiceTests
         var result = await _labelService.DeleteAsync("1", TestUserId);
 
         // Assert
-        result.Success.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
@@ -373,8 +374,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteAsync("nonexistent", TestUserId);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Label not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("was not found");
     }
 
     [Fact]
@@ -391,8 +392,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteAsync("1", TestUserId);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Cannot delete folder with children");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Cannot delete folder with children");
     }
 
     [Fact]
@@ -414,8 +415,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteAsync("1", TestUserId);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("System labels cannot be deleted");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Cannot delete system label");
     }
 
     #endregion
@@ -444,9 +445,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, "2");
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.TransactionCount.Should().Be(5);
-        result.Message.Should().Contain("5 transaction(s) reassigned");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.TransactionCount.Should().Be(5);
         
         // Verify ReassignLabelAsync was called with correct parameters
         _transactionRepositoryMock.Verify(x => x.ReassignLabelAsync("1", "2", TestUserId), Times.Once);
@@ -467,9 +467,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, null);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.TransactionCount.Should().Be(5);
-        result.Message.Should().Contain("has 5 transaction(s)");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("has 5 transaction(s)");
         
         // Verify ReassignLabelAsync was NOT called
         _transactionRepositoryMock.Verify(x => x.ReassignLabelAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
@@ -493,8 +492,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, "2");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Can only reassign to a category, not a folder");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Can only reassign to a category, not a folder");
     }
 
     [Fact]
@@ -514,8 +513,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, null);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.TransactionCount.Should().Be(0);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.TransactionCount.Should().Be(0);
         
         // Verify ReassignLabelAsync was NOT called (no transactions to reassign)
         _transactionRepositoryMock.Verify(x => x.ReassignLabelAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
@@ -540,8 +539,8 @@ public class LabelServiceTests
         var result = await _labelService.DeleteWithReassignmentAsync("1", TestUserId, "2");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("System labels cannot be deleted");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Cannot delete system label");
     }
 
     #endregion
@@ -570,8 +569,8 @@ public class LabelServiceTests
         var result = await _labelService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("System labels cannot be renamed");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("System labels cannot be renamed");
     }
 
     [Fact]
@@ -607,8 +606,8 @@ public class LabelServiceTests
         var result = await _labelService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("System labels cannot be moved");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("System labels cannot be moved");
     }
 
     [Fact]
@@ -638,9 +637,9 @@ public class LabelServiceTests
         var result = await _labelService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Label!.Icon.Should().Be("📊");
-        result.Label!.Color.Should().Be("#00ff00");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Icon.Should().Be("📊");
+        result.Value.Color.Should().Be("#00ff00");
     }
 
     #endregion
@@ -672,8 +671,8 @@ public class LabelServiceTests
     {
         // Arrange
         List<Label>? capturedLabels = null;
-        _labelRepositoryMock.Setup(x => x.CreateManyAsync(It.IsAny<List<Label>>()))
-            .Callback<List<Label>>(labels => capturedLabels = labels)
+        _labelRepositoryMock.Setup(x => x.CreateManyAsync(It.IsAny<List<Label>>(), It.IsAny<CancellationToken>()))
+            .Callback<List<Label>, CancellationToken>((labels, _) => capturedLabels = labels)
             .Returns(Task.CompletedTask);
 
         // Act
@@ -739,15 +738,15 @@ public class LabelServiceTests
         
         Label? createdFolder = null;
         Label? createdCategory = null;
-        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>()))
-            .Callback<Label>(label =>
+        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>(), It.IsAny<CancellationToken>()))
+            .Callback<Label, CancellationToken>((label, _) =>
             {
                 if (label.Type == LabelType.Folder)
                     createdFolder = label;
                 else if (label.Type == LabelType.Category)
                     createdCategory = label;
             })
-            .ReturnsAsync((Label l) => l);
+            .ReturnsAsync((Label l, CancellationToken _) => l);
 
         // Act
         var result = await _labelService.GetOrCreateAdjustmentsCategoryAsync(TestUserId);
@@ -784,9 +783,9 @@ public class LabelServiceTests
             .ReturnsAsync(new List<Label> { existingFolder });
         
         Label? createdLabel = null;
-        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>()))
-            .Callback<Label>(label => createdLabel = label)
-            .ReturnsAsync((Label l) => l);
+        _labelRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Label>(), It.IsAny<CancellationToken>()))
+            .Callback<Label, CancellationToken>((label, _) => createdLabel = label)
+            .ReturnsAsync((Label l, CancellationToken _) => l);
 
         // Act
         var result = await _labelService.GetOrCreateAdjustmentsCategoryAsync(TestUserId);

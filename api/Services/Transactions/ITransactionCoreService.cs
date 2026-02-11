@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 
@@ -22,19 +23,17 @@ public interface ITransactionCoreService
     /// <summary>
     /// Create a new transaction (handles routing to transfer/P2P/regular)
     /// </summary>
-    Task<(bool Success, string Message, TransactionResponse? Transaction)> CreateAsync(
-        string userId, CreateTransactionRequest request);
+    Task<Result<TransactionResponse>> CreateAsync(string userId, CreateTransactionRequest request);
     
     /// <summary>
     /// Update an existing transaction
     /// </summary>
-    Task<(bool Success, string Message, TransactionResponse? Transaction)> UpdateAsync(
-        string id, string userId, UpdateTransactionRequest request);
+    Task<Result<TransactionResponse>> UpdateAsync(string id, string userId, UpdateTransactionRequest request);
     
     /// <summary>
     /// Delete a transaction
     /// </summary>
-    Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
+    Task<Result> DeleteAsync(string id, string userId);
     
     /// <summary>
     /// Get pending transaction count for a user

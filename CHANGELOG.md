@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-02-12
+
+### Performance
+- **Fix N+1 in TransactionBatchService.BatchDeleteAsync** - Batch-fetch transactions via `GetByIdsAsync` and accounts via `GetByUserIdAsync`, build dictionaries for O(1) lookups instead of per-item repository queries
+- **Fix N+1 in TransactionBatchService.BatchUpdateStatusAsync** - Same batch-fetch + dictionary pattern for status update operations
+- **Fix N+1 in TransactionImportService.CreateTransaction** - Pre-fetch labels once before the import loop instead of re-querying per CSV row
+- **Fix N+1 in RecurringTransactionService.DeleteRecurringAsync** - Batch-fetch accounts with `GetByUserIdAsync` and build `accountMap` instead of per-recurring-transaction account lookup
+
+### Changed
+- **Extract GetTransactionCurrency** - Deduplicated currency resolution logic (was copy-pasted in 6 analytics methods) into a single `private static` method in `TransactionAnalyticsService`
+- **Extract CalculateDistanceKm** - Deduplicated Haversine formula (was duplicated in location insights and trip grouping) into a single `private static` method with `ToRadians` helper
+- **Extract FetchAnalyticsContextAsync** - Consolidated shared analytics data-fetch pattern (primary currency, exchange rates, accounts, labels, DEK) into `FetchAnalyticsContextAsync` returning an `AnalyticsContext` record
+- **TransactionImportService → ITransactionMapperService** - Replaced `IEncryptionService` + `IKeyManagementService` + `IUserRepository` with unified `ITransactionMapperService` for encryption operations
+- **TransactionAnalyticsService Logging** - Added `ILogger<TransactionAnalyticsService>` with debug logging on all 8 public analytics methods
+- **CancellationToken in TwoFactorService** - Propagated `CancellationToken` to all `IUserRepository` calls (`GetByIdAsync`, `UpdateAsync`) in all 4 async methods
+- **CancellationToken in RecurringTransactionBackgroundService** - Propagated `stoppingToken` through to `ProcessRecurringTransactionsAsync`; updated `IRecurringTransactionService` interface and implementation
+- **CancellationToken in IUserRepository** - Added `CancellationToken ct = default` to all interface methods and MongoDB driver calls in implementation
+- **Centralized API URL in useNotifications** - Replaced hardcoded `import.meta.env.VITE_API_URL || 'http://localhost:5000'` with imported `API_BASE_URL` from `apiClient`
+
+### Security
+- **Environment guard on curl fallback** - `ExchangeRateService.FetchWithCurlAsync` now only executes curl in Development environment; logs error and throws `InvalidOperationException` in production instead of spawning system processes
+
+### Fixed
+- **Test Suite Updated** - All 401 unit tests passing with updated mocks for `CancellationToken` parameters on `IUserRepository` methods and `IHostEnvironment` on `ExchangeRateService`
+
+## [1.3.0] - 2026-02-12
+
+### Performance
+- **Fix N+1 in BudgetService.GetSummaryAsync** - Batch-fetch all accounts upfront instead of querying per-budget inside loop
+- **Fix N+1 in ConversationService.GetConversationsAsync** - Batch-fetch all users upfront instead of querying per-conversation inside loop
+- **Fix N+1 in ReorderAsync** - AccountService and LabelService now use `BulkUpdateOrderAsync` repository methods instead of per-item `UpdateAsync` calls
+- **Fix dictionary recreation in TransactionCoreService.GetAllAsync** - Moved `accountMap` dictionary creation outside the transaction loop
+
+### Changed
+- **Transaction Facade Pattern** - Extracted `AccountService` encryption/decryption logic into `ITransactionMapperService`, reducing 3 injected dependencies (`IKeyManagementService`, `IDekCacheService`, `IEncryptionService`) to 1
+- **Result Pattern Migration** - Migrated remaining 6 services (`LabelService`, `TagService`, `BudgetService`, `AccountService`, `ConversationService`, `RecurringTransactionService`) from tuple returns `(bool, string, T?)` to `Result<T>` pattern with `DomainErrors`
+- **CancellationToken Propagation** - Added `CancellationToken ct = default` parameter to all service interfaces, implementations, and repository methods; endpoints pass `HttpContext.RequestAborted` through the call chain
+- **Centralized API_BASE_URL** - Frontend `apiClient.ts` now exports `API_BASE_URL`; `authService.ts` and all other services import from single source
+- **CSV Export via apiClient** - Frontend CSV export now uses `apiClient` with proper auth headers instead of raw `fetch` with manual token handling
+- **Frontend formatCurrency** - Replaced hardcoded `'en-IN'` locale with `navigator.language` for proper locale-sensitive currency formatting
+- **FluentValidation for Budgets** - Added `CreateBudgetRequestValidator` and `UpdateBudgetRequestValidator` with proper validation rules for budget endpoints
+- **ConversationService Logging** - Added `ILogger<ConversationService>` for structured logging of conversation operations
+
+### Fixed
+- **Auth Email Conflict** - `DomainErrors.Auth.EmailAlreadyRegistered` now correctly returns HTTP 409 Conflict instead of 400 Bad Request
+- **Test Suite Updated** - All 425 tests passing (up from 421) with updated mocks for CancellationToken parameters, Result pattern assertions, and corrected error message expectations
+
+## [1.2.0] - 2026-02-11
+
+### Added
+- **Result Pattern** - Type-safe `Result<T>` with `Error` records, `DomainErrors` catalog, and extension methods (`Map`, `Bind`, `Match`, `Ensure`, `ToApiResult()`)
+- **Global Exception Handler** - RFC 7807 Problem Details middleware with exception-to-HTTP-status mapping and trace IDs
+- **Content-based ETags** - SHA256-based content hashing via `ETagHelper`, `If-None-Match` support with 304 Not Modified responses on analytics and transaction list endpoints
+- **Redis Caching** - `RedisCacheService` implementation with conditional registration (Redis when `Redis:ConnectionString` configured, in-memory fallback)
+- **Cache Keys** - Centralized `CacheKeys` static class for consistent cache key naming across cache invalidation handlers
+- **Request Logging Middleware** - Structured request/response logging with method, path, status code, duration, user ID, and sensitive path redaction
+- **Configurable MongoDB Pool** - Connection pool size, timeouts, idle time, retry settings all configurable via `appsettings.json > MongoDb` section
+- **CurrencyFormatter** - Shared utility extracted from duplicated formatting logic across analytics services
+- **Notification DTOs** - Dedicated `Models/Dto/NotificationDto.cs` with `P2PTransactionNotification`, `ChatMessageNotification`, `PendingCountNotification`, `BudgetAlertNotification`, `PushNotificationPayload`
+
+### Changed
+- **Program.cs Refactored** - Extracted all service registration and middleware pipeline into extension methods (~62 lines)
+- **Transaction Endpoints Split** - Monolithic `TransactionEndpoints.cs` split into 4 focused files: CRUD, Analytics, Batch, Export with coordinator
+- **Auth Endpoints Split** - Monolithic `AuthEndpoints.cs` split into 4 focused files: Core, Account, Password with coordinator
+- **AuthService Split** - Split into 7 partial class files (Registration, Login, Account, Password, Token, Helpers, core) for maintainability
+- **ITransactionCoreService** - Migrated from tuple returns `(bool, string, T?)` to `Result<T>` pattern
+- **IAuthService** - Migrated from tuple returns to `Result<T>` pattern with `DomainErrors`
+- **Caching Architecture** - `ICacheService` now supports tag-based invalidation, pattern removal, and `GetOrCreateAsync` with `CacheOptions`
+
+### Fixed
+- **SSL Certificate Validation** - Removed dangerous `ServerCertificateCustomValidationCallback` that bypassed all SSL validation
+- **ETag Implementation** - Replaced timestamp-based ETags with content-hash-based ETags that correctly detect data changes
+- **BatchOperationRequestValidator** - Synced validator with endpoint handler to validate all required fields
+- **Account Deletion** - Now transactional using Unit of Work pattern to ensure atomic deletion of all user data
+- **AzureKeyVaultService** - Added guard against runtime crashes when Key Vault URL is not configured
+- **UnitOfWork DI Registration** - Added missing `IUnitOfWork` registration in dependency injection container
+
+### Security
+- Removed SSL bypass that accepted all certificates in non-development environments
+- Auth endpoints have sensitive path redaction in request logging
+- Exception details (stack traces) only exposed in Development environment
+
 ## [1.1.8] - 2026-02-09
 
 ### Added

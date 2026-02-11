@@ -3,6 +3,7 @@ import * as signalR from '@microsoft/signalr';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { NOTIFICATION_CONSTANTS } from '../utils/constants';
+import { API_BASE_URL } from '../services/apiClient';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -58,8 +59,8 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     optionsRef.current = options;
   }, [options]);
 
-  // Get the API URL from environment
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  // Use the centralized API base URL (avoids hardcoded localhost fallback)
+  const apiUrl = API_BASE_URL;
 
   // Initialize connection
   const initializeConnection = useCallback((token: string) => {

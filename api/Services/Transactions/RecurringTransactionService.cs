@@ -203,11 +203,15 @@ public class RecurringTransactionService : IRecurringTransactionService
             // Delete future instances (transactions with parentTransactionId = this id and date >= today)
             var filter = TransactionFilterRequest.ForRecurring(DateTime.UtcNow.Date);
             var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
+            var futureInstances = transactions.Where(t => t.ParentTransactionId == id).ToList();
 
-            foreach (var transaction in transactions.Where(t => t.ParentTransactionId == id))
+            // Batch-fetch all accounts upfront to avoid N+1
+            var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: true);
+            var accountMap = accounts.ToDictionary(a => a.Id);
+
+            foreach (var transaction in futureInstances)
             {
-                var account = await _accountRepository.GetByIdAndUserIdAsync(transaction.AccountId!, userId);
-                if (account != null)
+                if (transaction.AccountId != null && accountMap.TryGetValue(transaction.AccountId, out var account))
                 {
                     await _accountBalanceService.UpdateBalanceAsync(
                         account, transaction.Type, transaction.Amount, false);
@@ -219,7 +223,7 @@ public class RecurringTransactionService : IRecurringTransactionService
         return (true, "Recurring transaction deleted successfully");
     }
 
-    public async Task ProcessRecurringTransactionsAsync()
+    public async Task ProcessRecurringTransactionsAsync(CancellationToken ct = default)
     {
         var pendingTemplates = await _transactionRepository.GetPendingRecurringAsync(DateTime.UtcNow);
 

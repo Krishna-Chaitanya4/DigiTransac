@@ -1,5 +1,6 @@
 using DigiTransac.Api.Events;
 using DigiTransac.Api.Hubs;
+using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using MediatR;
 

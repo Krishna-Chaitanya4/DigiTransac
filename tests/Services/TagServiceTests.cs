@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -109,17 +110,17 @@ public class TagServiceTests
         var request = new CreateTagRequest("New Tag", "#3b82f6");
         _tagRepositoryMock.Setup(x => x.GetByNameAndUserIdAsync("New Tag", TestUserId))
             .ReturnsAsync((Tag?)null);
-        _tagRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Tag>()))
-            .ReturnsAsync((Tag t) => t);
+        _tagRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Tag>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Tag t, CancellationToken _) => t);
 
         // Act
         var result = await _tagService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Tag.Should().NotBeNull();
-        result.Tag!.Name.Should().Be("New Tag");
-        result.Tag.Color.Should().Be("#3b82f6");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Name.Should().Be("New Tag");
+        result.Value.Color.Should().Be("#3b82f6");
     }
 
     [Fact]
@@ -132,8 +133,8 @@ public class TagServiceTests
         var result = await _tagService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Name is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Name is required");
     }
 
     [Fact]
@@ -146,8 +147,8 @@ public class TagServiceTests
         var result = await _tagService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Name is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Name is required");
     }
 
     [Fact]
@@ -164,8 +165,8 @@ public class TagServiceTests
         var result = await _tagService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Tag with this name already exists");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Tag with this name already exists");
     }
 
     [Fact]
@@ -175,15 +176,15 @@ public class TagServiceTests
         var request = new CreateTagRequest("No Color Tag", null);
         _tagRepositoryMock.Setup(x => x.GetByNameAndUserIdAsync("No Color Tag", TestUserId))
             .ReturnsAsync((Tag?)null);
-        _tagRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Tag>()))
-            .ReturnsAsync((Tag t) => t);
+        _tagRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Tag>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Tag t, CancellationToken _) => t);
 
         // Act
         var result = await _tagService.CreateAsync(TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Tag!.Color.Should().BeNull();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Color.Should().BeNull();
     }
 
     #endregion
@@ -208,9 +209,9 @@ public class TagServiceTests
         var result = await _tagService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Tag!.Name.Should().Be("New Name");
-        result.Tag.Color.Should().Be("#22c55e");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Name.Should().Be("New Name");
+        result.Value.Color.Should().Be("#22c55e");
     }
 
     [Fact]
@@ -226,8 +227,8 @@ public class TagServiceTests
         var result = await _tagService.UpdateAsync("nonexistent", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Tag not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("was not found");
     }
 
     [Fact]
@@ -244,8 +245,8 @@ public class TagServiceTests
         var result = await _tagService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Name is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Name is required");
     }
 
     [Fact]
@@ -265,8 +266,8 @@ public class TagServiceTests
         var result = await _tagService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Tag with this name already exists");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Tag with this name already exists");
     }
 
     [Fact]
@@ -288,7 +289,7 @@ public class TagServiceTests
         var result = await _tagService.UpdateAsync("1", TestUserId, request);
 
         // Assert
-        result.Success.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue();
     }
 
     #endregion
@@ -309,7 +310,7 @@ public class TagServiceTests
         var result = await _tagService.DeleteAsync("1", TestUserId);
 
         // Assert
-        result.Success.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
@@ -323,8 +324,8 @@ public class TagServiceTests
         var result = await _tagService.DeleteAsync("nonexistent", TestUserId);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Tag not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("was not found");
     }
 
     #endregion

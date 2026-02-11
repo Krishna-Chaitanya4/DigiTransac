@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using FluentAssertions;
@@ -8,6 +9,7 @@ using Moq;
 
 namespace DigiTransac.Tests.Integration;
 
+[Trait("Category", "Integration")]
 public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory>
 {
     private readonly DigiTransacWebApplicationFactory _factory;
@@ -86,7 +88,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             )
         };
 
-        _factory.AccountServiceMock.Setup(x => x.GetAllAsync(TestUserId, false))
+        _factory.AccountServiceMock.Setup(x => x.GetAllAsync(TestUserId, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(accounts);
 
         // Act
@@ -106,7 +108,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         // Arrange
         var authClient = await GetAuthenticatedClientAsync();
         
-        _factory.AccountServiceMock.Setup(x => x.GetAllAsync(TestUserId, true))
+        _factory.AccountServiceMock.Setup(x => x.GetAllAsync(TestUserId, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<AccountResponse>());
 
         // Act
@@ -114,7 +116,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        _factory.AccountServiceMock.Verify(x => x.GetAllAsync(TestUserId, true), Times.Once);
+        _factory.AccountServiceMock.Verify(x => x.GetAllAsync(TestUserId, true, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -158,7 +160,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             RatesLastUpdated: DateTime.UtcNow
         );
 
-        _factory.AccountServiceMock.Setup(x => x.GetSummaryAsync(TestUserId))
+        _factory.AccountServiceMock.Setup(x => x.GetSummaryAsync(TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(summary);
 
         // Act
@@ -203,7 +205,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             UpdatedAt: DateTime.UtcNow
         );
 
-        _factory.AccountServiceMock.Setup(x => x.GetByIdAsync("1", TestUserId))
+        _factory.AccountServiceMock.Setup(x => x.GetByIdAsync("1", TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(account);
 
         // Act
@@ -222,7 +224,7 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         // Arrange
         var authClient = await GetAuthenticatedClientAsync();
         
-        _factory.AccountServiceMock.Setup(x => x.GetByIdAsync("invalid", TestUserId))
+        _factory.AccountServiceMock.Setup(x => x.GetByIdAsync("invalid", TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AccountResponse?)null);
 
         // Act
@@ -276,8 +278,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             UpdatedAt: DateTime.UtcNow
         );
 
-        _factory.AccountServiceMock.Setup(x => x.CreateAsync(TestUserId, It.IsAny<CreateAccountRequest>()))
-            .ReturnsAsync((true, "Account created successfully", createdAccount));
+        _factory.AccountServiceMock.Setup(x => x.CreateAsync(TestUserId, It.IsAny<CreateAccountRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success<AccountResponse>(createdAccount));
 
         // Act
         var response = await authClient.PostAsJsonAsync("/api/accounts", request);
@@ -308,8 +310,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             IncludeInNetWorth: null
         );
 
-        _factory.AccountServiceMock.Setup(x => x.CreateAsync(TestUserId, It.IsAny<CreateAccountRequest>()))
-            .ReturnsAsync((false, "Account name is required", (AccountResponse?)null));
+        _factory.AccountServiceMock.Setup(x => x.CreateAsync(TestUserId, It.IsAny<CreateAccountRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<AccountResponse>(Error.Validation("Account name is required")));
 
         // Act
         var response = await authClient.PostAsJsonAsync("/api/accounts", request);
@@ -362,8 +364,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             UpdatedAt: DateTime.UtcNow
         );
 
-        _factory.AccountServiceMock.Setup(x => x.UpdateAsync("1", TestUserId, It.IsAny<UpdateAccountRequest>()))
-            .ReturnsAsync((true, "Account updated successfully", updatedAccount));
+        _factory.AccountServiceMock.Setup(x => x.UpdateAsync("1", TestUserId, It.IsAny<UpdateAccountRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success<AccountResponse>(updatedAccount));
 
         // Act
         var response = await authClient.PutAsJsonAsync("/api/accounts/1", request);
@@ -394,8 +396,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             Order: null
         );
 
-        _factory.AccountServiceMock.Setup(x => x.UpdateAsync("invalid", TestUserId, It.IsAny<UpdateAccountRequest>()))
-            .ReturnsAsync((false, "Account not found", (AccountResponse?)null));
+        _factory.AccountServiceMock.Setup(x => x.UpdateAsync("invalid", TestUserId, It.IsAny<UpdateAccountRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<AccountResponse>(Error.Validation("Account not found")));
 
         // Act
         var response = await authClient.PutAsJsonAsync("/api/accounts/invalid", request);
@@ -419,8 +421,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             Notes: "Balance adjustment"
         );
 
-        _factory.AccountServiceMock.Setup(x => x.AdjustBalanceAsync("1", TestUserId, It.IsAny<AdjustBalanceRequest>()))
-            .ReturnsAsync((true, "Balance adjusted successfully"));
+        _factory.AccountServiceMock.Setup(x => x.AdjustBalanceAsync("1", TestUserId, It.IsAny<AdjustBalanceRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
 
         // Act
         var response = await authClient.PostAsJsonAsync("/api/accounts/1/adjust-balance", request);
@@ -440,8 +442,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             Notes: null
         );
 
-        _factory.AccountServiceMock.Setup(x => x.AdjustBalanceAsync("invalid", TestUserId, It.IsAny<AdjustBalanceRequest>()))
-            .ReturnsAsync((false, "Account not found"));
+        _factory.AccountServiceMock.Setup(x => x.AdjustBalanceAsync("invalid", TestUserId, It.IsAny<AdjustBalanceRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(Error.Validation("Account not found")));
 
         // Act
         var response = await authClient.PostAsJsonAsync("/api/accounts/invalid/adjust-balance", request);
@@ -467,8 +469,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
             new("3", 1)
         });
 
-        _factory.AccountServiceMock.Setup(x => x.ReorderAsync(TestUserId, It.IsAny<ReorderAccountsRequest>()))
-            .ReturnsAsync((true, "Accounts reordered successfully"));
+        _factory.AccountServiceMock.Setup(x => x.ReorderAsync(TestUserId, It.IsAny<ReorderAccountsRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
 
         // Act
         var response = await authClient.PostAsJsonAsync("/api/accounts/reorder", request);
@@ -487,8 +489,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         // Arrange
         var authClient = await GetAuthenticatedClientAsync();
         
-        _factory.AccountServiceMock.Setup(x => x.DeleteAsync("1", TestUserId))
-            .ReturnsAsync((true, "Account deleted successfully", ""));
+        _factory.AccountServiceMock.Setup(x => x.DeleteAsync("1", TestUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
 
         // Act
         var response = await authClient.DeleteAsync("/api/accounts/1");
@@ -503,8 +505,8 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         // Arrange
         var authClient = await GetAuthenticatedClientAsync();
         
-        _factory.AccountServiceMock.Setup(x => x.DeleteAsync("invalid", TestUserId))
-            .ReturnsAsync((false, "Account not found", "NotFound"));
+        _factory.AccountServiceMock.Setup(x => x.DeleteAsync("invalid", TestUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(Error.NotFound("Account")));
 
         // Act
         var response = await authClient.DeleteAsync("/api/accounts/invalid");
@@ -519,14 +521,14 @@ public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFact
         // Arrange
         var authClient = await GetAuthenticatedClientAsync();
         
-        _factory.AccountServiceMock.Setup(x => x.DeleteAsync("1", TestUserId))
-            .ReturnsAsync((false, "Cannot delete account with 5 transaction(s). Archive it instead to preserve your transaction history.", "HasTransactions"));
+        _factory.AccountServiceMock.Setup(x => x.DeleteAsync("1", TestUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(Error.Conflict("Cannot delete account with 5 transaction(s). Archive it instead to preserve your transaction history.")));
 
         // Act
         var response = await authClient.DeleteAsync("/api/accounts/1");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("Cannot delete account");
     }

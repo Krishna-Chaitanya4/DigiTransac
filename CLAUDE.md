@@ -6,20 +6,24 @@ DigiTransac is a full-stack digital transaction tracker that helps users manage 
 ## Tech Stack
 
 ### Backend (./api)
-- **.NET 8** Web API with Minimal APIs
-- **MongoDB** database with async driver
+- **.NET 9** Web API with Minimal APIs
+- **MongoDB** database with async driver and configurable connection pooling
 - **MediatR** for domain events and CQRS patterns
 - **FluentValidation** for request validation
 - **JWT Authentication** with HS256
-- **AES-256 Encryption** for sensitive data (envelope encryption with DEK/KEK)
+- **AES-256-GCM Encryption** for sensitive data (envelope encryption with per-user DEK wrapped by KEK)
 - **SignalR** for real-time notifications
+- **Serilog** for structured logging with file and console sinks
+- **Redis** (optional) for distributed caching via `IDistributedCache`
+- **OpenTelemetry** for distributed tracing
+- **Swashbuckle** for Swagger/OpenAPI documentation
 
 ### Frontend (./web)
-- **React 18** with TypeScript
-- **Vite** build tool with PWA support
+- **React 19** with TypeScript
+- **Vite 7** build tool with PWA support
 - **TanStack Query (React Query)** for server state management
 - **TanStack Virtual** for virtualized lists
-- **Tailwind CSS** for styling with dark mode
+- **Tailwind CSS 4** for styling with dark mode
 - **React Router** for navigation
 - **Leaflet.js** for map visualization
 - **Chart.js** for analytics charts
@@ -46,22 +50,33 @@ The transaction handling is split into focused services:
 
 ### Design Patterns Used
 1. **Unit of Work** (`./api/Services/UnitOfWork/`) - MongoDB transaction management with graceful fallback for standalone instances
-2. **Result Pattern** (`./api/Common/Result.cs`) - Type-safe error handling without exceptions
-3. **Domain Events** (`./api/Events/`) - MediatR-based event publishing for decoupled notifications
+2. **Result Pattern** (`./api/Common/Result.cs`) - Type-safe `Result<T>` with `Error` records, `DomainErrors` catalog, and extension methods (`Map`, `Bind`, `Match`, `Ensure`, `ToApiResult()`)
+3. **Domain Events** (`./api/Events/`) - MediatR-based event publishing for decoupled notifications and cache invalidation
 4. **Repository Pattern** (`./api/Repositories/`) - Data access abstraction
 5. **Facade Pattern** - `TransactionServiceFacade` provides unified API over split services
+6. **Partial Classes** - `AuthService` split into 7 partial class files for maintainability without interface/DI changes
 
-### Caching
-- `MemoryCacheService` (`./api/Services/Caching/`) - In-memory caching with configurable TTL
-- Cache invalidation via domain event handlers
+### Caching (`./api/Services/Caching/`)
+- `ICacheService` interface with tag-based invalidation, pattern removal, and `GetOrCreateAsync`
+- `MemoryCacheService` - In-memory caching with `IMemoryCache` (default)
+- `RedisCacheService` - Redis-backed distributed caching via `IDistributedCache` (when `Redis:ConnectionString` configured)
+- `CacheKeys` - Centralized cache key definitions
+- `CacheInvalidationHandler` - MediatR handler that invalidates cache on domain events
+- Conditional registration: Redis when connection string present, otherwise in-memory
 
 ### Rate Limiting
-- Per-user rate limiting configured in `AppSettings.cs`
-- Prevents API abuse with configurable limits
+- 6 rate limit policies: global, auth, sensitive, per-user, transaction-create, export
+- Configured via `RateLimitSettings` in `appsettings.json`
+- Can be disabled via `DISABLE_RATE_LIMITING` environment variable
+
+### Middleware Pipeline (`./api/Middleware/`)
+- `GlobalExceptionHandlerMiddleware` - RFC 7807 Problem Details with exception-to-status mapping
+- `RequestLoggingMiddleware` - Structured request/response logging with sensitive path redaction
 
 ### Observability
-- OpenTelemetry integration (`./api/Extensions/OpenTelemetryExtensions.cs`)
-- Distributed tracing for HTTP, MongoDB, and custom activities
+- **OpenTelemetry** integration (`./api/Extensions/OpenTelemetryExtensions.cs`) - Distributed tracing for HTTP, MongoDB, and custom activities
+- **Structured Logging** - Serilog with enriched context (RequestId, HttpMethod, StatusCode, ElapsedMs, UserId)
+- **ETag Support** - Content-based SHA256 ETags with `If-None-Match` / 304 Not Modified (`./api/Common/ETagHelper.cs`)
 
 ## Key Features
 
@@ -98,16 +113,39 @@ The transaction handling is split into focused services:
 ## Key Files
 
 ### Configuration
-- `./api/appsettings.json` - App configuration
-- `./api/Settings/AppSettings.cs` - Strongly-typed settings
+- `./api/appsettings.json` - App configuration (MongoDB pool settings, rate limits, JWT, encryption, Redis, etc.)
+- `./api/Settings/AppSettings.cs` - Strongly-typed settings classes (`MongoDbSettings`, `JwtSettings`, `EncryptionSettings`, `RateLimitSettings`, `SecuritySettings`)
 - `./web/vite.config.ts` - Vite config with API proxy (port 5000)
 
-### API Endpoints
-- `./api/Endpoints/TransactionEndpoints.cs` - Transaction API routes
-- `./api/Endpoints/AccountEndpoints.cs` - Account API routes
-- `./api/Endpoints/AuthEndpoints.cs` - Authentication routes
-- `./api/Endpoints/BudgetEndpoints.cs` - Budget API routes
-- `./api/Endpoints/ConversationEndpoints.cs` - Chat API routes
+### Extension Methods (`./api/Extensions/`)
+- `ApplicationServiceExtensions.cs` - Core service DI registration (auth, transaction, caching, validation, MediatR)
+- `MongoDbServiceExtensions.cs` - MongoDB and repository registration with health checks
+- `SecurityServiceExtensions.cs` - JWT auth, CORS, rate limiting
+- `SwaggerExtensions.cs` - OpenAPI/Swagger configuration
+- `OpenTelemetryExtensions.cs` - Distributed tracing setup
+- `ConfigurationExtensions.cs` - Settings binding from `IConfiguration`
+- `MiddlewareExtensions.cs` - HTTP pipeline configuration
+- `ResultExtensions.cs` - `Result<T>` to `IResult` HTTP response mapping
+
+### API Endpoints (`./api/Endpoints/`)
+Transaction endpoints are split into focused files:
+- `TransactionEndpoints.cs` - Route group coordinator
+- `TransactionCrudEndpoints.cs` - CRUD operations with ETag support
+- `TransactionAnalyticsEndpoints.cs` - Analytics with ETag + 304 Not Modified
+- `TransactionBatchEndpoints.cs` - Batch operations
+- `TransactionExportEndpoints.cs` - CSV/JSON export
+
+Auth endpoints are split similarly:
+- `AuthEndpoints.cs` - Route group coordinator
+- `AuthCoreEndpoints.cs` - Login, register, refresh
+- `AuthAccountEndpoints.cs` - Profile, delete account
+- `AuthPasswordEndpoints.cs` - Password change/reset/forgot
+
+Other endpoints:
+- `AccountEndpoints.cs` - Account CRUD
+- `BudgetEndpoints.cs` - Budget management
+- `ConversationEndpoints.cs` - Chat & P2P
+- `TwoFactorEndpoints.cs` - 2FA setup/verify
 
 ### Frontend State
 - `./web/src/hooks/useTransactionQueries.ts` - React Query hooks for transactions
@@ -189,7 +227,23 @@ cd tests && dotnet test --filter "Category=Integration"
 
 ## Recent Changes (Feb 2026)
 
-### New Features
+### Architecture Refactoring (Feb 11, 2026)
+- **Result Pattern** - Migrated `ITransactionCoreService` and `IAuthService` from tuple returns to `Result<T>` with `DomainErrors`
+- **Program.cs Refactor** - Extracted service registration and middleware pipeline into extension methods (~62 line Program.cs)
+- **Endpoint Splitting** - Split monolithic `TransactionEndpoints.cs` into 4 focused files, `AuthEndpoints.cs` into 4 focused files
+- **AuthService Splitting** - Split into 7 partial class files (Registration, Login, Account, Password, Token, Helpers, core)
+- **Global Exception Handler** - RFC 7807 Problem Details middleware replacing inline exception handling
+- **Content-based ETags** - SHA256-based content hashing with `If-None-Match` / 304 Not Modified support
+- **Redis Caching** - Added `RedisCacheService` with conditional registration (Redis or in-memory fallback)
+- **MongoDB Pool Config** - Connection pool, timeout, and retry settings now configurable via `appsettings.json`
+- **Request Logging** - Structured logging middleware with sensitive path redaction and timing
+- **CurrencyFormatter** - Extracted shared utility from duplicated formatting logic
+- **Cache Keys** - Centralized `CacheKeys` static class for consistent cache key naming
+- **Notification DTOs** - Extracted to dedicated `Models/Dto/NotificationDto.cs`
+- **Security Fixes** - SSL validation fix, ETag fix, validator sync, transactional deletion, KeyVault guard
+- **DI Audit** - Verified all service lifetime registrations are correct
+
+### New Features (Feb 2026)
 - **Spending Map** - Leaflet.js visualization with markers, clustering, heatmap, trip grouping
 - **Budget Management** - Full CRUD with notifications and rollovers
 - **Location Insights** - "You spent ₹X near home" analysis

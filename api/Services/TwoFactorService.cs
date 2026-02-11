@@ -1,4 +1,5 @@
 using OtpNet;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Repositories;
 
@@ -9,7 +10,7 @@ public interface ITwoFactorService
     /// <summary>
     /// Generates a new 2FA secret and returns setup information
     /// </summary>
-    Task<TwoFactorSetupInfo> GenerateSetupInfoAsync(string userId);
+    Task<TwoFactorSetupInfo> GenerateSetupInfoAsync(string userId, CancellationToken ct = default);
     
     /// <summary>
     /// Validates a TOTP code against the user's secret
@@ -19,17 +20,17 @@ public interface ITwoFactorService
     /// <summary>
     /// Enables 2FA for a user after verifying their code
     /// </summary>
-    Task<(bool Success, string Message)> EnableTwoFactorAsync(string userId, string code);
+    Task<Result> EnableTwoFactorAsync(string userId, string code, CancellationToken ct = default);
     
     /// <summary>
     /// Disables 2FA for a user after verifying password
     /// </summary>
-    Task<(bool Success, string Message)> DisableTwoFactorAsync(string userId, string password);
+    Task<Result> DisableTwoFactorAsync(string userId, string password, CancellationToken ct = default);
     
     /// <summary>
     /// Verifies 2FA code during login
     /// </summary>
-    Task<bool> VerifyTwoFactorAsync(string userId, string code);
+    Task<bool> VerifyTwoFactorAsync(string userId, string code, CancellationToken ct = default);
 }
 
 public class TwoFactorSetupInfo
@@ -51,9 +52,9 @@ public class TwoFactorService : ITwoFactorService
         _logger = logger;
     }
 
-    public async Task<TwoFactorSetupInfo> GenerateSetupInfoAsync(string userId)
+    public async Task<TwoFactorSetupInfo> GenerateSetupInfoAsync(string userId, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
         {
             throw new InvalidOperationException("User not found");
@@ -65,7 +66,7 @@ public class TwoFactorService : ITwoFactorService
 
         // Store the secret temporarily (will be confirmed when 2FA is enabled)
         user.TwoFactorSecret = base32Secret;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateAsync(user, ct);
 
         // Generate the otpauth URI for QR code
         var otpauthUri = GenerateOtpAuthUri(user.Email, base32Secret);
@@ -102,71 +103,61 @@ public class TwoFactorService : ITwoFactorService
         }
     }
 
-    public async Task<(bool Success, string Message)> EnableTwoFactorAsync(string userId, string code)
+    public async Task<Result> EnableTwoFactorAsync(string userId, string code, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
-        {
-            return (false, "User not found");
-        }
+            return Error.NotFound("User");
 
         if (user.TwoFactorEnabled)
-        {
-            return (false, "Two-factor authentication is already enabled");
-        }
+            return Error.Validation("Two-factor authentication is already enabled");
 
         if (string.IsNullOrEmpty(user.TwoFactorSecret))
-        {
-            return (false, "Please generate a 2FA setup first");
-        }
+            return Error.Validation("Please generate a 2FA setup first");
 
         // Validate the code to ensure user has set up their authenticator app correctly
         if (!ValidateCode(user.TwoFactorSecret, code))
         {
             _logger.LogWarning("Invalid 2FA code during enable for user {UserId}", userId);
-            return (false, "Invalid verification code. Please check your authenticator app and try again.");
+            return Error.Validation("Invalid verification code. Please check your authenticator app and try again.");
         }
 
         // Enable 2FA
         user.TwoFactorEnabled = true;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateAsync(user, ct);
 
         _logger.LogInformation("2FA enabled for user {UserId}", userId);
-        return (true, "Two-factor authentication has been enabled");
+        return Result.Success();
     }
 
-    public async Task<(bool Success, string Message)> DisableTwoFactorAsync(string userId, string password)
+    public async Task<Result> DisableTwoFactorAsync(string userId, string password, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
-        {
-            return (false, "User not found");
-        }
+            return Error.NotFound("User");
 
         if (!user.TwoFactorEnabled)
-        {
-            return (false, "Two-factor authentication is not enabled");
-        }
+            return Error.Validation("Two-factor authentication is not enabled");
 
         // Verify password before disabling 2FA
         if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
         {
             _logger.LogWarning("Invalid password during 2FA disable for user {UserId}", userId);
-            return (false, "Invalid password");
+            return Error.Unauthorized("Invalid password");
         }
 
         // Disable 2FA and clear the secret
         user.TwoFactorEnabled = false;
         user.TwoFactorSecret = null;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateAsync(user, ct);
 
         _logger.LogInformation("2FA disabled for user {UserId}", userId);
-        return (true, "Two-factor authentication has been disabled");
+        return Result.Success();
     }
 
-    public async Task<bool> VerifyTwoFactorAsync(string userId, string code)
+    public async Task<bool> VerifyTwoFactorAsync(string userId, string code, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
         {
             return false;

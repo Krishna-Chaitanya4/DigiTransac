@@ -171,7 +171,14 @@ public class TransactionFilterRequestValidator : AbstractValidator<TransactionFi
 
 public class BatchOperationRequestValidator : AbstractValidator<BatchOperationRequest>
 {
-    private static readonly string[] ValidActions = { "delete", "markcleared", "markpending", "updatecategory" };
+    /// <summary>
+    /// Valid batch actions - kept in sync with TransactionEndpoints.cs batch handler.
+    /// "markcleared" is a legacy alias for "markconfirmed".
+    /// </summary>
+    public static readonly string[] ValidActions =
+    {
+        "delete", "markconfirmed", "markcleared", "markpending", "markdeclined", "updatecategory"
+    };
     
     public BatchOperationRequestValidator()
     {

@@ -21,6 +21,7 @@ public class ExchangeRateService : IExchangeRateService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IMemoryCache _cache;
     private readonly ILogger<ExchangeRateService> _logger;
+    private readonly IHostEnvironment _environment;
     
     // Free tier: 1,500 requests/month - https://www.exchangerate-api.com/
     private const string ExchangeRateApiUrl = "https://open.er-api.com/v6/latest/USD";
@@ -39,12 +40,14 @@ public class ExchangeRateService : IExchangeRateService
         IExchangeRateRepository exchangeRateRepository,
         IHttpClientFactory httpClientFactory,
         IMemoryCache cache,
-        ILogger<ExchangeRateService> logger)
+        ILogger<ExchangeRateService> logger,
+        IHostEnvironment environment)
     {
         _exchangeRateRepository = exchangeRateRepository;
         _httpClientFactory = httpClientFactory;
         _cache = cache;
         _logger = logger;
+        _environment = environment;
     }
 
     public async Task<ExchangeRateResponse> GetRatesAsync(string? baseCurrency = null)
@@ -153,10 +156,18 @@ public class ExchangeRateService : IExchangeRateService
         }
         
         // Fallback to curl if HttpClient fails (handles proxy/firewall issues on some systems)
+        // Only allowed in Development to avoid spawning system processes in production
         if (string.IsNullOrEmpty(json))
         {
+            if (!_environment.IsDevelopment())
+            {
+                _logger.LogError("HttpClient failed and curl fallback is disabled in production");
+                throw new InvalidOperationException("Unable to fetch exchange rates. Please check your internet connection.");
+            }
+
             try
             {
+                _logger.LogWarning("Using curl fallback for exchange rates (Development only)");
                 json = await FetchWithCurlAsync(ExchangeRateApiUrl);
             }
             catch (Exception ex)

@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Events;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
@@ -84,10 +85,14 @@ public class TransactionCoreService : ITransactionCoreService
 
     public async Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter)
     {
-        // Get accounts, labels, tags for mapping
+        // Get accounts, labels, tags for mapping — create dictionaries once for reuse
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labels = await _labelRepository.GetByUserIdAsync(userId);
         var tags = await _tagRepository.GetByUserIdAsync(userId);
+        
+        var accountsDict = accounts.ToDictionary(a => a.Id);
+        var labelsDict = labels.ToDictionary(l => l.Id);
+        var tagsDict = tags.ToDictionary(t => t.Id);
 
         // Get all counterparties for search
         var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
@@ -141,45 +146,46 @@ public class TransactionCoreService : ITransactionCoreService
         var pageSize = filter.PageSize ?? 50;
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
+        // Use pre-built dictionaries instead of recreating per iteration
         var responses = transactions.Select(t => _mapperService.MapToResponse(
             t, dek,
-            accounts.ToDictionary(a => a.Id),
-            labels.ToDictionary(l => l.Id),
-            tags.ToDictionary(t => t.Id),
+            accountsDict,
+            labelsDict,
+            tagsDict,
             allCounterpartyUsers)).ToList();
 
         return new TransactionListResponse(responses, totalCount, page, pageSize, totalPages);
     }
 
-    public async Task<(bool Success, string Message, TransactionResponse? Transaction)> CreateAsync(
+    public async Task<Result<TransactionResponse>> CreateAsync(
         string userId,
         CreateTransactionRequest request)
     {
         // Validate account
         var account = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId);
         if (account == null)
-            return (false, "Account not found", null);
+            return DomainErrors.Account.NotFound(request.AccountId);
 
         // Validate type
         if (!Enum.TryParse<TransactionType>(request.Type, true, out var type))
-            return (false, "Invalid transaction type. Use Receive or Send", null);
+            return DomainErrors.Transaction.InvalidType(request.Type);
 
         // Validate amount
         if (request.Amount <= 0)
-            return (false, "Amount must be positive", null);
+            return DomainErrors.Transaction.InvalidAmount;
 
         // Validate splits
         if (request.Splits == null || request.Splits.Count == 0)
-            return (false, "At least one split is required", null);
+            return Error.Validation("At least one split is required");
 
         var splitSum = request.Splits.Sum(s => s.Amount);
         if (Math.Abs(splitSum - request.Amount) > 0.01m)
-            return (false, $"Split amounts ({splitSum}) must equal transaction amount ({request.Amount})", null);
+            return DomainErrors.Transaction.InvalidSplits(splitSum, request.Amount);
 
         foreach (var split in request.Splits)
         {
             if (split.Amount <= 0)
-                return (false, "Each split amount must be positive", null);
+                return Error.Validation("Each split amount must be positive");
         }
 
         // Validate labels exist
@@ -188,35 +194,38 @@ public class TransactionCoreService : ITransactionCoreService
         foreach (var split in request.Splits)
         {
             if (!labelIds.Contains(split.LabelId))
-                return (false, $"Label {split.LabelId} not found", null);
+                return DomainErrors.Label.NotFound(split.LabelId);
         }
 
         var tags = await _tagRepository.GetByUserIdAsync(userId);
         var dek = await _mapperService.GetUserDekAsync(userId);
         if (dek == null)
-            return (false, "Encryption key not available", null);
+            return DomainErrors.Encryption.KeyNotAvailable;
 
         bool isP2P = !string.IsNullOrEmpty(request.CounterpartyEmail);
         bool isSelfTransfer = !string.IsNullOrEmpty(request.TransferToAccountId);
 
         // Validate transfer/P2P exclusivity
         if (isSelfTransfer && isP2P)
-            return (false, "Cannot combine transfer with P2P. Use either transfer or counterparty email.", null);
+            return DomainErrors.Transaction.TransferP2PConflict;
 
         // Handle self-transfer
         if (isSelfTransfer)
         {
             if (type != TransactionType.Send)
-                return (false, "Transfer must use Send type (money leaves source account)", null);
+                return Error.Validation("Transfer must use Send type (money leaves source account)");
 
             var transferToAccount = await _accountRepository.GetByIdAndUserIdAsync(request.TransferToAccountId!, userId);
             if (transferToAccount == null)
-                return (false, "Destination account not found", null);
+                return DomainErrors.Account.NotFound(request.TransferToAccountId!);
 
             if (request.TransferToAccountId == request.AccountId)
-                return (false, "Cannot transfer to the same account", null);
+                return DomainErrors.Account.InvalidTransfer;
 
-            return await _transferService.CreateTransferAsync(userId, request, account, transferToAccount, dek);
+            var transferResult = await _transferService.CreateTransferAsync(userId, request, account, transferToAccount, dek);
+            return transferResult.Success
+                ? Result.Success(transferResult.Transaction!)
+                : Result.Failure<TransactionResponse>(Error.Validation(transferResult.Message));
         }
 
         // Handle P2P
@@ -225,7 +234,7 @@ public class TransactionCoreService : ITransactionCoreService
         {
             counterpartyUser = await _userRepository.GetByEmailAsync(request.CounterpartyEmail!);
             if (counterpartyUser != null && counterpartyUser.Id == userId)
-                return (false, "Cannot send to yourself. Use Transfer to move money between your accounts.", null);
+                return DomainErrors.Transaction.SelfP2PNotAllowed;
         }
 
         // Handle recurring
@@ -235,7 +244,7 @@ public class TransactionCoreService : ITransactionCoreService
                 userId, request, account, dek);
 
             if (!success)
-                return (false, message, null);
+                return Result.Failure<TransactionResponse>(Error.Validation(message));
 
             // Handle transfer for recurring (first instance)
             if (isSelfTransfer && firstInstance != null)
@@ -258,7 +267,7 @@ public class TransactionCoreService : ITransactionCoreService
                 tags.ToDictionary(t => t.Id),
                 null);
 
-            return (true, "Recurring transaction created successfully", response);
+            return Result.Success(response);
         }
 
         // Create regular transaction
@@ -378,24 +387,24 @@ public class TransactionCoreService : ITransactionCoreService
             counterpartyUser?.Id
         ));
 
-        return (true, "Transaction created successfully", transactionResponse);
+        return Result.Success(transactionResponse);
     }
 
-    public async Task<(bool Success, string Message, TransactionResponse? Transaction)> UpdateAsync(
+    public async Task<Result<TransactionResponse>> UpdateAsync(
         string id,
         string userId,
         UpdateTransactionRequest request)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null)
-            return (false, "Transaction not found", null);
+            return DomainErrors.Transaction.NotFound(id);
 
         if (transaction.IsRecurringTemplate)
-            return (false, "Cannot edit recurring template. Delete and recreate instead.", null);
+            return DomainErrors.Transaction.CannotEditRecurringTemplate;
 
         var dek = await _mapperService.GetUserDekAsync(userId);
         if (dek == null)
-            return (false, "Encryption key not available", null);
+            return DomainErrors.Encryption.KeyNotAvailable;
 
         // Account lookup
         Account? account = null;
@@ -403,7 +412,7 @@ public class TransactionCoreService : ITransactionCoreService
         {
             account = await _accountRepository.GetByIdAndUserIdAsync(transaction.AccountId, userId);
             if (account == null)
-                return (false, "Account not found", null);
+                return DomainErrors.Account.NotFound(transaction.AccountId);
         }
 
         // Store old values for balance adjustment
@@ -417,9 +426,9 @@ public class TransactionCoreService : ITransactionCoreService
         {
             newAccount = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId);
             if (newAccount == null)
-                return (false, "New account not found", null);
+                return DomainErrors.Account.NotFound(request.AccountId);
             if (newAccount.IsArchived)
-                return (false, "Cannot move transaction to an archived account", null);
+                return DomainErrors.Account.Archived;
 
             transaction.AccountId = request.AccountId;
             transaction.Currency = newAccount.Currency;
@@ -434,7 +443,7 @@ public class TransactionCoreService : ITransactionCoreService
         if (request.Amount.HasValue)
         {
             if (request.Amount.Value <= 0)
-                return (false, "Amount must be positive", null);
+                return DomainErrors.Transaction.InvalidAmount;
             transaction.Amount = request.Amount.Value;
         }
 
@@ -481,11 +490,11 @@ public class TransactionCoreService : ITransactionCoreService
         if (request.Splits != null)
         {
             if (request.Splits.Count == 0)
-                return (false, "At least one split is required", null);
+                return Error.Validation("At least one split is required");
 
             var splitSum = request.Splits.Sum(s => s.Amount);
             if (Math.Abs(splitSum - transaction.Amount) > 0.01m)
-                return (false, $"Split amounts ({splitSum}) must equal transaction amount ({transaction.Amount})", null);
+                return DomainErrors.Transaction.InvalidSplits(splitSum, transaction.Amount);
 
             transaction.Splits = request.Splits.Select(s => new TransactionSplit
             {
@@ -565,14 +574,14 @@ public class TransactionCoreService : ITransactionCoreService
             newAccount?.Id ?? transaction.AccountId
         ));
 
-        return (true, "Transaction updated successfully", response);
+        return Result.Success(response);
     }
 
-    public async Task<(bool Success, string Message)> DeleteAsync(string id, string userId)
+    public async Task<Result> DeleteAsync(string id, string userId)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null)
-            return (false, "Transaction not found");
+            return DomainErrors.Transaction.NotFound(id);
 
         // Get account for balance reversal
         Account? account = null;
@@ -619,7 +628,7 @@ public class TransactionCoreService : ITransactionCoreService
             transaction.IsRecurringTemplate
         ));
 
-        return (true, "Transaction deleted successfully");
+        return Result.Success();
     }
 
     public async Task<int> GetPendingCountAsync(string userId)

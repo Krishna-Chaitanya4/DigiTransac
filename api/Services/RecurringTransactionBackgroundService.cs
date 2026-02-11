@@ -32,7 +32,7 @@ public class RecurringTransactionBackgroundService : BackgroundService
         {
             try
             {
-                await ProcessRecurringTransactionsAsync();
+                await ProcessRecurringTransactionsAsync(stoppingToken);
             }
             catch (Exception ex)
             {
@@ -45,14 +45,14 @@ public class RecurringTransactionBackgroundService : BackgroundService
         _logger.LogInformation("Recurring Transaction Background Service stopped");
     }
 
-    private async Task ProcessRecurringTransactionsAsync()
+    private async Task ProcessRecurringTransactionsAsync(CancellationToken ct)
     {
         _logger.LogInformation("Processing recurring transactions...");
 
         using var scope = _scopeFactory.CreateScope();
         var recurringService = scope.ServiceProvider.GetRequiredService<IRecurringTransactionService>();
 
-        await recurringService.ProcessRecurringTransactionsAsync();
+        await recurringService.ProcessRecurringTransactionsAsync(ct);
 
         _logger.LogInformation("Finished processing recurring transactions");
     }

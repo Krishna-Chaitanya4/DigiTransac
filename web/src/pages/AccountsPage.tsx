@@ -308,10 +308,10 @@ export default function AccountsPage() {
                         : 'text-red-600 dark:text-red-400'      // Asset overdraft = red
                     }`}
                   >
-                    {/* For liabilities: show as negative (money owed)
+                    {/* For liabilities: negate the balance (positive debt → negative display, negative credit → positive display)
                         For assets: show as-is (negative for overdraft) */}
                     {formatCurrencyWithCode(
-                      config.isLiability ? -Math.abs(typeTotal) : typeTotal,
+                      config.isLiability ? -typeTotal : typeTotal,
                       summary?.primaryCurrency || 'INR'
                     )}
                   </span>

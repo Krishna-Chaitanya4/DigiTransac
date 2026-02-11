@@ -7,6 +7,7 @@ using Moq;
 
 namespace DigiTransac.Tests.Integration;
 
+[Trait("Category", "Integration")]
 public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory>
 {
     private readonly DigiTransacWebApplicationFactory _factory;
@@ -73,7 +74,7 @@ public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory
         var response = await _client.PostAsJsonAsync("/api/auth/send-verification", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     #endregion

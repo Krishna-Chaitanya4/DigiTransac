@@ -6,12 +6,12 @@ namespace DigiTransac.Api.Repositories;
 
 public interface ITwoFactorTokenRepository
 {
-    Task<TwoFactorToken?> GetByTokenAsync(string token);
-    Task<TwoFactorToken> CreateAsync(TwoFactorToken twoFactorToken);
-    Task MarkAsUsedAsync(string id);
-    Task DeleteByUserIdAsync(string userId);
-    Task DeleteAllByUserIdAsync(string userId);
-    Task SetEmailOtpAsync(string id, string emailOtpCode);
+    Task<TwoFactorToken?> GetByTokenAsync(string token, CancellationToken ct = default);
+    Task<TwoFactorToken> CreateAsync(TwoFactorToken twoFactorToken, CancellationToken ct = default);
+    Task MarkAsUsedAsync(string id, CancellationToken ct = default);
+    Task DeleteByUserIdAsync(string userId, CancellationToken ct = default);
+    Task DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
+    Task SetEmailOtpAsync(string id, string emailOtpCode, CancellationToken ct = default);
 }
 
 public class TwoFactorTokenRepository : ITwoFactorTokenRepository
@@ -36,41 +36,41 @@ public class TwoFactorTokenRepository : ITwoFactorTokenRepository
         _tokens.Indexes.CreateOne(new CreateIndexModel<TwoFactorToken>(ttlIndex, ttlOptions));
     }
 
-    public async Task<TwoFactorToken?> GetByTokenAsync(string token)
+    public async Task<TwoFactorToken?> GetByTokenAsync(string token, CancellationToken ct = default)
     {
         return await _tokens
             .Find(t => t.Token == token && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<TwoFactorToken> CreateAsync(TwoFactorToken twoFactorToken)
+    public async Task<TwoFactorToken> CreateAsync(TwoFactorToken twoFactorToken, CancellationToken ct = default)
     {
-        await _tokens.InsertOneAsync(twoFactorToken);
+        await _tokens.InsertOneAsync(twoFactorToken, options: null, ct);
         return twoFactorToken;
     }
 
-    public async Task MarkAsUsedAsync(string id)
+    public async Task MarkAsUsedAsync(string id, CancellationToken ct = default)
     {
         var update = Builders<TwoFactorToken>.Update.Set(t => t.IsUsed, true);
-        await _tokens.UpdateOneAsync(t => t.Id == id, update);
+        await _tokens.UpdateOneAsync(t => t.Id == id, update, options: null, ct);
     }
 
-    public async Task SetEmailOtpAsync(string id, string emailOtpCode)
+    public async Task SetEmailOtpAsync(string id, string emailOtpCode, CancellationToken ct = default)
     {
         var update = Builders<TwoFactorToken>.Update
             .Set(t => t.EmailOtpCode, emailOtpCode)
             .Set(t => t.EmailOtpSentAt, DateTime.UtcNow);
-        await _tokens.UpdateOneAsync(t => t.Id == id, update);
+        await _tokens.UpdateOneAsync(t => t.Id == id, update, options: null, ct);
     }
 
-    public async Task DeleteByUserIdAsync(string userId)
+    public async Task DeleteByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        await _tokens.DeleteManyAsync(t => t.UserId == userId);
+        await _tokens.DeleteManyAsync(t => t.UserId == userId, ct);
     }
 
-    public async Task DeleteAllByUserIdAsync(string userId)
+    public async Task DeleteAllByUserIdAsync(string userId, CancellationToken ct = default)
     {
         // Alias for DeleteByUserIdAsync for consistency
-        await DeleteByUserIdAsync(userId);
+        await DeleteByUserIdAsync(userId, ct);
     }
 }

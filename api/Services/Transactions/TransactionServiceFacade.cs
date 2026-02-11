@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models.Dto;
 
 namespace DigiTransac.Api.Services.Transactions;
@@ -39,15 +40,15 @@ public class TransactionServiceFacade : ITransactionService
     public Task<TransactionResponse?> GetByIdAsync(string id, string userId)
         => _coreService.GetByIdAsync(id, userId);
 
-    public Task<(bool Success, string Message, TransactionResponse? Transaction)> CreateAsync(
+    public Task<Result<TransactionResponse>> CreateAsync(
         string userId, CreateTransactionRequest request)
         => _coreService.CreateAsync(userId, request);
 
-    public Task<(bool Success, string Message, TransactionResponse? Transaction)> UpdateAsync(
+    public Task<Result<TransactionResponse>> UpdateAsync(
         string id, string userId, UpdateTransactionRequest request)
         => _coreService.UpdateAsync(id, userId, request);
 
-    public Task<(bool Success, string Message)> DeleteAsync(string id, string userId)
+    public Task<Result> DeleteAsync(string id, string userId)
         => _coreService.DeleteAsync(id, userId);
 
     public Task<int> GetPendingCountAsync(string userId)
