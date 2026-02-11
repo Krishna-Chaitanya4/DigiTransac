@@ -17,6 +17,7 @@ namespace DigiTransac.Tests.Integration.MongoDb;
 /// and authentication/authorization enforcement.
 /// </summary>
 [Collection(MongoDbTestCollection.Name)]
+[Trait("Category", "Integration")]
 public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new()

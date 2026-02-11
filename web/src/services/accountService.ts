@@ -135,9 +135,11 @@ export async function setDefaultAccount(id: string): Promise<void> {
   return apiClient.post<void>(`/accounts/${id}/set-default`, {});
 }
 
-// Format currency using browser's locale for proper number formatting
+// Format currency with locale-aware number formatting
+// Uses en-IN for INR (lakhs/crores grouping), en-US for others
 export function formatCurrency(amount: number, currency = 'INR'): string {
-  return new Intl.NumberFormat(undefined, {
+  const locale = currency === 'INR' ? 'en-IN' : 'en-US';
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,

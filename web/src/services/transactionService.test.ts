@@ -8,6 +8,7 @@ vi.mock('./apiClient', () => ({
     put: vi.fn(),
     delete: vi.fn(),
   },
+  API_BASE_URL: '/api',
 }));
 
 // Mock fetch for export tests

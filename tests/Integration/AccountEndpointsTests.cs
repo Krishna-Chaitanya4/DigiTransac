@@ -9,6 +9,7 @@ using Moq;
 
 namespace DigiTransac.Tests.Integration;
 
+[Trait("Category", "Integration")]
 public class AccountEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory>
 {
     private readonly DigiTransacWebApplicationFactory _factory;

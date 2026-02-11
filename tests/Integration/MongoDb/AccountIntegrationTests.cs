@@ -12,6 +12,7 @@ namespace DigiTransac.Tests.Integration.MongoDb;
 /// Integration tests for Account endpoints using real MongoDB via TestContainers.
 /// </summary>
 [Collection(MongoDbTestCollection.Name)]
+[Trait("Category", "Integration")]
 public class AccountIntegrationTests : MongoDbIntegrationTestBase
 {
     public AccountIntegrationTests(MongoDbContainerFixture mongoFixture) 

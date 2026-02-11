@@ -17,6 +17,7 @@ namespace DigiTransac.Tests.Integration.MongoDb;
 /// profile updates, and password flows against a real database.
 /// </summary>
 [Collection(MongoDbTestCollection.Name)]
+[Trait("Category", "Integration")]
 public class AuthIntegrationTests : MongoDbIntegrationTestBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new()

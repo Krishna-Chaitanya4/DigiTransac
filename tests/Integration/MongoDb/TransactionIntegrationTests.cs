@@ -14,6 +14,7 @@ namespace DigiTransac.Tests.Integration.MongoDb;
 /// Integration tests for Transaction endpoints using real MongoDB via TestContainers.
 /// </summary>
 [Collection(MongoDbTestCollection.Name)]
+[Trait("Category", "Integration")]
 public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 {
     // JSON options that match the API's serialization (enums as strings)
