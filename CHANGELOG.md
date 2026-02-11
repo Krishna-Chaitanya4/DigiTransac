@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-02-12
+
+### Performance
+- **Fix N+1 in TransactionBatchService.BatchDeleteAsync** - Batch-fetch transactions via `GetByIdsAsync` and accounts via `GetByUserIdAsync`, build dictionaries for O(1) lookups instead of per-item repository queries
+- **Fix N+1 in TransactionBatchService.BatchUpdateStatusAsync** - Same batch-fetch + dictionary pattern for status update operations
+- **Fix N+1 in TransactionImportService.CreateTransaction** - Pre-fetch labels once before the import loop instead of re-querying per CSV row
+- **Fix N+1 in RecurringTransactionService.DeleteRecurringAsync** - Batch-fetch accounts with `GetByUserIdAsync` and build `accountMap` instead of per-recurring-transaction account lookup
+
+### Changed
+- **Extract GetTransactionCurrency** - Deduplicated currency resolution logic (was copy-pasted in 6 analytics methods) into a single `private static` method in `TransactionAnalyticsService`
+- **Extract CalculateDistanceKm** - Deduplicated Haversine formula (was duplicated in location insights and trip grouping) into a single `private static` method with `ToRadians` helper
+- **Extract FetchAnalyticsContextAsync** - Consolidated shared analytics data-fetch pattern (primary currency, exchange rates, accounts, labels, DEK) into `FetchAnalyticsContextAsync` returning an `AnalyticsContext` record
+- **TransactionImportService → ITransactionMapperService** - Replaced `IEncryptionService` + `IKeyManagementService` + `IUserRepository` with unified `ITransactionMapperService` for encryption operations
+- **TransactionAnalyticsService Logging** - Added `ILogger<TransactionAnalyticsService>` with debug logging on all 8 public analytics methods
+- **CancellationToken in TwoFactorService** - Propagated `CancellationToken` to all `IUserRepository` calls (`GetByIdAsync`, `UpdateAsync`) in all 4 async methods
+- **CancellationToken in RecurringTransactionBackgroundService** - Propagated `stoppingToken` through to `ProcessRecurringTransactionsAsync`; updated `IRecurringTransactionService` interface and implementation
+- **CancellationToken in IUserRepository** - Added `CancellationToken ct = default` to all interface methods and MongoDB driver calls in implementation
+- **Centralized API URL in useNotifications** - Replaced hardcoded `import.meta.env.VITE_API_URL || 'http://localhost:5000'` with imported `API_BASE_URL` from `apiClient`
+
+### Security
+- **Environment guard on curl fallback** - `ExchangeRateService.FetchWithCurlAsync` now only executes curl in Development environment; logs error and throws `InvalidOperationException` in production instead of spawning system processes
+
+### Fixed
+- **Test Suite Updated** - All 401 unit tests passing with updated mocks for `CancellationToken` parameters on `IUserRepository` methods and `IHostEnvironment` on `ExchangeRateService`
+
 ## [1.3.0] - 2026-02-12
 
 ### Performance

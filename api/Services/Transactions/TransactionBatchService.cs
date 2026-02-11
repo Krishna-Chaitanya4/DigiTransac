@@ -31,10 +31,17 @@ public class TransactionBatchService : ITransactionBatchService
         var successCount = 0;
         var failedIds = new List<string>();
 
+        // Batch-fetch all transactions upfront to avoid N+1
+        var transactions = await _transactionRepository.GetByIdsAsync(ids, userId);
+        var transactionMap = transactions.ToDictionary(t => t.Id);
+
+        // Batch-fetch all accounts for this user (one query instead of N)
+        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: true);
+        var accountMap = accounts.ToDictionary(a => a.Id);
+
         foreach (var id in ids)
         {
-            var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
-            if (transaction == null)
+            if (!transactionMap.TryGetValue(id, out var transaction))
             {
                 failedIds.Add(id);
                 continue;
@@ -48,39 +55,45 @@ public class TransactionBatchService : ITransactionBatchService
             }
 
             // Reverse balance change
-            if (!string.IsNullOrEmpty(transaction.AccountId))
+            if (!string.IsNullOrEmpty(transaction.AccountId) &&
+                accountMap.TryGetValue(transaction.AccountId, out var account))
             {
-                var account = await _accountRepository.GetByIdAndUserIdAsync(transaction.AccountId, userId);
-                if (account != null)
-                {
-                    await _accountBalanceService.UpdateBalanceAsync(
-                        account, transaction.Type, transaction.Amount, false);
-                }
+                await _accountBalanceService.UpdateBalanceAsync(
+                    account, transaction.Type, transaction.Amount, false);
             }
 
             // Delete linked transaction for transfers
-            if (!string.IsNullOrEmpty(transaction.LinkedTransactionId))
+            if (!string.IsNullOrEmpty(transaction.LinkedTransactionId) &&
+                transactionMap.TryGetValue(transaction.LinkedTransactionId, out var linkedTransaction))
             {
-                var linkedTransaction = await _transactionRepository.GetByIdAndUserIdAsync(
-                    transaction.LinkedTransactionId, userId);
-                if (linkedTransaction != null)
+                // Linked transaction was in the batch — handle it
+                if (!string.IsNullOrEmpty(linkedTransaction.AccountId) &&
+                    accountMap.TryGetValue(linkedTransaction.AccountId, out var linkedAccount))
                 {
-                    if (!string.IsNullOrEmpty(linkedTransaction.AccountId))
+                    await _accountBalanceService.UpdateBalanceAsync(
+                        linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, false);
+                }
+                await _transactionRepository.DeleteAsync(linkedTransaction.Id, userId);
+            }
+            else if (!string.IsNullOrEmpty(transaction.LinkedTransactionId))
+            {
+                // Linked transaction wasn't in batch — fetch individually (rare case)
+                var linkedTx = await _transactionRepository.GetByIdAndUserIdAsync(
+                    transaction.LinkedTransactionId, userId);
+                if (linkedTx != null)
+                {
+                    if (!string.IsNullOrEmpty(linkedTx.AccountId) &&
+                        accountMap.TryGetValue(linkedTx.AccountId, out var linkedAcct))
                     {
-                        var linkedAccount = await _accountRepository.GetByIdAndUserIdAsync(
-                            linkedTransaction.AccountId, userId);
-                        if (linkedAccount != null)
-                        {
-                            await _accountBalanceService.UpdateBalanceAsync(
-                                linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, false);
-                        }
+                        await _accountBalanceService.UpdateBalanceAsync(
+                            linkedAcct, linkedTx.Type, linkedTx.Amount, false);
                     }
-                    await _transactionRepository.DeleteAsync(linkedTransaction.Id, userId);
+                    await _transactionRepository.DeleteAsync(linkedTx.Id, userId);
                 }
             }
 
             // Delete P2P linked transaction if still pending
-            if (transaction.TransactionLinkId.HasValue && 
+            if (transaction.TransactionLinkId.HasValue &&
                 !string.IsNullOrEmpty(transaction.CounterpartyUserId))
             {
                 var linkedP2P = await _transactionRepository.GetLinkedP2PTransactionAsync(
@@ -120,13 +133,16 @@ public class TransactionBatchService : ITransactionBatchService
             return new BatchOperationResponse(0, ids.Count, ids, $"Invalid status: {status}");
         }
 
+        // Batch-fetch all transactions upfront to avoid N+1
+        var transactions = await _transactionRepository.GetByIdsAsync(ids, userId);
+        var transactionMap = transactions.ToDictionary(t => t.Id);
+
         var successCount = 0;
         var failedIds = new List<string>();
 
         foreach (var id in ids)
         {
-            var transaction = await _transactionRepository.GetByIdAsync(id);
-            if (transaction == null || transaction.UserId != userId)
+            if (!transactionMap.TryGetValue(id, out var transaction))
             {
                 failedIds.Add(id);
                 continue;

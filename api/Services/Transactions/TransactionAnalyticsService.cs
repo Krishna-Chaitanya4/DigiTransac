@@ -16,6 +16,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
     private readonly IUserRepository _userRepository;
     private readonly IExchangeRateService _exchangeRateService;
     private readonly ITransactionMapperService _mapperService;
+    private readonly ILogger<TransactionAnalyticsService> _logger;
 
     public TransactionAnalyticsService(
         ITransactionRepository transactionRepository,
@@ -23,7 +24,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         ILabelRepository labelRepository,
         IUserRepository userRepository,
         IExchangeRateService exchangeRateService,
-        ITransactionMapperService mapperService)
+        ITransactionMapperService mapperService,
+        ILogger<TransactionAnalyticsService> logger)
     {
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
@@ -31,12 +33,74 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         _userRepository = userRepository;
         _exchangeRateService = exchangeRateService;
         _mapperService = mapperService;
+        _logger = logger;
     }
+
+    /// <summary>
+    /// Shared analytics context to avoid repeated fetches across methods.
+    /// </summary>
+    private record AnalyticsContext(
+        string PrimaryCurrency,
+        Dictionary<string, decimal> Rates,
+        Dictionary<string, Account> Accounts,
+        Dictionary<string, Label> Labels,
+        byte[]? Dek);
+
+    /// <summary>
+    /// Fetches the shared analytics context (user, accounts, labels, rates, DEK).
+    /// </summary>
+    private async Task<AnalyticsContext> FetchAnalyticsContextAsync(
+        string userId,
+        bool needsDek = false,
+        bool needsLabels = false)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
+            .ToDictionary(a => a.Id);
+        var labels = needsLabels
+            ? (await _labelRepository.GetByUserIdAsync(userId)).ToDictionary(l => l.Id)
+            : new Dictionary<string, Label>();
+        var dek = needsDek ? await _mapperService.GetUserDekAsync(userId) : null;
+
+        return new AnalyticsContext(primaryCurrency, ratesResponse.Rates, accounts, labels, dek);
+    }
+
+    /// <summary>
+    /// Gets the currency for a transaction based on its account, falling back to the primary currency.
+    /// </summary>
+    private static string GetTransactionCurrency(
+        Transaction t,
+        Dictionary<string, Account> accounts,
+        string primaryCurrency) =>
+        !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
+            ? acc.Currency
+            : primaryCurrency;
+
+    /// <summary>
+    /// Calculates the great-circle distance between two geographic points using the Haversine formula.
+    /// </summary>
+    private static double CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double EarthRadiusKm = 6371.0;
+        var dLat = ToRadians(lat2 - lat1);
+        var dLon = ToRadians(lon2 - lon1);
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return EarthRadiusKm * c;
+    }
+
+    private static double ToRadians(double degrees) => degrees * Math.PI / 180.0;
 
     public async Task<TransactionSummaryResponse> GetSummaryAsync(
         string userId,
         TransactionFilterRequest filter)
     {
+        _logger.LogDebug("Fetching transaction summary for user {UserId}", userId);
+
         // Summary reflects the current status filter for consistency with the list view
         // If no status filter is specified, default to Confirmed (main financial view)
         var summaryFilter = string.IsNullOrEmpty(filter.Status)
@@ -44,16 +108,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             : filter;
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, summaryFilter);
 
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-
-        // Get accounts to know transaction currencies
-        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: true);
-        var accountDict = accounts.ToDictionary(a => a.Id);
-
-        // Get exchange rates for currency conversion
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
+        var ctx = await FetchAnalyticsContextAsync(userId);
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
+        var accountDict = ctx.Accounts;
 
         // Convert all transaction amounts to user's primary currency before summing
         decimal totalCredits = 0;
@@ -69,9 +127,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             if (string.IsNullOrEmpty(t.AccountId))
                 continue;
 
-            var transactionCurrency = accountDict.TryGetValue(t.AccountId, out var account)
-                ? account.Currency
-                : primaryCurrency;
+            var transactionCurrency = GetTransactionCurrency(t, accountDict, primaryCurrency);
 
             var convertedAmount = _exchangeRateService.Convert(
                 t.Amount, transactionCurrency, primaryCurrency, rates);
@@ -120,23 +176,13 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         DateTime? endDate,
         string? accountId)
     {
-        var dek = await _mapperService.GetUserDekAsync(userId);
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
-            .ToDictionary(a => a.Id);
-        var labels = (await _labelRepository.GetByUserIdAsync(userId))
-            .ToDictionary(l => l.Id);
+        _logger.LogDebug("Fetching analytics for user {UserId}, period {Start} to {End}", userId, startDate, endDate);
 
-        // Get user's primary currency and exchange rates
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
-
-        // Helper to get transaction currency
-        string GetTransactionCurrency(Transaction t) =>
-            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
-                ? acc.Currency
-                : primaryCurrency;
+        var ctx = await FetchAnalyticsContextAsync(userId, needsDek: true, needsLabels: true);
+        var accounts = ctx.Accounts;
+        var labels = ctx.Labels;
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
 
         // Get all transactions for the period
         var filter = TransactionFilterRequest.ForAnalytics(
@@ -150,7 +196,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var categoryTotals = new Dictionary<string, (decimal amount, int count)>();
         foreach (var t in transactions.Where(t => !t.IsRecurringTemplate))
         {
-            var transactionCurrency = GetTransactionCurrency(t);
+            var transactionCurrency = GetTransactionCurrency(t, accounts, primaryCurrency);
             foreach (var split in t.Splits)
             {
                 if (!categoryTotals.ContainsKey(split.LabelId))
@@ -192,16 +238,16 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 g.Key,
                 g.Where(t => t.Type == TransactionType.Receive)
                     .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
+                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
                 g.Where(t => t.Type == TransactionType.Send)
                     .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
+                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
                 g.Where(t => t.Type == TransactionType.Receive)
                     .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)) -
+                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)) -
                 g.Where(t => t.Type == TransactionType.Send)
                     .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
+                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
                 g.Count()
             ))
             .ToList();
@@ -215,11 +261,11 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var averagesByType = new AveragesByType(
             receives.Any() ? Math.Round(receives.Average(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
+                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)), 2) : 0,
             sends.Any() ? Math.Round(sends.Average(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0,
+                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)), 2) : 0,
             transfers.Any() ? Math.Round(transfers.Average(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)), 2) : 0
+                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)), 2) : 0
         );
 
         // Calculate daily and monthly averages with currency conversion
@@ -227,7 +273,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var days = Math.Max(1, dateRange.Days);
         var months = Math.Max(1, days / 30.0);
         var totalSends = sends.Sum(t => _exchangeRateService.Convert(
-            t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+            t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
 
         return new TransactionAnalyticsResponse(
             topCategories,
@@ -245,14 +291,13 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         int page = 1,
         int pageSize = 10)
     {
-        var dek = await _mapperService.GetUserDekAsync(userId);
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
+        _logger.LogDebug("Fetching top counterparties for user {UserId}", userId);
 
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
-            .ToDictionary(a => a.Id);
+        var ctx = await FetchAnalyticsContextAsync(userId, needsDek: true);
+        var dek = ctx.Dek;
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
+        var accounts = ctx.Accounts;
 
         // Get counterparty users for P2P transactions
         var counterpartyUsers = new Dictionary<string, User>();
@@ -283,12 +328,6 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             counterpartyUsers = await _userRepository.GetByIdsAsync(counterpartyUserIds);
         }
 
-        // Helper to get transaction currency
-        string GetTransactionCurrency(Transaction t) =>
-            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
-                ? acc.Currency
-                : primaryCurrency;
-
         // Helper to get decrypted payee
         string GetPayee(Transaction t) =>
             dek != null && !string.IsNullOrEmpty(t.EncryptedPayee)
@@ -308,7 +347,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             })
             .Select(g => {
                 var totalAmount = g.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
                 return new {
                     Type = g.Key.Item1,
                     Name = g.Key.Item2,
@@ -350,13 +389,12 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         int page = 1,
         int pageSize = 50)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
+        _logger.LogDebug("Fetching spending by account for user {UserId}", userId);
 
-        var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
-        var accountDict = accounts.ToDictionary(a => a.Id);
+        var ctx = await FetchAnalyticsContextAsync(userId);
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
+        var accountDict = ctx.Accounts;
 
         // Get transactions for the period
         var filter = TransactionFilterRequest.Builder()
@@ -423,13 +461,12 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         DateTime? startDate,
         DateTime? endDate)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
+        _logger.LogDebug("Fetching spending patterns for user {UserId}", userId);
 
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
-            .ToDictionary(a => a.Id);
+        var ctx = await FetchAnalyticsContextAsync(userId);
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
+        var accounts = ctx.Accounts;
 
         // Get transactions for the period
         var filter = TransactionFilterRequest.Builder()
@@ -444,12 +481,6 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var sendTransactions = transactions
             .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate)
             .ToList();
-
-        // Helper to get transaction currency
-        string GetTransactionCurrency(Transaction t) =>
-            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
-                ? acc.Currency
-                : primaryCurrency;
 
         var dayNames = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
@@ -478,7 +509,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .GroupBy(t => GetTransactionDayOfWeek(t))
             .Select(g => {
                 var totalAmount = g.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
                 return new DayOfWeekSpending(
                     g.Key,
                     dayNames[g.Key],
@@ -505,7 +536,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .GroupBy(t => GetTransactionHour(t))
             .Select(g => {
                 var totalAmount = g.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
                 var hourLabel = g.Key == 0 ? "12 AM" :
                                g.Key < 12 ? $"{g.Key} AM" :
                                g.Key == 12 ? "12 PM" :
@@ -545,16 +576,14 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         int page = 1,
         int pageSize = 10)
     {
-        var dek = await _mapperService.GetUserDekAsync(userId);
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
+        _logger.LogDebug("Fetching spending anomalies for user {UserId}", userId);
 
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
-            .ToDictionary(a => a.Id);
-        var labels = (await _labelRepository.GetByUserIdAsync(userId))
-            .ToDictionary(l => l.Id);
+        var ctx = await FetchAnalyticsContextAsync(userId, needsDek: true, needsLabels: true);
+        var dek = ctx.Dek;
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
+        var accounts = ctx.Accounts;
+        var labels = ctx.Labels;
 
         // Get transactions for the period (current period)
         var filter = TransactionFilterRequest.Builder()
@@ -570,12 +599,6 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate)
             .ToList();
 
-        // Helper to get transaction currency
-        string GetTransactionCurrency(Transaction t) =>
-            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
-                ? acc.Currency
-                : primaryCurrency;
-        
         // Helper to get decrypted payee
         string? GetPayee(Transaction t) =>
             dek != null && !string.IsNullOrEmpty(t.EncryptedPayee)
@@ -592,7 +615,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         // Calculate statistics for anomaly detection
         var convertedAmounts = sendTransactions
-            .Select(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t), primaryCurrency, rates))
+            .Select(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates))
             .ToList();
 
         var average = convertedAmounts.Average();
@@ -603,7 +626,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         foreach (var t in sendTransactions)
         {
             var convertedAmount = _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates);
+                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates);
 
             if (convertedAmount > threshold && convertedAmount > average * 2)
             {
@@ -629,7 +652,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var categorySpending = sendTransactions
             .SelectMany(t => t.Splits.Select(s => new {
                 LabelId = s.LabelId,
-                Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t), primaryCurrency, rates)
+                Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
             }))
             .GroupBy(x => x.LabelId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
@@ -652,7 +675,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .SelectMany(t => t.Splits.Select(s => new {
                 LabelId = s.LabelId,
                 Amount = _exchangeRateService.Convert(
-                    s.Amount, GetTransactionCurrency(t), primaryCurrency, rates)
+                    s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
             }))
             .GroupBy(x => x.LabelId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
@@ -691,7 +714,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .Where(t => !string.IsNullOrEmpty(t.EncryptedPayee) || !string.IsNullOrEmpty(t.Title))
             .GroupBy(t => GetPayee(t) ?? "Unknown")
             .ToDictionary(g => g.Key, g => g.Sum(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)));
+                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)));
 
         var historicalPayees = historicalTransactions
             .Where(t => t.Type == TransactionType.Send && (!string.IsNullOrEmpty(t.EncryptedPayee) || !string.IsNullOrEmpty(t.Title)))
@@ -742,16 +765,14 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         double? longitude = null,
         double radiusKm = 1.0)
     {
-        var dek = await _mapperService.GetUserDekAsync(userId);
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
+        _logger.LogDebug("Fetching location insights for user {UserId}", userId);
 
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
-            .ToDictionary(a => a.Id);
-        var labels = (await _labelRepository.GetByUserIdAsync(userId))
-            .ToDictionary(l => l.Id);
+        var ctx = await FetchAnalyticsContextAsync(userId, needsDek: true, needsLabels: true);
+        var dek = ctx.Dek;
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
+        var accounts = ctx.Accounts;
+        var labels = ctx.Labels;
 
         // Get transactions for the period
         var filter = TransactionFilterRequest.Builder()
@@ -766,12 +787,6 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var transactionsWithLocation = transactions
             .Where(t => t.Location != null && !t.IsRecurringTemplate)
             .ToList();
-
-        // Helper to get transaction currency
-        string GetTransactionCurrency(Transaction t) =>
-            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
-                ? acc.Currency
-                : primaryCurrency;
 
         // Helper to decrypt longitude
         double GetLongitude(TransactionLocation loc)
@@ -795,26 +810,11 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             return null;
         }
 
-        // Helper to calculate distance using Haversine formula
-        double CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
-        {
-            const double EarthRadiusKm = 6371.0;
-            var dLat = ToRadians(lat2 - lat1);
-            var dLon = ToRadians(lon2 - lon1);
-            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                    Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
-                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            return EarthRadiusKm * c;
-        }
-
-        double ToRadians(double degrees) => degrees * Math.PI / 180.0;
-
         // Calculate total spending with location
         var totalSpendingWithLocation = transactionsWithLocation
             .Where(t => t.Type == TransactionType.Send)
             .Sum(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
 
         // Group transactions by location (cluster nearby transactions within 500m)
         var locationClusters = new List<(double Lat, double Lon, string Name, string? City, string? Country, List<Transaction> Transactions)>();
@@ -853,7 +853,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                     .ToList();
                 
                 var totalAmount = sendTransactions.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
 
                 // Find top category at this location
                 var categoryAmounts = sendTransactions
@@ -911,7 +911,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             {
                 var sendNearby = nearbyTransactions.Where(t => t.Type == TransactionType.Send).ToList();
                 var nearbyTotal = sendNearby.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
 
                 // Get the most common location name
                 var locationName = nearbyTransactions
@@ -986,16 +986,14 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         double? homeLongitude = null,
         double minTripDistanceKm = 50.0)
     {
-        var dek = await _mapperService.GetUserDekAsync(userId);
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse.Rates;
+        _logger.LogDebug("Fetching trip groups for user {UserId}", userId);
 
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
-            .ToDictionary(a => a.Id);
-        var labels = (await _labelRepository.GetByUserIdAsync(userId))
-            .ToDictionary(l => l.Id);
+        var ctx = await FetchAnalyticsContextAsync(userId, needsDek: true, needsLabels: true);
+        var dek = ctx.Dek;
+        var primaryCurrency = ctx.PrimaryCurrency;
+        var rates = ctx.Rates;
+        var accounts = ctx.Accounts;
+        var labels = ctx.Labels;
 
         // Get transactions for the period
         var filter = TransactionFilterRequest.Builder()
@@ -1017,12 +1015,6 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             return new TripGroupsResponse(new List<TripGroup>(), 0, 0, primaryCurrency);
         }
 
-        // Helper to get transaction currency
-        string GetTransactionCurrency(Transaction t) =>
-            !string.IsNullOrEmpty(t.AccountId) && accounts.TryGetValue(t.AccountId, out var acc)
-                ? acc.Currency
-                : primaryCurrency;
-
         // Helper to decrypt longitude
         double GetLongitude(TransactionLocation loc)
         {
@@ -1033,19 +1025,6 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                     return lon;
             }
             return 0;
-        }
-
-        // Haversine distance calculation
-        double CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
-        {
-            const double EarthRadiusKm = 6371.0;
-            var dLat = (lat2 - lat1) * Math.PI / 180.0;
-            var dLon = (lon2 - lon1) * Math.PI / 180.0;
-            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                    Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0) *
-                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            return EarthRadiusKm * c;
         }
 
         // Group transactions by city/country to identify trip regions
@@ -1109,13 +1088,13 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
             // Calculate total spending
             var totalAmount = regionTransactions.Sum(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t), primaryCurrency, rates));
+                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
 
             // Calculate category breakdown
             var categoryTotals = regionTransactions
                 .SelectMany(t => t.Splits.Select(s => new {
                     LabelId = s.LabelId,
-                    Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t), primaryCurrency, rates)
+                    Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
                 }))
                 .GroupBy(x => x.LabelId)
                 .Select(g => {
@@ -1142,7 +1121,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                     DateTime.TryParse(g.Key, out var d) ? d : g.First().Date,
                     g.Key,
                     g.Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t), primaryCurrency, rates)),
+                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
                     g.Count()
                 ))
                 .ToList();

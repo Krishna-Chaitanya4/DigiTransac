@@ -54,7 +54,7 @@ public class TwoFactorService : ITwoFactorService
 
     public async Task<TwoFactorSetupInfo> GenerateSetupInfoAsync(string userId, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
         {
             throw new InvalidOperationException("User not found");
@@ -66,7 +66,7 @@ public class TwoFactorService : ITwoFactorService
 
         // Store the secret temporarily (will be confirmed when 2FA is enabled)
         user.TwoFactorSecret = base32Secret;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateAsync(user, ct);
 
         // Generate the otpauth URI for QR code
         var otpauthUri = GenerateOtpAuthUri(user.Email, base32Secret);
@@ -105,7 +105,7 @@ public class TwoFactorService : ITwoFactorService
 
     public async Task<Result> EnableTwoFactorAsync(string userId, string code, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
             return Error.NotFound("User");
 
@@ -124,7 +124,7 @@ public class TwoFactorService : ITwoFactorService
 
         // Enable 2FA
         user.TwoFactorEnabled = true;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateAsync(user, ct);
 
         _logger.LogInformation("2FA enabled for user {UserId}", userId);
         return Result.Success();
@@ -132,7 +132,7 @@ public class TwoFactorService : ITwoFactorService
 
     public async Task<Result> DisableTwoFactorAsync(string userId, string password, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
             return Error.NotFound("User");
 
@@ -149,7 +149,7 @@ public class TwoFactorService : ITwoFactorService
         // Disable 2FA and clear the secret
         user.TwoFactorEnabled = false;
         user.TwoFactorSecret = null;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateAsync(user, ct);
 
         _logger.LogInformation("2FA disabled for user {UserId}", userId);
         return Result.Success();
@@ -157,7 +157,7 @@ public class TwoFactorService : ITwoFactorService
 
     public async Task<bool> VerifyTwoFactorAsync(string userId, string code, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
         {
             return false;

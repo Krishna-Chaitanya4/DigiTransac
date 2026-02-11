@@ -55,11 +55,11 @@ public class ConversationServiceTests
             .ReturnsAsync(new List<Label>());
 
         // Default user with primary currency
-        _userRepositoryMock.Setup(x => x.GetByIdAsync(TestUserId))
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new User { Id = TestUserId, Email = "test@example.com", FullName = "Test User", PrimaryCurrency = "USD" });
 
         // Default counterparty
-        _userRepositoryMock.Setup(x => x.GetByIdAsync(CounterpartyUserId))
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(CounterpartyUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new User { Id = CounterpartyUserId, Email = "counter@example.com", FullName = "Counter Party" });
         
         // Default exchange rate service - returns empty rates (so conversion returns original amount)
@@ -69,8 +69,8 @@ public class ConversationServiceTests
             .Returns((decimal amount, string from, string to, Dictionary<string, decimal> rates) => amount);
 
         // Default batch user lookup - returns default users for known IDs
-        _userRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync((IEnumerable<string> ids) =>
+        _userRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<string> ids, CancellationToken _) =>
             {
                 var result = new Dictionary<string, User>();
                 foreach (var id in ids)
@@ -229,11 +229,11 @@ public class ConversationServiceTests
     {
         // Arrange
         var user2 = new User { Id = "user-2", Email = "user2@example.com", FullName = "User Two" };
-        _userRepositoryMock.Setup(x => x.GetByIdAsync("user-2")).ReturnsAsync(user2);
+        _userRepositoryMock.Setup(x => x.GetByIdAsync("user-2", It.IsAny<CancellationToken>())).ReturnsAsync(user2);
         
         // Setup batch lookup to include user-2
-        _userRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync((IEnumerable<string> ids) =>
+        _userRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<string> ids, CancellationToken _) =>
             {
                 var result = new Dictionary<string, User>();
                 foreach (var id in ids)
@@ -273,7 +273,7 @@ public class ConversationServiceTests
     public async Task GetConversationAsync_ReturnsEmptyConversation_WhenCounterpartyNotFound()
     {
         // Arrange
-        _userRepositoryMock.Setup(x => x.GetByIdAsync("unknown-user"))
+        _userRepositoryMock.Setup(x => x.GetByIdAsync("unknown-user", It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -416,7 +416,7 @@ public class ConversationServiceTests
     public async Task SendMessageAsync_ReturnsError_WhenCounterpartyNotFound()
     {
         // Arrange
-        _userRepositoryMock.Setup(x => x.GetByIdAsync("unknown-user"))
+        _userRepositoryMock.Setup(x => x.GetByIdAsync("unknown-user", It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -653,7 +653,7 @@ public class ConversationServiceTests
     public async Task SearchUserByEmailAsync_ReturnsNotFound_WhenUserDoesNotExist()
     {
         // Arrange
-        _userRepositoryMock.Setup(x => x.GetByEmailAsync("unknown@example.com"))
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync("unknown@example.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -669,7 +669,7 @@ public class ConversationServiceTests
     {
         // Arrange
         var user = new User { Id = TestUserId, Email = "test@example.com" };
-        _userRepositoryMock.Setup(x => x.GetByEmailAsync("test@example.com"))
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync("test@example.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act
@@ -684,7 +684,7 @@ public class ConversationServiceTests
     {
         // Arrange
         var user = new User { Id = "other-user", Email = "other@example.com", FullName = "Other User" };
-        _userRepositoryMock.Setup(x => x.GetByEmailAsync("other@example.com"))
+        _userRepositoryMock.Setup(x => x.GetByEmailAsync("other@example.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act

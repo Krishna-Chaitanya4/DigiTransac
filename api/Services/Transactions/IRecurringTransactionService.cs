@@ -34,7 +34,7 @@ public interface IRecurringTransactionService
     /// <summary>
     /// Process all pending recurring transactions (called by background service)
     /// </summary>
-    Task ProcessRecurringTransactionsAsync();
+    Task ProcessRecurringTransactionsAsync(CancellationToken ct = default);
     
     /// <summary>
     /// Calculate the next occurrence date based on the recurring rule

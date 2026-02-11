@@ -238,9 +238,9 @@ public class AuthServiceTests
             .ReturnsAsync(verification);
         _userRepositoryMock.Setup(x => x.GetByEmailAsync(request.Email))
             .ReturnsAsync((User?)null);
-        _userRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<User>()))
-            .Callback<User>(u => u.Id = "generated-user-id") // Simulate MongoDB assigning an Id
-            .ReturnsAsync((User u) => u);
+        _userRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Callback<User, CancellationToken>((u, _) => u.Id = "generated-user-id") // Simulate MongoDB assigning an Id
+            .ReturnsAsync((User u, CancellationToken _) => u);
 
         // Act
         var result = await _authService.CompleteRegistrationAsync(request);

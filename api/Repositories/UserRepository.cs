@@ -7,12 +7,12 @@ namespace DigiTransac.Api.Repositories;
 
 public interface IUserRepository
 {
-    Task<User?> GetByEmailAsync(string email);
-    Task<User?> GetByIdAsync(string id);
-    Task<Dictionary<string, User>> GetByIdsAsync(IEnumerable<string> ids);
-    Task<User> CreateAsync(User user);
-    Task UpdateAsync(User user);
-    Task<bool> DeleteAsync(string id);
+    Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
+    Task<User?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<Dictionary<string, User>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default);
+    Task<User> CreateAsync(User user, CancellationToken ct = default);
+    Task UpdateAsync(User user, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string id, CancellationToken ct = default);
 }
 
 public class UserRepository : IUserRepository
@@ -51,44 +51,44 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<User?> GetByEmailAsync(string email)
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
     {
-        return await _users.Find(u => u.Email == email.ToLowerInvariant()).FirstOrDefaultAsync();
+        return await _users.Find(u => u.Email == email.ToLowerInvariant()).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<User?> GetByIdAsync(string id)
+    public async Task<User?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        return await _users.Find(u => u.Id == id).FirstOrDefaultAsync();
+        return await _users.Find(u => u.Id == id).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Dictionary<string, User>> GetByIdsAsync(IEnumerable<string> ids)
+    public async Task<Dictionary<string, User>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default)
     {
         var idList = ids.Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
         if (idList.Count == 0)
             return new Dictionary<string, User>();
 
         var filter = Builders<User>.Filter.In(u => u.Id, idList);
-        var users = await _users.Find(filter).ToListAsync();
+        var users = await _users.Find(filter).ToListAsync(ct);
         return users.ToDictionary(u => u.Id);
     }
 
-    public async Task<User> CreateAsync(User user)
+    public async Task<User> CreateAsync(User user, CancellationToken ct = default)
     {
         user.Email = user.Email.ToLowerInvariant();
-        await _users.InsertOneAsync(user);
+        await _users.InsertOneAsync(user, cancellationToken: ct);
         return user;
     }
 
-    public async Task UpdateAsync(User user)
+    public async Task UpdateAsync(User user, CancellationToken ct = default)
     {
-        await _users.ReplaceOneAsync(u => u.Id == user.Id, user);
+        await _users.ReplaceOneAsync(u => u.Id == user.Id, user, cancellationToken: ct);
     }
 
-    public async Task<bool> DeleteAsync(string id)
+    public async Task<bool> DeleteAsync(string id, CancellationToken ct = default)
     {
         // Use ObjectId filter for more reliable deletion
         var filter = Builders<User>.Filter.Eq("_id", new ObjectId(id));
-        var result = await _users.DeleteOneAsync(filter);
+        var result = await _users.DeleteOneAsync(filter, ct);
         return result.DeletedCount > 0;
     }
 }
