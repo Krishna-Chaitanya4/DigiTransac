@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -268,58 +269,3 @@ public class NotificationService : INotificationService
             budgetName, thresholdPercent, userId);
     }
 }
-
-#region Notification DTOs
-
-/// <summary>
-/// Notification payload for P2P transaction events
-/// </summary>
-public record P2PTransactionNotification(
-    string TransactionId,
-    string CounterpartyUserId,
-    string? CounterpartyEmail,
-    string? CounterpartyName,
-    string Type,
-    decimal Amount,
-    string Currency,
-    string? Title,
-    DateTime Date,
-    string Status,
-    string? Reason = null
-);
-
-/// <summary>
-/// Notification payload for chat messages
-/// </summary>
-public record ChatMessageNotification(
-    string MessageId,
-    string SenderId,
-    string? SenderName,
-    string MessageType,
-    string? Content,
-    string? TransactionId,
-    DateTime SentAt
-);
-
-/// <summary>
-/// Notification for pending transaction count updates
-/// </summary>
-public record PendingCountNotification(
-    int PendingCount
-);
-
-/// <summary>
-/// Notification payload for budget alerts
-/// </summary>
-public record BudgetAlertNotification(
-    string BudgetId,
-    string BudgetName,
-    int ThresholdPercent,
-    decimal ActualPercent,
-    decimal AmountSpent,
-    decimal BudgetAmount,
-    string Currency,
-    DateTime AlertedAt
-);
-
-#endregion

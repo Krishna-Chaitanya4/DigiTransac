@@ -20,17 +20,40 @@ public class MongoDbService : IMongoDbService
     private readonly IMongoClient _client;
     private readonly IMongoDatabase _database;
 
-    public MongoDbService(IOptions<MongoDbSettings> settings)
+    public MongoDbService(IOptions<MongoDbSettings> settings, ILogger<MongoDbService> logger)
     {
-        var clientSettings = MongoClientSettings.FromConnectionString(settings.Value.ConnectionString);
+        var mongoSettings = settings.Value;
+        var clientSettings = MongoClientSettings.FromConnectionString(mongoSettings.ConnectionString);
         
-        // Configure connection pool settings for optimal performance
-        clientSettings.MaxConnectionPoolSize = 100;
-        clientSettings.MinConnectionPoolSize = 10;
-        clientSettings.WaitQueueTimeout = TimeSpan.FromSeconds(30);
+        // Connection pool settings (configurable via appsettings.json > MongoDb section)
+        clientSettings.MaxConnectionPoolSize = mongoSettings.MaxConnectionPoolSize;
+        clientSettings.MinConnectionPoolSize = mongoSettings.MinConnectionPoolSize;
+        clientSettings.WaitQueueTimeout = TimeSpan.FromSeconds(mongoSettings.WaitQueueTimeoutSeconds);
+        clientSettings.MaxConnectionIdleTime = TimeSpan.FromSeconds(mongoSettings.MaxConnectionIdleTimeSeconds);
+        clientSettings.MaxConnectionLifeTime = TimeSpan.FromSeconds(mongoSettings.MaxConnectionLifeTimeSeconds);
+        
+        // Timeout settings
+        clientSettings.ConnectTimeout = TimeSpan.FromSeconds(mongoSettings.ConnectTimeoutSeconds);
+        clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(mongoSettings.ServerSelectionTimeoutSeconds);
+        
+        if (mongoSettings.SocketTimeoutSeconds > 0)
+        {
+            clientSettings.SocketTimeout = TimeSpan.FromSeconds(mongoSettings.SocketTimeoutSeconds);
+        }
+        
+        // Retry settings
+        clientSettings.RetryWrites = mongoSettings.RetryWrites;
+        clientSettings.RetryReads = mongoSettings.RetryReads;
         
         _client = new MongoClient(clientSettings);
-        _database = _client.GetDatabase(settings.Value.DatabaseName);
+        _database = _client.GetDatabase(mongoSettings.DatabaseName);
+        
+        logger.LogInformation(
+            "MongoDB connected to {Database} (pool: {Min}-{Max}, waitQueue: {WaitQueue}s)",
+            mongoSettings.DatabaseName,
+            mongoSettings.MinConnectionPoolSize,
+            mongoSettings.MaxConnectionPoolSize,
+            mongoSettings.WaitQueueTimeoutSeconds);
     }
 
     public IMongoDatabase Database => _database;

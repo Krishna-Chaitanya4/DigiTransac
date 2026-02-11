@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
@@ -168,14 +169,14 @@ public static class TwoFactorEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var (success, message) = await authService.SendTwoFactorEmailOtpAsync(request.TwoFactorToken);
+            var result = await authService.SendTwoFactorEmailOtpAsync(request.TwoFactorToken);
             
-            if (!success)
+            if (result.IsFailure)
             {
-                return Results.BadRequest(new ErrorResponse(message));
+                return result.ToApiResult();
             }
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Verification code sent to your email" });
         })
         .WithName("SendTwoFactorEmailOtp")
         .Produces(200)

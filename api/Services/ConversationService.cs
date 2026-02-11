@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
+using CurrencyFormatter = DigiTransac.Api.Common.CurrencyFormatter;
 
 namespace DigiTransac.Api.Services;
 
@@ -30,44 +32,6 @@ public static class ConversationConstants
     
     /// <summary>Display name for self-chat conversations</summary>
     public const string SelfChatDisplayName = "Personal";
-}
-
-/// <summary>
-/// Utility class for formatting currency amounts with symbols.
-/// Uses CurrencyConfig from ExchangeRate.cs as the single source of truth.
-/// </summary>
-public static class CurrencyFormatter
-{
-    /// <summary>
-    /// Get the symbol for a currency code
-    /// </summary>
-    public static string GetSymbol(string currencyCode)
-    {
-        if (string.IsNullOrEmpty(currencyCode))
-            return "";
-            
-        // Use CurrencyConfig as the single source of truth
-        var currencyInfo = CurrencyConfig.GetCurrency(currencyCode);
-        return currencyInfo.Symbol;
-    }
-    
-    /// <summary>
-    /// Format an amount with its currency symbol
-    /// </summary>
-    public static string Format(decimal amount, string currencyCode)
-    {
-        var symbol = GetSymbol(currencyCode);
-        return $"{symbol}{amount:N2}";
-    }
-    
-    /// <summary>
-    /// Format a transaction preview (e.g., "Sent ₹1,000.00")
-    /// </summary>
-    public static string FormatTransactionPreview(TransactionType type, decimal amount, string currencyCode)
-    {
-        var direction = type == TransactionType.Send ? "Sent" : "Received";
-        return $"{direction} {Format(amount, currencyCode)}";
-    }
 }
 
 /// <summary>
@@ -751,12 +715,14 @@ public class ConversationService : IConversationService
             Source: nameof(TransactionSource.Chat)  // Mark as created via chat
         );
         
-        var (success, message, transaction) = await _transactionService.CreateAsync(userId, createRequest);
+        var result = await _transactionService.CreateAsync(userId, createRequest);
         
-        if (!success || transaction == null)
+        if (!result.IsSuccess)
         {
-            return (false, message, null);
+            return (false, result.Error.Message, null);
         }
+        
+        var transaction = result.Value;
         
         // Create chat message for this transaction
         if (transaction.TransactionLinkId.HasValue)

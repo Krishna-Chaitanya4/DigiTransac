@@ -1,7 +1,9 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Services.UnitOfWork;
 using DigiTransac.Api.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -27,6 +29,7 @@ public class AuthServiceTests
     private readonly Mock<ILabelRepository> _labelRepositoryMock;
     private readonly Mock<ITagRepository> _tagRepositoryMock;
     private readonly Mock<IBudgetRepository> _budgetRepositoryMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
     private readonly AuthService _authService;
@@ -49,6 +52,7 @@ public class AuthServiceTests
         _labelRepositoryMock = new Mock<ILabelRepository>();
         _tagRepositoryMock = new Mock<ITagRepository>();
         _budgetRepositoryMock = new Mock<IBudgetRepository>();
+        _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
         {
@@ -76,6 +80,12 @@ public class AuthServiceTests
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(new ChatMessage());
 
+        // Setup UnitOfWork to execute the action directly (no real transaction in tests)
+        _unitOfWorkMock.Setup(x => x.ExecuteInTransactionAsync(
+                It.IsAny<Func<MongoDB.Driver.IClientSessionHandle?, Task>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((Func<MongoDB.Driver.IClientSessionHandle?, Task> action, CancellationToken _) => action(null));
+
         _authService = new AuthService(
             _userRepositoryMock.Object,
             _emailVerificationRepositoryMock.Object,
@@ -92,6 +102,7 @@ public class AuthServiceTests
             _labelRepositoryMock.Object,
             _tagRepositoryMock.Object,
             _budgetRepositoryMock.Object,
+            _unitOfWorkMock.Object,
             _jwtSettings,
             _loggerMock.Object
         );
@@ -113,8 +124,7 @@ public class AuthServiceTests
         var result = await _authService.SendVerificationCodeAsync(email);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Message.Should().Contain("Verification code sent");
+        result.IsSuccess.Should().BeTrue();
         _emailServiceMock.Verify(x => x.SendVerificationCodeAsync(email, It.IsAny<string>()), Times.Once);
     }
 
@@ -130,8 +140,8 @@ public class AuthServiceTests
         var result = await _authService.SendVerificationCodeAsync(email);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Invalid email format");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Invalid email format");
     }
 
     [Fact]
@@ -146,8 +156,8 @@ public class AuthServiceTests
         var result = await _authService.SendVerificationCodeAsync(email);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Email already registered");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Email already registered");
     }
 
     #endregion
@@ -178,9 +188,8 @@ public class AuthServiceTests
         var result = await _authService.VerifyCodeAsync(email, code);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Message.Should().Contain("Email verified successfully");
-        result.VerificationToken.Should().NotBeNullOrEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -197,9 +206,8 @@ public class AuthServiceTests
         var result = await _authService.VerifyCodeAsync(email, code);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Invalid or expired");
-        result.VerificationToken.Should().BeNull();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Invalid or expired");
     }
 
     #endregion
@@ -396,11 +404,25 @@ public class AuthServiceTests
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password)
         };
 
-        // First call returns user, second call (verification) returns null
-        _userRepositoryMock.SetupSequence(x => x.GetByIdAsync(userId))
-            .ReturnsAsync(user)
-            .ReturnsAsync((User?)null);
+        // Setup user lookup (only called once — transactional deletion doesn't re-verify)
+        _userRepositoryMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(user);
+        // Setup all repository deletions within the transaction
+        _transactionRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
+            .ReturnsAsync(true);
+        _accountRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
+            .ReturnsAsync(true);
+        _labelRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
+            .ReturnsAsync(true);
+        _tagRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
+            .ReturnsAsync(true);
+        _budgetRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
+            .ReturnsAsync(true);
+        _chatMessageRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
+            .ReturnsAsync(true);
         _refreshTokenRepositoryMock.Setup(x => x.DeleteByUserIdAsync(userId))
+            .Returns(Task.CompletedTask);
+        _twoFactorTokenRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
             .Returns(Task.CompletedTask);
         _emailVerificationRepositoryMock.Setup(x => x.DeleteAllByEmailAsync(user.Email))
             .Returns(Task.CompletedTask);
@@ -411,12 +433,18 @@ public class AuthServiceTests
         var result = await _authService.DeleteAccountAsync(userId, password);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Message.Should().Contain("deleted successfully");
+        result.IsSuccess.Should().BeTrue();
+        _userRepositoryMock.Verify(x => x.GetByIdAsync(userId), Times.Once);
+        _transactionRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
+        _accountRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
+        _labelRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
+        _tagRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
+        _budgetRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
+        _chatMessageRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
         _refreshTokenRepositoryMock.Verify(x => x.DeleteByUserIdAsync(userId), Times.Once);
+        _twoFactorTokenRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
         _emailVerificationRepositoryMock.Verify(x => x.DeleteAllByEmailAsync(user.Email), Times.Once);
         _userRepositoryMock.Verify(x => x.DeleteAsync(userId), Times.Once);
-        _userRepositoryMock.Verify(x => x.GetByIdAsync(userId), Times.Exactly(2)); // Initial + verification
     }
 
     [Fact]
@@ -439,8 +467,8 @@ public class AuthServiceTests
         var result = await _authService.DeleteAccountAsync(userId, "WrongPassword@123");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Invalid password");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Invalid password");
         _userRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<string>()), Times.Never);
     }
 
@@ -457,8 +485,8 @@ public class AuthServiceTests
         var result = await _authService.DeleteAccountAsync(userId, "Test@123!");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("User not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("not found");
     }
 
     #endregion
@@ -487,8 +515,7 @@ public class AuthServiceTests
         var result = await _authService.UpdateNameAsync(userId, newName);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Message.Should().Contain("updated successfully");
+        result.IsSuccess.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.UpdateAsync(It.Is<User>(u => u.FullName == newName)), Times.Once);
     }
 
@@ -499,8 +526,8 @@ public class AuthServiceTests
         var result = await _authService.UpdateNameAsync("user-123", "");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("empty");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("empty");
     }
 
     [Fact]
@@ -515,8 +542,8 @@ public class AuthServiceTests
         var result = await _authService.UpdateNameAsync(userId, "New Name");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("not found");
     }
 
     #endregion
@@ -549,8 +576,7 @@ public class AuthServiceTests
         var result = await _authService.SendEmailChangeCodeAsync(userId, newEmail);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Message.Should().Contain("Verification code sent");
+        result.IsSuccess.Should().BeTrue();
         _emailServiceMock.Verify(x => x.SendVerificationCodeAsync(newEmail, It.IsAny<string>()), Times.Once);
     }
 
@@ -574,8 +600,8 @@ public class AuthServiceTests
         var result = await _authService.SendEmailChangeCodeAsync(userId, email);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("same as current");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("same as current");
     }
 
     [Fact]
@@ -605,8 +631,8 @@ public class AuthServiceTests
         var result = await _authService.SendEmailChangeCodeAsync(userId, newEmail);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("already in use");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("already in use");
     }
 
     #endregion
@@ -650,8 +676,7 @@ public class AuthServiceTests
         var result = await _authService.VerifyAndUpdateEmailAsync(userId, newEmail, code);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Message.Should().Contain("updated successfully");
+        result.IsSuccess.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.UpdateAsync(It.Is<User>(u => u.Email == newEmail)), Times.Once);
     }
 
@@ -669,8 +694,8 @@ public class AuthServiceTests
         var result = await _authService.VerifyAndUpdateEmailAsync(userId, newEmail, "wrongcode");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Invalid or expired");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Invalid or expired");
     }
 
     [Fact]
@@ -696,8 +721,8 @@ public class AuthServiceTests
         var result = await _authService.VerifyAndUpdateEmailAsync(userId, newEmail, code);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("Invalid or expired");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Invalid or expired");
     }
 
     #endregion
@@ -724,9 +749,7 @@ public class AuthServiceTests
         var result = await _authService.SendPasswordResetCodeAsync(email);
 
         // Assert
-        result.Success.Should().BeTrue();
-        // The actual message is "If an account with that email exists, a reset code has been sent"
-        result.Message.Should().Contain("reset code");
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
@@ -743,7 +766,7 @@ public class AuthServiceTests
 
         // Assert
         // For security, we return success even if user doesn't exist
-        result.Success.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
@@ -784,8 +807,7 @@ public class AuthServiceTests
         var result = await _authService.ResetPasswordAsync(request);
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.Message.Should().Contain("reset successfully");
+        result.IsSuccess.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.UpdateAsync(It.Is<User>(u => u.Email == email)), Times.Once);
     }
 
@@ -802,7 +824,7 @@ public class AuthServiceTests
         var result = await _authService.ResetPasswordAsync(request);
 
         // Assert
-        result.Success.Should().BeFalse();
+        result.IsFailure.Should().BeTrue();
     }
 
     #endregion
@@ -1260,11 +1282,10 @@ public class AuthServiceTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var (success, message) = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
+        var result = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
 
         // Assert
-        success.Should().BeTrue();
-        message.Should().Contain("Verification code sent");
+        result.IsSuccess.Should().BeTrue();
         _emailServiceMock.Verify(x => x.SendTwoFactorBackupCodeAsync(user.Email, It.IsAny<string>()), Times.Once);
     }
 
@@ -1277,11 +1298,11 @@ public class AuthServiceTests
             .ReturnsAsync((TwoFactorToken?)null);
 
         // Act
-        var (success, message) = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
+        var result = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
 
         // Assert
-        success.Should().BeFalse();
-        message.Should().Contain("Invalid or expired session");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Invalid or expired session");
     }
 
     [Fact]
@@ -1303,11 +1324,11 @@ public class AuthServiceTests
             .ReturnsAsync(twoFactorToken);
 
         // Act
-        var (success, message) = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
+        var result = await _authService.SendTwoFactorEmailOtpAsync(tokenString);
 
         // Assert
-        success.Should().BeFalse();
-        message.Should().Contain("wait");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("wait");
     }
 
     [Fact]

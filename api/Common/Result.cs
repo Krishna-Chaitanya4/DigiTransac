@@ -147,6 +147,26 @@ public static class DomainErrors
             Error.Conflict("An account with this email already exists.");
     }
 
+    public static class Auth
+    {
+        public static Error InvalidEmail => Error.Validation("Invalid email format");
+        public static Error EmailAlreadyRegistered => Error.Conflict("Email already registered");
+        public static Error InvalidOrExpiredCode => Error.Validation("Invalid or expired verification code");
+        public static Error InvalidOrExpiredToken => Error.Validation("Invalid or expired verification token");
+        public static Error InvalidPassword => Error.Unauthorized("Invalid password");
+        public static Error WeakPassword(string reason) => Error.Validation(reason);
+        public static Error NameEmpty => Error.Validation("Name cannot be empty");
+        public static Error NameLength => Error.Validation("Name must be between 2 and 100 characters");
+        public static Error EmailSameAsCurrent => Error.Validation("New email is the same as current email");
+        public static Error EmailAlreadyInUse => Error.Conflict("Email is already in use");
+        public static Error CurrentPasswordIncorrect => Error.Unauthorized("Current password is incorrect");
+        public static Error NewPasswordSameAsCurrent => Error.Validation("New password must be different from current password");
+        public static Error InvalidOrExpiredResetToken => Error.Validation("Invalid or expired reset token");
+        public static Error InvalidOrExpiredSession => Error.Validation("Invalid or expired session. Please login again.");
+        public static Error RateLimited => Error.Validation("Please wait before requesting another code");
+        public static Error AccountDeletionFailed => Error.InternalError("Failed to delete account. Please try again.");
+    }
+
     public static class Encryption
     {
         public static Error KeyNotAvailable =>

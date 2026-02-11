@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using Lib.Net.Http.WebPush;
 using Lib.Net.Http.WebPush.Authentication;
@@ -49,19 +50,6 @@ public interface IWebPushService
     /// </summary>
     Task<bool> SendToSubscriptionAsync(AppPushSubscription subscription, PushNotificationPayload payload);
 }
-
-/// <summary>
-/// Payload for push notifications
-/// </summary>
-public record PushNotificationPayload(
-    string Title,
-    string Body,
-    string? Icon = null,
-    string? Badge = null,
-    string? Tag = null,
-    string? Url = null,
-    Dictionary<string, object>? Data = null
-);
 
 public class WebPushService : IWebPushService
 {

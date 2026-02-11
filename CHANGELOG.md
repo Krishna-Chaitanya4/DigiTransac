@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-11
+
+### Added
+- **Result Pattern** - Type-safe `Result<T>` with `Error` records, `DomainErrors` catalog, and extension methods (`Map`, `Bind`, `Match`, `Ensure`, `ToApiResult()`)
+- **Global Exception Handler** - RFC 7807 Problem Details middleware with exception-to-HTTP-status mapping and trace IDs
+- **Content-based ETags** - SHA256-based content hashing via `ETagHelper`, `If-None-Match` support with 304 Not Modified responses on analytics and transaction list endpoints
+- **Redis Caching** - `RedisCacheService` implementation with conditional registration (Redis when `Redis:ConnectionString` configured, in-memory fallback)
+- **Cache Keys** - Centralized `CacheKeys` static class for consistent cache key naming across cache invalidation handlers
+- **Request Logging Middleware** - Structured request/response logging with method, path, status code, duration, user ID, and sensitive path redaction
+- **Configurable MongoDB Pool** - Connection pool size, timeouts, idle time, retry settings all configurable via `appsettings.json > MongoDb` section
+- **CurrencyFormatter** - Shared utility extracted from duplicated formatting logic across analytics services
+- **Notification DTOs** - Dedicated `Models/Dto/NotificationDto.cs` with `P2PTransactionNotification`, `ChatMessageNotification`, `PendingCountNotification`, `BudgetAlertNotification`, `PushNotificationPayload`
+
+### Changed
+- **Program.cs Refactored** - Extracted all service registration and middleware pipeline into extension methods (~62 lines)
+- **Transaction Endpoints Split** - Monolithic `TransactionEndpoints.cs` split into 4 focused files: CRUD, Analytics, Batch, Export with coordinator
+- **Auth Endpoints Split** - Monolithic `AuthEndpoints.cs` split into 4 focused files: Core, Account, Password with coordinator
+- **AuthService Split** - Split into 7 partial class files (Registration, Login, Account, Password, Token, Helpers, core) for maintainability
+- **ITransactionCoreService** - Migrated from tuple returns `(bool, string, T?)` to `Result<T>` pattern
+- **IAuthService** - Migrated from tuple returns to `Result<T>` pattern with `DomainErrors`
+- **Caching Architecture** - `ICacheService` now supports tag-based invalidation, pattern removal, and `GetOrCreateAsync` with `CacheOptions`
+
+### Fixed
+- **SSL Certificate Validation** - Removed dangerous `ServerCertificateCustomValidationCallback` that bypassed all SSL validation
+- **ETag Implementation** - Replaced timestamp-based ETags with content-hash-based ETags that correctly detect data changes
+- **BatchOperationRequestValidator** - Synced validator with endpoint handler to validate all required fields
+- **Account Deletion** - Now transactional using Unit of Work pattern to ensure atomic deletion of all user data
+- **AzureKeyVaultService** - Added guard against runtime crashes when Key Vault URL is not configured
+- **UnitOfWork DI Registration** - Added missing `IUnitOfWork` registration in dependency injection container
+
+### Security
+- Removed SSL bypass that accepted all certificates in non-development environments
+- Auth endpoints have sensitive path redaction in request logging
+- Exception details (stack traces) only exposed in Development environment
+
 ## [1.1.8] - 2026-02-09
 
 ### Added

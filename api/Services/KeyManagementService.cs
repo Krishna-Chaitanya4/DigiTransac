@@ -113,8 +113,15 @@ public class LocalKeyManagementService : IKeyManagementService
 }
 
 /// <summary>
-/// Azure Key Vault implementation (for production)
-/// Placeholder - implement when deploying to Azure
+/// Azure Key Vault implementation (for production).
+/// Currently a placeholder — will be implemented when deploying to Azure.
+///
+/// To use this, set Encryption:Provider to "AzureKeyVault" and configure:
+///   - Encryption:KeyVaultUrl — your Key Vault URI
+///   - Encryption:KeyName — the name of the key to use for wrapping
+///
+/// The application will fail fast at startup if this provider is selected
+/// but not yet implemented, preventing silent runtime failures.
 /// </summary>
 public class AzureKeyVaultService : IKeyManagementService
 {
@@ -124,26 +131,30 @@ public class AzureKeyVaultService : IKeyManagementService
 
     public AzureKeyVaultService(IOptions<EncryptionSettings> settings)
     {
-        // var vaultUri = settings.Value.KeyVaultUrl;
-        // var keyName = settings.Value.KeyName;
-        // _keyClient = new KeyClient(new Uri(vaultUri), new DefaultAzureCredential());
-        throw new NotImplementedException(
-            "Azure Key Vault integration not yet implemented. Use LocalKeyManagementService for development.");
+        // Fail fast at startup with a clear, actionable error message
+        var keyVaultUrl = settings.Value.KeyVaultUrl;
+        
+        throw new InvalidOperationException(
+            "Azure Key Vault key management is not yet implemented. " +
+            $"KeyVault URL configured: '{keyVaultUrl ?? "(not set)"}'. " +
+            "Please use the 'Local' encryption provider by setting Encryption:Provider to 'Local' " +
+            "or omitting it (Local is the default). " +
+            "To implement Azure Key Vault support, see: https://learn.microsoft.com/en-us/dotnet/api/azure.security.keyvault.keys");
     }
 
     public byte[] GenerateDek()
     {
-        return RandomNumberGenerator.GetBytes(32);
+        throw new InvalidOperationException("AzureKeyVaultService is not implemented.");
     }
 
     public Task<byte[]> WrapKeyAsync(byte[] dek)
     {
-        throw new NotImplementedException();
+        throw new InvalidOperationException("AzureKeyVaultService is not implemented.");
     }
 
     public Task<byte[]> UnwrapKeyAsync(byte[] wrappedDek)
     {
-        throw new NotImplementedException();
+        throw new InvalidOperationException("AzureKeyVaultService is not implemented.");
     }
 }
 

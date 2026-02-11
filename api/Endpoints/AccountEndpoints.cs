@@ -30,6 +30,8 @@ public static class AccountEndpoints
             return Results.Ok(accounts);
         })
         .WithName("GetAccounts")
+        .WithSummary("Get all accounts")
+        .WithDescription("Returns all financial accounts for the authenticated user. Optionally includes archived accounts.")
         .Produces<List<AccountResponse>>(200);
 
         // Get account summary (totals, net worth)
@@ -45,6 +47,8 @@ public static class AccountEndpoints
             return Results.Ok(summary);
         })
         .WithName("GetAccountSummary")
+        .WithSummary("Get account summary")
+        .WithDescription("Returns aggregated account totals by type (asset/liability), net worth calculation, and multi-currency breakdown.")
         .Produces<AccountSummaryResponse>(200)
         .CacheOutput("AccountSummary");
 
@@ -69,6 +73,8 @@ public static class AccountEndpoints
             return Results.Ok(account);
         })
         .WithName("GetAccount")
+        .WithSummary("Get account by ID")
+        .WithDescription("Returns a single financial account by its ID. Only returns accounts owned by the authenticated user.")
         .Produces<AccountResponse>(200)
         .Produces<ErrorResponse>(404);
 
@@ -97,6 +103,8 @@ public static class AccountEndpoints
             return Results.Created($"/api/accounts/{account!.Id}", account);
         })
         .WithName("CreateAccount")
+        .WithSummary("Create an account")
+        .WithDescription("Creates a new financial account (bank, credit card, cash, etc.) with initial balance and currency.")
         .Produces<AccountResponse>(201)
         .Produces<ErrorResponse>(400);
 
@@ -126,6 +134,8 @@ public static class AccountEndpoints
             return Results.Ok(account);
         })
         .WithName("UpdateAccount")
+        .WithSummary("Update an account")
+        .WithDescription("Updates account details such as name, icon, color, or archived status.")
         .Produces<AccountResponse>(200)
         .Produces<ErrorResponse>(400);
 
@@ -150,6 +160,8 @@ public static class AccountEndpoints
             return Results.Ok(new { message });
         })
         .WithName("AdjustAccountBalance")
+        .WithSummary("Adjust account balance")
+        .WithDescription("Manually adjusts the account balance to a target amount. Creates an audit trail transaction and records the adjustment in Personal chat.")
         .Produces(200)
         .Produces<ErrorResponse>(400);
 
@@ -174,6 +186,8 @@ public static class AccountEndpoints
             return Results.Ok(new { message });
         })
         .WithName("ReorderAccounts")
+        .WithSummary("Reorder accounts")
+        .WithDescription("Updates the display order of accounts by providing a list of account IDs in the desired sequence.")
         .Produces(200)
         .Produces<ErrorResponse>(400);
 
@@ -195,6 +209,8 @@ public static class AccountEndpoints
             return Results.Ok(new { message });
         })
         .WithName("SetDefaultAccount")
+        .WithSummary("Set default account")
+        .WithDescription("Sets the specified account as the default for new transactions.")
         .Produces(200)
         .Produces<ErrorResponse>(400);
 
@@ -218,6 +234,8 @@ public static class AccountEndpoints
             return Results.Ok(new { message });
         })
         .WithName("DeleteFinancialAccount")
+        .WithSummary("Delete an account")
+        .WithDescription("Deletes a financial account. Fails if the account has associated transactions (must delete transactions first).")
         .Produces(200)
         .Produces<ErrorResponse>(400)
         .Produces<ErrorResponse>(404);

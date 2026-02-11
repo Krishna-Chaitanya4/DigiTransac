@@ -1,36 +1,9 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 
 namespace DigiTransac.Api.Services;
-
-/// <summary>
-/// Utility class for formatting currency amounts in chat messages.
-/// Uses CurrencyConfig from ExchangeRate.cs as the single source of truth.
-/// </summary>
-internal static class AccountCurrencyFormatter
-{
-    /// <summary>
-    /// Get the symbol for a currency code
-    /// </summary>
-    public static string GetSymbol(string currencyCode)
-    {
-        if (string.IsNullOrEmpty(currencyCode))
-            return "";
-            
-        var currencyInfo = CurrencyConfig.GetCurrency(currencyCode);
-        return currencyInfo.Symbol;
-    }
-    
-    /// <summary>
-    /// Format an amount with its currency symbol
-    /// </summary>
-    public static string Format(decimal amount, string currencyCode)
-    {
-        var symbol = GetSymbol(currencyCode);
-        return $"{symbol}{amount:N2}";
-    }
-}
 
 public interface IAccountService
 {
@@ -473,9 +446,9 @@ public class AccountService : IAccountService
         // Create a chat message in the personal conversation for audit trail
         // Format: "Balance Adjustment: HDFC Bank +₹1,000.00 → ₹15,000.00"
         var formattedDifference = difference > 0
-            ? $"+{AccountCurrencyFormatter.Format(difference, account.Currency)}"
-            : $"-{AccountCurrencyFormatter.Format(Math.Abs(difference), account.Currency)}";
-        var formattedNewBalance = AccountCurrencyFormatter.Format(request.NewBalance, account.Currency);
+            ? $"+{CurrencyFormatter.Format(difference, account.Currency)}"
+            : $"-{CurrencyFormatter.Format(Math.Abs(difference), account.Currency)}";
+        var formattedNewBalance = CurrencyFormatter.Format(request.NewBalance, account.Currency);
         var chatContent = $"Balance Adjustment: {account.Name} {formattedDifference} → {formattedNewBalance}";
         
         await _chatMessageRepository.CreateSystemMessageAsync(

@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Events;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Repositories;
@@ -41,7 +42,7 @@ public class ActivityFeedTransactionAcceptedHandler : INotificationHandler<P2PTr
             var transaction = await _transactionRepository.GetByIdAsync(notification.TransactionId);
             if (transaction == null) return;
 
-            var formattedAmount = FormatCurrency(notification.Amount, notification.Currency);
+            var formattedAmount = CurrencyFormatter.Format(notification.Amount, notification.Currency);
 
             // Create activity message for the sender (the one who initiated the transaction)
             // "John confirmed your transaction of ₹500"
@@ -77,17 +78,6 @@ public class ActivityFeedTransactionAcceptedHandler : INotificationHandler<P2PTr
         }
     }
 
-    private static string FormatCurrency(decimal amount, string currency)
-    {
-        return currency.ToUpperInvariant() switch
-        {
-            "INR" => $"₹{amount:N2}",
-            "USD" => $"${amount:N2}",
-            "EUR" => $"€{amount:N2}",
-            "GBP" => $"£{amount:N2}",
-            _ => $"{amount:N2} {currency}"
-        };
-    }
 }
 
 /// <summary>
@@ -125,7 +115,7 @@ public class ActivityFeedTransactionRejectedHandler : INotificationHandler<P2PTr
             var transaction = await _transactionRepository.GetByIdAsync(notification.TransactionId);
             if (transaction == null) return;
 
-            var formattedAmount = FormatCurrency(transaction.Amount, transaction.Currency);
+            var formattedAmount = CurrencyFormatter.Format(transaction.Amount, transaction.Currency);
             var reasonSuffix = !string.IsNullOrEmpty(notification.Reason) 
                 ? $": \"{notification.Reason}\"" 
                 : "";
@@ -164,17 +154,6 @@ public class ActivityFeedTransactionRejectedHandler : INotificationHandler<P2PTr
         }
     }
 
-    private static string FormatCurrency(decimal amount, string currency)
-    {
-        return currency.ToUpperInvariant() switch
-        {
-            "INR" => $"₹{amount:N2}",
-            "USD" => $"${amount:N2}",
-            "EUR" => $"€{amount:N2}",
-            "GBP" => $"£{amount:N2}",
-            _ => $"{amount:N2} {currency}"
-        };
-    }
 }
 
 /// <summary>
@@ -216,7 +195,7 @@ public class ActivityFeedTransactionEditedHandler : INotificationHandler<Transac
             var transaction = await _transactionRepository.GetByIdAsync(notification.TransactionId);
             if (transaction == null) return;
 
-            var formattedAmount = FormatCurrency(transaction.Amount, transaction.Currency);
+            var formattedAmount = CurrencyFormatter.Format(transaction.Amount, transaction.Currency);
             var changesDescription = BuildChangesDescription(notification.ChangedFields);
 
             // Create activity message for the editor (current user's chat view)
@@ -265,15 +244,4 @@ public class ActivityFeedTransactionEditedHandler : INotificationHandler<Transac
         return $" (changed: {string.Join(", ", friendlyNames)})";
     }
 
-    private static string FormatCurrency(decimal amount, string currency)
-    {
-        return currency.ToUpperInvariant() switch
-        {
-            "INR" => $"₹{amount:N2}",
-            "USD" => $"${amount:N2}",
-            "EUR" => $"€{amount:N2}",
-            "GBP" => $"£{amount:N2}",
-            _ => $"{amount:N2} {currency}"
-        };
-    }
 }

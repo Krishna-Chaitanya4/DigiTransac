@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DigiTransac.Api.Models;
+using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
 using Microsoft.AspNetCore.Authorization;
