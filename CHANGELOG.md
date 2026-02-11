@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-02-12
+
+### Fixed
+- **CI/CD Pipeline .NET Version Mismatch** - Updated `DOTNET_VERSION` from `9.0.x` to `10.0.x` in GitHub Actions pipeline to match the project's `net10.0` target framework
+- **Dockerfile .NET Version Mismatch** - Updated Docker base images from `dotnet/sdk:9.0` and `dotnet/aspnet:9.0` to `dotnet/sdk:10.0` and `dotnet/aspnet:10.0` to match the project's `net10.0` target framework
+
 ## [1.4.0] - 2026-02-12
 
 ### Performance
