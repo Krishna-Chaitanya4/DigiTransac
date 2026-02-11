@@ -2,7 +2,7 @@
 import { getStoredAccessToken } from './tokenStorage';
 
 // Use environment variable for API URL in production, fallback to /api for development (Vite proxy)
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Event for session expiration
 export const SESSION_EXPIRED_EVENT = 'session-expired';

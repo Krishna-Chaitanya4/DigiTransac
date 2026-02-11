@@ -7,14 +7,14 @@ namespace DigiTransac.Api.Repositories;
 
 public interface ITagRepository
 {
-    Task<List<Tag>> GetByUserIdAsync(string userId);
-    Task<Tag?> GetByIdAsync(string id);
-    Task<Tag?> GetByIdAndUserIdAsync(string id, string userId);
-    Task<Tag?> GetByNameAndUserIdAsync(string name, string userId);
-    Task<Tag> CreateAsync(Tag tag);
-    Task UpdateAsync(Tag tag);
-    Task<bool> DeleteAsync(string id, string userId);
-    Task<bool> DeleteAllByUserIdAsync(string userId);
+    Task<List<Tag>> GetByUserIdAsync(string userId, CancellationToken ct = default);
+    Task<Tag?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<Tag?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<Tag?> GetByNameAndUserIdAsync(string name, string userId, CancellationToken ct = default);
+    Task<Tag> CreateAsync(Tag tag, CancellationToken ct = default);
+    Task UpdateAsync(Tag tag, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string id, string userId, CancellationToken ct = default);
+    Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
 }
 
 public class TagRepository : ITagRepository
@@ -51,52 +51,52 @@ public class TagRepository : ITagRepository
         }
     }
 
-    public async Task<List<Tag>> GetByUserIdAsync(string userId)
+    public async Task<List<Tag>> GetByUserIdAsync(string userId, CancellationToken ct = default)
     {
         return await _tags.Find(t => t.UserId == userId)
             .SortBy(t => t.Name)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<Tag?> GetByIdAsync(string id)
+    public async Task<Tag?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        return await _tags.Find(t => t.Id == id).FirstOrDefaultAsync();
+        return await _tags.Find(t => t.Id == id).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Tag?> GetByIdAndUserIdAsync(string id, string userId)
+    public async Task<Tag?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        return await _tags.Find(t => t.Id == id && t.UserId == userId).FirstOrDefaultAsync();
+        return await _tags.Find(t => t.Id == id && t.UserId == userId).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Tag?> GetByNameAndUserIdAsync(string name, string userId)
+    public async Task<Tag?> GetByNameAndUserIdAsync(string name, string userId, CancellationToken ct = default)
     {
-        return await _tags.Find(t => t.Name == name && t.UserId == userId).FirstOrDefaultAsync();
+        return await _tags.Find(t => t.Name == name && t.UserId == userId).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Tag> CreateAsync(Tag tag)
+    public async Task<Tag> CreateAsync(Tag tag, CancellationToken ct = default)
     {
-        await _tags.InsertOneAsync(tag);
+        await _tags.InsertOneAsync(tag, options: null, ct);
         return tag;
     }
 
-    public async Task UpdateAsync(Tag tag)
+    public async Task UpdateAsync(Tag tag, CancellationToken ct = default)
     {
-        await _tags.ReplaceOneAsync(t => t.Id == tag.Id && t.UserId == tag.UserId, tag);
+        await _tags.ReplaceOneAsync(t => t.Id == tag.Id && t.UserId == tag.UserId, tag, options: (ReplaceOptions?)null, ct);
     }
 
-    public async Task<bool> DeleteAsync(string id, string userId)
+    public async Task<bool> DeleteAsync(string id, string userId, CancellationToken ct = default)
     {
         var filter = Builders<Tag>.Filter.And(
             Builders<Tag>.Filter.Eq("_id", new ObjectId(id)),
             Builders<Tag>.Filter.Eq(t => t.UserId, userId)
         );
-        var result = await _tags.DeleteOneAsync(filter);
+        var result = await _tags.DeleteOneAsync(filter, ct);
         return result.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteAllByUserIdAsync(string userId)
+    public async Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        var result = await _tags.DeleteManyAsync(t => t.UserId == userId);
+        var result = await _tags.DeleteManyAsync(t => t.UserId == userId, ct);
         return result.DeletedCount > 0;
     }
 }

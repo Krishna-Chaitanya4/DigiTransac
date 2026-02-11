@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
@@ -10,15 +11,15 @@ namespace DigiTransac.Api.Services;
 /// </summary>
 public interface IBudgetService
 {
-    Task<(bool Success, string Message, BudgetResponse? Budget)> CreateAsync(string userId, CreateBudgetRequest request);
-    Task<(bool Success, string Message, BudgetResponse? Budget)> UpdateAsync(string budgetId, string userId, UpdateBudgetRequest request);
-    Task<(bool Success, string Message)> DeleteAsync(string budgetId, string userId);
-    Task<BudgetResponse?> GetByIdAsync(string budgetId, string userId);
-    Task<BudgetSummaryResponse> GetSummaryAsync(string userId, bool? activeOnly = true);
-    Task<BudgetSpendingBreakdown?> GetSpendingBreakdownAsync(string budgetId, string userId);
-    Task<BudgetNotificationListResponse> GetNotificationsAsync(string userId, bool? unreadOnly = null);
-    Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId);
-    Task<bool> MarkAllNotificationsAsReadAsync(string userId);
+    Task<Result<BudgetResponse>> CreateAsync(string userId, CreateBudgetRequest request, CancellationToken ct = default);
+    Task<Result<BudgetResponse>> UpdateAsync(string budgetId, string userId, UpdateBudgetRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(string budgetId, string userId, CancellationToken ct = default);
+    Task<BudgetResponse?> GetByIdAsync(string budgetId, string userId, CancellationToken ct = default);
+    Task<BudgetSummaryResponse> GetSummaryAsync(string userId, bool? activeOnly = true, CancellationToken ct = default);
+    Task<BudgetSpendingBreakdown?> GetSpendingBreakdownAsync(string budgetId, string userId, CancellationToken ct = default);
+    Task<BudgetNotificationListResponse> GetNotificationsAsync(string userId, bool? unreadOnly = null, CancellationToken ct = default);
+    Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId, CancellationToken ct = default);
+    Task<bool> MarkAllNotificationsAsReadAsync(string userId, CancellationToken ct = default);
     
     // Called when transactions are created/updated/deleted to check budget alerts
     Task CheckBudgetAlertsAsync(string userId, string? accountId, List<string>? labelIds);
@@ -61,27 +62,21 @@ public class BudgetService : IBudgetService
         _logger = logger;
     }
 
-    public async Task<(bool Success, string Message, BudgetResponse? Budget)> CreateAsync(string userId, CreateBudgetRequest request)
+    public async Task<Result<BudgetResponse>> CreateAsync(string userId, CreateBudgetRequest request, CancellationToken ct = default)
     {
         _logger.LogInformation("Creating budget '{Name}' for user {UserId}", request.Name, userId);
 
         // Validate period
         if (!Enum.TryParse<BudgetPeriod>(request.Period, true, out var period))
-        {
-            return (false, $"Invalid period: {request.Period}. Valid values: Weekly, Monthly, Quarterly, Yearly, Custom", null);
-        }
+            return Error.Validation($"Invalid period: {request.Period}. Valid values: Weekly, Monthly, Quarterly, Yearly, Custom");
 
         // Validate custom period has end date
         if (period == BudgetPeriod.Custom && !request.EndDate.HasValue)
-        {
-            return (false, "EndDate is required for Custom period", null);
-        }
+            return Error.Validation("EndDate is required for Custom period");
 
         // Validate amount
         if (request.Amount <= 0)
-        {
-            return (false, "Amount must be greater than 0", null);
-        }
+            return Error.Validation("Amount must be greater than 0");
 
         // Calculate period dates
         var (periodStart, periodEnd) = CalculatePeriodDates(period, request.StartDate, request.EndDate);
@@ -106,22 +101,20 @@ public class BudgetService : IBudgetService
             UpdatedAt = DateTime.UtcNow
         };
 
-        await _budgetRepository.CreateAsync(budget);
+        await _budgetRepository.CreateAsync(budget, ct);
         
         // Audit log the budget creation
         await _auditService.LogBudgetCreatedAsync(userId, budget.Id, budget.Name, budget.Amount, budget.Currency);
 
         var response = await BuildBudgetResponseAsync(budget, userId);
-        return (true, "Budget created successfully", response);
+        return response;
     }
 
-    public async Task<(bool Success, string Message, BudgetResponse? Budget)> UpdateAsync(string budgetId, string userId, UpdateBudgetRequest request)
+    public async Task<Result<BudgetResponse>> UpdateAsync(string budgetId, string userId, UpdateBudgetRequest request, CancellationToken ct = default)
     {
-        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId);
+        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId, ct);
         if (budget == null)
-        {
-            return (false, "Budget not found", null);
-        }
+            return Error.NotFound("Budget", budgetId);
 
         // Update fields
         if (!string.IsNullOrWhiteSpace(request.Name))
@@ -153,7 +146,7 @@ public class BudgetService : IBudgetService
             budget.Icon = request.Icon;
 
         budget.UpdatedAt = DateTime.UtcNow;
-        await _budgetRepository.UpdateAsync(budget);
+        await _budgetRepository.UpdateAsync(budget, ct);
         
         // Audit log the budget update
         await _auditService.LogBudgetUpdatedAsync(userId, budget.Id, budget.Name, new Dictionary<string, object>
@@ -163,45 +156,46 @@ public class BudgetService : IBudgetService
         });
 
         var response = await BuildBudgetResponseAsync(budget, userId);
-        return (true, "Budget updated successfully", response);
+        return response;
     }
 
-    public async Task<(bool Success, string Message)> DeleteAsync(string budgetId, string userId)
+    public async Task<Result> DeleteAsync(string budgetId, string userId, CancellationToken ct = default)
     {
-        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId);
+        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId, ct);
         if (budget == null)
-        {
-            return (false, "Budget not found");
-        }
+            return Error.NotFound("Budget", budgetId);
 
         var budgetName = budget.Name;
-        await _budgetRepository.DeleteAsync(budgetId);
+        await _budgetRepository.DeleteAsync(budgetId, ct);
         
         // Audit log the budget deletion
         await _auditService.LogBudgetDeletedAsync(userId, budgetId, budgetName);
         
         _logger.LogInformation("Deleted budget {BudgetId} for user {UserId}", budgetId, userId);
-        return (true, "Budget deleted successfully");
+        return Result.Success();
     }
 
-    public async Task<BudgetResponse?> GetByIdAsync(string budgetId, string userId)
+    public async Task<BudgetResponse?> GetByIdAsync(string budgetId, string userId, CancellationToken ct = default)
     {
-        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId);
+        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId, ct);
         if (budget == null) return null;
 
         return await BuildBudgetResponseAsync(budget, userId);
     }
 
-    public async Task<BudgetSummaryResponse> GetSummaryAsync(string userId, bool? activeOnly = true)
+    public async Task<BudgetSummaryResponse> GetSummaryAsync(string userId, bool? activeOnly = true, CancellationToken ct = default)
     {
-        var budgets = await _budgetRepository.GetByUserIdAsync(userId, activeOnly);
+        var budgets = await _budgetRepository.GetByUserIdAsync(userId, activeOnly, ct);
         var responses = new List<BudgetResponse>();
         
-        // Get user's primary currency and exchange rates for conversion
+        // Pre-fetch shared data once for all budgets (fixes N+1)
         var user = await _userRepository.GetByIdAsync(userId);
         var primaryCurrency = user?.PrimaryCurrency ?? "USD";
         var ratesResponse = await _exchangeRateService.GetRatesAsync();
         var rates = ratesResponse?.Rates ?? new Dictionary<string, decimal>();
+        var accounts = await _accountRepository.GetByUserIdAsync(userId, ct: ct);
+        var accountDict = accounts.ToDictionary(a => a.Id);
+        var labels = await _labelRepository.GetByUserIdAsync(userId, ct);
         
         decimal totalBudgetAmount = 0;
         decimal totalSpent = 0;
@@ -210,7 +204,7 @@ public class BudgetService : IBudgetService
 
         foreach (var budget in budgets)
         {
-            var response = await BuildBudgetResponseAsync(budget, userId);
+            var response = await BuildBudgetResponseAsync(budget, userId, accountDict, labels, rates, primaryCurrency);
             responses.Add(response);
 
             // Convert budget amounts to user's primary currency
@@ -241,9 +235,9 @@ public class BudgetService : IBudgetService
         );
     }
 
-    public async Task<BudgetSpendingBreakdown?> GetSpendingBreakdownAsync(string budgetId, string userId)
+    public async Task<BudgetSpendingBreakdown?> GetSpendingBreakdownAsync(string budgetId, string userId, CancellationToken ct = default)
     {
-        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId);
+        var budget = await _budgetRepository.GetByIdAndUserIdAsync(budgetId, userId, ct);
         if (budget == null) return null;
 
         var (periodStart, periodEnd) = GetCurrentPeriodDates(budget);
@@ -270,7 +264,7 @@ public class BudgetService : IBudgetService
 
         // Calculate percentages and enrich with label info
         var totalSpent = byCategory.Sum(c => c.Amount);
-        var labels = await _labelRepository.GetByUserIdAsync(userId);
+        var labels = await _labelRepository.GetByUserIdAsync(userId, ct);
         var labelDict = labels.ToDictionary(l => l.Id);
 
         byCategory = byCategory.Select(c =>
@@ -329,10 +323,10 @@ public class BudgetService : IBudgetService
         );
     }
 
-    public async Task<BudgetNotificationListResponse> GetNotificationsAsync(string userId, bool? unreadOnly = null)
+    public async Task<BudgetNotificationListResponse> GetNotificationsAsync(string userId, bool? unreadOnly = null, CancellationToken ct = default)
     {
-        var notifications = await _budgetRepository.GetNotificationsByUserIdAsync(userId, unreadOnly);
-        var unreadCount = await _budgetRepository.GetUnreadNotificationCountAsync(userId);
+        var notifications = await _budgetRepository.GetNotificationsByUserIdAsync(userId, unreadOnly, ct: ct);
+        var unreadCount = await _budgetRepository.GetUnreadNotificationCountAsync(userId, ct);
 
         var responses = notifications.Select(n => new BudgetNotificationResponse(
             Id: n.Id,
@@ -356,14 +350,14 @@ public class BudgetService : IBudgetService
         );
     }
 
-    public async Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId)
+    public async Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId, CancellationToken ct = default)
     {
-        return await _budgetRepository.MarkNotificationAsReadAsync(notificationId, userId);
+        return await _budgetRepository.MarkNotificationAsReadAsync(notificationId, userId, ct);
     }
 
-    public async Task<bool> MarkAllNotificationsAsReadAsync(string userId)
+    public async Task<bool> MarkAllNotificationsAsReadAsync(string userId, CancellationToken ct = default)
     {
-        return await _budgetRepository.MarkAllNotificationsAsReadAsync(userId);
+        return await _budgetRepository.MarkAllNotificationsAsReadAsync(userId, ct);
     }
 
     public async Task CheckBudgetAlertsAsync(string userId, string? accountId, List<string>? labelIds)
@@ -456,22 +450,35 @@ public class BudgetService : IBudgetService
 
     // ===== Private Helper Methods =====
 
+    /// <summary>
+    /// Overload for single-budget calls (GetByIdAsync, CreateAsync, UpdateAsync) - fetches data internally
+    /// </summary>
     private async Task<BudgetResponse> BuildBudgetResponseAsync(Budget budget, string userId)
+    {
+        var accounts = await _accountRepository.GetByUserIdAsync(userId, ct: default);
+        var accountDict = accounts.ToDictionary(a => a.Id);
+        var labels = await _labelRepository.GetByUserIdAsync(userId);
+        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var rates = ratesResponse?.Rates ?? new Dictionary<string, decimal>();
+        var user = await _userRepository.GetByIdAsync(userId);
+        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
+        
+        return await BuildBudgetResponseAsync(budget, userId, accountDict, labels, rates, primaryCurrency);
+    }
+
+    /// <summary>
+    /// Optimized overload that accepts pre-fetched shared data (used by GetSummaryAsync to avoid N+1)
+    /// </summary>
+    private async Task<BudgetResponse> BuildBudgetResponseAsync(
+        Budget budget,
+        string userId,
+        Dictionary<string, Account> accountDict,
+        List<Label> labels,
+        Dictionary<string, decimal> rates,
+        string primaryCurrency)
     {
         var (periodStart, periodEnd) = GetCurrentPeriodDates(budget);
         var transactions = await GetBudgetTransactionsAsync(userId, budget, periodStart, periodEnd);
-        
-        // Get accounts to determine transaction currencies
-        var accounts = await _accountRepository.GetByUserIdAsync(userId);
-        var accountDict = accounts.ToDictionary(a => a.Id);
-        
-        // Get exchange rates for currency conversion
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
-        var rates = ratesResponse?.Rates ?? new Dictionary<string, decimal>();
-        
-        // Get user's primary currency for display
-        var user = await _userRepository.GetByIdAsync(userId);
-        var primaryCurrency = user?.PrimaryCurrency ?? "USD";
         
         // Group transactions by account currency and calculate spending
         var spendingByCurrency = new Dictionary<string, BudgetCurrencyBreakdown>();
@@ -516,13 +523,12 @@ public class BudgetService : IBudgetService
         var daysRemaining = Math.Max(0, (periodEnd.Date - DateTime.UtcNow.Date).Days);
 
         // Get label and account info for display
-        var labels = await _labelRepository.GetByUserIdAsync(userId);
         var labelInfos = labels
             .Where(l => budget.LabelIds.Contains(l.Id))
             .Select(l => new LabelInfo(l.Id, l.Name, l.Color, l.Icon))
             .ToList();
 
-        var accountInfos = accounts
+        var accountInfos = accountDict.Values
             .Where(a => budget.AccountIds.Contains(a.Id))
             .Select(a => new AccountInfo(a.Id, a.Name, a.Currency))
             .ToList();

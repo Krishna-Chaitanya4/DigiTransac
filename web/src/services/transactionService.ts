@@ -1,4 +1,5 @@
-import { apiClient } from './apiClient';
+import { apiClient, API_BASE_URL } from './apiClient';
+import { getStoredAccessToken } from './tokenStorage';
 import type {
   Transaction,
   TransactionListResponse,
@@ -239,13 +240,13 @@ export async function exportTransactions(
   const query = params.toString();
   
   if (format === 'csv') {
-    // For CSV, we need to get the raw text response
-    const token = localStorage.getItem('digitransac_access_token');
+    // For CSV, we need to get the raw text response (apiClient parses JSON)
+    const token = getStoredAccessToken();
     const headers: HeadersInit = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    const response = await fetch(`/api/transactions/export?${query}`, {
+    const response = await fetch(`${API_BASE_URL}/transactions/export?${query}`, {
       headers,
       credentials: 'include',
     });

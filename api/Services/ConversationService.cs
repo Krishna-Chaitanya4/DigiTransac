@@ -3,6 +3,7 @@ using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
+using Microsoft.Extensions.Logging;
 using CurrencyFormatter = DigiTransac.Api.Common.CurrencyFormatter;
 
 namespace DigiTransac.Api.Services;
@@ -59,47 +60,47 @@ public interface IConversationService
     /// <summary>
     /// Get all conversations for a user (people they've transacted with or messaged)
     /// </summary>
-    Task<ConversationListResponse> GetConversationsAsync(string userId);
+    Task<ConversationListResponse> GetConversationsAsync(string userId, CancellationToken ct = default);
     
     /// <summary>
     /// Get messages/transactions in a conversation with a specific user
     /// </summary>
-    Task<ConversationDetailResponse> GetConversationAsync(string userId, string counterpartyUserId, int limit = ConversationConstants.DefaultMessageLimit, DateTime? before = null);
+    Task<ConversationDetailResponse> GetConversationAsync(string userId, string counterpartyUserId, int limit = ConversationConstants.DefaultMessageLimit, DateTime? before = null, CancellationToken ct = default);
     
     /// <summary>
     /// Send a text message to another user
     /// </summary>
-    Task<(bool Success, string Message, ConversationMessage? ChatMessage)> SendMessageAsync(string userId, string counterpartyUserId, SendMessageRequest request);
+    Task<Result<ConversationMessage>> SendMessageAsync(string userId, string counterpartyUserId, SendMessageRequest request, CancellationToken ct = default);
     
     /// <summary>
     /// Edit a message
     /// </summary>
-    Task<(bool Success, string Message)> EditMessageAsync(string userId, string messageId, EditMessageRequest request);
+    Task<Result> EditMessageAsync(string userId, string messageId, EditMessageRequest request, CancellationToken ct = default);
     
     /// <summary>
     /// Delete a message
     /// </summary>
-    Task<(bool Success, string Message)> DeleteMessageAsync(string userId, string messageId);
+    Task<Result> DeleteMessageAsync(string userId, string messageId, CancellationToken ct = default);
     
     /// <summary>
     /// Send money to another user (creates P2P transaction + chat message)
     /// </summary>
-    Task<(bool Success, string Message, ConversationMessage? ChatMessage)> SendMoneyAsync(string userId, string counterpartyUserId, SendMoneyRequest request);
+    Task<Result<ConversationMessage>> SendMoneyAsync(string userId, string counterpartyUserId, SendMoneyRequest request, CancellationToken ct = default);
     
     /// <summary>
     /// Mark all messages in a conversation as read
     /// </summary>
-    Task MarkAsReadAsync(string userId, string counterpartyUserId);
+    Task MarkAsReadAsync(string userId, string counterpartyUserId, CancellationToken ct = default);
     
     /// <summary>
     /// Get total unread message count
     /// </summary>
-    Task<int> GetUnreadCountAsync(string userId);
+    Task<int> GetUnreadCountAsync(string userId, CancellationToken ct = default);
     
     /// <summary>
     /// Search for a user by email to start a new conversation
     /// </summary>
-    Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email);
+    Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email, CancellationToken ct = default);
 }
 
 public class ConversationService : IConversationService
@@ -111,6 +112,7 @@ public class ConversationService : IConversationService
     private readonly ITransactionService _transactionService;
     private readonly IExchangeRateService _exchangeRateService;
     private readonly ILabelRepository _labelRepository;
+    private readonly ILogger<ConversationService> _logger;
 
     public ConversationService(
         IChatMessageRepository chatMessageRepository,
@@ -119,7 +121,8 @@ public class ConversationService : IConversationService
         IUserRepository userRepository,
         ITransactionService transactionService,
         IExchangeRateService exchangeRateService,
-        ILabelRepository labelRepository)
+        ILabelRepository labelRepository,
+        ILogger<ConversationService> logger)
     {
         _chatMessageRepository = chatMessageRepository;
         _transactionRepository = transactionRepository;
@@ -128,6 +131,7 @@ public class ConversationService : IConversationService
         _transactionService = transactionService;
         _exchangeRateService = exchangeRateService;
         _labelRepository = labelRepository;
+        _logger = logger;
     }
 
     /// <summary>
@@ -168,13 +172,13 @@ public class ConversationService : IConversationService
         );
     }
 
-    public async Task<ConversationListResponse> GetConversationsAsync(string userId)
+    public async Task<ConversationListResponse> GetConversationsAsync(string userId, CancellationToken ct = default)
     {
         // Get all P2P transactions for this user (those with CounterpartyUserId)
         var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
         
         // Get latest messages per conversation
-        var latestMessages = await _chatMessageRepository.GetLatestMessagePerConversationAsync(userId);
+        var latestMessages = await _chatMessageRepository.GetLatestMessagePerConversationAsync(userId, ct);
         
         // Get user's primary currency and exchange rates for conversion
         var currentUser = await _userRepository.GetByIdAsync(userId);
@@ -203,6 +207,9 @@ public class ConversationService : IConversationService
         
         // Fetch user details for all counterparties in a single batch query (fixes N+1)
         var userDetails = await _userRepository.GetByIdsAsync(counterpartyIds);
+        
+        // Batch fetch unread counts for all counterparties (fixes N+1)
+        var unreadCounts = await _chatMessageRepository.GetUnreadCountsAsync(userId, counterpartyIds, ct);
         
         // Build conversation summaries
         var conversations = new List<ConversationSummary>();
@@ -281,8 +288,8 @@ public class ConversationService : IConversationService
                 continue; // No activity, skip
             }
             
-            // Get unread count
-            var unreadCount = await _chatMessageRepository.GetUnreadCountAsync(userId, counterpartyId);
+            // Get unread count from batch-fetched dictionary
+            var unreadCount = unreadCounts.GetValueOrDefault(counterpartyId, 0);
             
             // Determine primary currency
             var currencies = txsWithCounterparty
@@ -311,7 +318,7 @@ public class ConversationService : IConversationService
             .OrderByDescending(c => c.LastActivityAt)
             .ToList();
         
-        var totalUnread = await _chatMessageRepository.GetTotalUnreadCountAsync(userId);
+        var totalUnread = await _chatMessageRepository.GetTotalUnreadCountAsync(userId, ct);
         
         return new ConversationListResponse(conversations, totalUnread);
     }
@@ -320,7 +327,8 @@ public class ConversationService : IConversationService
         string userId,
         string counterpartyUserId,
         int limit = ConversationConstants.DefaultMessageLimit,
-        DateTime? before = null)
+        DateTime? before = null,
+        CancellationToken ct = default)
     {
         // Get counterparty details
         var counterparty = await _userRepository.GetByIdAsync(counterpartyUserId);
@@ -341,7 +349,7 @@ public class ConversationService : IConversationService
         
         // Get chat messages
         var chatMessages = await _chatMessageRepository.GetConversationMessagesAsync(
-            userId, counterpartyUserId, limit, before);
+            userId, counterpartyUserId, limit, before, ct);
         
         // Get transactions for this conversation
         List<Transaction> transactionsForChat;
@@ -370,11 +378,11 @@ public class ConversationService : IConversationService
         }
         
         // Get user's accounts for display names
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, includeArchived: true))
+        var accounts = (await _accountRepository.GetByUserIdAsync(userId, includeArchived: true, ct))
             .ToDictionary(a => a.Id);
         
         // Get user's labels for category display in transaction cards
-        var labels = (await _labelRepository.GetByUserIdAsync(userId))
+        var labels = (await _labelRepository.GetByUserIdAsync(userId, ct))
             .ToDictionary(l => l.Id);
         
         // Build unified message list
@@ -465,7 +473,7 @@ public class ConversationService : IConversationService
             var replyMessageIds = messagesWithReplies.Select(m => m.ReplyToMessageId!).Distinct().ToList();
             
             // Fetch the original messages being replied to in a single batch query (fixes N+1)
-            var replyMessages = await _chatMessageRepository.GetByIdsAsync(replyMessageIds);
+            var replyMessages = await _chatMessageRepository.GetByIdsAsync(replyMessageIds, ct);
             
             // Create new list with reply previews populated
             var messagesWithReplyPreviews = new List<ConversationMessage>();
@@ -587,27 +595,22 @@ public class ConversationService : IConversationService
         );
     }
 
-    public async Task<(bool Success, string Message, ConversationMessage? ChatMessage)> SendMessageAsync(
-        string userId, 
-        string counterpartyUserId, 
-        SendMessageRequest request)
+    public async Task<Result<ConversationMessage>> SendMessageAsync(
+        string userId,
+        string counterpartyUserId,
+        SendMessageRequest request,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Content))
-        {
-            return (false, "Message content is required", null);
-        }
+            return Error.Validation("Message content is required");
         
         if (request.Content.Length > ConversationConstants.MaxMessageLength)
-        {
-            return (false, $"Message cannot exceed {ConversationConstants.MaxMessageLength} characters", null);
-        }
+            return Error.Validation($"Message cannot exceed {ConversationConstants.MaxMessageLength} characters");
         
         // Verify counterparty exists (for self-chat, user is their own counterparty)
         var counterparty = await _userRepository.GetByIdAsync(counterpartyUserId);
         if (counterparty == null)
-        {
-            return (false, "User not found", null);
-        }
+            return Error.NotFound("User");
         
         var chatMessage = new ChatMessage
         {
@@ -620,13 +623,13 @@ public class ConversationService : IConversationService
             CreatedAt = DateTime.UtcNow
         };
         
-        await _chatMessageRepository.CreateAsync(chatMessage);
+        await _chatMessageRepository.CreateAsync(chatMessage, ct);
         
         // Build reply preview if this is a reply
         ReplyPreview? replyPreview = null;
         if (!string.IsNullOrEmpty(request.ReplyToMessageId))
         {
-            var replyMsg = await _chatMessageRepository.GetByIdAsync(request.ReplyToMessageId);
+            var replyMsg = await _chatMessageRepository.GetByIdAsync(request.ReplyToMessageId, ct);
             if (replyMsg != null)
             {
                 var replySender = await _userRepository.GetByIdAsync(replyMsg.SenderUserId);
@@ -669,32 +672,27 @@ public class ConversationService : IConversationService
             SystemSource: null
         );
         
-        return (true, "Message sent", response);
+        return response;
     }
 
-    public async Task<(bool Success, string Message, ConversationMessage? ChatMessage)> SendMoneyAsync(
-        string userId, 
-        string counterpartyUserId, 
-        SendMoneyRequest request)
+    public async Task<Result<ConversationMessage>> SendMoneyAsync(
+        string userId,
+        string counterpartyUserId,
+        SendMoneyRequest request,
+        CancellationToken ct = default)
     {
         // Validate type
         if (request.Type != nameof(TransactionType.Send) && request.Type != nameof(TransactionType.Receive))
-        {
-            return (false, "Type must be Send or Receive", null);
-        }
+            return Error.Validation("Type must be Send or Receive");
         
         // Verify counterparty exists
         var counterparty = await _userRepository.GetByIdAsync(counterpartyUserId);
         if (counterparty == null)
-        {
-            return (false, "User not found", null);
-        }
+            return Error.NotFound("User");
         
         // Prevent sending to yourself
         if (counterpartyUserId == userId)
-        {
-            return (false, "Cannot transact with yourself. Use Transfer to move between your accounts.", null);
-        }
+            return DomainErrors.Transaction.SelfP2PNotAllowed;
         
         // Create transaction through TransactionService
         var createRequest = new CreateTransactionRequest(
@@ -718,9 +716,7 @@ public class ConversationService : IConversationService
         var result = await _transactionService.CreateAsync(userId, createRequest);
         
         if (!result.IsSuccess)
-        {
-            return (false, result.Error.Message, null);
-        }
+            return result.Error;
         
         var transaction = result.Value;
         
@@ -735,7 +731,7 @@ public class ConversationService : IConversationService
         }
         
         // Get account for display
-        var account = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId);
+        var account = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId, ct);
         
         var txData = new TransactionMessageData(
             TransactionId: transaction.Id,
@@ -771,82 +767,64 @@ public class ConversationService : IConversationService
             SystemSource: null
         );
         
-        var actionWord = request.Type == nameof(TransactionType.Send) ? "sent" : "received";
-        return (true, $"Money {actionWord}", response);
+        return response;
     }
 
-    public async Task MarkAsReadAsync(string userId, string counterpartyUserId)
+    public async Task MarkAsReadAsync(string userId, string counterpartyUserId, CancellationToken ct = default)
     {
-        await _chatMessageRepository.MarkConversationAsReadAsync(userId, counterpartyUserId);
+        await _chatMessageRepository.MarkConversationAsReadAsync(userId, counterpartyUserId, ct);
     }
 
-    public async Task<int> GetUnreadCountAsync(string userId)
+    public async Task<int> GetUnreadCountAsync(string userId, CancellationToken ct = default)
     {
-        return await _chatMessageRepository.GetTotalUnreadCountAsync(userId);
+        return await _chatMessageRepository.GetTotalUnreadCountAsync(userId, ct);
     }
 
-    public async Task<(bool Success, string Message)> EditMessageAsync(
-        string userId, 
-        string messageId, 
-        EditMessageRequest request)
+    public async Task<Result> EditMessageAsync(
+        string userId,
+        string messageId,
+        EditMessageRequest request,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Content))
-        {
-            return (false, "Message content is required");
-        }
+            return Error.Validation("Message content is required");
         
         if (request.Content.Length > ConversationConstants.MaxMessageLength)
-        {
-            return (false, $"Message cannot exceed {ConversationConstants.MaxMessageLength} characters");
-        }
+            return Error.Validation($"Message cannot exceed {ConversationConstants.MaxMessageLength} characters");
         
         // Check time limit for editing
-        var message = await _chatMessageRepository.GetByIdAsync(messageId);
+        var message = await _chatMessageRepository.GetByIdAsync(messageId, ct);
         if (message == null || message.SenderUserId != userId)
-        {
-            return (false, "Message not found or you don't have permission to edit it");
-        }
+            return Error.NotFound("Message");
         
         if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(ConversationConstants.EditWindowMinutes))
-        {
-            return (false, $"Messages can only be edited within {ConversationConstants.EditWindowMinutes} minutes of sending");
-        }
+            return Error.Validation($"Messages can only be edited within {ConversationConstants.EditWindowMinutes} minutes of sending");
         
-        var success = await _chatMessageRepository.EditMessageAsync(messageId, userId, request.Content);
-        
+        var success = await _chatMessageRepository.EditMessageAsync(messageId, userId, request.Content, ct);
         if (!success)
-        {
-            return (false, "Failed to update message");
-        }
+            return Error.InternalError("Failed to update message");
         
-        return (true, "Message updated");
+        return Result.Success();
     }
 
-    public async Task<(bool Success, string Message)> DeleteMessageAsync(string userId, string messageId)
+    public async Task<Result> DeleteMessageAsync(string userId, string messageId, CancellationToken ct = default)
     {
         // Check time limit for deleting
-        var message = await _chatMessageRepository.GetByIdAsync(messageId);
+        var message = await _chatMessageRepository.GetByIdAsync(messageId, ct);
         if (message == null || message.SenderUserId != userId)
-        {
-            return (false, "Message not found or you don't have permission to delete it");
-        }
+            return Error.NotFound("Message");
         
         if (DateTime.UtcNow - message.CreatedAt > TimeSpan.FromMinutes(ConversationConstants.DeleteWindowMinutes))
-        {
-            return (false, $"Messages can only be deleted within {ConversationConstants.DeleteWindowMinutes} minutes of sending");
-        }
+            return Error.Validation($"Messages can only be deleted within {ConversationConstants.DeleteWindowMinutes} minutes of sending");
         
-        var success = await _chatMessageRepository.DeleteMessageAsync(messageId, userId);
-        
+        var success = await _chatMessageRepository.DeleteMessageAsync(messageId, userId, ct);
         if (!success)
-        {
-            return (false, "Failed to delete message");
-        }
+            return Error.InternalError("Failed to delete message");
         
-        return (true, "Message deleted");
+        return Result.Success();
     }
 
-    public async Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email)
+    public async Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(email))
         {

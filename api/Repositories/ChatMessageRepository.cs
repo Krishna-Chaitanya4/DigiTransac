@@ -7,69 +7,74 @@ namespace DigiTransac.Api.Repositories;
 
 public interface IChatMessageRepository
 {
-    Task<ChatMessage?> GetByIdAsync(string id);
+    Task<ChatMessage?> GetByIdAsync(string id, CancellationToken ct = default);
     
     /// <summary>
     /// Get multiple messages by their IDs
     /// </summary>
-    Task<Dictionary<string, ChatMessage>> GetByIdsAsync(IEnumerable<string> ids);
+    Task<Dictionary<string, ChatMessage>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default);
     
     /// <summary>
     /// Get all messages between two users (both directions)
     /// </summary>
-    Task<List<ChatMessage>> GetConversationMessagesAsync(string userId, string counterpartyUserId, int? limit = null, DateTime? before = null);
+    Task<List<ChatMessage>> GetConversationMessagesAsync(string userId, string counterpartyUserId, int? limit = null, DateTime? before = null, CancellationToken ct = default);
     
     /// <summary>
     /// Get the latest message for each conversation the user has
     /// </summary>
-    Task<List<ChatMessage>> GetLatestMessagePerConversationAsync(string userId);
+    Task<List<ChatMessage>> GetLatestMessagePerConversationAsync(string userId, CancellationToken ct = default);
     
     /// <summary>
     /// Get unread message count for a specific conversation
     /// </summary>
-    Task<int> GetUnreadCountAsync(string userId, string counterpartyUserId);
+    Task<int> GetUnreadCountAsync(string userId, string counterpartyUserId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Get unread message counts for multiple counterparties in a single query (batch)
+    /// </summary>
+    Task<Dictionary<string, int>> GetUnreadCountsAsync(string userId, IEnumerable<string> counterpartyIds, CancellationToken ct = default);
     
     /// <summary>
     /// Get total unread message count across all conversations
     /// </summary>
-    Task<int> GetTotalUnreadCountAsync(string userId);
+    Task<int> GetTotalUnreadCountAsync(string userId, CancellationToken ct = default);
     
-    Task<ChatMessage> CreateAsync(ChatMessage message);
+    Task<ChatMessage> CreateAsync(ChatMessage message, CancellationToken ct = default);
     
     /// <summary>
     /// Mark all messages from counterparty as read
     /// </summary>
-    Task MarkConversationAsReadAsync(string userId, string counterpartyUserId);
+    Task MarkConversationAsReadAsync(string userId, string counterpartyUserId, CancellationToken ct = default);
     
     /// <summary>
     /// Mark messages as delivered
     /// </summary>
-    Task MarkAsDeliveredAsync(string userId, string counterpartyUserId);
+    Task MarkAsDeliveredAsync(string userId, string counterpartyUserId, CancellationToken ct = default);
     
     /// <summary>
     /// Edit a message's content
     /// </summary>
-    Task<bool> EditMessageAsync(string messageId, string senderUserId, string newContent);
+    Task<bool> EditMessageAsync(string messageId, string senderUserId, string newContent, CancellationToken ct = default);
     
     /// <summary>
     /// Soft delete a message
     /// </summary>
-    Task<bool> DeleteMessageAsync(string messageId, string senderUserId);
+    Task<bool> DeleteMessageAsync(string messageId, string senderUserId, CancellationToken ct = default);
     
     /// <summary>
     /// Create transaction message entry for a P2P transaction
     /// </summary>
-    Task CreateTransactionMessageAsync(string senderUserId, string recipientUserId, string transactionId);
+    Task CreateTransactionMessageAsync(string senderUserId, string recipientUserId, string transactionId, CancellationToken ct = default);
 
     /// <summary>
     /// Create a system-generated activity message (e.g., "Transaction confirmed")
     /// </summary>
-    Task<ChatMessage> CreateSystemMessageAsync(string userId, string counterpartyUserId, string content, string systemSource, string? transactionId = null);
+    Task<ChatMessage> CreateSystemMessageAsync(string userId, string counterpartyUserId, string content, string systemSource, string? transactionId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Delete all messages where the user is sender or recipient (for account deletion)
     /// </summary>
-    Task<bool> DeleteAllByUserIdAsync(string userId);
+    Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
 }
 
 public class ChatMessageRepository : IChatMessageRepository
@@ -101,19 +106,19 @@ public class ChatMessageRepository : IChatMessageRepository
         ));
     }
 
-    public async Task<ChatMessage?> GetByIdAsync(string id)
+    public async Task<ChatMessage?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        return await _chatMessages.Find(m => m.Id == id).FirstOrDefaultAsync();
+        return await _chatMessages.Find(m => m.Id == id).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Dictionary<string, ChatMessage>> GetByIdsAsync(IEnumerable<string> ids)
+    public async Task<Dictionary<string, ChatMessage>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default)
     {
         var idList = ids.Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
         if (idList.Count == 0)
             return new Dictionary<string, ChatMessage>();
 
         var filter = Builders<ChatMessage>.Filter.In(m => m.Id, idList);
-        var messages = await _chatMessages.Find(filter).ToListAsync();
+        var messages = await _chatMessages.Find(filter).ToListAsync(ct);
         return messages.ToDictionary(m => m.Id);
     }
 
@@ -121,7 +126,8 @@ public class ChatMessageRepository : IChatMessageRepository
         string userId, 
         string counterpartyUserId, 
         int? limit = null, 
-        DateTime? before = null)
+        DateTime? before = null,
+        CancellationToken ct = default)
     {
         // Get messages where user is either sender or recipient with this counterparty
         var filter = Builders<ChatMessage>.Filter.Or(
@@ -148,13 +154,13 @@ public class ChatMessageRepository : IChatMessageRepository
 
         if (limit.HasValue)
         {
-            return await findFluent.Limit(limit.Value).ToListAsync();
+            return await findFluent.Limit(limit.Value).ToListAsync(ct);
         }
 
-        return await findFluent.ToListAsync();
+        return await findFluent.ToListAsync(ct);
     }
 
-    public async Task<List<ChatMessage>> GetLatestMessagePerConversationAsync(string userId)
+    public async Task<List<ChatMessage>> GetLatestMessagePerConversationAsync(string userId, CancellationToken ct = default)
     {
         // Aggregate to get the latest message per conversation partner
         var userObjectId = new ObjectId(userId);
@@ -199,10 +205,10 @@ public class ChatMessageRepository : IChatMessageRepository
         };
 
         var pipelineDefinition = PipelineDefinition<ChatMessage, ChatMessage>.Create(pipeline);
-        return await _chatMessages.Aggregate(pipelineDefinition).ToListAsync();
+        return await _chatMessages.Aggregate(pipelineDefinition).ToListAsync(ct);
     }
 
-    public async Task<int> GetUnreadCountAsync(string userId, string counterpartyUserId)
+    public async Task<int> GetUnreadCountAsync(string userId, string counterpartyUserId, CancellationToken ct = default)
     {
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
@@ -211,10 +217,31 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
         );
 
-        return (int)await _chatMessages.CountDocumentsAsync(filter);
+        return (int)await _chatMessages.CountDocumentsAsync(filter, options: null, ct);
     }
 
-    public async Task<int> GetTotalUnreadCountAsync(string userId)
+    public async Task<Dictionary<string, int>> GetUnreadCountsAsync(string userId, IEnumerable<string> counterpartyIds, CancellationToken ct = default)
+    {
+        var counterpartyIdList = counterpartyIds.ToList();
+        if (counterpartyIdList.Count == 0)
+            return new Dictionary<string, int>();
+
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
+            Builders<ChatMessage>.Filter.In(m => m.SenderUserId, counterpartyIdList),
+            Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+        );
+
+        var pipeline = _chatMessages.Aggregate()
+            .Match(filter)
+            .Group(m => m.SenderUserId, g => new { CounterpartyId = g.Key, Count = g.Count() });
+
+        var results = await pipeline.ToListAsync(ct);
+        return results.ToDictionary(r => r.CounterpartyId, r => r.Count);
+    }
+
+    public async Task<int> GetTotalUnreadCountAsync(string userId, CancellationToken ct = default)
     {
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
@@ -222,18 +249,18 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
         );
 
-        return (int)await _chatMessages.CountDocumentsAsync(filter);
+        return (int)await _chatMessages.CountDocumentsAsync(filter, options: null, ct);
     }
 
-    public async Task<ChatMessage> CreateAsync(ChatMessage message)
+    public async Task<ChatMessage> CreateAsync(ChatMessage message, CancellationToken ct = default)
     {
         message.CreatedAt = DateTime.UtcNow;
         message.Status = MessageStatus.Sent;
-        await _chatMessages.InsertOneAsync(message);
+        await _chatMessages.InsertOneAsync(message, options: null, ct);
         return message;
     }
 
-    public async Task MarkConversationAsReadAsync(string userId, string counterpartyUserId)
+    public async Task MarkConversationAsReadAsync(string userId, string counterpartyUserId, CancellationToken ct = default)
     {
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
@@ -244,10 +271,10 @@ public class ChatMessageRepository : IChatMessageRepository
         var update = Builders<ChatMessage>.Update
             .Set(m => m.Status, MessageStatus.Read)
             .Set(m => m.ReadAt, DateTime.UtcNow);
-        await _chatMessages.UpdateManyAsync(filter, update);
+        await _chatMessages.UpdateManyAsync(filter, update, options: null, ct);
     }
 
-    public async Task MarkAsDeliveredAsync(string userId, string counterpartyUserId)
+    public async Task MarkAsDeliveredAsync(string userId, string counterpartyUserId, CancellationToken ct = default)
     {
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
@@ -258,10 +285,10 @@ public class ChatMessageRepository : IChatMessageRepository
         var update = Builders<ChatMessage>.Update
             .Set(m => m.Status, MessageStatus.Delivered)
             .Set(m => m.DeliveredAt, DateTime.UtcNow);
-        await _chatMessages.UpdateManyAsync(filter, update);
+        await _chatMessages.UpdateManyAsync(filter, update, options: null, ct);
     }
 
-    public async Task<bool> EditMessageAsync(string messageId, string senderUserId, string newContent)
+    public async Task<bool> EditMessageAsync(string messageId, string senderUserId, string newContent, CancellationToken ct = default)
     {
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
@@ -275,11 +302,11 @@ public class ChatMessageRepository : IChatMessageRepository
             .Set(m => m.IsEdited, true)
             .Set(m => m.EditedAt, DateTime.UtcNow);
         
-        var result = await _chatMessages.UpdateOneAsync(filter, update);
+        var result = await _chatMessages.UpdateOneAsync(filter, update, options: null, ct);
         return result.ModifiedCount > 0;
     }
 
-    public async Task<bool> DeleteMessageAsync(string messageId, string senderUserId)
+    public async Task<bool> DeleteMessageAsync(string messageId, string senderUserId, CancellationToken ct = default)
     {
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
@@ -291,14 +318,15 @@ public class ChatMessageRepository : IChatMessageRepository
             .Set(m => m.IsDeleted, true)
             .Set(m => m.DeletedAt, DateTime.UtcNow);
         
-        var result = await _chatMessages.UpdateOneAsync(filter, update);
+        var result = await _chatMessages.UpdateOneAsync(filter, update, options: null, ct);
         return result.ModifiedCount > 0;
     }
 
     public async Task CreateTransactionMessageAsync(
         string senderUserId,
         string recipientUserId,
-        string transactionId)
+        string transactionId,
+        CancellationToken ct = default)
     {
         // Create a single message that represents the transaction in the chat
         // The sender "sends" a transaction message to the recipient
@@ -312,7 +340,7 @@ public class ChatMessageRepository : IChatMessageRepository
             CreatedAt = DateTime.UtcNow
         };
 
-        await _chatMessages.InsertOneAsync(message);
+        await _chatMessages.InsertOneAsync(message, options: null, ct);
     }
 
     public async Task<ChatMessage> CreateSystemMessageAsync(
@@ -320,7 +348,8 @@ public class ChatMessageRepository : IChatMessageRepository
         string counterpartyUserId,
         string content,
         string systemSource,
-        string? transactionId = null)
+        string? transactionId = null,
+        CancellationToken ct = default)
     {
         // System messages are created on behalf of the "system" but attributed to userId
         // For self-chat, sender and recipient are the same
@@ -338,11 +367,11 @@ public class ChatMessageRepository : IChatMessageRepository
             ReadAt = DateTime.UtcNow
         };
 
-        await _chatMessages.InsertOneAsync(message);
+        await _chatMessages.InsertOneAsync(message, options: null, ct);
         return message;
     }
 
-    public async Task<bool> DeleteAllByUserIdAsync(string userId)
+    public async Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default)
     {
         // Delete all messages where user is either sender or recipient
         var filter = Builders<ChatMessage>.Filter.Or(
@@ -350,7 +379,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId)
         );
         
-        var result = await _chatMessages.DeleteManyAsync(filter);
+        var result = await _chatMessages.DeleteManyAsync(filter, ct);
         return result.DeletedCount > 0;
     }
 }

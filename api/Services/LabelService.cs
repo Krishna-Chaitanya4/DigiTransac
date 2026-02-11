@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -6,17 +7,17 @@ namespace DigiTransac.Api.Services;
 
 public interface ILabelService
 {
-    Task<List<LabelResponse>> GetAllAsync(string userId);
-    Task<List<LabelTreeResponse>> GetTreeAsync(string userId);
-    Task<LabelResponse?> GetByIdAsync(string id, string userId);
-    Task<(bool Success, string Message, LabelResponse? Label)> CreateAsync(string userId, CreateLabelRequest request);
-    Task<(bool Success, string Message, LabelResponse? Label)> UpdateAsync(string id, string userId, UpdateLabelRequest request);
-    Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
-    Task<(bool Success, string Message, int TransactionCount)> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId);
-    Task<int> GetTransactionCountAsync(string id, string userId);
-    Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderLabelsRequest request);
-    Task CreateDefaultLabelsAsync(string userId);
-    Task<Label> GetOrCreateAdjustmentsCategoryAsync(string userId);
+    Task<List<LabelResponse>> GetAllAsync(string userId, CancellationToken ct = default);
+    Task<List<LabelTreeResponse>> GetTreeAsync(string userId, CancellationToken ct = default);
+    Task<LabelResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<Result<LabelResponse>> CreateAsync(string userId, CreateLabelRequest request, CancellationToken ct = default);
+    Task<Result<LabelResponse>> UpdateAsync(string id, string userId, UpdateLabelRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default);
+    Task<Result<DeleteWithCountResponse>> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId, CancellationToken ct = default);
+    Task<int> GetTransactionCountAsync(string id, string userId, CancellationToken ct = default);
+    Task<Result> ReorderAsync(string userId, ReorderLabelsRequest request, CancellationToken ct = default);
+    Task CreateDefaultLabelsAsync(string userId, CancellationToken ct = default);
+    Task<Label> GetOrCreateAdjustmentsCategoryAsync(string userId, CancellationToken ct = default);
 }
 
 public class LabelService : ILabelService
@@ -32,49 +33,41 @@ public class LabelService : ILabelService
         _logger = logger;
     }
 
-    public async Task<List<LabelResponse>> GetAllAsync(string userId)
+    public async Task<List<LabelResponse>> GetAllAsync(string userId, CancellationToken ct = default)
     {
-        var labels = await _labelRepository.GetByUserIdAsync(userId);
+        var labels = await _labelRepository.GetByUserIdAsync(userId, ct);
         return labels.Select(MapToResponse).ToList();
     }
 
-    public async Task<List<LabelTreeResponse>> GetTreeAsync(string userId)
+    public async Task<List<LabelTreeResponse>> GetTreeAsync(string userId, CancellationToken ct = default)
     {
-        var labels = await _labelRepository.GetByUserIdAsync(userId);
+        var labels = await _labelRepository.GetByUserIdAsync(userId, ct);
         return BuildTree(labels, null);
     }
 
-    public async Task<LabelResponse?> GetByIdAsync(string id, string userId)
+    public async Task<LabelResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId);
+        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId, ct);
         return label != null ? MapToResponse(label) : null;
     }
 
-    public async Task<(bool Success, string Message, LabelResponse? Label)> CreateAsync(string userId, CreateLabelRequest request)
+    public async Task<Result<LabelResponse>> CreateAsync(string userId, CreateLabelRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return (false, "Name is required", null);
-        }
+            return Error.Validation("Name is required");
 
         // Parse type
         if (!Enum.TryParse<LabelType>(request.Type, true, out var labelType))
-        {
-            return (false, "Invalid type. Must be 'Folder' or 'Category'", null);
-        }
+            return Error.Validation("Invalid type. Must be 'Folder' or 'Category'");
 
         // Validate parent exists if specified
         if (!string.IsNullOrEmpty(request.ParentId))
         {
-            var parent = await _labelRepository.GetByIdAndUserIdAsync(request.ParentId, userId);
+            var parent = await _labelRepository.GetByIdAndUserIdAsync(request.ParentId, userId, ct);
             if (parent == null)
-            {
-                return (false, "Parent not found", null);
-            }
+                return Error.NotFound("Parent");
             if (parent.Type != LabelType.Folder)
-            {
-                return (false, "Parent must be a folder", null);
-            }
+                return Error.Validation("Parent must be a folder");
         }
 
         var label = new Label
@@ -89,62 +82,46 @@ public class LabelService : ILabelService
             IsSystem = false
         };
 
-        await _labelRepository.CreateAsync(label);
+        await _labelRepository.CreateAsync(label, ct);
         _logger.LogInformation("Created label {LabelId} for user {UserId}", label.Id, userId);
 
-        return (true, "Label created successfully", MapToResponse(label));
+        return MapToResponse(label);
     }
 
-    public async Task<(bool Success, string Message, LabelResponse? Label)> UpdateAsync(string id, string userId, UpdateLabelRequest request)
+    public async Task<Result<LabelResponse>> UpdateAsync(string id, string userId, UpdateLabelRequest request, CancellationToken ct = default)
     {
-        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId);
+        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (label == null)
-        {
-            return (false, "Label not found", null);
-        }
+            return DomainErrors.Label.NotFound(id);
 
         // System labels cannot be renamed or moved
         if (label.IsSystem)
         {
             if (request.Name?.Trim() != label.Name)
-            {
-                return (false, "System labels cannot be renamed", null);
-            }
+                return Error.InvalidOperation("System labels cannot be renamed");
             if (request.ParentId != label.ParentId)
-            {
-                return (false, "System labels cannot be moved", null);
-            }
+                return Error.InvalidOperation("System labels cannot be moved");
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return (false, "Name is required", null);
-        }
+            return Error.Validation("Name is required");
 
         // Validate parent if changing
         if (request.ParentId != label.ParentId && !string.IsNullOrEmpty(request.ParentId))
         {
             // Can't set self as parent
             if (request.ParentId == id)
-            {
-                return (false, "Cannot set label as its own parent", null);
-            }
+                return Error.Validation("Cannot set label as its own parent");
 
-            var parent = await _labelRepository.GetByIdAndUserIdAsync(request.ParentId, userId);
+            var parent = await _labelRepository.GetByIdAndUserIdAsync(request.ParentId, userId, ct);
             if (parent == null)
-            {
-                return (false, "Parent not found", null);
-            }
+                return Error.NotFound("Parent");
             if (parent.Type != LabelType.Folder)
-            {
-                return (false, "Parent must be a folder", null);
-            }
+                return Error.Validation("Parent must be a folder");
 
             // Check for circular reference (can't move folder under its own descendant)
             if (label.Type == LabelType.Folder && await IsDescendantAsync(request.ParentId, id, userId))
-            {
-                return (false, "Cannot move folder under its own descendant", null);
-            }
+                return Error.Validation("Cannot move folder under its own descendant");
         }
 
         label.Name = request.Name.Trim();
@@ -156,80 +133,64 @@ public class LabelService : ILabelService
             label.Order = request.Order.Value;
         }
 
-        await _labelRepository.UpdateAsync(label);
+        await _labelRepository.UpdateAsync(label, ct);
         _logger.LogInformation("Updated label {LabelId} for user {UserId}", id, userId);
 
-        return (true, "Label updated successfully", MapToResponse(label));
+        return MapToResponse(label);
     }
 
-    public async Task<(bool Success, string Message)> DeleteAsync(string id, string userId)
+    public async Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default)
     {
-        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId);
+        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (label == null)
-        {
-            return (false, "Label not found");
-        }
+            return DomainErrors.Label.NotFound(id);
 
         // System labels cannot be deleted
         if (label.IsSystem)
-        {
-            return (false, "System labels cannot be deleted");
-        }
+            return DomainErrors.Label.CannotDeleteSystemLabel(label.Name);
 
         // Check if folder has children
         if (label.Type == LabelType.Folder)
         {
-            var hasChildren = await _labelRepository.HasChildrenAsync(id, userId);
+            var hasChildren = await _labelRepository.HasChildrenAsync(id, userId, ct);
             if (hasChildren)
-            {
-                return (false, "Cannot delete folder with children. Delete or move children first.");
-            }
+                return Error.Validation("Cannot delete folder with children. Delete or move children first.");
         }
 
         // Check if label is used in transactions - require reassignment
         var transactionCount = await _transactionRepository.GetCountByLabelIdAsync(id, userId);
         if (transactionCount > 0)
-        {
-            return (false, $"Cannot delete label with {transactionCount} transaction(s). Please reassign them first.");
-        }
+            return DomainErrors.Label.HasTransactions(transactionCount);
 
-        var deleted = await _labelRepository.DeleteAsync(id, userId);
+        var deleted = await _labelRepository.DeleteAsync(id, userId, ct);
         if (!deleted)
-        {
-            return (false, "Failed to delete label");
-        }
+            return Error.InternalError("Failed to delete label");
 
         _logger.LogInformation("Deleted label {LabelId} for user {UserId}", id, userId);
-        return (true, "Label deleted successfully");
+        return Result.Success();
     }
 
-    public async Task<int> GetTransactionCountAsync(string id, string userId)
+    public async Task<int> GetTransactionCountAsync(string id, string userId, CancellationToken ct = default)
     {
         return await _transactionRepository.GetCountByLabelIdAsync(id, userId);
     }
 
-    public async Task<(bool Success, string Message, int TransactionCount)> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId)
+    public async Task<Result<DeleteWithCountResponse>> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId, CancellationToken ct = default)
     {
-        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId);
+        var label = await _labelRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (label == null)
-        {
-            return (false, "Label not found", 0);
-        }
+            return DomainErrors.Label.NotFound(id);
 
         // System labels cannot be deleted
         if (label.IsSystem)
-        {
-            return (false, "System labels cannot be deleted", 0);
-        }
+            return DomainErrors.Label.CannotDeleteSystemLabel(label.Name);
 
         // Check if folder has children
         if (label.Type == LabelType.Folder)
         {
-            var hasChildren = await _labelRepository.HasChildrenAsync(id, userId);
+            var hasChildren = await _labelRepository.HasChildrenAsync(id, userId, ct);
             if (hasChildren)
-            {
-                return (false, "Cannot delete folder with children. Delete or move children first.", 0);
-            }
+                return Error.Validation("Cannot delete folder with children. Delete or move children first.");
         }
 
         var transactionCount = await _transactionRepository.GetCountByLabelIdAsync(id, userId);
@@ -238,53 +199,40 @@ public class LabelService : ILabelService
         {
             if (string.IsNullOrEmpty(reassignToLabelId))
             {
-                // Return count so frontend can show reassignment modal
-                return (false, $"This label has {transactionCount} transaction(s). Please select a label to reassign them to.", transactionCount);
+                // Return error so frontend can show reassignment modal
+                return Error.Conflict($"This label has {transactionCount} transaction(s). Please select a label to reassign them to.");
             }
 
             // Validate target label exists
-            var targetLabel = await _labelRepository.GetByIdAndUserIdAsync(reassignToLabelId, userId);
+            var targetLabel = await _labelRepository.GetByIdAndUserIdAsync(reassignToLabelId, userId, ct);
             if (targetLabel == null)
-            {
-                return (false, "Target label not found", transactionCount);
-            }
+                return Error.NotFound("Target label");
 
             if (targetLabel.Type != LabelType.Category)
-            {
-                return (false, "Can only reassign to a category, not a folder", transactionCount);
-            }
+                return Error.Validation("Can only reassign to a category, not a folder");
 
             // Reassign all transactions to the target label
             await _transactionRepository.ReassignLabelAsync(id, reassignToLabelId, userId);
             _logger.LogInformation("Reassigned {Count} transactions from label {FromId} to {ToId}", transactionCount, id, reassignToLabelId);
         }
 
-        var deleted = await _labelRepository.DeleteAsync(id, userId);
+        var deleted = await _labelRepository.DeleteAsync(id, userId, ct);
         if (!deleted)
-        {
-            return (false, "Failed to delete label", 0);
-        }
+            return Error.InternalError("Failed to delete label");
 
         _logger.LogInformation("Deleted label {LabelId} for user {UserId}", id, userId);
-        return (true, $"Label deleted successfully. {transactionCount} transaction(s) reassigned.", transactionCount);
+        return new DeleteWithCountResponse($"Label deleted successfully. {transactionCount} transaction(s) reassigned.", transactionCount);
     }
 
-    public async Task<(bool Success, string Message)> ReorderAsync(string userId, ReorderLabelsRequest request)
+    public async Task<Result> ReorderAsync(string userId, ReorderLabelsRequest request, CancellationToken ct = default)
     {
-        foreach (var item in request.Items)
-        {
-            var label = await _labelRepository.GetByIdAndUserIdAsync(item.Id, userId);
-            if (label != null)
-            {
-                label.Order = item.Order;
-                await _labelRepository.UpdateAsync(label);
-            }
-        }
+        var orderMap = request.Items.ToDictionary(item => item.Id, item => item.Order);
+        await _labelRepository.BulkUpdateOrderAsync(userId, orderMap, ct);
 
-        return (true, "Labels reordered successfully");
+        return Result.Success();
     }
 
-    public async Task CreateDefaultLabelsAsync(string userId)
+    public async Task CreateDefaultLabelsAsync(string userId, CancellationToken ct = default)
     {
         var labels = new List<Label>();
         var order = 0;
@@ -405,7 +353,7 @@ public class LabelService : ILabelService
             CreateCategory("Balance Adjustment", adjustments.Id, "⚖️", isSystem: true);
         }
 
-        await _labelRepository.CreateManyAsync(labels);
+        await _labelRepository.CreateManyAsync(labels, ct);
         _logger.LogInformation("Created {Count} default labels for user {UserId}", labels.Count, userId);
     }
 
@@ -459,10 +407,10 @@ public class LabelService : ILabelService
         );
     }
 
-    public async Task<Label> GetOrCreateAdjustmentsCategoryAsync(string userId)
+    public async Task<Label> GetOrCreateAdjustmentsCategoryAsync(string userId, CancellationToken ct = default)
     {
         // First, try to find existing "Balance Adjustment" category
-        var existingLabels = await _labelRepository.GetByUserIdAsync(userId);
+        var existingLabels = await _labelRepository.GetByUserIdAsync(userId, ct);
         var existingCategory = existingLabels.FirstOrDefault(l => 
             l.Name == "Balance Adjustment" && l.Type == LabelType.Category && l.IsSystem);
         
@@ -496,7 +444,7 @@ public class LabelService : ILabelService
                 IsSystem = true,
                 CreatedAt = DateTime.UtcNow
             };
-            await _labelRepository.CreateAsync(adjustmentsFolder);
+            await _labelRepository.CreateAsync(adjustmentsFolder, ct);
         }
 
         // Create the "Balance Adjustment" system category
@@ -518,7 +466,7 @@ public class LabelService : ILabelService
             IsSystem = true,
             CreatedAt = DateTime.UtcNow
         };
-        await _labelRepository.CreateAsync(adjustmentCategory);
+        await _labelRepository.CreateAsync(adjustmentCategory, ct);
 
         return adjustmentCategory;
     }

@@ -1,8 +1,10 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace DigiTransac.Tests.Services;
@@ -16,6 +18,7 @@ public class ConversationServiceTests
     private readonly Mock<ITransactionService> _transactionServiceMock;
     private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
     private readonly Mock<ILabelRepository> _labelRepositoryMock;
+    private readonly Mock<ILogger<ConversationService>> _loggerMock;
     private readonly ConversationService _conversationService;
     
     private const string TestUserId = "test-user-id";
@@ -30,6 +33,7 @@ public class ConversationServiceTests
         _transactionServiceMock = new Mock<ITransactionService>();
         _exchangeRateServiceMock = new Mock<IExchangeRateService>();
         _labelRepositoryMock = new Mock<ILabelRepository>();
+        _loggerMock = new Mock<ILogger<ConversationService>>();
 
         SetupDefaultMocks();
 
@@ -40,13 +44,14 @@ public class ConversationServiceTests
             _userRepositoryMock.Object,
             _transactionServiceMock.Object,
             _exchangeRateServiceMock.Object,
-            _labelRepositoryMock.Object);
+            _labelRepositoryMock.Object,
+            _loggerMock.Object);
     }
 
     private void SetupDefaultMocks()
     {
         // Default label repository - returns empty list
-        _labelRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>()))
+        _labelRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Label>());
 
         // Default user with primary currency
@@ -85,17 +90,19 @@ public class ConversationServiceTests
             .ReturnsAsync(new List<Transaction>());
         _transactionRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string>()))
             .ReturnsAsync(new List<Transaction>());
-        _chatMessageRepositoryMock.Setup(x => x.GetLatestMessagePerConversationAsync(It.IsAny<string>()))
+        _chatMessageRepositoryMock.Setup(x => x.GetLatestMessagePerConversationAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ChatMessage>());
-        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<DateTime?>()))
+        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ChatMessage>());
         _chatMessageRepositoryMock.Setup(x => x.GetUnreadCountAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(0);
-        _chatMessageRepositoryMock.Setup(x => x.GetTotalUnreadCountAsync(It.IsAny<string>()))
+        _chatMessageRepositoryMock.Setup(x => x.GetUnreadCountsAsync(It.IsAny<string>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, int>());
+        _chatMessageRepositoryMock.Setup(x => x.GetTotalUnreadCountAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>()))
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, ChatMessage>());
-        _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>()))
+        _accountRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Account>());
     }
 
@@ -156,7 +163,7 @@ public class ConversationServiceTests
                 CreatedAt = DateTime.UtcNow
             }
         };
-        _chatMessageRepositoryMock.Setup(x => x.GetLatestMessagePerConversationAsync(TestUserId))
+        _chatMessageRepositoryMock.Setup(x => x.GetLatestMessagePerConversationAsync(TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(messages);
 
         // Act
@@ -183,7 +190,7 @@ public class ConversationServiceTests
                 CreatedAt = DateTime.UtcNow
             }
         };
-        _chatMessageRepositoryMock.Setup(x => x.GetLatestMessagePerConversationAsync(TestUserId))
+        _chatMessageRepositoryMock.Setup(x => x.GetLatestMessagePerConversationAsync(TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(messages);
 
         // Act
@@ -285,7 +292,7 @@ public class ConversationServiceTests
         {
             new() { Id = "msg-1", SenderUserId = TestUserId, RecipientUserId = CounterpartyUserId, Type = ChatMessageType.Text, Content = "Hello", CreatedAt = DateTime.UtcNow }
         };
-        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, CounterpartyUserId, It.IsAny<int>(), It.IsAny<DateTime?>()))
+        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, CounterpartyUserId, It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(chatMessages);
         _transactionRepositoryMock.Setup(x => x.GetP2PTransactionsWithCounterpartyAsync(TestUserId, CounterpartyUserId))
             .ReturnsAsync(new List<Transaction>());
@@ -307,7 +314,7 @@ public class ConversationServiceTests
         {
             new() { Id = "msg-1", SenderUserId = TestUserId, RecipientUserId = TestUserId, Type = ChatMessageType.Text, Content = "Self note", CreatedAt = DateTime.UtcNow }
         };
-        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, TestUserId, It.IsAny<int>(), It.IsAny<DateTime?>()))
+        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, TestUserId, It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(chatMessages);
         // For self-chat, we use GetByIdsAsync instead of GetP2PTransactionsWithCounterpartyAsync
         _transactionRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), TestUserId))
@@ -350,7 +357,7 @@ public class ConversationServiceTests
                 CreatedAt = DateTime.UtcNow
             }
         };
-        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, TestUserId, It.IsAny<int>(), It.IsAny<DateTime?>()))
+        _chatMessageRepositoryMock.Setup(x => x.GetConversationMessagesAsync(TestUserId, TestUserId, It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(chatMessages);
         // For self-chat, we use GetByIdsAsync instead of GetP2PTransactionsWithCounterpartyAsync
         _transactionRepositoryMock.Setup(x => x.GetByIdsAsync(It.IsAny<IEnumerable<string>>(), TestUserId))
@@ -376,8 +383,8 @@ public class ConversationServiceTests
         var result = await _conversationService.SendMessageAsync(TestUserId, CounterpartyUserId, new SendMessageRequest(""));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Message content is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Message content is required");
     }
 
     [Fact]
@@ -387,8 +394,8 @@ public class ConversationServiceTests
         var result = await _conversationService.SendMessageAsync(TestUserId, CounterpartyUserId, new SendMessageRequest("   "));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Message content is required");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Message content is required");
     }
 
     [Fact]
@@ -401,8 +408,8 @@ public class ConversationServiceTests
         var result = await _conversationService.SendMessageAsync(TestUserId, CounterpartyUserId, new SendMessageRequest(longContent));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Message cannot exceed 1000 characters");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Message cannot exceed 1000 characters");
     }
 
     [Fact]
@@ -416,8 +423,8 @@ public class ConversationServiceTests
         var result = await _conversationService.SendMessageAsync(TestUserId, "unknown-user", new SendMessageRequest("Hello"));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("User not found");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("not found");
     }
 
     [Fact]
@@ -425,18 +432,18 @@ public class ConversationServiceTests
     {
         // Arrange
         ChatMessage? createdMessage = null;
-        _chatMessageRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<ChatMessage>()))
-            .Callback<ChatMessage>(m => { m.Id = "new-msg-id"; createdMessage = m; })
-            .ReturnsAsync((ChatMessage m) => m);
+        _chatMessageRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<ChatMessage>(), It.IsAny<CancellationToken>()))
+            .Callback<ChatMessage, CancellationToken>((m, _) => { m.Id = "new-msg-id"; createdMessage = m; })
+            .ReturnsAsync((ChatMessage m, CancellationToken _) => m);
 
         // Act
         var result = await _conversationService.SendMessageAsync(TestUserId, CounterpartyUserId, new SendMessageRequest("Hello!"));
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.ChatMessage.Should().NotBeNull();
-        result.ChatMessage!.Content.Should().Be("Hello!");
-        result.ChatMessage.IsFromMe.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Content.Should().Be("Hello!");
+        result.Value.IsFromMe.Should().BeTrue();
         
         createdMessage.Should().NotBeNull();
         createdMessage!.SenderUserId.Should().Be(TestUserId);
@@ -447,15 +454,15 @@ public class ConversationServiceTests
     public async Task SendMessageAsync_AllowsSelfChat()
     {
         // Arrange
-        _chatMessageRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<ChatMessage>()))
-            .ReturnsAsync((ChatMessage m) => { m.Id = "msg-id"; return m; });
+        _chatMessageRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<ChatMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ChatMessage m, CancellationToken _) => { m.Id = "msg-id"; return m; });
 
         // Act
         var result = await _conversationService.SendMessageAsync(TestUserId, TestUserId, new SendMessageRequest("Note to self"));
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.ChatMessage.Should().NotBeNull();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
     }
 
     #endregion
@@ -466,15 +473,15 @@ public class ConversationServiceTests
     public async Task EditMessageAsync_ReturnsError_WhenMessageNotFound()
     {
         // Arrange
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("unknown-msg"))
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("unknown-msg", It.IsAny<CancellationToken>()))
             .ReturnsAsync((ChatMessage?)null);
 
         // Act
         var result = await _conversationService.EditMessageAsync(TestUserId, "unknown-msg", new EditMessageRequest("Edit"));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Message not found or you don't have permission to edit it");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("not found");
     }
 
     [Fact]
@@ -482,14 +489,14 @@ public class ConversationServiceTests
     {
         // Arrange
         var message = new ChatMessage { Id = "msg-1", SenderUserId = "other-user", Type = ChatMessageType.Text, CreatedAt = DateTime.UtcNow };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
 
         // Act
         var result = await _conversationService.EditMessageAsync(TestUserId, "msg-1", new EditMessageRequest("Edit"));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Message not found or you don't have permission to edit it");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("not found");
     }
 
     [Fact]
@@ -497,15 +504,15 @@ public class ConversationServiceTests
     {
         // Arrange - EditMessageAsync returns false when message is deleted or non-text
         var message = new ChatMessage { Id = "msg-1", SenderUserId = TestUserId, Type = ChatMessageType.Text, CreatedAt = DateTime.UtcNow };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
-        _chatMessageRepositoryMock.Setup(x => x.EditMessageAsync("msg-1", TestUserId, "Edit")).ReturnsAsync(false);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.EditMessageAsync("msg-1", TestUserId, "Edit", It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         // Act
         var result = await _conversationService.EditMessageAsync(TestUserId, "msg-1", new EditMessageRequest("Edit"));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Failed to update message");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Failed to update message");
     }
 
     [Fact]
@@ -513,14 +520,14 @@ public class ConversationServiceTests
     {
         // Arrange
         var message = new ChatMessage { Id = "msg-1", SenderUserId = TestUserId, Type = ChatMessageType.Text, CreatedAt = DateTime.UtcNow.AddMinutes(-20) };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
 
         // Act
         var result = await _conversationService.EditMessageAsync(TestUserId, "msg-1", new EditMessageRequest("Edit"));
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("can only be edited within");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("can only be edited within");
     }
 
     [Fact]
@@ -528,15 +535,15 @@ public class ConversationServiceTests
     {
         // Arrange
         var message = new ChatMessage { Id = "msg-1", SenderUserId = TestUserId, Type = ChatMessageType.Text, Content = "Original", CreatedAt = DateTime.UtcNow };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
-        _chatMessageRepositoryMock.Setup(x => x.EditMessageAsync("msg-1", TestUserId, "Edited")).ReturnsAsync(true);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.EditMessageAsync("msg-1", TestUserId, "Edited", It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         // Act
         var result = await _conversationService.EditMessageAsync(TestUserId, "msg-1", new EditMessageRequest("Edited"));
 
         // Assert
-        result.Success.Should().BeTrue();
-        _chatMessageRepositoryMock.Verify(x => x.EditMessageAsync("msg-1", TestUserId, "Edited"), Times.Once);
+        result.IsSuccess.Should().BeTrue();
+        _chatMessageRepositoryMock.Verify(x => x.EditMessageAsync("msg-1", TestUserId, "Edited", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -547,15 +554,15 @@ public class ConversationServiceTests
     public async Task DeleteMessageAsync_ReturnsError_WhenMessageNotFound()
     {
         // Arrange
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("unknown-msg"))
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("unknown-msg", It.IsAny<CancellationToken>()))
             .ReturnsAsync((ChatMessage?)null);
 
         // Act
         var result = await _conversationService.DeleteMessageAsync(TestUserId, "unknown-msg");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Message not found or you don't have permission to delete it");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("not found");
     }
 
     [Fact]
@@ -563,14 +570,14 @@ public class ConversationServiceTests
     {
         // Arrange
         var message = new ChatMessage { Id = "msg-1", SenderUserId = "other-user", CreatedAt = DateTime.UtcNow };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
 
         // Act
         var result = await _conversationService.DeleteMessageAsync(TestUserId, "msg-1");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Message not found or you don't have permission to delete it");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("not found");
     }
 
     [Fact]
@@ -578,15 +585,15 @@ public class ConversationServiceTests
     {
         // Arrange - DeleteMessageAsync returns false for already deleted messages
         var message = new ChatMessage { Id = "msg-1", SenderUserId = TestUserId, CreatedAt = DateTime.UtcNow };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
-        _chatMessageRepositoryMock.Setup(x => x.DeleteMessageAsync("msg-1", TestUserId)).ReturnsAsync(false);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.DeleteMessageAsync("msg-1", TestUserId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         // Act
         var result = await _conversationService.DeleteMessageAsync(TestUserId, "msg-1");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Be("Failed to delete message");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("Failed to delete message");
     }
 
     [Fact]
@@ -594,14 +601,14 @@ public class ConversationServiceTests
     {
         // Arrange
         var message = new ChatMessage { Id = "msg-1", SenderUserId = TestUserId, CreatedAt = DateTime.UtcNow.AddHours(-2) };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
 
         // Act
         var result = await _conversationService.DeleteMessageAsync(TestUserId, "msg-1");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Message.Should().Contain("can only be deleted within");
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("can only be deleted within");
     }
 
     [Fact]
@@ -609,15 +616,15 @@ public class ConversationServiceTests
     {
         // Arrange
         var message = new ChatMessage { Id = "msg-1", SenderUserId = TestUserId, Content = "To delete", CreatedAt = DateTime.UtcNow };
-        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1")).ReturnsAsync(message);
-        _chatMessageRepositoryMock.Setup(x => x.DeleteMessageAsync("msg-1", TestUserId)).ReturnsAsync(true);
+        _chatMessageRepositoryMock.Setup(x => x.GetByIdAsync("msg-1", It.IsAny<CancellationToken>())).ReturnsAsync(message);
+        _chatMessageRepositoryMock.Setup(x => x.DeleteMessageAsync("msg-1", TestUserId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         // Act
         var result = await _conversationService.DeleteMessageAsync(TestUserId, "msg-1");
 
         // Assert
-        result.Success.Should().BeTrue();
-        _chatMessageRepositoryMock.Verify(x => x.DeleteMessageAsync("msg-1", TestUserId), Times.Once);
+        result.IsSuccess.Should().BeTrue();
+        _chatMessageRepositoryMock.Verify(x => x.DeleteMessageAsync("msg-1", TestUserId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -628,7 +635,7 @@ public class ConversationServiceTests
     public async Task GetUnreadCountAsync_ReturnsCount()
     {
         // Arrange
-        _chatMessageRepositoryMock.Setup(x => x.GetTotalUnreadCountAsync(TestUserId))
+        _chatMessageRepositoryMock.Setup(x => x.GetTotalUnreadCountAsync(TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(5);
 
         // Act
@@ -698,14 +705,14 @@ public class ConversationServiceTests
     public async Task MarkAsReadAsync_CallsRepository()
     {
         // Arrange
-        _chatMessageRepositoryMock.Setup(x => x.MarkConversationAsReadAsync(TestUserId, CounterpartyUserId))
+        _chatMessageRepositoryMock.Setup(x => x.MarkConversationAsReadAsync(TestUserId, CounterpartyUserId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
         await _conversationService.MarkAsReadAsync(TestUserId, CounterpartyUserId);
 
         // Assert
-        _chatMessageRepositoryMock.Verify(x => x.MarkConversationAsReadAsync(TestUserId, CounterpartyUserId), Times.Once);
+        _chatMessageRepositoryMock.Verify(x => x.MarkConversationAsReadAsync(TestUserId, CounterpartyUserId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion

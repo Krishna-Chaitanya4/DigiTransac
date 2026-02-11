@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FluentValidation;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -16,9 +17,10 @@ public static class AccountEndpoints
 
         // Get all accounts
         group.MapGet("/", async (
-            bool? includeArchived, 
-            ClaimsPrincipal user, 
-            IAccountService accountService) =>
+            bool? includeArchived,
+            ClaimsPrincipal user,
+            IAccountService accountService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -26,7 +28,7 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var accounts = await accountService.GetAllAsync(userId, includeArchived ?? false);
+            var accounts = await accountService.GetAllAsync(userId, includeArchived ?? false, ct);
             return Results.Ok(accounts);
         })
         .WithName("GetAccounts")
@@ -35,7 +37,7 @@ public static class AccountEndpoints
         .Produces<List<AccountResponse>>(200);
 
         // Get account summary (totals, net worth)
-        group.MapGet("/summary", async (ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapGet("/summary", async (ClaimsPrincipal user, IAccountService accountService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -43,7 +45,7 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var summary = await accountService.GetSummaryAsync(userId);
+            var summary = await accountService.GetSummaryAsync(userId, ct);
             return Results.Ok(summary);
         })
         .WithName("GetAccountSummary")
@@ -54,9 +56,10 @@ public static class AccountEndpoints
 
         // Get single account
         group.MapGet("/{id}", async (
-            string id, 
-            ClaimsPrincipal user, 
-            IAccountService accountService) =>
+            string id,
+            ClaimsPrincipal user,
+            IAccountService accountService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -64,7 +67,7 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var account = await accountService.GetByIdAsync(id, userId);
+            var account = await accountService.GetByIdAsync(id, userId, ct);
             if (account == null)
             {
                 return Results.NotFound(new ErrorResponse("Account not found"));
@@ -80,10 +83,11 @@ public static class AccountEndpoints
 
         // Create account
         group.MapPost("/", async (
-            CreateAccountRequest request, 
-            ClaimsPrincipal user, 
+            CreateAccountRequest request,
+            ClaimsPrincipal user,
             IAccountService accountService,
-            IValidator<CreateAccountRequest> validator) =>
+            IValidator<CreateAccountRequest> validator,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -94,13 +98,8 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message, account) = await accountService.CreateAsync(userId, request);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
-
-            return Results.Created($"/api/accounts/{account!.Id}", account);
+            var result = await accountService.CreateAsync(userId, request, ct);
+            return result.ToApiResult(account => Results.Created($"/api/accounts/{account.Id}", account));
         })
         .WithName("CreateAccount")
         .WithSummary("Create an account")
@@ -110,11 +109,12 @@ public static class AccountEndpoints
 
         // Update account
         group.MapPut("/{id}", async (
-            string id, 
-            UpdateAccountRequest request, 
-            ClaimsPrincipal user, 
+            string id,
+            UpdateAccountRequest request,
+            ClaimsPrincipal user,
             IAccountService accountService,
-            IValidator<UpdateAccountRequest> validator) =>
+            IValidator<UpdateAccountRequest> validator,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -125,13 +125,8 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message, account) = await accountService.UpdateAsync(id, userId, request);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
-
-            return Results.Ok(account);
+            var result = await accountService.UpdateAsync(id, userId, request, ct);
+            return result.ToApiResult();
         })
         .WithName("UpdateAccount")
         .WithSummary("Update an account")
@@ -140,7 +135,7 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(400);
 
         // Adjust balance
-        group.MapPost("/{id}/adjust-balance", async (string id, AdjustBalanceRequest request, ClaimsPrincipal user, IAccountService accountService, IValidator<AdjustBalanceRequest> validator) =>
+        group.MapPost("/{id}/adjust-balance", async (string id, AdjustBalanceRequest request, ClaimsPrincipal user, IAccountService accountService, IValidator<AdjustBalanceRequest> validator, CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -151,13 +146,11 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message) = await accountService.AdjustBalanceAsync(id, userId, request);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
+            var result = await accountService.AdjustBalanceAsync(id, userId, request, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Balance adjusted successfully" });
         })
         .WithName("AdjustAccountBalance")
         .WithSummary("Adjust account balance")
@@ -166,7 +159,7 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(400);
 
         // Reorder accounts
-        group.MapPost("/reorder", async (ReorderAccountsRequest request, ClaimsPrincipal user, IAccountService accountService, IValidator<ReorderAccountsRequest> validator) =>
+        group.MapPost("/reorder", async (ReorderAccountsRequest request, ClaimsPrincipal user, IAccountService accountService, IValidator<ReorderAccountsRequest> validator, CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -177,13 +170,11 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message) = await accountService.ReorderAsync(userId, request);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
+            var result = await accountService.ReorderAsync(userId, request, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Accounts reordered successfully" });
         })
         .WithName("ReorderAccounts")
         .WithSummary("Reorder accounts")
@@ -192,7 +183,7 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(400);
 
         // Set default account
-        group.MapPost("/{id}/set-default", async (string id, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapPost("/{id}/set-default", async (string id, ClaimsPrincipal user, IAccountService accountService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -200,13 +191,11 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message) = await accountService.SetDefaultAsync(id, userId);
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
+            var result = await accountService.SetDefaultAsync(id, userId, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Default account set successfully" });
         })
         .WithName("SetDefaultAccount")
         .WithSummary("Set default account")
@@ -215,7 +204,7 @@ public static class AccountEndpoints
         .Produces<ErrorResponse>(400);
 
         // Delete account
-        group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, IAccountService accountService) =>
+        group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, IAccountService accountService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -223,15 +212,11 @@ public static class AccountEndpoints
                 return Results.Unauthorized();
             }
 
-            var (success, message, errorType) = await accountService.DeleteAsync(id, userId);
-            if (!success)
-            {
-                return errorType == "NotFound" 
-                    ? Results.NotFound(new ErrorResponse(message))
-                    : Results.BadRequest(new ErrorResponse(message));
-            }
+            var result = await accountService.DeleteAsync(id, userId, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Account deleted successfully" });
         })
         .WithName("DeleteFinancialAccount")
         .WithSummary("Delete an account")

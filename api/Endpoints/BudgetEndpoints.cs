@@ -1,6 +1,9 @@
 using System.Security.Claims;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Validators;
+using FluentValidation;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -16,13 +19,14 @@ public static class BudgetEndpoints
         group.MapGet("/", async (
             bool? activeOnly,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var summary = await budgetService.GetSummaryAsync(userId, activeOnly ?? true);
+            var summary = await budgetService.GetSummaryAsync(userId, activeOnly ?? true, ct);
             return Results.Ok(summary);
         })
         .WithName("GetBudgets")
@@ -33,13 +37,14 @@ public static class BudgetEndpoints
         group.MapGet("/{id}", async (
             string id,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var budget = await budgetService.GetByIdAsync(id, userId);
+            var budget = await budgetService.GetByIdAsync(id, userId, ct);
             if (budget == null)
                 return Results.NotFound(new ErrorResponse("Budget not found"));
 
@@ -54,13 +59,14 @@ public static class BudgetEndpoints
         group.MapGet("/{id}/breakdown", async (
             string id,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var breakdown = await budgetService.GetSpendingBreakdownAsync(id, userId);
+            var breakdown = await budgetService.GetSpendingBreakdownAsync(id, userId, ct);
             if (breakdown == null)
                 return Results.NotFound(new ErrorResponse("Budget not found"));
 
@@ -75,23 +81,19 @@ public static class BudgetEndpoints
         group.MapPost("/", async (
             CreateBudgetRequest request,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            IValidator<CreateBudgetRequest> validator,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            if (string.IsNullOrWhiteSpace(request.Name))
-                return Results.BadRequest(new ErrorResponse("Name is required"));
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
-            if (request.Amount <= 0)
-                return Results.BadRequest(new ErrorResponse("Amount must be greater than 0"));
-
-            var (success, message, budget) = await budgetService.CreateAsync(userId, request);
-            if (!success)
-                return Results.BadRequest(new ErrorResponse(message));
-
-            return Results.Created($"/api/budgets/{budget!.Id}", budget);
+            var result = await budgetService.CreateAsync(userId, request, ct);
+            return result.ToApiResult(budget => Results.Created($"/api/budgets/{budget.Id}", budget));
         })
         .WithName("CreateBudget")
         .WithDescription("Create a new budget")
@@ -103,21 +105,19 @@ public static class BudgetEndpoints
             string id,
             UpdateBudgetRequest request,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            IValidator<UpdateBudgetRequest> validator,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var (success, message, budget) = await budgetService.UpdateAsync(id, userId, request);
-            if (!success)
-            {
-                if (message.Contains("not found"))
-                    return Results.NotFound(new ErrorResponse(message));
-                return Results.BadRequest(new ErrorResponse(message));
-            }
+            var validationError = await validator.ValidateAndReturnErrorAsync(request);
+            if (validationError != null) return validationError;
 
-            return Results.Ok(budget);
+            var result = await budgetService.UpdateAsync(id, userId, request, ct);
+            return result.ToApiResult();
         })
         .WithName("UpdateBudget")
         .WithDescription("Update an existing budget")
@@ -129,15 +129,16 @@ public static class BudgetEndpoints
         group.MapDelete("/{id}", async (
             string id,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var (success, message) = await budgetService.DeleteAsync(id, userId);
-            if (!success)
-                return Results.NotFound(new ErrorResponse(message));
+            var result = await budgetService.DeleteAsync(id, userId, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
             return Results.NoContent();
         })
@@ -152,13 +153,14 @@ public static class BudgetEndpoints
         group.MapGet("/notifications", async (
             bool? unreadOnly,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var notifications = await budgetService.GetNotificationsAsync(userId, unreadOnly);
+            var notifications = await budgetService.GetNotificationsAsync(userId, unreadOnly, ct);
             return Results.Ok(notifications);
         })
         .WithName("GetBudgetNotifications")
@@ -169,13 +171,14 @@ public static class BudgetEndpoints
         group.MapPut("/notifications/{notificationId}/read", async (
             string notificationId,
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var success = await budgetService.MarkNotificationAsReadAsync(notificationId, userId);
+            var success = await budgetService.MarkNotificationAsReadAsync(notificationId, userId, ct);
             if (!success)
                 return Results.NotFound(new ErrorResponse("Notification not found"));
 
@@ -189,13 +192,14 @@ public static class BudgetEndpoints
         // Mark all notifications as read
         group.MapPut("/notifications/read-all", async (
             ClaimsPrincipal user,
-            IBudgetService budgetService) =>
+            IBudgetService budgetService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            await budgetService.MarkAllNotificationsAsReadAsync(userId);
+            await budgetService.MarkAllNotificationsAsReadAsync(userId, ct);
             return Results.Ok(new { success = true });
         })
         .WithName("MarkAllBudgetNotificationsAsRead")

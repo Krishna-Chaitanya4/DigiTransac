@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FluentValidation;
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -16,26 +17,26 @@ public static class ConversationEndpoints
             .RequireAuthorization();
 
         // Get all conversations
-        group.MapGet("/", async (ClaimsPrincipal user, IConversationService conversationService) =>
+        group.MapGet("/", async (ClaimsPrincipal user, IConversationService conversationService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var conversations = await conversationService.GetConversationsAsync(userId);
+            var conversations = await conversationService.GetConversationsAsync(userId, ct);
             return Results.Ok(conversations);
         })
         .WithName("GetConversations")
         .Produces<ConversationListResponse>(200);
 
         // Get unread count
-        group.MapGet("/unread-count", async (ClaimsPrincipal user, IConversationService conversationService) =>
+        group.MapGet("/unread-count", async (ClaimsPrincipal user, IConversationService conversationService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var count = await conversationService.GetUnreadCountAsync(userId);
+            var count = await conversationService.GetUnreadCountAsync(userId, ct);
             return Results.Ok(new { count });
         })
         .WithName("GetUnreadCount")
@@ -47,14 +48,15 @@ public static class ConversationEndpoints
             int? limit,
             DateTime? before,
             ClaimsPrincipal user,
-            IConversationService conversationService) =>
+            IConversationService conversationService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
             var conversation = await conversationService.GetConversationAsync(
-                userId, counterpartyUserId, limit ?? 50, before);
+                userId, counterpartyUserId, limit ?? 50, before, ct);
             return Results.Ok(conversation);
         })
         .WithName("GetConversation")
@@ -67,20 +69,23 @@ public static class ConversationEndpoints
             ClaimsPrincipal user,
             IConversationService conversationService,
             INotificationService notificationService,
-            IUserRepository userRepository) =>
+            IUserRepository userRepository,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var (success, message, chatMessage) = await conversationService.SendMessageAsync(
-                userId, counterpartyUserId, request);
+            var result = await conversationService.SendMessageAsync(
+                userId, counterpartyUserId, request, ct);
             
-            if (!success)
-                return Results.BadRequest(new ErrorResponse(message));
+            if (result.IsFailure)
+                return result.ToApiResult();
+
+            var chatMessage = result.Value;
 
             // Send real-time notification to recipient
-            if (chatMessage != null && userId != counterpartyUserId)
+            if (userId != counterpartyUserId)
             {
                 var sender = await userRepository.GetByIdAsync(userId);
                 var notification = new ChatMessageNotification(
@@ -109,21 +114,24 @@ public static class ConversationEndpoints
             IConversationService conversationService,
             IValidator<SendMoneyRequest> validator,
             INotificationService notificationService,
-            IUserRepository userRepository) =>
+            IUserRepository userRepository,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var validationResult = await validator.ValidateAsync(request);
+            var validationResult = await validator.ValidateAsync(request, ct);
             if (!validationResult.IsValid)
                 return Results.BadRequest(new ErrorResponse(validationResult.Errors.First().ErrorMessage));
 
-            var (success, message, chatMessage) = await conversationService.SendMoneyAsync(
-                userId, counterpartyUserId, request);
+            var result = await conversationService.SendMoneyAsync(
+                userId, counterpartyUserId, request, ct);
             
-            if (!success)
-                return Results.BadRequest(new ErrorResponse(message));
+            if (result.IsFailure)
+                return result.ToApiResult();
+
+            var chatMessage = result.Value;
 
             // Send real-time notification to recipient
             if (chatMessage != null)
@@ -151,13 +159,14 @@ public static class ConversationEndpoints
         group.MapPost("/{counterpartyUserId}/mark-read", async (
             string counterpartyUserId,
             ClaimsPrincipal user,
-            IConversationService conversationService) =>
+            IConversationService conversationService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            await conversationService.MarkAsReadAsync(userId, counterpartyUserId);
+            await conversationService.MarkAsReadAsync(userId, counterpartyUserId, ct);
             return Results.Ok(new { message = "Conversation marked as read" });
         })
         .WithName("MarkConversationAsRead")
@@ -168,16 +177,16 @@ public static class ConversationEndpoints
             string messageId,
             EditMessageRequest request,
             ClaimsPrincipal user,
-            IConversationService conversationService) =>
+            IConversationService conversationService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var (success, message) = await conversationService.EditMessageAsync(userId, messageId, request);
-            
-            if (!success)
-                return Results.BadRequest(new ErrorResponse(message));
+            var result = await conversationService.EditMessageAsync(userId, messageId, request, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
             return Results.Ok(new { message = "Message updated" });
         })
@@ -189,16 +198,16 @@ public static class ConversationEndpoints
         group.MapDelete("/messages/{messageId}", async (
             string messageId,
             ClaimsPrincipal user,
-            IConversationService conversationService) =>
+            IConversationService conversationService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var (success, message) = await conversationService.DeleteMessageAsync(userId, messageId);
-            
-            if (!success)
-                return Results.BadRequest(new ErrorResponse(message));
+            var result = await conversationService.DeleteMessageAsync(userId, messageId, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
             return Results.Ok(new { message = "Message deleted" });
         })
@@ -210,13 +219,14 @@ public static class ConversationEndpoints
         group.MapGet("/search-user", async (
             string email,
             ClaimsPrincipal user,
-            IConversationService conversationService) =>
+            IConversationService conversationService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await conversationService.SearchUserByEmailAsync(userId, email);
+            var result = await conversationService.SearchUserByEmailAsync(userId, email, ct);
             return Results.Ok(result);
         })
         .WithName("SearchUserByEmail")

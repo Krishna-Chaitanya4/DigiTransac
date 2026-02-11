@@ -1,3 +1,4 @@
+using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -6,14 +7,19 @@ namespace DigiTransac.Api.Services;
 
 public interface ITagService
 {
-    Task<List<TagResponse>> GetAllAsync(string userId);
-    Task<TagResponse?> GetByIdAsync(string id, string userId);
-    Task<(bool Success, string Message, TagResponse? Tag)> CreateAsync(string userId, CreateTagRequest request);
-    Task<(bool Success, string Message, TagResponse? Tag)> UpdateAsync(string id, string userId, UpdateTagRequest request);
-    Task<(bool Success, string Message)> DeleteAsync(string id, string userId);
-    Task<(bool Success, string Message, int TransactionCount)> DeleteWithConfirmationAsync(string id, string userId, bool confirmed);
-    Task<int> GetTransactionCountAsync(string id, string userId);
+    Task<List<TagResponse>> GetAllAsync(string userId, CancellationToken ct = default);
+    Task<TagResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<Result<TagResponse>> CreateAsync(string userId, CreateTagRequest request, CancellationToken ct = default);
+    Task<Result<TagResponse>> UpdateAsync(string id, string userId, UpdateTagRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default);
+    Task<Result<DeleteWithCountResponse>> DeleteWithConfirmationAsync(string id, string userId, bool confirmed, CancellationToken ct = default);
+    Task<int> GetTransactionCountAsync(string id, string userId, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Response DTO for delete operations that include a transaction count
+/// </summary>
+public record DeleteWithCountResponse(string Message, int TransactionCount);
 
 public class TagService : ITagService
 {
@@ -28,31 +34,27 @@ public class TagService : ITagService
         _logger = logger;
     }
 
-    public async Task<List<TagResponse>> GetAllAsync(string userId)
+    public async Task<List<TagResponse>> GetAllAsync(string userId, CancellationToken ct = default)
     {
-        var tags = await _tagRepository.GetByUserIdAsync(userId);
+        var tags = await _tagRepository.GetByUserIdAsync(userId, ct);
         return tags.Select(MapToResponse).ToList();
     }
 
-    public async Task<TagResponse?> GetByIdAsync(string id, string userId)
+    public async Task<TagResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId);
+        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId, ct);
         return tag != null ? MapToResponse(tag) : null;
     }
 
-    public async Task<(bool Success, string Message, TagResponse? Tag)> CreateAsync(string userId, CreateTagRequest request)
+    public async Task<Result<TagResponse>> CreateAsync(string userId, CreateTagRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return (false, "Name is required", null);
-        }
+            return Error.Validation("Name is required");
 
         // Check for duplicate name
-        var existing = await _tagRepository.GetByNameAndUserIdAsync(request.Name.Trim(), userId);
+        var existing = await _tagRepository.GetByNameAndUserIdAsync(request.Name.Trim(), userId, ct);
         if (existing != null)
-        {
-            return (false, "Tag with this name already exists", null);
-        }
+            return Error.Conflict("Tag with this name already exists");
 
         var tag = new Tag
         {
@@ -61,85 +63,71 @@ public class TagService : ITagService
             Color = request.Color
         };
 
-        await _tagRepository.CreateAsync(tag);
+        await _tagRepository.CreateAsync(tag, ct);
         _logger.LogInformation("Created tag {TagId} for user {UserId}", tag.Id, userId);
 
-        return (true, "Tag created successfully", MapToResponse(tag));
+        return MapToResponse(tag);
     }
 
-    public async Task<(bool Success, string Message, TagResponse? Tag)> UpdateAsync(string id, string userId, UpdateTagRequest request)
+    public async Task<Result<TagResponse>> UpdateAsync(string id, string userId, UpdateTagRequest request, CancellationToken ct = default)
     {
-        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId);
+        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (tag == null)
-        {
-            return (false, "Tag not found", null);
-        }
+            return DomainErrors.Tag.NotFound(id);
 
         if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return (false, "Name is required", null);
-        }
+            return Error.Validation("Name is required");
 
         // Check for duplicate name (excluding current tag)
-        var existing = await _tagRepository.GetByNameAndUserIdAsync(request.Name.Trim(), userId);
+        var existing = await _tagRepository.GetByNameAndUserIdAsync(request.Name.Trim(), userId, ct);
         if (existing != null && existing.Id != id)
-        {
-            return (false, "Tag with this name already exists", null);
-        }
+            return Error.Conflict("Tag with this name already exists");
 
         tag.Name = request.Name.Trim();
         tag.Color = request.Color;
 
-        await _tagRepository.UpdateAsync(tag);
+        await _tagRepository.UpdateAsync(tag, ct);
         _logger.LogInformation("Updated tag {TagId} for user {UserId}", id, userId);
 
-        return (true, "Tag updated successfully", MapToResponse(tag));
+        return MapToResponse(tag);
     }
 
-    public async Task<(bool Success, string Message)> DeleteAsync(string id, string userId)
+    public async Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default)
     {
-        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId);
+        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (tag == null)
-        {
-            return (false, "Tag not found");
-        }
+            return DomainErrors.Tag.NotFound(id);
 
         // Check if tag is used in transactions - require confirmation
         var transactionCount = await _transactionRepository.GetCountByTagIdAsync(id, userId);
         if (transactionCount > 0)
-        {
-            return (false, $"This tag is used in {transactionCount} transaction(s). Please confirm to remove it from all transactions.");
-        }
+            return DomainErrors.Tag.HasTransactions(transactionCount);
 
-        var deleted = await _tagRepository.DeleteAsync(id, userId);
+        var deleted = await _tagRepository.DeleteAsync(id, userId, ct);
         if (!deleted)
-        {
-            return (false, "Failed to delete tag");
-        }
+            return Error.InternalError("Failed to delete tag");
 
         _logger.LogInformation("Deleted tag {TagId} for user {UserId}", id, userId);
-        return (true, "Tag deleted successfully");
+        return Result.Success();
     }
 
-    public async Task<int> GetTransactionCountAsync(string id, string userId)
+    public async Task<int> GetTransactionCountAsync(string id, string userId, CancellationToken ct = default)
     {
         return await _transactionRepository.GetCountByTagIdAsync(id, userId);
     }
 
-    public async Task<(bool Success, string Message, int TransactionCount)> DeleteWithConfirmationAsync(string id, string userId, bool confirmed)
+    public async Task<Result<DeleteWithCountResponse>> DeleteWithConfirmationAsync(string id, string userId, bool confirmed, CancellationToken ct = default)
     {
-        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId);
+        var tag = await _tagRepository.GetByIdAndUserIdAsync(id, userId, ct);
         if (tag == null)
-        {
-            return (false, "Tag not found", 0);
-        }
+            return DomainErrors.Tag.NotFound(id);
 
         var transactionCount = await _transactionRepository.GetCountByTagIdAsync(id, userId);
         
         if (transactionCount > 0 && !confirmed)
         {
             // Return count so frontend can show confirmation
-            return (false, $"This tag is used in {transactionCount} transaction(s). Confirm to remove it from all.", transactionCount);
+            return Error.Conflict($"This tag is used in {transactionCount} transaction(s). Confirm to remove it from all.");
         }
 
         if (transactionCount > 0)
@@ -149,14 +137,12 @@ public class TagService : ITagService
             _logger.LogInformation("Removed tag {TagId} from {Count} transactions", id, transactionCount);
         }
 
-        var deleted = await _tagRepository.DeleteAsync(id, userId);
+        var deleted = await _tagRepository.DeleteAsync(id, userId, ct);
         if (!deleted)
-        {
-            return (false, "Failed to delete tag", 0);
-        }
+            return Error.InternalError("Failed to delete tag");
 
         _logger.LogInformation("Deleted tag {TagId} for user {UserId}", id, userId);
-        return (true, $"Tag deleted successfully. Removed from {transactionCount} transaction(s).", transactionCount);
+        return new DeleteWithCountResponse($"Tag deleted successfully. Removed from {transactionCount} transaction(s).", transactionCount);
     }
 
     private static TagResponse MapToResponse(Tag tag)

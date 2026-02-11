@@ -85,10 +85,14 @@ public class TransactionCoreService : ITransactionCoreService
 
     public async Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter)
     {
-        // Get accounts, labels, tags for mapping
+        // Get accounts, labels, tags for mapping — create dictionaries once for reuse
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
         var labels = await _labelRepository.GetByUserIdAsync(userId);
         var tags = await _tagRepository.GetByUserIdAsync(userId);
+        
+        var accountsDict = accounts.ToDictionary(a => a.Id);
+        var labelsDict = labels.ToDictionary(l => l.Id);
+        var tagsDict = tags.ToDictionary(t => t.Id);
 
         // Get all counterparties for search
         var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
@@ -142,11 +146,12 @@ public class TransactionCoreService : ITransactionCoreService
         var pageSize = filter.PageSize ?? 50;
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
+        // Use pre-built dictionaries instead of recreating per iteration
         var responses = transactions.Select(t => _mapperService.MapToResponse(
             t, dek,
-            accounts.ToDictionary(a => a.Id),
-            labels.ToDictionary(l => l.Id),
-            tags.ToDictionary(t => t.Id),
+            accountsDict,
+            labelsDict,
+            tagsDict,
             allCounterpartyUsers)).ToList();
 
         return new TransactionListResponse(responses, totalCount, page, pageSize, totalPages);

@@ -1084,8 +1084,8 @@ public class AuthServiceTests
             TwoFactorSecret = "TESTSECRET"
         };
         _userRepositoryMock.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
-        _twoFactorTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<TwoFactorToken>()))
-            .ReturnsAsync((TwoFactorToken t) => t);
+        _twoFactorTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<TwoFactorToken>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TwoFactorToken t, CancellationToken _) => t);
 
         // Act
         var result = await _authService.LoginAsync(new LoginRequest(email, password));

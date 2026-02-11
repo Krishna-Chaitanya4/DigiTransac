@@ -9,22 +9,22 @@ namespace DigiTransac.Api.Repositories;
 /// </summary>
 public interface IBudgetRepository
 {
-    Task<Budget> CreateAsync(Budget budget);
-    Task<Budget?> GetByIdAsync(string id);
-    Task<Budget?> GetByIdAndUserIdAsync(string id, string userId);
-    Task<List<Budget>> GetByUserIdAsync(string userId, bool? isActive = null);
-    Task<Budget> UpdateAsync(Budget budget);
-    Task<bool> DeleteAsync(string id);
-    Task<bool> DeleteAllByUserIdAsync(string userId);
+    Task<Budget> CreateAsync(Budget budget, CancellationToken ct = default);
+    Task<Budget?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<Budget?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<List<Budget>> GetByUserIdAsync(string userId, bool? isActive = null, CancellationToken ct = default);
+    Task<Budget> UpdateAsync(Budget budget, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string id, CancellationToken ct = default);
+    Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
     
     // Notifications
-    Task<BudgetNotification> CreateNotificationAsync(BudgetNotification notification);
-    Task<List<BudgetNotification>> GetNotificationsByUserIdAsync(string userId, bool? unreadOnly = null, int limit = 50);
-    Task<int> GetUnreadNotificationCountAsync(string userId);
-    Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId);
-    Task<bool> MarkAllNotificationsAsReadAsync(string userId);
-    Task<bool> DeleteOldNotificationsAsync(DateTime olderThan);
-    Task<bool> DeleteAllNotificationsByUserIdAsync(string userId);
+    Task<BudgetNotification> CreateNotificationAsync(BudgetNotification notification, CancellationToken ct = default);
+    Task<List<BudgetNotification>> GetNotificationsByUserIdAsync(string userId, bool? unreadOnly = null, int limit = 50, CancellationToken ct = default);
+    Task<int> GetUnreadNotificationCountAsync(string userId, CancellationToken ct = default);
+    Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId, CancellationToken ct = default);
+    Task<bool> MarkAllNotificationsAsReadAsync(string userId, CancellationToken ct = default);
+    Task<bool> DeleteOldNotificationsAsync(DateTime olderThan, CancellationToken ct = default);
+    Task<bool> DeleteAllNotificationsByUserIdAsync(string userId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -104,24 +104,24 @@ public class BudgetRepository : IBudgetRepository
         }
     }
 
-    public async Task<Budget> CreateAsync(Budget budget)
+    public async Task<Budget> CreateAsync(Budget budget, CancellationToken ct = default)
     {
-        await _budgets.InsertOneAsync(budget);
+        await _budgets.InsertOneAsync(budget, options: null, ct);
         _logger.LogInformation("Created budget {BudgetId} for user {UserId}", budget.Id, budget.UserId);
         return budget;
     }
 
-    public async Task<Budget?> GetByIdAsync(string id)
+    public async Task<Budget?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        return await _budgets.Find(b => b.Id == id).FirstOrDefaultAsync();
+        return await _budgets.Find(b => b.Id == id).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Budget?> GetByIdAndUserIdAsync(string id, string userId)
+    public async Task<Budget?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        return await _budgets.Find(b => b.Id == id && b.UserId == userId).FirstOrDefaultAsync();
+        return await _budgets.Find(b => b.Id == id && b.UserId == userId).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<List<Budget>> GetByUserIdAsync(string userId, bool? isActive = null)
+    public async Task<List<Budget>> GetByUserIdAsync(string userId, bool? isActive = null, CancellationToken ct = default)
     {
         var filter = Builders<Budget>.Filter.Eq(b => b.UserId, userId);
         
@@ -133,20 +133,20 @@ public class BudgetRepository : IBudgetRepository
         return await _budgets
             .Find(filter)
             .SortByDescending(b => b.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<Budget> UpdateAsync(Budget budget)
+    public async Task<Budget> UpdateAsync(Budget budget, CancellationToken ct = default)
     {
         budget.UpdatedAt = DateTime.UtcNow;
-        await _budgets.ReplaceOneAsync(b => b.Id == budget.Id, budget);
+        await _budgets.ReplaceOneAsync(b => b.Id == budget.Id, budget, options: (ReplaceOptions?)null, ct);
         _logger.LogInformation("Updated budget {BudgetId}", budget.Id);
         return budget;
     }
 
-    public async Task<bool> DeleteAsync(string id)
+    public async Task<bool> DeleteAsync(string id, CancellationToken ct = default)
     {
-        var result = await _budgets.DeleteOneAsync(b => b.Id == id);
+        var result = await _budgets.DeleteOneAsync(b => b.Id == id, ct);
         if (result.DeletedCount > 0)
         {
             _logger.LogInformation("Deleted budget {BudgetId}", id);
@@ -155,13 +155,13 @@ public class BudgetRepository : IBudgetRepository
         return false;
     }
 
-    public async Task<bool> DeleteAllByUserIdAsync(string userId)
+    public async Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default)
     {
         // Delete all budgets for the user
-        var budgetResult = await _budgets.DeleteManyAsync(b => b.UserId == userId);
+        var budgetResult = await _budgets.DeleteManyAsync(b => b.UserId == userId, ct);
         
         // Also delete all notifications for the user
-        var notificationResult = await _notifications.DeleteManyAsync(n => n.UserId == userId);
+        var notificationResult = await _notifications.DeleteManyAsync(n => n.UserId == userId, ct);
         
         _logger.LogInformation("Deleted {BudgetCount} budgets and {NotificationCount} notifications for user {UserId}",
             budgetResult.DeletedCount, notificationResult.DeletedCount, userId);
@@ -169,24 +169,24 @@ public class BudgetRepository : IBudgetRepository
         return budgetResult.DeletedCount > 0 || notificationResult.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteAllNotificationsByUserIdAsync(string userId)
+    public async Task<bool> DeleteAllNotificationsByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        var result = await _notifications.DeleteManyAsync(n => n.UserId == userId);
+        var result = await _notifications.DeleteManyAsync(n => n.UserId == userId, ct);
         _logger.LogInformation("Deleted {Count} notifications for user {UserId}", result.DeletedCount, userId);
         return result.DeletedCount > 0;
     }
 
     // Notification methods
 
-    public async Task<BudgetNotification> CreateNotificationAsync(BudgetNotification notification)
+    public async Task<BudgetNotification> CreateNotificationAsync(BudgetNotification notification, CancellationToken ct = default)
     {
-        await _notifications.InsertOneAsync(notification);
+        await _notifications.InsertOneAsync(notification, options: null, ct);
         _logger.LogInformation("Created budget notification for budget {BudgetId}, threshold {Threshold}%", 
             notification.BudgetId, notification.ThresholdPercent);
         return notification;
     }
 
-    public async Task<List<BudgetNotification>> GetNotificationsByUserIdAsync(string userId, bool? unreadOnly = null, int limit = 50)
+    public async Task<List<BudgetNotification>> GetNotificationsByUserIdAsync(string userId, bool? unreadOnly = null, int limit = 50, CancellationToken ct = default)
     {
         var filter = Builders<BudgetNotification>.Filter.Eq(n => n.UserId, userId);
         
@@ -199,36 +199,38 @@ public class BudgetRepository : IBudgetRepository
             .Find(filter)
             .SortByDescending(n => n.CreatedAt)
             .Limit(limit)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<int> GetUnreadNotificationCountAsync(string userId)
+    public async Task<int> GetUnreadNotificationCountAsync(string userId, CancellationToken ct = default)
     {
         return (int)await _notifications.CountDocumentsAsync(
-            n => n.UserId == userId && !n.IsRead);
+            n => n.UserId == userId && !n.IsRead, options: null, ct);
     }
 
-    public async Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId)
+    public async Task<bool> MarkNotificationAsReadAsync(string notificationId, string userId, CancellationToken ct = default)
     {
         var result = await _notifications.UpdateOneAsync(
             n => n.Id == notificationId && n.UserId == userId,
-            Builders<BudgetNotification>.Update.Set(n => n.IsRead, true));
+            Builders<BudgetNotification>.Update.Set(n => n.IsRead, true),
+            options: null, ct);
         return result.ModifiedCount > 0;
     }
 
-    public async Task<bool> MarkAllNotificationsAsReadAsync(string userId)
+    public async Task<bool> MarkAllNotificationsAsReadAsync(string userId, CancellationToken ct = default)
     {
         var result = await _notifications.UpdateManyAsync(
             n => n.UserId == userId && !n.IsRead,
-            Builders<BudgetNotification>.Update.Set(n => n.IsRead, true));
+            Builders<BudgetNotification>.Update.Set(n => n.IsRead, true),
+            options: null, ct);
         _logger.LogInformation("Marked {Count} notifications as read for user {UserId}", 
             result.ModifiedCount, userId);
         return result.ModifiedCount > 0;
     }
 
-    public async Task<bool> DeleteOldNotificationsAsync(DateTime olderThan)
+    public async Task<bool> DeleteOldNotificationsAsync(DateTime olderThan, CancellationToken ct = default)
     {
-        var result = await _notifications.DeleteManyAsync(n => n.CreatedAt < olderThan);
+        var result = await _notifications.DeleteManyAsync(n => n.CreatedAt < olderThan, ct);
         if (result.DeletedCount > 0)
         {
             _logger.LogInformation("Deleted {Count} old budget notifications", result.DeletedCount);

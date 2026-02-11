@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-12
+
+### Performance
+- **Fix N+1 in BudgetService.GetSummaryAsync** - Batch-fetch all accounts upfront instead of querying per-budget inside loop
+- **Fix N+1 in ConversationService.GetConversationsAsync** - Batch-fetch all users upfront instead of querying per-conversation inside loop
+- **Fix N+1 in ReorderAsync** - AccountService and LabelService now use `BulkUpdateOrderAsync` repository methods instead of per-item `UpdateAsync` calls
+- **Fix dictionary recreation in TransactionCoreService.GetAllAsync** - Moved `accountMap` dictionary creation outside the transaction loop
+
+### Changed
+- **Transaction Facade Pattern** - Extracted `AccountService` encryption/decryption logic into `ITransactionMapperService`, reducing 3 injected dependencies (`IKeyManagementService`, `IDekCacheService`, `IEncryptionService`) to 1
+- **Result Pattern Migration** - Migrated remaining 6 services (`LabelService`, `TagService`, `BudgetService`, `AccountService`, `ConversationService`, `RecurringTransactionService`) from tuple returns `(bool, string, T?)` to `Result<T>` pattern with `DomainErrors`
+- **CancellationToken Propagation** - Added `CancellationToken ct = default` parameter to all service interfaces, implementations, and repository methods; endpoints pass `HttpContext.RequestAborted` through the call chain
+- **Centralized API_BASE_URL** - Frontend `apiClient.ts` now exports `API_BASE_URL`; `authService.ts` and all other services import from single source
+- **CSV Export via apiClient** - Frontend CSV export now uses `apiClient` with proper auth headers instead of raw `fetch` with manual token handling
+- **Frontend formatCurrency** - Replaced hardcoded `'en-IN'` locale with `navigator.language` for proper locale-sensitive currency formatting
+- **FluentValidation for Budgets** - Added `CreateBudgetRequestValidator` and `UpdateBudgetRequestValidator` with proper validation rules for budget endpoints
+- **ConversationService Logging** - Added `ILogger<ConversationService>` for structured logging of conversation operations
+
+### Fixed
+- **Auth Email Conflict** - `DomainErrors.Auth.EmailAlreadyRegistered` now correctly returns HTTP 409 Conflict instead of 400 Bad Request
+- **Test Suite Updated** - All 425 tests passing (up from 421) with updated mocks for CancellationToken parameters, Result pattern assertions, and corrected error message expectations
+
 ## [1.2.0] - 2026-02-11
 
 ### Added

@@ -18,7 +18,7 @@ public static class TwoFactorEndpoints
         var group = app.MapGroup("/api/auth/2fa").WithTags("Two-Factor Authentication");
 
         // Get 2FA status
-        group.MapGet("/status", [Authorize] async (ClaimsPrincipal user, ITwoFactorService twoFactorService, IAuthService authService) =>
+        group.MapGet("/status", [Authorize] async (ClaimsPrincipal user, ITwoFactorService twoFactorService, IAuthService authService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -39,7 +39,7 @@ public static class TwoFactorEndpoints
         .Produces(401);
 
         // Generate 2FA setup (QR code, secret)
-        group.MapPost("/setup", [Authorize] async (ClaimsPrincipal user, ITwoFactorService twoFactorService) =>
+        group.MapPost("/setup", [Authorize] async (ClaimsPrincipal user, ITwoFactorService twoFactorService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -49,7 +49,7 @@ public static class TwoFactorEndpoints
 
             try
             {
-                var setupInfo = await twoFactorService.GenerateSetupInfoAsync(userId);
+                var setupInfo = await twoFactorService.GenerateSetupInfoAsync(userId, ct);
                 return Results.Ok(new TwoFactorSetupResponse(
                     setupInfo.Secret,
                     setupInfo.QrCodeUri,
@@ -68,10 +68,11 @@ public static class TwoFactorEndpoints
 
         // Enable 2FA (verify code and activate)
         group.MapPost("/enable", [Authorize] async (
-            [FromBody] EnableTwoFactorRequest request, 
+            [FromBody] EnableTwoFactorRequest request,
             IValidator<EnableTwoFactorRequest> validator,
-            ClaimsPrincipal user, 
-            ITwoFactorService twoFactorService) =>
+            ClaimsPrincipal user,
+            ITwoFactorService twoFactorService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -82,14 +83,11 @@ public static class TwoFactorEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var (success, message) = await twoFactorService.EnableTwoFactorAsync(userId, request.Code);
-            
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
+            var result = await twoFactorService.EnableTwoFactorAsync(userId, request.Code, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Two-factor authentication has been enabled" });
         })
         .WithName("EnableTwoFactor")
         .Produces(200)
@@ -98,10 +96,11 @@ public static class TwoFactorEndpoints
 
         // Disable 2FA (requires password)
         group.MapPost("/disable", [Authorize] async (
-            [FromBody] DisableTwoFactorRequest request, 
+            [FromBody] DisableTwoFactorRequest request,
             IValidator<DisableTwoFactorRequest> validator,
-            ClaimsPrincipal user, 
-            ITwoFactorService twoFactorService) =>
+            ClaimsPrincipal user,
+            ITwoFactorService twoFactorService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -112,14 +111,11 @@ public static class TwoFactorEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var (success, message) = await twoFactorService.DisableTwoFactorAsync(userId, request.Password);
-            
-            if (!success)
-            {
-                return Results.BadRequest(new ErrorResponse(message));
-            }
+            var result = await twoFactorService.DisableTwoFactorAsync(userId, request.Password, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
 
-            return Results.Ok(new { message });
+            return Results.Ok(new { message = "Two-factor authentication has been disabled" });
         })
         .WithName("DisableTwoFactor")
         .Produces(200)

@@ -273,9 +273,9 @@ public class TransactionImportService : ITransactionImportService
                     Icon: "📁",
                     Color: "#6B7280"
                 ));
-                if (result.Success && result.Label != null)
+                if (result.IsSuccess)
                 {
-                    labelMap[labelName.ToLowerInvariant()] = result.Label.Id;
+                    labelMap[labelName.ToLowerInvariant()] = result.Value.Id;
                     createdLabels.Add(labelName);
                 }
             }
@@ -299,9 +299,9 @@ public class TransactionImportService : ITransactionImportService
                     Name: tagName,
                     Color: "#6B7280"
                 ));
-                if (result.Success && result.Tag != null)
+                if (result.IsSuccess)
                 {
-                    tagMap[tagName.ToLowerInvariant()] = result.Tag.Id;
+                    tagMap[tagName.ToLowerInvariant()] = result.Value.Id;
                     createdTags.Add(tagName);
                 }
             }
