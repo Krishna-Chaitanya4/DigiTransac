@@ -60,7 +60,7 @@ env:
   CUSTOM_DOMAINS: ${{ vars.CUSTOM_DOMAINS || 'https://digitransac.com,https://www.digitransac.com' }}
   
   # Build Configuration
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '10.0.x'
   NODE_VERSION: '22.x'
 
 # ════════════════════════════════════════════════════════════════════════════════
