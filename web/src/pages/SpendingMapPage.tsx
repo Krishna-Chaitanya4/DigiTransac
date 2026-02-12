@@ -430,7 +430,7 @@ export default function SpendingMapPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Spending Map</h1>
+          <h1 className="hidden lg:block text-2xl font-bold text-gray-900 dark:text-gray-100">Spending Map</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Visualize where you spend money
           </p>

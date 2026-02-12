@@ -374,7 +374,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         var response = await Client.PostAsJsonAsync("/api/auth/send-verification", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     [Fact]

@@ -214,7 +214,7 @@ export default function AccountsPage() {
       }}
     >
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Accounts</h1>
+        <h1 className="hidden lg:block text-2xl font-bold text-gray-900 dark:text-gray-100">Accounts</h1>
         <button
           onClick={handleCreate}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900"
