@@ -1,7 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import { useScrollDirection } from '../hooks/useScrollDirection';
+import { useSwipeNavigation } from '../hooks/useSwipeNavigation';
+import { useKeyboardAwareScroll } from '../hooks/useKeyboardAwareScroll';
+import { BottomTabBar } from './mobile';
 
 const navigation = [
   {
@@ -82,11 +87,27 @@ const navigation = [
   },
 ];
 
+/** Map route paths to page titles for the mobile header */
+const pageTitles: Record<string, string> = {
+  '/insights': 'Insights',
+  '/accounts': 'Accounts',
+  '/transactions': 'Transactions',
+  '/budgets': 'Budgets',
+  '/chats': 'Chats',
+  '/map': 'Map',
+  '/labels': 'Labels',
+  '/settings': 'Settings',
+};
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const location = useLocation();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const scrollDirection = useScrollDirection({ threshold: 10, topOffset: 50 });
+  const mainRef = useRef<HTMLElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -104,26 +125,77 @@ export default function Layout() {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Handle "Add Transaction" from the bottom tab bar
+  const handleAddTransaction = useCallback(() => {
+    // Navigate to transactions page and trigger the add sheet via URL state
+    navigate('/transactions', { state: { openAddSheet: true } });
+  }, [navigate]);
+
+  // Derive current page title for mobile header
+  const pageTitle = useMemo(() => {
+    return pageTitles[location.pathname] || 'DigiTransac';
+  }, [location.pathname]);
+
+  // Mobile header hidden state — hide on scroll down, show on scroll up or at top
+  const mobileHeaderHidden = scrollDirection === 'down';
+
+  // Swipe between tab pages on mobile
+  useSwipeNavigation(mainRef, { enabled: isMobile });
+
+  // Ensure focused inputs stay visible when mobile keyboard opens
+  useKeyboardAwareScroll();
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile sidebar backdrop */}
-      {mobileMenuOpen && (
-        <div 
+      {/* Mobile header — auto-hides on scroll down, reappears on scroll up */}
+      {isMobile && (
+        <header
+          className={`
+            fixed top-0 left-0 right-0 z-30
+            bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm
+            border-b border-gray-200 dark:border-gray-700
+            transition-transform duration-300 ease-in-out safe-area-top
+            ${mobileHeaderHidden ? '-translate-y-full' : 'translate-y-0'}
+          `}
+        >
+          <div className="flex items-center justify-between h-12 px-4">
+            <div className="flex items-center gap-2">
+              <img
+                src={isDark ? "/favicon-dark.svg" : "/favicon.svg"}
+                alt="DigiTransac"
+                className="w-6 h-6 flex-shrink-0"
+              />
+              <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                {pageTitle}
+              </h1>
+            </div>
+            <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+              <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                {user?.fullName?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* Mobile sidebar backdrop — only for desktop-style sidebar on mobile (hidden when using bottom tab bar) */}
+      {!isMobile && mobileMenuOpen && (
+        <div
           className="fixed inset-0 bg-gray-900/50 z-40 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — desktop only (hidden on mobile, replaced by bottom tab bar) */}
       <aside className={`
         fixed top-0 left-0 z-50 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 
         transform transition-all duration-300 ease-in-out
         ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'}
-        ${mobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'}
+        -translate-x-full lg:translate-x-0
       `}>
         {/* Logo */}
         <div className={`flex items-center h-16 border-b border-gray-200 dark:border-gray-700 ${sidebarCollapsed ? 'lg:justify-center lg:px-0 px-4' : 'px-4'}`}>
-          <Link to="/chats" className="flex items-center gap-3">
+          <Link to="/insights" className="flex items-center gap-3">
             <img 
               src={isDark ? "/favicon-dark.svg" : "/favicon.svg"} 
               alt="DigiTransac" 
@@ -133,17 +205,6 @@ export default function Layout() {
               DigiTransac
             </span>
           </Link>
-          
-          {/* Close button for mobile */}
-          <button 
-            onClick={() => setMobileMenuOpen(false)}
-            className="lg:hidden ml-auto p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-            aria-label="Close menu"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
         {/* Navigation */}
@@ -203,48 +264,13 @@ export default function Layout() {
             </span>
           </button>
         </div>
-
-        {/* User info at bottom of sidebar (mobile only) */}
-        <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-              <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                {user?.fullName?.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user?.fullName}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-            </svg>
-            Sign out
-          </button>
-        </div>
       </aside>
 
       {/* Main content area */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
-        {/* Top header */}
-        <header className="sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        {/* Top header — only show on desktop (mobile uses bottom tab bar) */}
+        <header className="sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hidden lg:block">
           <div className="flex items-center justify-between h-14 px-4 sm:px-6">
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-              aria-label="Open menu"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              </svg>
-            </button>
-
             {/* Spacer for desktop */}
             <div className="hidden lg:block" />
 
@@ -314,11 +340,16 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="p-4 sm:p-6 lg:p-8">
+        {/* Page content — add top padding on mobile for auto-hide header, bottom padding for tab bar */}
+        <main ref={mainRef} className={`p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 ${isMobile ? 'pt-16' : ''}`}>
           <Outlet />
         </main>
       </div>
+
+      {/* Bottom Tab Bar — mobile only */}
+      {isMobile && (
+        <BottomTabBar onAddTransaction={handleAddTransaction} />
+      )}
     </div>
   );
 }

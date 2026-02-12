@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-02-12
+
+### Added
+- **Mobile UX Overhaul** — 16-item comprehensive mobile experience improvement for PWA usage
+  
+  #### Phase 1: Core Mobile Navigation
+  - **Bottom Tab Bar** — Native-style 5-tab navigation (Insights, Accounts, Add FAB, Transactions, More) with active state indicators and haptic feedback on taps
+  - **More Menu** — Bottom sheet for secondary navigation items (Chats, Budgets, Map, Labels, Settings) with sign-out action
+  - **Sidebar Hidden on Mobile** — Desktop sidebar hidden below `lg` breakpoint; mobile uses bottom tab bar exclusively
+  - **OfflineIndicator Repositioned** — Moved from bottom bar to top-center pill toast to avoid tab bar overlap
+  - **InstallPrompt Repositioned** — PWA install banner uses `bottom-20 lg:bottom-4` to clear tab bar
+  - **Safe Area CSS** — `safe-area-bottom` and `safe-area-top` utility classes for notched devices
+  - **Print Styles** — Bottom tab bar hidden in print media
+  
+  #### Phase 2: Touch Quality
+  - **ConfirmDialog Component** — Dual-mode confirmation: bottom sheet on mobile (`useIsMobile()`), centered modal on desktop; replaces all `window.confirm()` usage
+  - **useConfirmDialog Hook** — Promise-based hook returning `{ confirm, dialogProps }` for async confirmation flows
+  - **useHaptics Hook** — Vibration API wrapper with 7 named patterns (`light`, `medium`, `heavy`, `success`, `warning`, `error`, `selection`) via `navigator.vibrate()`
+  - **Haptic Feedback Integration** — Added haptic feedback to SwipeableRow (threshold crossing, swipe complete), PullToRefresh (threshold, refresh trigger), BottomTabBar taps, delete actions, and form wizard step transitions
+  - **Touch Target Audit** — All interactive elements enforce minimum 44×44px with `min-h-[44px]` and `touch-manipulation` class
+  
+  #### Phase 3: Form & Page Optimization
+  - **TransactionForm Mobile Wizard** — 3-step mobile wizard (Amount → Account/Category → Details) with step indicators, shared field renderers, and haptic feedback on step transitions; desktop retains single-page layout
+  - **Auto-Hide Header** — `useScrollDirection` hook detects scroll direction; mobile header slides up on scroll-down and reappears on scroll-up with smooth transitions
+  - **Insights Page Mobile Layout** — Touch-friendly reorder buttons (up/down arrows replacing drag-and-drop), horizontally scrollable period selector, `grid-cols-1 sm:grid-cols-3` hero stats
+  - **AccountCard Bottom Action Sheet** — Mobile: full-width bottom sheet with account info header, large touch targets with icons; Desktop: existing dropdown menu preserved
+  
+  #### Phase 4: Feature Parity & Polish
+  - **Mobile Export** — Web Share API integration (`navigator.share()` + `navigator.canShare()`) for sharing exported files on mobile; fallback to `<a>` download
+  - **Swipe-to-Navigate** — `useSwipeNavigation` hook enables horizontal swipe between adjacent tab pages (Insights ↔ Accounts ↔ Transactions) with haptic feedback
+  - **Branded Pull-to-Refresh** — Custom SVG progress ring with indigo gradient, rotating transaction arrows icon, and status text ("Pull to refresh" / "Release to refresh" / "Refreshing…")
+  - **Keyboard-Aware Scroll** — `useKeyboardAwareScroll` hook uses VisualViewport API + focusin events to auto-scroll focused inputs into view when virtual keyboard opens
+  - **Long-Press Quick Actions** — `useLongPress` hook (500ms delay, 10px move threshold) with haptic feedback; transaction rows show bottom sheet with Edit, Confirm/Pending, Select, and Delete actions
+  - **OnboardingTour Mobile Steps** — Mobile-specific tour steps targeting tab bar, more menu, swipe gestures, and pull-to-refresh (replacing desktop sidebar-targeted steps); touch-friendly buttons with `min-h-[44px]`
+
+### New Hooks
+- `useMediaQuery(query)` + `useIsMobile()` — Generic media query hook with SSR-safe initialization
+- `useHaptics()` — Vibration API with 7 named haptic patterns
+- `useScrollDirection(options)` — Scroll direction detection with configurable threshold and topOffset
+- `useSwipeNavigation(options)` — Horizontal swipe navigation between tab pages
+- `useKeyboardAwareScroll()` — Auto-scroll inputs into view on virtual keyboard open
+- `useLongPress(options)` — Touch gesture hook with configurable delay and movement threshold
+- `useConfirmDialog()` — Promise-based confirmation dialog hook
+
+### New Components
+- `BottomTabBar` — Mobile bottom navigation with 5 tabs and FAB center button
+- `MoreMenu` — Bottom sheet for secondary navigation items
+- `ConfirmDialog` — Responsive confirmation dialog (bottom sheet on mobile, modal on desktop)
+
+### Changed
+- `Layout.tsx` — Integrated BottomTabBar, auto-hide header, swipe navigation, keyboard-aware scroll; sidebar hidden on mobile
+- `TransactionList.tsx` — Added long-press quick actions on transaction rows with bottom action sheet
+- `TransactionForm.tsx` — Refactored to 3-step mobile wizard with shared field renderers
+- `InsightsPage.tsx` — Mobile reorder buttons, horizontal scroll period selector, responsive hero stats grid
+- `AccountCard.tsx` — Dual-mode menu (desktop dropdown + mobile bottom action sheet)
+- `TransactionsPage.tsx` — Mobile export with Web Share API, touch-friendly filter controls
+- `SwipeableRow.tsx` — Added haptic feedback on threshold crossing and swipe completion
+- `PullToRefreshIndicator.tsx` — Complete rewrite with branded SVG animation
+- `OnboardingTour.tsx` — Mobile-specific tour steps and touch-friendly UI
+- `OfflineIndicator.tsx` — Repositioned to top-center pill toast
+- `InstallPrompt.tsx` — Repositioned to avoid tab bar overlap
+- `BudgetsPage.tsx` / `BudgetList.tsx` — Replaced `window.confirm` with `useConfirmDialog`
+
+### Fixed
+- `TransactionList.test.tsx` — Updated 3 tests to match new direct-delete behavior (parent handles undo toast instead of `window.confirm`)
+
 ## [1.5.0] - 2026-02-12
 
 ### Added

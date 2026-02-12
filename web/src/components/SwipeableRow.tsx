@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { useHaptics } from '../hooks/useHaptics';
 
 interface SwipeableRowProps {
   children: React.ReactNode;
@@ -35,6 +36,8 @@ export function SwipeableRow({
   const [startX, setStartX] = useState<number | null>(null);
   const [currentX, setCurrentX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const haptics = useHaptics();
+  const hasVibratedThreshold = useRef(false);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (disabled) return;
@@ -59,24 +62,35 @@ export function SwipeableRow({
     // Only allow swipe in enabled directions
     if (diff > 0 && !onSwipeRight) return;
     if (diff < 0 && !onSwipeLeft) return;
+
+    // Haptic feedback when crossing the threshold
+    if (Math.abs(clampedDiff) >= threshold && !hasVibratedThreshold.current) {
+      haptics.medium();
+      hasVibratedThreshold.current = true;
+    } else if (Math.abs(clampedDiff) < threshold) {
+      hasVibratedThreshold.current = false;
+    }
     
     setCurrentX(clampedDiff);
-  }, [startX, isDragging, disabled, onSwipeRight, onSwipeLeft]);
+  }, [startX, isDragging, disabled, onSwipeRight, onSwipeLeft, threshold, haptics]);
 
   const handleTouchEnd = useCallback(() => {
     if (!isDragging) return;
     
     if (currentX > threshold && onSwipeRight) {
+      haptics.heavy();
       onSwipeRight();
     } else if (currentX < -threshold && onSwipeLeft) {
+      haptics.heavy();
       onSwipeLeft();
     }
     
     // Reset
+    hasVibratedThreshold.current = false;
     setStartX(null);
     setCurrentX(0);
     setIsDragging(false);
-  }, [currentX, threshold, isDragging, onSwipeRight, onSwipeLeft]);
+  }, [currentX, threshold, isDragging, onSwipeRight, onSwipeLeft, haptics]);
 
   // Handle touch cancel
   const handleTouchCancel = useCallback(() => {

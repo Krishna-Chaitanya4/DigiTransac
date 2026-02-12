@@ -86,7 +86,7 @@ export default function InstallPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4">
+    <div className="fixed bottom-20 lg:bottom-4 right-4 z-50 max-w-sm bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0">
           <img src="/icons/icon-72x72.png" alt="DigiTransac" className="w-12 h-12 rounded-lg" />

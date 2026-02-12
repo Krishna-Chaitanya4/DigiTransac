@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useHaptics } from './useHaptics';
 
 interface PullToRefreshOptions {
   /** Callback to execute when pull threshold is reached */
@@ -46,6 +47,8 @@ export function usePullToRefresh({
   const containerRef = useRef<HTMLDivElement>(null);
   const startY = useRef<number>(0);
   const currentY = useRef<number>(0);
+  const hasVibratedThreshold = useRef(false);
+  const haptics = useHaptics();
   
   const [state, setState] = useState<PullToRefreshState>({
     isPulling: false,
@@ -94,12 +97,20 @@ export function usePullToRefresh({
     const resistance = 0.5;
     const pullDistance = Math.min(deltaY * resistance, maxPull);
     
+    // Haptic feedback when crossing threshold
+    if (pullDistance >= threshold && !hasVibratedThreshold.current) {
+      haptics.light();
+      hasVibratedThreshold.current = true;
+    } else if (pullDistance < threshold) {
+      hasVibratedThreshold.current = false;
+    }
+
     if (pullDistance > 10) {
       // Prevent scrolling while pulling
       e.preventDefault();
       setState(s => ({ ...s, isPulling: true, pullDistance }));
     }
-  }, [enabled, maxPull, state.isRefreshing]);
+  }, [enabled, maxPull, state.isRefreshing, threshold, haptics]);
 
   const handleTouchEnd = useCallback(async () => {
     if (!enabled || state.isRefreshing) return;
@@ -113,6 +124,8 @@ export function usePullToRefresh({
     
     if (state.pullDistance >= threshold) {
       // Trigger refresh
+      haptics.success();
+      hasVibratedThreshold.current = false;
       setState(s => ({ ...s, isPulling: false, pullDistance: threshold, isRefreshing: true }));
       
       try {
@@ -122,9 +135,10 @@ export function usePullToRefresh({
       }
     } else {
       // Didn't reach threshold, spring back
+      hasVibratedThreshold.current = false;
       setState({ isPulling: false, pullDistance: 0, isRefreshing: false });
     }
-  }, [enabled, onRefresh, state.isPulling, state.pullDistance, state.isRefreshing, threshold]);
+  }, [enabled, onRefresh, state.isPulling, state.pullDistance, state.isRefreshing, threshold, haptics]);
 
   useEffect(() => {
     const container = containerRef.current;

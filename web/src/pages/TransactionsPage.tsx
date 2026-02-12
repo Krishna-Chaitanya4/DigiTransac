@@ -1,8 +1,10 @@
 ﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
 import { AddTransactionSheet } from '../components/AddTransactionSheet';
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog';
 import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
 import { PendingIndicator } from '../components/PendingIndicator';
@@ -55,6 +57,8 @@ export default function TransactionsPage() {
   
   // Navigation for View in Chat
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMobile = useIsMobile();
   
   // React Query hooks for data fetching
   const { data: accounts = [], isLoading: isLoadingAccounts, error: accountsError } = useAccounts();
@@ -79,6 +83,9 @@ export default function TransactionsPage() {
   // Toast notifications
   const { showInfo, toasts, dismissToast } = useToast();
   
+  // Confirm dialog for batch operations
+  const { confirm, dialogProps: confirmDialogProps } = useConfirmDialog();
+  
   // Conversations for contact picker in AddTransactionSheet
   const { data: conversationsData } = useConversations();
   const conversations = conversationsData?.conversations ?? [];
@@ -86,7 +93,10 @@ export default function TransactionsPage() {
   // UI state
   const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(
+    // Open add sheet if navigated from bottom tab bar
+    !!(location.state as { openAddSheet?: boolean } | null)?.openAddSheet
+  );
   const [addSheetMode, setAddSheetMode] = useState<'dropdown' | 'modal'>('dropdown');
   const [pendingRefreshTrigger, setPendingRefreshTrigger] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -577,9 +587,13 @@ export default function TransactionsPage() {
 
   // Batch operations
   const handleBatchDelete = async () => {
-    if (!confirm(`Delete ${selectionCount} transaction${selectionCount > 1 ? 's' : ''}?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete transactions?',
+      message: `This will permanently delete ${selectionCount} transaction${selectionCount > 1 ? 's' : ''}. This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     
     setIsBatchProcessing(true);
     try {
@@ -633,7 +647,7 @@ export default function TransactionsPage() {
     }
   };
 
-  // Export
+  // Export — uses Web Share API on mobile (for sharing files), fallback to direct download
   const handleExport = async (format: 'csv' | 'json') => {
     try {
       const dateRange = getDateRange();
@@ -648,15 +662,32 @@ export default function TransactionsPage() {
       
       const data = await exportTransactions(exportFilter, format);
       
-      // Create download
-      const blob = format === 'csv' 
-        ? new Blob([data as string], { type: 'text/csv' })
-        : new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const mimeType = format === 'csv' ? 'text/csv' : 'application/json';
+      const content = format === 'csv' ? (data as string) : JSON.stringify(data, null, 2);
+      const blob = new Blob([content], { type: mimeType });
+      const fileName = `transactions-${new Date().toISOString().split('T')[0]}.${format}`;
       
+      // Try Web Share API on mobile (supports file sharing)
+      if (isMobile && navigator.share && navigator.canShare) {
+        const file = new File([blob], fileName, { type: mimeType });
+        const shareData = { files: [file], title: 'Transactions Export' };
+        
+        if (navigator.canShare(shareData)) {
+          try {
+            await navigator.share(shareData);
+            return; // Successfully shared
+          } catch (shareErr) {
+            // User cancelled or share failed — fall through to download
+            if ((shareErr as DOMException).name === 'AbortError') return;
+          }
+        }
+      }
+      
+      // Fallback: direct download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `transactions-${new Date().toISOString().split('T')[0]}.${format}`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -666,6 +697,9 @@ export default function TransactionsPage() {
       setLocalError('Failed to export transactions. Please try again.');
     }
   };
+  
+  // Mobile export bottom sheet state
+  const [showMobileExportSheet, setShowMobileExportSheet] = useState(false);
 
   // Close form
   const handleCloseForm = () => {
@@ -696,6 +730,22 @@ export default function TransactionsPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
           Transactions
         </h1>
+        
+        {/* Mobile export button */}
+        <div className="flex sm:hidden items-center gap-2">
+          <button
+            onClick={() => setShowMobileExportSheet(true)}
+            className="flex items-center justify-center w-10 h-10 min-w-[44px] min-h-[44px] rounded-lg border border-gray-300 dark:border-gray-600
+              text-gray-700 dark:text-gray-300 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+            aria-label="Export transactions"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+        </div>
+        
         <div className="hidden sm:flex items-center gap-2">
           {/* Export dropdown */}
           <div className="relative group">
@@ -783,7 +833,7 @@ export default function TransactionsPage() {
           <button
             key={preset}
             onClick={() => handleDatePresetChange(preset)}
-            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+            className={`px-3 py-2 lg:py-1.5 min-h-[44px] lg:min-h-0 text-sm rounded-lg border transition-colors touch-manipulation ${
               datePreset === preset
                 ? 'bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white border-blue-600 dark:border-blue-900'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-500 hover:border-blue-400 dark:hover:border-blue-400'
@@ -857,7 +907,7 @@ export default function TransactionsPage() {
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search title, category, tag, account, city... (press / to focus)"
+            placeholder={isMobile ? "Search transactions..." : "Search title, category, tag, account, city... (press / to focus)"}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
@@ -868,7 +918,8 @@ export default function TransactionsPage() {
           {searchText && (
             <button
               onClick={() => setSearchText('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-1 top-1/2 -translate-y-1/2 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 touch-manipulation"
+              aria-label="Clear search"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -878,7 +929,7 @@ export default function TransactionsPage() {
         </div>
         <button
           onClick={() => setIsFilterOpen(!isFilterOpen)}
-          className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 min-h-[44px] border rounded-lg transition-colors touch-manipulation ${
             isFilterOpen || activeFilterCount > 0
               ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
               : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400'
@@ -966,22 +1017,6 @@ export default function TransactionsPage() {
         isProcessing={isBatchProcessing}
       />
 
-      {/* Floating Action Button (Mobile) */}
-      {!hasSelection && (
-        <button
-          onClick={() => {
-            setAddSheetMode('modal');
-            setIsAddSheetOpen(true);
-          }}
-          className="sm:hidden fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-full
-            shadow-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 transition-colors flex items-center justify-center z-40"
-        >
-          <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-      )}
-
       {/* Transaction Form Modal */}
       <TransactionForm
         isOpen={isFormOpen}
@@ -1018,6 +1053,62 @@ export default function TransactionsPage() {
       
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      
+      {/* Confirm dialog for batch operations */}
+      <ConfirmDialog {...confirmDialogProps} />
+      
+      {/* Mobile Export Bottom Sheet */}
+      {showMobileExportSheet && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-40 animate-fade-in"
+            onClick={() => setShowMobileExportSheet(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl animate-slide-up safe-area-bottom">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+            </div>
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Export Transactions</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Choose a format to export</p>
+            </div>
+            <div className="py-2">
+              <button
+                onClick={() => { setShowMobileExportSheet(false); handleExport('csv'); }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-left text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+              >
+                <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <div>
+                  <span className="text-base font-medium">CSV Spreadsheet</span>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Best for Excel, Google Sheets</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowMobileExportSheet(false); handleExport('json'); }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-left text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+              >
+                <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                </svg>
+                <div>
+                  <span className="text-base font-medium">JSON Data</span>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Best for backup, developers</p>
+                </div>
+              </button>
+            </div>
+            <div className="px-4 pb-4 pt-1">
+              <button
+                onClick={() => setShowMobileExportSheet(false)}
+                className="w-full py-3 min-h-[48px] text-center text-base font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-xl active:bg-gray-200 dark:active:bg-gray-600 touch-manipulation"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

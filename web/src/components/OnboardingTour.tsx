@@ -1,11 +1,15 @@
 /**
  * Onboarding Tour Component
- * 
+ *
  * A step-by-step guide for first-time users to learn the app's features.
  * Uses local storage to track completion and only shows once.
+ *
+ * On mobile, shows a full-screen card-based tour (bottom tab bar replaces sidebar)
+ * with safe area awareness and touch-friendly buttons.
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 interface TourStep {
   id: string;
@@ -16,7 +20,7 @@ interface TourStep {
   emoji?: string;
 }
 
-const tourSteps: TourStep[] = [
+const desktopTourSteps: TourStep[] = [
   {
     id: 'welcome',
     title: 'Welcome to DigiTransac! 🎉',
@@ -80,6 +84,52 @@ const tourSteps: TourStep[] = [
   },
 ];
 
+/** Mobile-specific tour — no element targets (uses bottom tab bar), touch-friendly cards */
+const mobileTourSteps: TourStep[] = [
+  {
+    id: 'welcome',
+    title: 'Welcome to DigiTransac!',
+    content: 'Let\'s take a quick tour to help you get started with managing your finances on the go.',
+    position: 'center',
+    emoji: '👋',
+  },
+  {
+    id: 'tab-bar',
+    title: 'Bottom Navigation',
+    content: 'Use the tab bar at the bottom to switch between Insights, Accounts, and Transactions. Tap the + button to add new transactions.',
+    position: 'center',
+    emoji: '📱',
+  },
+  {
+    id: 'more-menu',
+    title: 'More Features',
+    content: 'Tap "More" in the tab bar to access Budgets, Chats, Map, Labels, and Settings.',
+    position: 'center',
+    emoji: '📋',
+  },
+  {
+    id: 'swipe-gestures',
+    title: 'Swipe Gestures',
+    content: 'Swipe right on a transaction to change its status, or swipe left to delete. Long-press for quick actions.',
+    position: 'center',
+    emoji: '👆',
+  },
+  {
+    id: 'pull-refresh',
+    title: 'Pull to Refresh',
+    content: 'Pull down from the top of any list to refresh your data.',
+    position: 'center',
+    emoji: '🔄',
+  },
+  {
+    id: 'complete',
+    title: 'You\'re All Set!',
+    content: 'Start tracking your finances today. Swipe between tabs and explore!',
+    position: 'center',
+    emoji: '🚀',
+  },
+];
+
 const TOUR_STORAGE_KEY = 'digitransac_tour_completed';
 const TOUR_VERSION = '1'; // Increment to show tour again after major updates
 
@@ -92,7 +142,9 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
   const [isVisible, setIsVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
+  const isMobile = useIsMobile();
 
+  const tourSteps = isMobile ? mobileTourSteps : desktopTourSteps;
   const currentTourStep = tourSteps[currentStep];
 
   // Check if tour should be shown
@@ -138,7 +190,7 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
     } else {
       handleComplete();
     }
-  }, [currentStep, handleComplete]);
+  }, [currentStep, tourSteps.length, handleComplete]);
 
   const handlePrevious = useCallback(() => {
     if (currentStep > 0) {
@@ -174,14 +226,16 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
   const isLastStep = currentStep === tourSteps.length - 1;
   const progress = ((currentStep + 1) / tourSteps.length) * 100;
 
-  // Calculate tooltip position
+  // Calculate tooltip position — on mobile, always center with bottom tab bar clearance
   const getTooltipStyles = () => {
-    if (currentTourStep.position === 'center' || !highlightRect) {
+    if (isMobile || currentTourStep.position === 'center' || !highlightRect) {
       return {
         position: 'fixed' as const,
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
+        // On mobile, ensure card doesn't overlap with bottom tab bar
+        ...(isMobile ? { maxHeight: 'calc(100vh - 10rem)' } : {}),
       };
     }
 
@@ -263,13 +317,13 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
             {currentTourStep.content}
           </p>
 
-          {/* Navigation */}
+          {/* Navigation — touch-friendly on mobile */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {!isFirstStep && (
                 <button
                   onClick={handlePrevious}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  className="px-4 py-2.5 min-h-[44px] text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 touch-manipulation"
                 >
                   ← Back
                 </button>
@@ -277,7 +331,7 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
               {!isLastStep && (
                 <button
                   onClick={handleSkip}
-                  className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="px-4 py-2.5 min-h-[44px] text-sm font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation"
                 >
                   Skip tour
                 </button>
@@ -286,7 +340,7 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
 
             <button
               onClick={handleNext}
-              className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all"
+              className="px-6 py-2.5 min-h-[44px] bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all touch-manipulation active:scale-95"
             >
               {isLastStep ? 'Get Started' : 'Next →'}
             </button>

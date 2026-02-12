@@ -310,6 +310,7 @@ html.dark {
   button:not(.print-button),
   .mobile-nav,
   .sidebar,
+  .bottom-tab-bar,
   .fab,
   .toast,
   .modal-backdrop,

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import {
   useBudgets,
@@ -215,6 +216,7 @@ export default function BudgetsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [filter, setFilter] = useState<BudgetFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const { confirm, dialogProps: confirmDialogProps } = useConfirmDialog();
 
   const budgets = budgetSummary?.budgets ?? [];
   const activeBudgets = budgetSummary?.activeBudgets ?? 0;
@@ -263,15 +265,19 @@ export default function BudgetsPage() {
   }, []);
 
   const handleDelete = useCallback(async (budgetId: string) => {
-    if (!confirm('Are you sure you want to delete this budget?')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete budget?',
+      message: 'Are you sure you want to delete this budget? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await deleteBudget.mutateAsync(budgetId);
     } catch (err) {
       console.error('Failed to delete budget:', err);
     }
-  }, [deleteBudget]);
+  }, [deleteBudget, confirm]);
 
   const handleFormSubmit = useCallback(async (data: CreateBudgetRequest | UpdateBudgetRequest) => {
     setFormError(null);
@@ -480,6 +486,8 @@ export default function BudgetsPage() {
         isLoading={createBudget.isPending || updateBudget.isPending}
         error={formError}
       />
+      {/* Confirm dialog */}
+      <ConfirmDialog {...confirmDialogProps} />
     </PullToRefreshContainer>
   );
 }

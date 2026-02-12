@@ -1,4 +1,4 @@
-import { useState, memo, useMemo, useCallback } from 'react';
+import { useState, memo, useMemo, useCallback, useRef } from 'react';
 import type { Transaction, TransactionUIType } from '../types/transactions';
 import type { Account } from '../services/accountService';
 import type { Label, Tag } from '../types/labels';
@@ -7,6 +7,8 @@ import { formatAmount } from '../utils/formatters';
 import { isLabelEffectivelyExcluded, isTransactionExcluded } from '../utils/labelExclusion';
 import { SwipeableRow, SwipeActionIcon } from './SwipeableRow';
 import { useCurrency } from '../context/CurrencyContext';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import { useHaptics } from '../hooks/useHaptics';
 
 // Memoized transaction row to prevent unnecessary re-renders
 interface TransactionRowProps {
@@ -25,6 +27,7 @@ interface TransactionRowProps {
   accountMap: Map<string, Account>;
   onToggleExpand: (id: string) => void;
   onToggleSelection?: (id: string) => void;
+  onLongPress?: (transaction: Transaction) => void;
   onUpdateStatus: (id: string, status: 'Pending' | 'Confirmed') => void;
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
@@ -50,6 +53,7 @@ const TransactionRow = memo(function TransactionRow({
   accountMap,
   onToggleExpand,
   onToggleSelection,
+  onLongPress,
   onUpdateStatus,
   onEdit,
   onDelete,
@@ -72,9 +76,7 @@ const TransactionRow = memo(function TransactionRow({
       handleClick();
     } else if (e.key === 'Delete' && !selectionMode) {
       e.preventDefault();
-      if (confirm('Delete this transaction?')) {
-        onDelete(transaction.id);
-      }
+      onDelete(transaction.id);
     }
   }, [handleClick, selectionMode, onDelete, transaction.id]);
 
@@ -84,6 +86,57 @@ const TransactionRow = memo(function TransactionRow({
       onToggleSelection(transaction.id);
     }
   }, [onToggleSelection, selectionMode, transaction.id]);
+
+  // Long press handler for mobile quick actions
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!onLongPress || selectionMode) return;
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    longPressTriggered.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      onLongPress(transaction);
+    }, 500);
+  }, [onLongPress, selectionMode, transaction]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartPos.current) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPos.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPos.current.y);
+    if (dx > 10 || dy > 10) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      touchStartPos.current = null;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchStartPos.current = null;
+    if (longPressTriggered.current) {
+      e.preventDefault();
+      longPressTriggered.current = false;
+    }
+  }, []);
+
+  const handleTouchCancel = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchStartPos.current = null;
+    longPressTriggered.current = false;
+  }, []);
 
   const handleUpdateStatus = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -103,9 +156,7 @@ const TransactionRow = memo(function TransactionRow({
 
   const handleDelete = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Delete this transaction?')) {
-      onDelete(transaction.id);
-    }
+    onDelete(transaction.id);
   }, [onDelete, transaction.id]);
 
   const handleViewInChat = useCallback((e: React.MouseEvent) => {
@@ -119,9 +170,7 @@ const TransactionRow = memo(function TransactionRow({
   }, [onUpdateStatus, transaction.id, transaction.status]);
 
   const handleSwipeLeft = useCallback(() => {
-    if (confirm('Delete this transaction?')) {
-      onDelete(transaction.id);
-    }
+    onDelete(transaction.id);
   }, [onDelete, transaction.id]);
 
   const isConfirmed = transaction.status === 'Confirmed';
@@ -166,6 +215,10 @@ const TransactionRow = memo(function TransactionRow({
           onClick={handleClick}
           onKeyDown={handleKeyDown}
           onContextMenu={handleContextMenu}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
         >
           {/* Selection Checkbox (shown in selection mode) */}
           {selectionMode && (
@@ -385,35 +438,35 @@ const TransactionRow = memo(function TransactionRow({
             )}
             
             {/* Actions */}
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               {isConfirmed ? (
                 /* Confirmed transaction actions */
                 <>
                   <button
                     onClick={handleUpdateStatus}
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 
-                      text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex-1 px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-gray-300 dark:border-gray-600
+                      text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation"
                   >
                     ↩ Mark Pending
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onDecline?.(transaction.id); }}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-orange-300 dark:border-orange-700 
-                      text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-orange-300 dark:border-orange-700
+                      text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors touch-manipulation"
                   >
                     ✗ Decline
                   </button>
                   <button
                     onClick={handleEdit}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 
-                      text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-blue-300 dark:border-blue-700
+                      text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 touch-manipulation"
                   >
                     Edit
                   </button>
                   <button
                     onClick={handleDelete}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 
-                      text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-red-300 dark:border-red-700
+                      text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 touch-manipulation"
                   >
                     Delete
                   </button>
@@ -423,29 +476,29 @@ const TransactionRow = memo(function TransactionRow({
                 <>
                   <button
                     onClick={handleUpdateStatus}
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-green-300 dark:border-green-700 
-                      text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                    className="flex-1 px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-green-300 dark:border-green-700
+                      text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors touch-manipulation"
                   >
                     ✓ Confirm
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onDecline?.(transaction.id); }}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-orange-300 dark:border-orange-700 
-                      text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-orange-300 dark:border-orange-700
+                      text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors touch-manipulation"
                   >
                     ✗ Decline
                   </button>
                   <button
                     onClick={handleEdit}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 
-                      text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-blue-300 dark:border-blue-700
+                      text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 touch-manipulation"
                   >
                     Edit
                   </button>
                   <button
                     onClick={handleDelete}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 
-                      text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-red-300 dark:border-red-700
+                      text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 touch-manipulation"
                   >
                     Delete
                   </button>
@@ -455,29 +508,29 @@ const TransactionRow = memo(function TransactionRow({
                 <>
                   <button
                     onClick={handleUpdateStatus}
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-green-300 dark:border-green-700 
-                      text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                    className="flex-1 px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-green-300 dark:border-green-700
+                      text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors touch-manipulation"
                   >
                     ✓ Confirm
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onUpdateStatus(transaction.id, 'Pending'); }}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 
-                      text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-gray-300 dark:border-gray-600
+                      text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation"
                   >
                     ↩ Mark Pending
                   </button>
                   <button
                     onClick={handleEdit}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-blue-300 dark:border-blue-700 
-                      text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-blue-300 dark:border-blue-700
+                      text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 touch-manipulation"
                   >
                     Edit
                   </button>
                   <button
                     onClick={handleDelete}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 
-                      text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-red-300 dark:border-red-700
+                      text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 touch-manipulation"
                   >
                     Delete
                   </button>
@@ -487,8 +540,8 @@ const TransactionRow = memo(function TransactionRow({
               {transaction.chatMessageId && onViewInChat && (
                 <button
                   onClick={handleViewInChat}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-purple-300 dark:border-purple-700 
-                    text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                  className="px-3 py-2.5 min-h-[44px] text-sm rounded-lg border border-purple-300 dark:border-purple-700
+                    text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors touch-manipulation"
                   title="View this transaction in chat"
                 >
                   💬 Chat
@@ -629,6 +682,9 @@ export function TransactionList({
   onToggleSelection,
 }: TransactionListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [longPressTransaction, setLongPressTransaction] = useState<Transaction | null>(null);
+  const isMobile = useIsMobile();
+  const haptics = useHaptics();
   const { formatWithConversion, primaryCurrency, convert } = useCurrency();
   
   // Memoize lookup maps to prevent recreation on every render
@@ -649,6 +705,12 @@ export function TransactionList({
   const handleToggleExpand = useCallback((id: string) => {
     setExpandedId(prev => prev === id ? null : id);
   }, []);
+
+  // Long press handler — shows quick action bottom sheet on mobile
+  const handleLongPress = useCallback((transaction: Transaction) => {
+    haptics.heavy();
+    setLongPressTransaction(transaction);
+  }, [haptics]);
 
   // Calculate daily totals (excluding transactions whose labels are all excluded from calculations)
   const dailyTotals = useMemo(() => {
@@ -774,6 +836,7 @@ export function TransactionList({
                     accountMap={accountMap}
                     onToggleExpand={handleToggleExpand}
                     onToggleSelection={onToggleSelection}
+                    onLongPress={isMobile ? handleLongPress : undefined}
                     onUpdateStatus={onUpdateStatus}
                     onEdit={onEdit}
                     onDelete={onDelete}
@@ -788,6 +851,109 @@ export function TransactionList({
           </div>
         );
       })}
+
+      {/* Long-press Quick Action Bottom Sheet (mobile only) */}
+      {longPressTransaction && isMobile && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-40 animate-fade-in"
+            onClick={() => setLongPressTransaction(null)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl animate-slide-up safe-area-bottom">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+            </div>
+            {/* Transaction info header */}
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
+                  style={{ backgroundColor: (labelMap.get(longPressTransaction.splits[0]?.labelId)?.color || '#6B7280') + '20' }}
+                >
+                  {labelMap.get(longPressTransaction.splits[0]?.labelId)?.icon || '📝'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {longPressTransaction.title || labelMap.get(longPressTransaction.splits[0]?.labelId)?.name || 'Transaction'}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {getCurrencySymbol(longPressTransaction.currency)}{formatAmount(longPressTransaction.amount, longPressTransaction.currency)}
+                    {' · '}{longPressTransaction.status}
+                  </p>
+                </div>
+              </div>
+            </div>
+            {/* Quick actions */}
+            <div className="py-2">
+              <button
+                onClick={() => {
+                  setLongPressTransaction(null);
+                  onEdit(longPressTransaction);
+                }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-left text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+              >
+                <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                </svg>
+                <span className="text-base font-medium">Edit</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLongPressTransaction(null);
+                  const newStatus = longPressTransaction.status === 'Confirmed' ? 'Pending' : 'Confirmed';
+                  onUpdateStatus(longPressTransaction.id, newStatus as 'Pending' | 'Confirmed');
+                }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-left text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+              >
+                <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  {longPressTransaction.status === 'Confirmed' ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  )}
+                </svg>
+                <span className="text-base font-medium">
+                  {longPressTransaction.status === 'Confirmed' ? 'Mark Pending' : 'Confirm'}
+                </span>
+              </button>
+              {onToggleSelection && (
+                <button
+                  onClick={() => {
+                    setLongPressTransaction(null);
+                    onToggleSelection(longPressTransaction.id);
+                  }}
+                  className="w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-left text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+                >
+                  <svg className="w-5 h-5 text-indigo-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  <span className="text-base font-medium">Select</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setLongPressTransaction(null);
+                  onDelete(longPressTransaction.id);
+                }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-left text-red-600 dark:text-red-400 active:bg-red-50 dark:active:bg-red-900/20 touch-manipulation"
+              >
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+                <span className="text-base font-medium">Delete</span>
+              </button>
+            </div>
+            <div className="px-4 pb-4 pt-1">
+              <button
+                onClick={() => setLongPressTransaction(null)}
+                className="w-full py-3 min-h-[48px] text-center text-base font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-xl active:bg-gray-200 dark:active:bg-gray-600 touch-manipulation"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

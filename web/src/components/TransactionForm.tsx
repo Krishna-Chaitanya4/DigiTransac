@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
 import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
@@ -12,6 +12,8 @@ import {
 } from './transaction-form';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useCurrency } from '../context/CurrencyContext';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import { useHaptics } from '../hooks/useHaptics';
 import { getCurrentPosition, reverseGeocode } from '../services/locationService';
 import { logger } from '../services/logger';
 import type {
@@ -440,10 +442,334 @@ export function TransactionForm({
     }
   };
 
+  // ──────────── Mobile Wizard State ────────────
+  const isMobile = useIsMobile();
+  const haptics = useHaptics();
+  const [wizardStep, setWizardStep] = useState(0);
+
+  // Reset wizard step when form opens
+  useEffect(() => {
+    if (isOpen) setWizardStep(0);
+  }, [isOpen]);
+
+  // Wizard step definitions
+  const WIZARD_STEPS = useMemo(() => [
+    { label: 'Amount', icon: '💰' },
+    { label: 'Account', icon: '🏦' },
+    { label: 'Details', icon: '📝' },
+  ], []);
+
+  const canAdvanceStep = useMemo(() => {
+    switch (wizardStep) {
+      case 0: return amount > 0;
+      case 1: return !!accountId && (type !== 'Transfer' || !!transferToAccountId) &&
+                (type === 'Transfer' || showSplits ? splitsValid : !!selectedLabelId);
+      case 2: return true; // Details are all optional
+      default: return false;
+    }
+  }, [wizardStep, amount, accountId, type, transferToAccountId, showSplits, splitsValid, selectedLabelId]);
+
+  const handleNextStep = () => {
+    if (canAdvanceStep && wizardStep < WIZARD_STEPS.length - 1) {
+      haptics.light();
+      setWizardStep(s => s + 1);
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (wizardStep > 0) {
+      haptics.light();
+      setWizardStep(s => s - 1);
+    }
+  };
+
   if (!isOpen) return null;
 
+  // ──────────── Shared Field Renderers ────────────
+  const renderTypeSelector = () => (
+    <TransactionTypeSelector value={type} onChange={setType} showTransfer={showTransfer} />
+  );
+
+  const renderAccountSelect = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        {type === 'Transfer' ? 'From Account' : 'Account'} *
+      </label>
+      {accounts.filter(a => !a.isArchived).length === 0 ? (
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+          <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
+            You need to create an account first before adding transactions.
+          </p>
+          <a href="/accounts" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 underline">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            Create Account
+          </a>
+        </div>
+      ) : (
+        <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
+          className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+          required>
+          <option value="">Select account...</option>
+          {accounts.filter(a => !a.isArchived).map((account) => (
+            <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+
+  const renderTransferToAccount = () => type === 'Transfer' ? (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To Account *</label>
+      {accounts.filter(a => !a.isArchived && a.id !== accountId).length === 0 ? (
+        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">You need at least two accounts to transfer between them.</p>
+        </div>
+      ) : (
+        <>
+          <select value={transferToAccountId} onChange={(e) => setTransferToAccountId(e.target.value)}
+            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+            required>
+            <option value="">Select destination...</option>
+            {accounts.filter(a => !a.isArchived && a.id !== accountId).map((account) => (
+              <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>
+            ))}
+          </select>
+          {transferToAccountId && (() => {
+            const destAccount = accounts.find(a => a.id === transferToAccountId);
+            const sourceAccount = accounts.find(a => a.id === accountId);
+            const isCrossCurrency = destAccount && sourceAccount && destAccount.currency !== sourceAccount.currency;
+            return isCrossCurrency ? (
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                <span className="inline-flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+                  Amount will be converted from {sourceAccount.currency} to {destAccount.currency}
+                </span>
+              </p>
+            ) : null;
+          })()}
+        </>
+      )}
+    </div>
+  ) : null;
+
+  const renderP2PEmail = () => type === 'Send' && !hideRecipientField ? (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Recipient's Email (optional)</label>
+      <input type="email" value={counterpartyEmail} onChange={(e) => setCounterpartyEmail(e.target.value)} placeholder="friend@example.com"
+        className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base" />
+      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">If they're on DigiTransac, they'll see this transaction too</p>
+    </div>
+  ) : null;
+
+  const renderAmount = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount *</label>
+      <CalculatorInput value={amount} onChange={setAmount} currency={currencySymbol} placeholder="0.00"
+        autoFocus={!editingTransaction} expressionInput={expressionInput}
+        onExpressionInputConsumed={() => setExpressionInput(undefined)} />
+      <QuickAmountButtons amounts={[10, 20, 50, 100, 500]} onSelect={setAmount}
+        onExpressionClick={setExpressionInput} currency={currencySymbol} />
+    </div>
+  );
+
+  const renderDatePicker = () => (
+    <DatePicker label="Date *" value={date} onChange={setDate} maxDate={new Date()} />
+  );
+
+  const renderCategory = () => {
+    if (type === 'Transfer') {
+      return (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+          <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center gap-2">
+            <span>🔁</span><span>Account Transfer</span>
+            <svg className="w-4 h-4 ml-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+          </div>
+        </div>
+      );
+    }
+    if (showSplits) {
+      return (
+        <SplitCategoriesSection splits={splits} onSplitsChange={setSplits} categories={categories}
+          amount={amount} currencySymbol={currencySymbol} onCancelSplit={handleCancelSplit} />
+      );
+    }
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category *</label>
+          <button type="button" onClick={handleStartSplit} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Split transaction</button>
+        </div>
+        <SearchableCategoryDropdown value={selectedLabelId} onChange={setSelectedLabelId}
+          categories={categories} placeholder="Select category..." />
+      </div>
+    );
+  };
+
+  const renderAdvancedFields = () => (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+          placeholder="e.g., Grocery shopping" />
+      </div>
+
+      {/* Payee/Payer */}
+      {type !== 'Transfer' && !hidePayeeField && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{type === 'Send' ? 'Payee' : 'Payer'}</label>
+          <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)}
+            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+            placeholder={type === 'Send' ? 'e.g., Supermarket' : 'e.g., Employer'} />
+        </div>
+      )}
+
+      {/* Tags */}
+      <TagTokenInput tags={tags} selectedTagIds={selectedTagIds} onToggleTag={toggleTag} onCreateTag={onCreateTag} />
+
+      {/* Location */}
+      <LocationPicker location={location} onChange={handleLocationChange} autoCapture={false} />
+
+      {/* Time & Timezone */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time</label>
+          <input type="time" value={timeLocal} onChange={(e) => setTimeLocal(e.target.value)}
+            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Timezone</label>
+          <select value={dateTimezone} onChange={(e) => setDateTimezone(e.target.value)}
+            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+            {TIMEZONE_OPTIONS.map((tz) => (<option key={tz.value} value={tz.value}>{tz.label}</option>))}
+            {!TIMEZONE_OPTIONS.find(tz => tz.value === dateTimezone) && (<option value={dateTimezone}>{dateTimezone}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Recurring (only new) */}
+      {isNewTransaction && (
+        <RecurringSection isRecurring={isRecurring} onIsRecurringChange={setIsRecurring}
+          frequency={recurrenceFrequency} onFrequencyChange={setRecurrenceFrequency}
+          interval={recurrenceInterval} onIntervalChange={setRecurrenceInterval}
+          endDate={recurrenceEndDate} onEndDateChange={setRecurrenceEndDate} />
+      )}
+
+      {/* Notes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
+          className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
+          placeholder="Additional notes..." />
+      </div>
+    </div>
+  );
+
+  const renderErrorMessage = () => error ? (
+    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm mt-4">
+      {error}
+    </div>
+  ) : null;
+
+  // ──────────── Mobile Wizard Layout ────────────
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white dark:bg-gray-800 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="transaction-form-title">
+        {/* Wizard Header */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+          <button type="button" onClick={wizardStep === 0 ? onClose : handlePrevStep}
+            className="flex items-center gap-1 p-2 -ml-2 min-h-[44px] min-w-[44px] text-gray-600 dark:text-gray-400 touch-manipulation"
+            aria-label={wizardStep === 0 ? 'Close' : 'Back'}>
+            {wizardStep === 0 ? (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+            )}
+          </button>
+          <h3 id="transaction-form-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {editingTransaction ? 'Edit Transaction' : 'New Transaction'}
+          </h3>
+          <div className="w-10" /> {/* Spacer for centering */}
+        </div>
+
+        {/* Step Indicators */}
+        <div className="flex items-center justify-center gap-2 px-4 py-3">
+          {WIZARD_STEPS.map((step, i) => (
+            <button key={i} type="button" onClick={() => { if (i < wizardStep) { haptics.selection(); setWizardStep(i); } }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
+                i === wizardStep
+                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                  : i < wizardStep
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 cursor-pointer'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
+              }`}
+              disabled={i > wizardStep}
+              aria-current={i === wizardStep ? 'step' : undefined}>
+              <span>{step.icon}</span>
+              <span>{step.label}</span>
+              {i < wizardStep && (
+                <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Step Content — scrollable */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="space-y-4 pt-2">
+              {/* Step 0: Type & Amount */}
+              {wizardStep === 0 && (
+                <>
+                  {renderTypeSelector()}
+                  {renderAmount()}
+                  {renderDatePicker()}
+                </>
+              )}
+
+              {/* Step 1: Account & Category */}
+              {wizardStep === 1 && (
+                <>
+                  {renderAccountSelect()}
+                  {renderTransferToAccount()}
+                  {renderP2PEmail()}
+                  {renderCategory()}
+                </>
+              )}
+
+              {/* Step 2: Details (optional) */}
+              {wizardStep === 2 && renderAdvancedFields()}
+            </div>
+            {renderErrorMessage()}
+          </div>
+
+          {/* Bottom Actions — fixed at bottom */}
+          <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 safe-area-bottom bg-white dark:bg-gray-800">
+            {wizardStep < WIZARD_STEPS.length - 1 ? (
+              <button type="button" onClick={handleNextStep} disabled={!canAdvanceStep}
+                className="w-full py-3.5 min-h-[48px] rounded-xl font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation transition-opacity">
+                Next: {WIZARD_STEPS[wizardStep + 1].label}
+              </button>
+            ) : (
+              <button type="submit"
+                disabled={isLoading || amount <= 0 || !accountId ||
+                  (type === 'Transfer' ? !transferToAccountId : ((!showSplits && !selectedLabelId) || (showSplits && !splitsValid)))}
+                className="w-full py-3.5 min-h-[48px] rounded-xl font-medium text-white bg-gradient-to-br from-green-600 to-green-700 dark:from-green-700 dark:to-green-800 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation transition-opacity">
+                {isLoading ? 'Saving...' : editingTransaction ? 'Update Transaction' : '✓ Add Transaction'}
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // ──────────── Desktop Modal Layout (Unchanged) ────────────
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 overflow-y-auto"
       role="dialog"
       aria-modal="true"
@@ -451,7 +777,7 @@ export function TransactionForm({
     >
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/30 dark:bg-black/50" onClick={onClose} aria-hidden="true" />
-        <div 
+        <div
           ref={modalRef}
           className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
           onKeyDown={(e) => e.key === 'Escape' && onClose()}
@@ -474,203 +800,13 @@ export function TransactionForm({
 
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
-              {/* Transaction Type */}
-              <TransactionTypeSelector value={type} onChange={setType} showTransfer={showTransfer} />
-
-              {/* Account Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {type === 'Transfer' ? 'From Account' : 'Account'} *
-                </label>
-                {accounts.filter(a => !a.isArchived).length === 0 ? (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
-                      You need to create an account first before adding transactions.
-                    </p>
-                    <a
-                      href="/accounts"
-                      className="inline-flex items-center gap-1 text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 underline"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                      Create Account
-                    </a>
-                  </div>
-                ) : (
-                  <select
-                    value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select account...</option>
-                    {accounts.filter(a => !a.isArchived).map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name} ({account.currency})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Transfer: To Account selector */}
-              {type === 'Transfer' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    To Account *
-                  </label>
-                  {accounts.filter(a => !a.isArchived && a.id !== accountId).length === 0 ? (
-                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                        You need at least two accounts to transfer between them. 
-                        Create another account first.
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <select
-                        value={transferToAccountId}
-                        onChange={(e) => setTransferToAccountId(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Select destination...</option>
-                        {accounts.filter(a => !a.isArchived && a.id !== accountId).map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.name} ({account.currency})
-                          </option>
-                        ))}
-                      </select>
-                      {/* Currency conversion info */}
-                      {transferToAccountId && (() => {
-                        const destAccount = accounts.find(a => a.id === transferToAccountId);
-                        const sourceAccount = accounts.find(a => a.id === accountId);
-                        const isCrossCurrency = destAccount && sourceAccount && destAccount.currency !== sourceAccount.currency;
-                        return isCrossCurrency ? (
-                          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            <span className="inline-flex items-center gap-1">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                              </svg>
-                              Amount will be converted from {sourceAccount.currency} to {destAccount.currency}
-                            </span>
-                          </p>
-                        ) : null;
-                      })()}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* P2P: Counterparty email (only for Send - sender initiates P2P) */}
-              {/* Hidden when in chat context (hideRecipientField=true) since recipient is the conversation partner */}
-              {type === 'Send' && !hideRecipientField && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Recipient's Email (optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={counterpartyEmail}
-                    onChange={(e) => setCounterpartyEmail(e.target.value)}
-                    placeholder="friend@example.com"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    If they're on DigiTransac, they'll see this transaction too
-                  </p>
-                </div>
-              )}
-
-              {/* Amount */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Amount *
-                </label>
-                <CalculatorInput
-                  value={amount}
-                  onChange={setAmount}
-                  currency={currencySymbol}
-                  placeholder="0.00"
-                  autoFocus={!editingTransaction}
-                  expressionInput={expressionInput}
-                  onExpressionInputConsumed={() => setExpressionInput(undefined)}
-                />
-                <QuickAmountButtons
-                  amounts={[10, 20, 50, 100, 500]}
-                  onSelect={setAmount}
-                  onExpressionClick={setExpressionInput}
-                  currency={currencySymbol}
-                />
-              </div>
-
-              {/* Date */}
-              <DatePicker
-                label="Date *"
-                value={date}
-                onChange={setDate}
-                maxDate={new Date()}
-              />
-
-              {/* Category (Single Mode) - Hidden for self-transfers */}
-              {!showSplits && type !== 'Transfer' && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Category *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleStartSplit}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      Split transaction
-                    </button>
-                  </div>
-                  <SearchableCategoryDropdown
-                    value={selectedLabelId}
-                    onChange={setSelectedLabelId}
-                    categories={categories}
-                    placeholder="Select category..."
-                  />
-                </div>
-              )}
-
-              {/* Split Categories - Shown when user clicks "Split transaction" */}
-              {showSplits && type !== 'Transfer' && (
-                <SplitCategoriesSection
-                  splits={splits}
-                  onSplitsChange={setSplits}
-                  categories={categories}
-                  amount={amount}
-                  currencySymbol={currencySymbol}
-                  onCancelSplit={handleCancelSplit}
-                />
-              )}
-
-              {/* Category (Locked for self-transfers only) */}
-              {type === 'Transfer' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Category
-                  </label>
-                  <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg
-                    bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                    <span>🔁</span>
-                    <span>Account Transfer</span>
-                    <svg className="w-4 h-4 ml-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                    </svg>
-                  </div>
-                </div>
-              )}
+              {renderTypeSelector()}
+              {renderAccountSelect()}
+              {renderTransferToAccount()}
+              {renderP2PEmail()}
+              {renderAmount()}
+              {renderDatePicker()}
+              {renderCategory()}
 
               {/* Advanced Options Toggle */}
               <button
@@ -691,158 +827,28 @@ export function TransactionForm({
                 Advanced options
               </button>
 
-              {/* Advanced Options Section */}
-              {showAdvancedOptions && (
-                <div className="space-y-4 pt-2">
-                  {/* Title */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Title
-                    </label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., Grocery shopping"
-                    />
-                  </div>
-
-                  {/* Payee/Payer - hidden for transfers and when hidePayeeField is true */}
-                  {type !== 'Transfer' && !hidePayeeField && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        {type === 'Send' ? 'Payee' : 'Payer'}
-                      </label>
-                      <input
-                        type="text"
-                        value={payee}
-                        onChange={(e) => setPayee(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={type === 'Send' ? 'e.g., Supermarket' : 'e.g., Employer'}
-                      />
-                    </div>
-                  )}
-
-                  {/* Tags */}
-                  <TagTokenInput
-                    tags={tags}
-                    selectedTagIds={selectedTagIds}
-                    onToggleTag={toggleTag}
-                    onCreateTag={onCreateTag}
-                  />
-
-                  {/* Location */}
-                  <LocationPicker
-                    location={location}
-                    onChange={handleLocationChange}
-                    autoCapture={false}
-                  />
-
-                  {/* Time & Timezone */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Time
-                      </label>
-                      <input
-                        type="time"
-                        value={timeLocal}
-                        onChange={(e) => setTimeLocal(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Timezone
-                      </label>
-                      <select
-                        value={dateTimezone}
-                        onChange={(e) => setDateTimezone(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      >
-                        {TIMEZONE_OPTIONS.map((tz) => (
-                          <option key={tz.value} value={tz.value}>
-                            {tz.label}
-                          </option>
-                        ))}
-                        {/* Add current timezone if not in the list */}
-                        {!TIMEZONE_OPTIONS.find(tz => tz.value === dateTimezone) && (
-                          <option value={dateTimezone}>
-                            {dateTimezone}
-                          </option>
-                        )}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Recurring (only for new transactions) */}
-                  {isNewTransaction && (
-                    <RecurringSection
-                      isRecurring={isRecurring}
-                      onIsRecurringChange={setIsRecurring}
-                      frequency={recurrenceFrequency}
-                      onFrequencyChange={setRecurrenceFrequency}
-                      interval={recurrenceInterval}
-                      onIntervalChange={setRecurrenceInterval}
-                      endDate={recurrenceEndDate}
-                      onEndDateChange={setRecurrenceEndDate}
-                    />
-                  )}
-
-                  {/* Notes */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Notes
-                    </label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                      placeholder="Additional notes..."
-                    />
-                  </div>
-                </div>
-              )}
+              {showAdvancedOptions && renderAdvancedFields()}
             </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 
-                rounded-lg text-red-600 dark:text-red-400 text-sm mt-4">
-                {error}
-              </div>
-            )}
+            {renderErrorMessage()}
 
             {/* Actions */}
             <div className="flex gap-3 mt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 
+                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700
                   rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={isLoading || amount <= 0 || !accountId || 
-                  (type === 'Transfer' 
-                    ? !transferToAccountId 
+                disabled={isLoading || amount <= 0 || !accountId ||
+                  (type === 'Transfer'
+                    ? !transferToAccountId
                     : ((!showSplits && !selectedLabelId) || (showSplits && !splitsValid)))}
-                className="flex-1 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 
+                className="flex-1 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900
                   font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Saving...' : editingTransaction ? 'Update' : 'Add Transaction'}

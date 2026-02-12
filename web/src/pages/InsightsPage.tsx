@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { formatCurrency } from '../services/currencyService';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 // Helper to convert and format currency - ensures proper conversion from source to target currency
 const convertAndFormat = (
@@ -81,17 +82,50 @@ function getPreviousPeriodRange(start: Date, end: Date): { start: Date; end: Dat
   return { start: prevStart, end: prevEnd };
 }
 
-// Drag Handle Component
+// Drag Handle Component (desktop only)
 function DragHandle({ onMouseDown }: { onMouseDown?: (e: React.MouseEvent) => void }) {
   return (
     <div
-      className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+      className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors hidden lg:block"
       onMouseDown={onMouseDown}
       title="Drag to reorder"
     >
       <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
         <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
       </svg>
+    </div>
+  );
+}
+
+// Mobile Reorder Buttons (touch-friendly up/down arrows)
+function MobileReorderButtons({ onMoveUp, onMoveDown, canMoveUp, canMoveDown }: {
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1 lg:hidden">
+      <button
+        onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+        disabled={!canMoveUp}
+        className="p-1.5 rounded-md touch-manipulation transition-colors disabled:opacity-30 hover:bg-gray-200 dark:hover:bg-gray-600"
+        aria-label="Move up"
+      >
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+        disabled={!canMoveDown}
+        className="p-1.5 rounded-md touch-manipulation transition-colors disabled:opacity-30 hover:bg-gray-200 dark:hover:bg-gray-600"
+        aria-label="Move down"
+      >
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -321,6 +355,7 @@ type ViewMode = 'categorized' | 'cashflow';
 export default function InsightsPage() {
   const { user } = useAuth();
   const { primaryCurrency, convert } = useCurrency();
+  const isMobile = useIsMobile();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodPreset>('thisMonth');
   const [viewMode, setViewMode] = useState<ViewMode>('categorized');
   
@@ -430,6 +465,27 @@ export default function InsightsPage() {
   // Reset widget order
   const resetWidgetOrder = useCallback(() => {
     setWidgetOrder(DEFAULT_WIDGET_ORDER);
+  }, []);
+  
+  // Mobile reorder helpers (touch-friendly alternative to drag)
+  const moveWidgetUp = useCallback((widgetId: WidgetId) => {
+    setWidgetOrder(prev => {
+      const idx = prev.indexOf(widgetId);
+      if (idx <= 0) return prev;
+      const newOrder = [...prev];
+      [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+      return newOrder;
+    });
+  }, []);
+  
+  const moveWidgetDown = useCallback((widgetId: WidgetId) => {
+    setWidgetOrder(prev => {
+      const idx = prev.indexOf(widgetId);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const newOrder = [...prev];
+      [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+      return newOrder;
+    });
   }, []);
   
   // Custom date range state - stored as YYYY-MM-DD strings
@@ -718,13 +774,13 @@ export default function InsightsPage() {
           </p>
         </div>
         
-        {/* Period Selector */}
-        <div className="flex gap-2 flex-wrap">
+        {/* Period Selector — horizontally scrollable on mobile */}
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide lg:flex-wrap lg:overflow-x-visible lg:pb-0 lg:mx-0 lg:px-0">
           {PERIOD_OPTIONS.map((option) => (
             <button
               key={option.value}
               onClick={() => handlePeriodChange(option.value)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              className={`px-3 py-1.5 min-h-[44px] lg:min-h-0 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex-shrink-0 touch-manipulation ${
                 selectedPeriod === option.value
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -819,7 +875,7 @@ export default function InsightsPage() {
         </div>
 
         {/* Hero Stats - 3 main cards with comparison badges */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           {viewMode === 'categorized' ? (
             <>
               {/* Income */}
@@ -997,14 +1053,22 @@ export default function InsightsPage() {
       </div>
 
       {/* Reorderable Widgets */}
-      {widgetOrder.map((widgetId) => {
+      {widgetOrder.map((widgetId, widgetIndex) => {
         const dragProps = {
-          draggable: true,
+          draggable: !isMobile, // Disable HTML5 drag on touch devices
           onDragStart: handleDragStart(widgetId),
           onDragOver: handleDragOver(widgetId),
           onDragEnd: handleDragEnd,
           onDrop: handleDrop(widgetId),
           isDragOver: dragOverWidget === widgetId,
+        };
+        
+        // Mobile reorder button props
+        const mobileReorderProps = {
+          onMoveUp: () => moveWidgetUp(widgetId),
+          onMoveDown: () => moveWidgetDown(widgetId),
+          canMoveUp: widgetIndex > 0,
+          canMoveDown: widgetIndex < widgetOrder.length - 1,
         };
         
         switch (widgetId) {
@@ -1033,6 +1097,7 @@ export default function InsightsPage() {
                   }
                   headerRight={
                     <>
+                      <MobileReorderButtons {...mobileReorderProps} />
                       <DragHandle />
                       <Link
                         to="/transactions"
@@ -1364,7 +1429,7 @@ export default function InsightsPage() {
                 onToggle={toggleSection}
                 {...dragProps}
               >
-                <div className="grid grid-cols-3 gap-4 pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
                   <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <div className="text-sm text-green-600 dark:text-green-400 mb-1">Avg. Income</div>
                     <div className="text-xl font-bold text-green-700 dark:text-green-300">

@@ -496,7 +496,7 @@ describe('TransactionList', () => {
       expect(onEdit).toHaveBeenCalledWith(transaction);
     });
 
-    it('should call onDelete when Delete button is clicked and confirmed', () => {
+    it('should call onDelete when Delete button is clicked', () => {
       const onDelete = vi.fn();
       const transaction = createTransaction();
       
@@ -514,36 +514,10 @@ describe('TransactionList', () => {
       const row = screen.getByText('Test Transaction').closest('.cursor-pointer');
       fireEvent.click(row!);
       
-      // Click delete
+      // Click delete - now calls onDelete directly (parent handles undo toast)
       fireEvent.click(screen.getByText('Delete'));
       
-      expect(mockConfirm).toHaveBeenCalled();
       expect(onDelete).toHaveBeenCalledWith('tx-1');
-    });
-
-    it('should not call onDelete when delete is cancelled', () => {
-      mockConfirm.mockReturnValue(false);
-      const onDelete = vi.fn();
-      const transaction = createTransaction();
-      
-      render(
-        <TransactionList
-          {...defaultProps}
-          transactions={[transaction]}
-          accounts={[createAccount()]}
-          labels={[createLabel()]}
-          onDelete={onDelete}
-        />
-      );
-      
-      // Expand to show actions
-      const row = screen.getByText('Test Transaction').closest('.cursor-pointer');
-      fireEvent.click(row!);
-      
-      // Click delete
-      fireEvent.click(screen.getByText('Delete'));
-      
-      expect(onDelete).not.toHaveBeenCalled();
     });
 
     it('should call onUpdateStatus when Confirm button is clicked', () => {
@@ -615,7 +589,7 @@ describe('TransactionList', () => {
       expect(onUpdateStatus).toHaveBeenCalledWith('tx-1', 'Confirmed');
     });
 
-    it('should call onDelete on swipe left when confirmed', () => {
+    it('should call onDelete on swipe left', () => {
       const onDelete = vi.fn();
       const transaction = createTransaction();
       
@@ -631,7 +605,7 @@ describe('TransactionList', () => {
       
       fireEvent.click(screen.getByTestId('swipe-left'));
       
-      expect(mockConfirm).toHaveBeenCalled();
+      // Now calls onDelete directly (parent handles undo toast)
       expect(onDelete).toHaveBeenCalledWith('tx-1');
     });
   });
