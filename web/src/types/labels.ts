@@ -34,6 +34,17 @@ export interface UpdateLabelRequest {
   excludeFromAnalytics?: boolean;
 }
 
+// Usage statistics
+export interface LabelUsageStat {
+  transactionCount: number;
+  totalAmount: number;
+}
+
+export interface LabelUsageStatsResponse {
+  stats: Record<string, LabelUsageStat>;
+  currency: string;
+}
+
 // Tag types
 export interface Tag {
   id: string;

@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryClient';
-import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel, deleteLabelWithReassignment, getLabelTransactionCount } from '../services/labelService';
-import type { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
+import { getLabels, getLabelsTree, createLabel, updateLabel, deleteLabel, deleteLabelWithReassignment, getLabelTransactionCount, getLabelUsageStats } from '../services/labelService';
+import type { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest, LabelUsageStatsResponse } from '../types/labels';
 
 // Hook for fetching all labels (flat list)
 export function useLabels(): UseQueryResult<Label[], Error> {
@@ -153,6 +153,15 @@ export function useDeleteLabelWithReassignment() {
       queryClient.invalidateQueries({ queryKey: queryKeys.labels.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
     },
+  });
+}
+
+// Hook for fetching label usage statistics
+export function useLabelUsageStats(): UseQueryResult<LabelUsageStatsResponse, Error> {
+  return useQuery({
+    queryKey: queryKeys.labels.usageStats(),
+    queryFn: getLabelUsageStats,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 

@@ -23,6 +23,7 @@
 
 body {
   @apply bg-gray-50 text-gray-900 antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Dark mode body styles - applied when html has .dark class */
@@ -32,6 +33,197 @@ body {
 
 html.dark {
   color-scheme: dark;
+}
+
+/* ============================================
+   DARK MODE TRANSITION
+   Smooth color transitions when toggling theme
+   ============================================ */
+
+*,
+*::before,
+*::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Opt-out of transitions for elements where it causes flicker */
+.notransition,
+.notransition *,
+canvas,
+svg,
+img,
+video,
+input[type="color"] {
+  transition: none !important;
+}
+
+/* ============================================
+   DARK MODE SCROLLBAR
+   ============================================ */
+
+html.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* ============================================
+   MICRO-ANIMATIONS
+   ============================================ */
+
+/* Card hover lift — apply with .hover-lift */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+html.dark .hover-lift:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Stagger children — apply .stagger-children on parent */
+.stagger-children > * {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: stagger-enter 0.35s ease forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.10s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.14s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.18s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.22s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.26s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.30s; }
+.stagger-children > *:nth-child(n+9) { animation-delay: 0.34s; }
+
+@keyframes stagger-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Content enter animation — apply .animate-content-enter */
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-content-enter {
+  animation: content-enter 0.3s ease-out;
+}
+
+/* Shimmer skeleton — enhanced gradient sweep for loading placeholders */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+html.dark .animate-shimmer {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+}
+
+/* Progress bar grow animation */
+@keyframes progress-grow {
+  from {
+    width: 0%;
+  }
+}
+
+.animate-progress-grow {
+  animation: progress-grow 0.8s ease-out;
+}
+
+/* Gentle pulse for attention */
+@keyframes gentle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-gentle-pulse {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+/* Number pop — subtle scale on value change */
+@keyframes number-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-number-pop {
+  animation: number-pop 0.3s ease-out;
+}
+
+/* Wiggle — for empty state icons */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.6s ease-in-out;
+}
+
+/* Check mark draw animation */
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-check-draw {
+  stroke-dasharray: 24;
+  animation: check-draw 0.4s ease-out forwards;
 }
 
 /* Toast animation */
@@ -50,18 +242,18 @@ html.dark {
   animation: slide-in-right 0.3s ease-out;
 }
 
-/* Skeleton loading animation */
+/* Skeleton loading animation (enhanced with shimmer variant above) */
 @keyframes pulse-skeleton {
   0%, 100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.4;
   }
 }
 
 .animate-skeleton {
-  animation: pulse-skeleton 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse-skeleton 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* ============================================

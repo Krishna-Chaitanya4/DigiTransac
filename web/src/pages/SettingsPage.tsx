@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import { logger } from '../services/logger';
 import TwoFactorSettings from '../components/TwoFactorSettings';
 import PushNotificationSettings from '../components/PushNotificationSettings';
+import DataManagementSection from '../components/settings/DataManagementSection';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   getSupportedCurrencies,
@@ -515,6 +516,9 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+
+        {/* Data Management */}
+        <DataManagementSection />
 
         {/* Danger Zone */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-900 p-6">

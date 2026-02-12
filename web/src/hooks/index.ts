@@ -6,6 +6,7 @@ export {
   useTransactionAnalytics,
   usePendingCount,
   useCounterparties,
+  useRecurringTransactions,
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
@@ -46,6 +47,7 @@ export {
   useDeleteLabel,
   useDeleteLabelWithReassignment,
   useLabelTransactionCount,
+  useLabelUsageStats,
   useInvalidateLabels,
   usePrefetchLabels,
 } from './useLabelQueries';
@@ -113,6 +115,9 @@ export { useModalState, useDeleteModalState } from './useModalState';
 export { usePullToRefresh } from './usePullToRefresh';
 export { useSwipeGesture } from './useSwipeGesture';
 export { usePinchZoom } from './usePinchZoom';
+export { useTransactionTemplates } from './useTransactionTemplates';
+export type { TransactionTemplate } from './useTransactionTemplates';
+export { useRecentPayees } from './useRecentPayees';
 
 // Re-export query keys for external use
 export { queryKeys } from '../lib/queryClient';

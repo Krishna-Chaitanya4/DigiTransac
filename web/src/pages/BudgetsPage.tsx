@@ -10,7 +10,7 @@ import {
   useAccounts,
   useInvalidateBudgets,
 } from '../hooks';
-import { BudgetForm } from '../components/budget';
+import { BudgetForm, BudgetWizard } from '../components/budget';
 import { useCurrency } from '../context/CurrencyContext';
 import { formatCurrency, getCurrencySymbol } from '../services/currencyService';
 import type { Budget, CreateBudgetRequest, UpdateBudgetRequest } from '../types/budgets';
@@ -211,6 +211,7 @@ export default function BudgetsPage() {
   const deleteBudget = useDeleteBudget();
   
   // UI state
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -318,18 +319,32 @@ export default function BudgetsPage() {
             Track spending limits for your categories
           </p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 
-            dark:from-blue-900 dark:to-blue-950 text-white rounded-lg 
-            hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900
-            transition-colors font-medium"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Create Budget
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsWizardOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-blue-300 dark:border-blue-700
+              text-blue-600 dark:text-blue-400 rounded-lg
+              hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Quick Start
+          </button>
+          <button
+            onClick={handleCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700
+              dark:from-blue-900 dark:to-blue-950 text-white rounded-lg
+              hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900
+              transition-colors font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Budget
+          </button>
+        </div>
       </div>
 
       {/* Overview Cards */}
@@ -439,17 +454,27 @@ export default function BudgetsPage() {
               <p className="text-gray-500 dark:text-gray-400 mb-4">
                 Create budgets to track spending limits for your categories.
               </p>
-              <button
-                onClick={handleCreate}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 
-                  dark:from-blue-900 dark:to-blue-950 text-white rounded-lg 
-                  hover:from-blue-700 hover:to-blue-800 transition-colors font-medium"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Create Your First Budget
-              </button>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  onClick={() => setIsWizardOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-blue-600 to-blue-700
+                    dark:from-blue-900 dark:to-blue-950 text-white rounded-lg
+                    hover:from-blue-700 hover:to-blue-800 transition-colors font-medium"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Quick Start Wizard
+                </button>
+                <span className="text-sm text-gray-400 dark:text-gray-500">or</span>
+                <button
+                  onClick={handleCreate}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Create manually
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -484,6 +509,18 @@ export default function BudgetsPage() {
         labels={labels}
         accounts={accounts}
         isLoading={createBudget.isPending || updateBudget.isPending}
+        error={formError}
+      />
+      {/* Budget Wizard */}
+      <BudgetWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onSubmit={async (data) => {
+          await createBudget.mutateAsync(data);
+          setIsWizardOpen(false);
+        }}
+        labels={labels}
+        isLoading={createBudget.isPending}
         error={formError}
       />
       {/* Confirm dialog */}

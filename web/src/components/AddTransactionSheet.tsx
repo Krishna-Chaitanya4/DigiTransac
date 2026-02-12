@@ -1,11 +1,13 @@
 import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useTransactionTemplates } from '../hooks/useTransactionTemplates';
 import { ContactPicker } from './ContactPicker';
 import { AccountPicker } from './AccountPicker';
 import { BulkImportModal } from './BulkImportModal';
 import type { Account } from '../services/accountService';
 import type { UserSearchResult, ConversationSummary } from '../types/conversations';
+import type { TransactionTemplate } from '../hooks/useTransactionTemplates';
 
 export type TransactionIntent = 'personal' | 'withSomeone' | 'transfer' | 'import';
 
@@ -18,6 +20,8 @@ interface AddTransactionSheetProps {
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
   /** Whether to use dropdown mode (anchored to button) vs modal mode (centered) */
   mode?: 'dropdown' | 'modal';
+  /** Callback when user selects a template for quick add */
+  onUseTemplate?: (template: TransactionTemplate) => void;
 }
 
 interface ActionOption {
@@ -71,10 +75,12 @@ export const AddTransactionSheet = memo(function AddTransactionSheet({
   conversations = [],
   anchorRef,
   mode = 'modal',
+  onUseTemplate,
 }: AddTransactionSheetProps) {
   const navigate = useNavigate();
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { templates, incrementUsage, removeTemplate } = useTransactionTemplates();
   
   // Sub-modal states
   const [showContactPicker, setShowContactPicker] = useState(false);
@@ -227,6 +233,19 @@ export const AddTransactionSheet = memo(function AddTransactionSheet({
     onClose();
   }, [onClose]);
 
+  // Handle template selection
+  const handleUseTemplate = useCallback((template: TransactionTemplate) => {
+    incrementUsage(template.id);
+    onUseTemplate?.(template);
+    onClose();
+  }, [incrementUsage, onUseTemplate, onClose]);
+
+  // Handle template removal
+  const handleRemoveTemplate = useCallback((e: React.MouseEvent, templateId: string) => {
+    e.stopPropagation();
+    removeTemplate(templateId);
+  }, [removeTemplate]);
+
   if (!isOpen) return null;
 
   // Show contact picker
@@ -264,6 +283,47 @@ export const AddTransactionSheet = memo(function AddTransactionSheet({
     );
   }
 
+  // Render template quick-add chips (shared between dropdown and modal)
+  const renderTemplateChips = (compact: boolean) => {
+    if (templates.length === 0) return null;
+    const displayTemplates = compact ? templates.slice(0, 3) : templates.slice(0, 6);
+    
+    return (
+      <div className={compact ? 'px-3 pb-2' : 'px-4 pb-2'}>
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+          Quick Add
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {displayTemplates.map((template) => (
+            <button
+              key={template.id}
+              onClick={() => handleUseTemplate(template)}
+              className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
+                bg-gray-100 dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30
+                text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300
+                transition-colors border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
+              title={`${template.name}${template.amount ? ` • ${template.amount}` : ''}`}
+            >
+              <span className="text-sm">{template.icon}</span>
+              <span className="font-medium truncate max-w-[120px]">{template.name}</span>
+              <button
+                onClick={(e) => handleRemoveTemplate(e, template.id)}
+                className="hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full
+                  bg-gray-300 dark:bg-gray-600 hover:bg-red-400 dark:hover:bg-red-600
+                  text-gray-600 dark:text-gray-300 hover:text-white transition-colors ml-0.5"
+                aria-label={`Remove ${template.name} template`}
+              >
+                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // Dropdown mode - compact menu anchored to button
   if (mode === 'dropdown') {
     return (
@@ -276,6 +336,13 @@ export const AddTransactionSheet = memo(function AddTransactionSheet({
         aria-label="Add transaction options"
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
       >
+        {/* Template Quick-Add Chips */}
+        {templates.length > 0 && (
+          <div className="pt-2 border-b border-gray-100 dark:border-gray-700/50">
+            {renderTemplateChips(true)}
+          </div>
+        )}
+
         {/* Compact Action Options */}
         <div className="py-2">
           {actionOptions.map((option, index) => (
@@ -361,6 +428,13 @@ export const AddTransactionSheet = memo(function AddTransactionSheet({
           </button>
         </div>
         
+        {/* Template Quick-Add Chips */}
+        {templates.length > 0 && (
+          <div className="pt-3 border-b border-gray-100 dark:border-gray-700">
+            {renderTemplateChips(false)}
+          </div>
+        )}
+
         {/* Action Options */}
         <div className="p-4 space-y-2">
           {actionOptions.map((option) => (

@@ -446,7 +446,8 @@ public record TransactionAnalyticsResponse(
     List<SpendingTrend> SpendingTrend,
     AveragesByType AveragesByType,
     decimal DailyAverage,
-    decimal MonthlyAverage
+    decimal MonthlyAverage,
+    List<SpendingTrend>? DailyTrend = null
 );
 
 public record CategoryBreakdown(

@@ -14,6 +14,7 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 const ChatsPage = lazy(() => import('./pages/ChatsPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
+const AccountDetailPage = lazy(() => import('./pages/AccountDetailPage'));
 const LabelsPage = lazy(() => import('./pages/LabelsPage'));
 const InsightsPage = lazy(() => import('./pages/InsightsPage'));
 const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
@@ -64,6 +65,7 @@ function App() {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/chats" element={<PageBoundary name="Chats"><ChatsPage /></PageBoundary>} />
             <Route path="/accounts" element={<PageBoundary name="Accounts"><AccountsPage /></PageBoundary>} />
+            <Route path="/accounts/:id" element={<PageBoundary name="AccountDetail"><AccountDetailPage /></PageBoundary>} />
             <Route path="/insights" element={<PageBoundary name="Insights"><InsightsPage /></PageBoundary>} />
             <Route path="/budgets" element={<PageBoundary name="Budgets"><BudgetsPage /></PageBoundary>} />
             <Route path="/map" element={<PageBoundary name="SpendingMap"><SpendingMapPage /></PageBoundary>} />

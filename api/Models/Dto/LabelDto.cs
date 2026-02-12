@@ -55,3 +55,14 @@ public record LabelTreeResponse(
     DateTime CreatedAt,
     List<LabelTreeResponse> Children
 );
+
+// Usage statistics per label
+public record LabelUsageStat(
+    int TransactionCount,
+    decimal TotalAmount
+);
+
+public record LabelUsageStatsResponse(
+    Dictionary<string, LabelUsageStat> Stats,
+    string Currency
+);

@@ -1,4 +1,4 @@
-import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
+import { Label, LabelTree, CreateLabelRequest, UpdateLabelRequest, LabelUsageStatsResponse } from '../types/labels';
 import { apiClient } from './apiClient';
 
 // Get all labels (flat list)
@@ -42,6 +42,11 @@ export async function deleteLabelWithReassignment(id: string, reassignToId?: str
     ? `/labels/${id}/with-reassignment?reassignToId=${reassignToId}`
     : `/labels/${id}/with-reassignment`;
   return apiClient.delete<void>(url);
+}
+
+// Get label usage statistics
+export async function getLabelUsageStats(): Promise<LabelUsageStatsResponse> {
+  return apiClient.get<LabelUsageStatsResponse>('/labels/usage-stats');
 }
 
 // Reorder labels

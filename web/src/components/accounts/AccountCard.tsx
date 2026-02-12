@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useHaptics } from '../../hooks/useHaptics';
@@ -17,6 +18,7 @@ interface AccountCardProps {
 
 export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArchiveToggle, onSetDefault, formatWithConversion, primaryCurrency }: AccountCardProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
   const haptics = useHaptics();
@@ -29,9 +31,13 @@ export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArch
 
   return (
     <div
-      className={`bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4 hover:shadow-md dark:hover:shadow-gray-900/50 transition-shadow ${
+      className={`bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4 hover-lift cursor-pointer ${
         account.isArchived ? 'opacity-60' : ''
       }`}
+      onClick={() => navigate(`/accounts/${account.id}`)}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/accounts/${account.id}`); }}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
@@ -60,7 +66,8 @@ export function AccountCard({ account, onEdit, onDelete, onAdjustBalance, onArch
 
         <div className="relative">
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               haptics.light();
               setShowMenu(!showMenu);
             }}

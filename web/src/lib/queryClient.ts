@@ -122,6 +122,7 @@ export const queryKeys = {
     pendingCount: ['transactions', 'pendingCount'] as const,
     counterparties: ['transactions', 'counterparties'] as const,
     analytics: ['transactions', 'analytics'] as const,
+    recurring: ['transactions', 'recurring'] as const,
   },
   // Accounts
   accounts: {
@@ -136,6 +137,7 @@ export const queryKeys = {
     list: () => ['labels', 'list'] as const,
     tree: () => ['labels', 'tree'] as const,
     transactionCount: (id: string) => ['labels', 'transactionCount', id] as const,
+    usageStats: () => ['labels', 'usageStats'] as const,
   },
   // Tags
   tags: {

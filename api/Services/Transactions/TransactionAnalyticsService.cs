@@ -305,10 +305,32 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             })
             .ToList();
 
-        // Calculate spending trends (by month) with currency conversion, excluding analytics-excluded transactions
-        var trends = transactions
+        // Filter non-template, non-excluded transactions for trend calculations
+        var trendTransactions = transactions
             .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
+            .ToList();
+
+        // Calculate spending trends (by month) with currency conversion, excluding analytics-excluded transactions
+        var trends = trendTransactions
             .GroupBy(t => t.Date.ToString("yyyy-MM"))
+            .OrderBy(g => g.Key)
+            .Select(g => new SpendingTrend(
+                g.Key,
+                g.Where(t => t.Type == TransactionType.Receive)
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
+                g.Where(t => t.Type == TransactionType.Send)
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
+                g.Where(t => t.Type == TransactionType.Receive)
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)) -
+                g.Where(t => t.Type == TransactionType.Send)
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
+                g.Count()
+            ))
+            .ToList();
+
+        // Calculate daily trends (by day) for sparkline charts
+        var dailyTrends = trendTransactions
+            .GroupBy(t => (t.DateLocal ?? t.Date.ToString("yyyy-MM-dd")))
             .OrderBy(g => g.Key)
             .Select(g => new SpendingTrend(
                 g.Key,
@@ -353,7 +375,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             trends,
             averagesByType,
             Math.Round(totalSends / days, 2),
-            Math.Round(totalSends / (decimal)months, 2)
+            Math.Round(totalSends / (decimal)months, 2),
+            dailyTrends
         );
     }
 

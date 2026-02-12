@@ -30,6 +30,7 @@ public interface ITransactionRepository
     Task<Dictionary<string, int>> GetCountsByAccountIdsAsync(IEnumerable<string> accountIds, string userId);
     Task<int> GetCountByLabelIdAsync(string labelId, string userId);
     Task<int> GetCountByTagIdAsync(string tagId, string userId);
+    Task<Dictionary<string, (int Count, decimal TotalAmount)>> GetUsageStatsByLabelAsync(string userId);
     
     // Reassignment methods
     Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId);
@@ -556,6 +557,39 @@ public class TransactionRepository : ITransactionRepository
         }
 
         return counts;
+    }
+
+    public async Task<Dictionary<string, (int Count, decimal TotalAmount)>> GetUsageStatsByLabelAsync(string userId)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Confirmed)
+        );
+
+        var pipeline = _transactions.Aggregate()
+            .Match(filter)
+            .Unwind(t => t.Splits)
+            .Group(new BsonDocument
+            {
+                { "_id", "$splits.labelId" },
+                { "count", new BsonDocument("$sum", 1) },
+                { "totalAmount", new BsonDocument("$sum", "$splits.amount") }
+            });
+
+        var results = await pipeline.ToListAsync();
+        var stats = new Dictionary<string, (int Count, decimal TotalAmount)>();
+
+        foreach (var result in results)
+        {
+            if (result["_id"].IsBsonNull) continue;
+            var labelId = result["_id"].IsString ? result["_id"].AsString : result["_id"].AsObjectId.ToString();
+            var count = result["count"].ToInt32();
+            var totalAmount = result["totalAmount"].ToDecimal();
+            stats[labelId] = (count, totalAmount);
+        }
+
+        return stats;
     }
 
     public async Task<int> GetCountByLabelIdAsync(string labelId, string userId)

@@ -567,6 +567,7 @@ interface TransactionListProps {
   onAcceptP2P?: (transaction: Transaction) => void;
   onDecline?: (transactionId: string) => void;
   onViewInChat?: (transaction: Transaction) => void;
+  onSaveAsTemplate?: (transaction: Transaction) => void;
   highlightedTransactionId?: string | null;
   isLoading?: boolean;
   /** Current status filter for empty state messaging */
@@ -674,6 +675,7 @@ export function TransactionList({
   onAcceptP2P,
   onDecline,
   onViewInChat,
+  onSaveAsTemplate,
   highlightedTransactionId,
   isLoading = false,
   statusFilter,
@@ -916,6 +918,20 @@ export function TransactionList({
                   {longPressTransaction.status === 'Confirmed' ? 'Mark Pending' : 'Confirm'}
                 </span>
               </button>
+              {onSaveAsTemplate && (
+                <button
+                  onClick={() => {
+                    setLongPressTransaction(null);
+                    onSaveAsTemplate(longPressTransaction);
+                  }}
+                  className="w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-left text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+                >
+                  <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+                  </svg>
+                  <span className="text-base font-medium">Save as Template</span>
+                </button>
+              )}
               {onToggleSelection && (
                 <button
                   onClick={() => {

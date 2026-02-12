@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, CircleMarker } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -8,8 +8,9 @@ import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useCurrency } from '../context/CurrencyContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../services/currencyService';
+import EmptyState from '../components/EmptyState';
 import { Transaction, TransactionLocation, TripGroup } from '../types/transactions';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { MapSkeleton, TripListSkeleton, LocationListSkeleton, StatsBarSkeleton } from '../components/ui/Skeleton';
 import { MapErrorBoundary } from '../components/error';
 
@@ -113,6 +114,258 @@ interface LocationCluster {
   primaryCategoryColor?: string;
 }
 
+// Trip Detail Mobile Bottom Sheet Component
+interface TripDetailBottomSheetProps {
+  trip: TripGroup;
+  currency: string;
+  onClose: () => void;
+}
+
+function TripDetailBottomSheet({ trip, currency, onClose }: TripDetailBottomSheetProps) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [translateY, setTranslateY] = useState(0);
+  const startYRef = useRef(0);
+  const currentYRef = useRef(0);
+
+  // Handle touch start on drag handle
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    setIsDragging(true);
+    startYRef.current = e.touches[0].clientY;
+    currentYRef.current = 0;
+  }, []);
+
+  // Handle touch move
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const delta = e.touches[0].clientY - startYRef.current;
+    // Only allow dragging down
+    if (delta > 0) {
+      currentYRef.current = delta;
+      setTranslateY(delta);
+    }
+  }, [isDragging]);
+
+  // Handle touch end
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+    // If dragged more than 150px down, close
+    if (currentYRef.current > 150) {
+      onClose();
+    } else {
+      setTranslateY(0);
+    }
+  }, [onClose]);
+
+  // Close on backdrop click
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }, [onClose]);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Prevent body scroll when sheet is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 lg:hidden"
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Trip details for ${trip.name}`}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50 transition-opacity" />
+      
+      {/* Bottom Sheet */}
+      <div
+        ref={sheetRef}
+        className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl shadow-xl max-h-[85vh] flex flex-col"
+        style={{
+          transform: `translateY(${translateY}px)`,
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+        }}
+      >
+        {/* Drag Handle */}
+        <div
+          className="flex-shrink-0 pt-3 pb-2 cursor-grab active:cursor-grabbing"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto" />
+        </div>
+
+        {/* Header */}
+        <div className="flex-shrink-0 px-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-lg">
+                ✈️
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">{trip.name}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {trip.city}{trip.country ? `, ${trip.country}` : ''}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              aria-label="Close trip details"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {/* Trip Summary Stats */}
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Total Spent</div>
+                <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                  {formatCurrency(trip.totalAmount, currency)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Duration</div>
+                <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  {trip.durationDays}d
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Transactions</div>
+                <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  {trip.transactionCount}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 text-center">
+              <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {new Date(trip.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                {' – '}
+                {new Date(trip.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+              {trip.totalAmount > 0 && trip.durationDays > 0 && (
+                <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+                  Avg {formatCurrency(trip.totalAmount / trip.durationDays, currency)}/day
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Category Breakdown */}
+          {trip.categoryBreakdown.length > 0 && (
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Spending by Category</h4>
+              <div className="space-y-2.5">
+                {trip.categoryBreakdown.slice(0, 6).map(cat => (
+                  <div key={cat.labelId} className="flex items-center gap-2.5">
+                    <div
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: cat.labelColor || '#6B7280' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                          {cat.labelIcon && <span className="mr-1">{cat.labelIcon}</span>}
+                          {cat.labelName}
+                        </span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 ml-2 shrink-0">
+                          {formatCurrency(cat.amount, currency)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+                        <div
+                          className="h-1.5 rounded-full transition-all"
+                          style={{
+                            width: `${cat.percentage}%`,
+                            backgroundColor: cat.labelColor || '#6B7280',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {trip.categoryBreakdown.length > 6 && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center pt-1">
+                    +{trip.categoryBreakdown.length - 6} more categories
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Daily Spending */}
+          {trip.dailyBreakdown.length > 0 && (
+            <div className="p-4">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Daily Spending</h4>
+              <div className="space-y-1.5">
+                {trip.dailyBreakdown.map(day => {
+                  const maxDayAmount = Math.max(...trip.dailyBreakdown.map(d => d.amount));
+                  const barWidth = maxDayAmount > 0 ? (day.amount / maxDayAmount) * 100 : 0;
+                  
+                  return (
+                    <div
+                      key={day.date}
+                      className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-750 rounded-lg"
+                    >
+                      <div className="w-14 shrink-0">
+                        <div className="text-xs font-medium text-gray-900 dark:text-gray-100">{day.dayName.slice(0, 3)}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          {new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full bg-blue-500 dark:bg-blue-400 transition-all"
+                            style={{ width: `${barWidth}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 w-20">
+                        <div className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                          {formatCurrency(day.amount, currency)}
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          {day.transactionCount} txn{day.transactionCount !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Trip Card Component
 interface TripCardProps {
   trip: TripGroup;
@@ -193,6 +446,7 @@ function TripCard({ trip, currency, isSelected, onClick }: TripCardProps) {
 }
 
 export default function SpendingMapPage() {
+  const navigate = useNavigate();
   const { primaryCurrency, convert } = useCurrency();
   const { resolvedTheme } = useTheme();
   const [dateFilter, setDateFilter] = useState<DateFilter>('last3Months');
@@ -617,21 +871,16 @@ export default function SpendingMapPage() {
           {isLoading ? (
             <MapSkeleton />
           ) : filteredTransactions.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 p-8">
-              <svg className="w-16 h-16 mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <p className="text-lg font-medium mb-2">No transactions with locations</p>
-              <p className="text-sm text-center">
-                Enable location when creating transactions to see them on the map.
-              </p>
-              <Link
-                to="/transactions"
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Add Transaction
-              </Link>
+            <div className="h-full flex items-center justify-center">
+              <EmptyState
+                variant="map"
+                title="No transactions with locations"
+                description="Enable location when creating transactions to see them on the map."
+                action={{
+                  label: 'Add Transaction',
+                  onClick: () => navigate('/transactions'),
+                }}
+              />
             </div>
           ) : (
             <MapErrorBoundary>
@@ -971,6 +1220,15 @@ export default function SpendingMapPage() {
           </div>
         )}
       </div>
+      
+      {/* Mobile Bottom Sheet for Trip Details (< lg screens) */}
+      {viewMode === 'trips' && selectedTrip && (
+        <TripDetailBottomSheet
+          trip={selectedTrip}
+          currency={primaryCurrency}
+          onClose={() => setSelectedTrip(null)}
+        />
+      )}
       
       {/* CSS for cluster icons and dark mode popups */}
       <style>{`

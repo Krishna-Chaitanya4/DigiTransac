@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-02-12
+
+### Added
+- **Features & UI Improvement Release** — 16-item comprehensive feature and UI enhancement plan
+
+  #### Phase 1: Insights & Dashboard Enhancements
+  - **Quick Stats Sparklines** — SVG sparkline charts on InsightsPage hero stat cards showing 30-day daily income/expense/savings trends with gradient fills and hover tooltips; backend `DailyTrend` field on analytics response with MongoDB daily aggregation
+  - **Net Worth Widget** — New collapsible InsightsPage widget showing total assets, total liabilities, and net worth with color-coded breakdown by account type and currency-formatted values
+  - **Recurring Transactions Widget** — New collapsible InsightsPage widget displaying upcoming recurring transactions with next-due countdown, frequency badges (daily/weekly/monthly/yearly), and amount formatting
+  - **Budget Progress Enhancement** — Refined budget status thresholds (healthy <70%, warning 70-90%, danger 90-100%, exceeded >100%), added `getBudgetPace()` (under/on/over), badge colors, days-remaining display, and empty-state CTA linking to budget creation
+
+  #### Phase 2: Transaction Form Improvements
+  - **Duplicate Transaction Warning** — Real-time duplicate detection in TransactionForm matching same amount ± same day ± same account, with dismissible amber warning banner showing potential duplicates
+  - **Transaction Templates / Quick Add** — localStorage-based `useTransactionTemplates` hook with CRUD operations; template chips in AddTransactionSheet for one-tap transaction creation; "Save as Template" option in transaction long-press menu
+  - **Payee Autocomplete** — localStorage-based `useRecentPayees` hook tracking last 50 payees; autocomplete dropdown in TransactionForm counterparty field with keyboard navigation (↑↓ Enter Escape) and ARIA accessibility
+  - **Split Percentage Mode** — Toggle between amount and percentage modes in SplitCategoriesSection; percentage inputs auto-calculate amounts based on transaction total; real-time percentage display alongside amounts
+
+  #### Phase 3: Page-Level Features
+  - **Account Detail Page** — New `/accounts/:id` route with account header (icon, name, type, balance), mini sparkline chart, period stats (income/expenses/net), top categories breakdown, and filtered transaction list with search
+  - **Trip Detail Mobile Bottom Sheet** — Drag-to-dismiss bottom sheet on SpendingMapPage showing trip summary (date range, total spending, transaction count, distance), category breakdown with proportional bars, and daily spending timeline
+  - **Labels Page Usage Statistics** — New `GET /api/labels/usage-stats` endpoint with MongoDB aggregation; transaction count badges (blue) and total amount badges (emerald) on each label in the category tree; `formatCompactAmount` helper for K/M/B formatting
+  - **Settings Data Import/Export** — Multi-step CSV import wizard (upload → column mapping → preview → import) with auto-guess mapping, account/label resolution by name, progress bar; JSON/CSV export format toggle using existing export API
+
+  #### Phase 4: UX & Visual Polish
+  - **Empty State Illustrations & Onboarding CTAs** — Reusable `EmptyState` component with 8 variants (transactions, accounts, budgets, chats, map, insights, categories, generic), each with unique SVG illustration, primary/secondary CTA buttons, and compact mode
+  - **Activity Timeline View** — Toggle between list and timeline views on TransactionsPage; vertical timeline with date group headers, color-coded dots (green=Receive, red=Send, blue=Transfer), expandable transaction details with edit/delete actions
+  - **Budget Creation Wizard** — 4-step wizard (Template → Customize → Categories → Review) with 8 suggested budget templates (Food & Dining, Groceries, Transportation, etc.), auto-matching categories by keyword, grouped category selection with select-all checkboxes
+  - **Dark Mode Refinements & Micro-animations** — Smooth theme transitions (0.2s ease on all elements), custom dark scrollbar, `.hover-lift` effect, `.stagger-children` cascading entrance, `.animate-content-enter` fade-up, `.animate-shimmer` skeleton, `.animate-progress-grow`, `.animate-gentle-pulse`, `.animate-number-pop`, `.animate-wiggle`, `.animate-check-draw` SVG animation
+
+### New Components
+- `Sparkline` — Reusable SVG sparkline with gradient fill, configurable color/height/showArea
+- `EmptyState` — 8-variant empty state with SVG illustrations and CTA buttons
+- `ActivityTimeline` — Vertical timeline view for transactions with expandable details
+- `BudgetWizard` — 4-step budget creation wizard with template suggestions
+- `DataManagementSection` — Settings section for CSV import wizard and data export
+- `AccountDetailPage` — Full account detail page with stats, chart, and transaction list
+
+### New Hooks
+- `useTransactionTemplates()` — localStorage CRUD for transaction templates
+- `useRecentPayees()` — localStorage tracking of recent payees with autocomplete
+- `useRecurringTransactions()` — TanStack Query hook for recurring transactions
+- `useLabelUsageStats()` — TanStack Query hook for label usage statistics
+
+### New API Endpoints
+- `GET /api/labels/usage-stats` — Returns transaction count and total amount per label via MongoDB aggregation
+
+### Changed
+- `InsightsPage.tsx` — Added sparklines to hero cards, net worth widget, recurring transactions widget, content-enter animations
+- `TransactionForm.tsx` — Added duplicate warning, payee autocomplete with keyboard nav, template default values
+- `AddTransactionSheet.tsx` — Added template chips for quick transaction creation
+- `TransactionList.tsx` — Added "Save as Template" to long-press context menu
+- `TransactionsPage.tsx` — Added list/timeline view toggle, template handling
+- `SplitCategoriesSection.tsx` — Added percentage/amount mode toggle
+- `AccountCard.tsx` — Made clickable linking to account detail page, added hover-lift effect
+- `AccountsPage.tsx` — Added stagger-children animation to card grid, EmptyState component
+- `AccountDetailPage.tsx` — New page with EmptyState for no-transactions state
+- `SpendingMapPage.tsx` — Added TripDetailBottomSheet, EmptyState component
+- `BudgetsPage.tsx` — Added BudgetWizard "Quick Start" button, EmptyState for no-budgets
+- `BudgetCard.tsx` — Enhanced with pace indicator, badge colors, hover-lift effect
+- `CategoriesTab.tsx` — Fetches and passes usage stats to LabelTreeItem
+- `LabelTreeItem.tsx` — Added transaction count and amount badges
+- `SettingsPage.tsx` — Added DataManagementSection for import/export
+- `index.css` — Added dark mode transitions, custom scrollbar, 8 micro-animation utility classes
+- `App.tsx` — Added `/accounts/:id` route
+- `queryClient.ts` — Added `recurring` and `usageStats` query keys
+
 ## [1.6.0] - 2026-02-12
 
 ### Added

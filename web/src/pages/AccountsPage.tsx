@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import EmptyState from '../components/EmptyState';
 import { useCurrency } from '../context/CurrencyContext';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import {
@@ -254,25 +255,21 @@ export default function AccountsPage() {
 
       {/* Empty State */}
       {accounts.length === 0 && (
-        <div className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-8 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-            <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-            </svg>
-          </div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Accounts Yet</h2>
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
-            Add your bank accounts, credit cards, and other financial accounts to track your money.
-          </p>
-          <button
-            onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Add Your First Account
-          </button>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <EmptyState
+            variant="accounts"
+            title="No Accounts Yet"
+            description="Add your bank accounts, credit cards, and other financial accounts to track your money."
+            action={{
+              label: 'Add Your First Account',
+              onClick: handleCreate,
+              icon: (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              ),
+            }}
+          />
         </div>
       )}
 
@@ -317,7 +314,7 @@ export default function AccountsPage() {
                   </span>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
                   {typeAccounts.map((account) => (
                     <AccountCard
                       key={account.id}

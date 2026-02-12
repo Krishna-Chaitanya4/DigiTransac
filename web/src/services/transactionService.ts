@@ -207,6 +207,7 @@ export interface TransactionAnalytics {
   averagesByType: AveragesByType;
   dailyAverage: number;
   monthlyAverage: number;
+  dailyTrend?: SpendingTrend[];
 }
 
 export async function getAnalytics(

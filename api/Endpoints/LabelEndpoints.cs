@@ -125,6 +125,21 @@ public static class LabelEndpoints
         .Produces(200)
         .Produces<ErrorResponse>(400);
 
+        // Get usage stats for all labels (bulk) - must be before /{id} routes
+        group.MapGet("/usage-stats", async (ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var stats = await labelService.GetUsageStatsAsync(userId, ct);
+            return Results.Ok(stats);
+        })
+        .WithName("GetLabelUsageStats")
+        .Produces<LabelUsageStatsResponse>(200);
+
         // Get transaction count for a label
         group.MapGet("/{id}/transaction-count", async (string id, ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
         {

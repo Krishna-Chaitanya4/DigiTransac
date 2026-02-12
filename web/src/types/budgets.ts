@@ -178,18 +178,34 @@ export const defaultAlerts: BudgetAlertRequest[] = [
   { thresholdPercent: 100, notifyEnabled: true },
 ];
 
-// Budget status helper
+// Budget status helper — green <70%, amber 70-90%, red >90%
 export function getBudgetStatus(budget: Budget): 'healthy' | 'warning' | 'danger' | 'exceeded' {
   if (budget.percentUsed >= 100) return 'exceeded';
-  if (budget.percentUsed >= 80) return 'danger';
-  if (budget.percentUsed >= 50) return 'warning';
+  if (budget.percentUsed >= 90) return 'danger';
+  if (budget.percentUsed >= 70) return 'warning';
   return 'healthy';
 }
 
 // Budget status colors
 export const budgetStatusColors = {
-  healthy: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-600 dark:text-green-400', bar: 'bg-green-500' },
-  warning: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-600 dark:text-yellow-400', bar: 'bg-yellow-500' },
-  danger: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400', bar: 'bg-orange-500' },
-  exceeded: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400', bar: 'bg-red-500' },
+  healthy: { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-600 dark:text-green-400', bar: 'bg-green-500', badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' },
+  warning: { bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400', bar: 'bg-amber-500', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' },
+  danger: { bg: 'bg-red-50 dark:bg-red-900/20', text: 'text-red-600 dark:text-red-400', bar: 'bg-red-500', badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' },
+  exceeded: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400', bar: 'bg-red-600', badge: 'bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300' },
 };
+
+// Get the budget spending pace (daily burn rate vs expected)
+export function getBudgetPace(budget: Budget): 'under' | 'on' | 'over' {
+  // Calculate what percentage should have been spent by now based on elapsed time
+  const start = new Date(budget.periodStart);
+  const end = new Date(budget.periodEnd);
+  const now = new Date();
+  const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const elapsedDays = Math.max(0, Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const expectedPercent = (elapsedDays / totalDays) * 100;
+  
+  const diff = budget.percentUsed - expectedPercent;
+  if (diff > 10) return 'over';
+  if (diff < -10) return 'under';
+  return 'on';
+}

@@ -15,6 +15,7 @@ public interface ILabelService
     Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default);
     Task<Result<DeleteWithCountResponse>> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId, CancellationToken ct = default);
     Task<int> GetTransactionCountAsync(string id, string userId, CancellationToken ct = default);
+    Task<LabelUsageStatsResponse> GetUsageStatsAsync(string userId, CancellationToken ct = default);
     Task<Result> ReorderAsync(string userId, ReorderLabelsRequest request, CancellationToken ct = default);
     Task CreateDefaultLabelsAsync(string userId, CancellationToken ct = default);
     Task<Label> GetOrCreateAdjustmentsCategoryAsync(string userId, CancellationToken ct = default);
@@ -188,6 +189,16 @@ public class LabelService : ILabelService
     public async Task<int> GetTransactionCountAsync(string id, string userId, CancellationToken ct = default)
     {
         return await _transactionRepository.GetCountByLabelIdAsync(id, userId);
+    }
+
+    public async Task<LabelUsageStatsResponse> GetUsageStatsAsync(string userId, CancellationToken ct = default)
+    {
+        var rawStats = await _transactionRepository.GetUsageStatsByLabelAsync(userId);
+        var stats = rawStats.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new LabelUsageStat(kvp.Value.Count, kvp.Value.TotalAmount)
+        );
+        return new LabelUsageStatsResponse(stats, ""); // Currency is handled by frontend context
     }
 
     public async Task<Result<DeleteWithCountResponse>> DeleteWithReassignmentAsync(string id, string userId, string? reassignToLabelId, CancellationToken ct = default)

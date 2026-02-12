@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
+import { LabelTree, CreateLabelRequest, UpdateLabelRequest, LabelUsageStat } from '../types/labels';
 import {
   useLabels,
   useLabelsTree,
@@ -8,6 +8,7 @@ import {
   useDeleteLabel,
   useDeleteLabelWithReassignment,
   useLabelTransactionCount,
+  useLabelUsageStats,
 } from '../hooks';
 import {
   SearchResultItem,
@@ -21,6 +22,11 @@ export default function CategoriesTab() {
   // React Query hooks
   const { data: labels = [], isLoading, error: queryError } = useLabelsTree();
   const { data: allLabels = [] } = useLabels();
+  const { data: usageStatsData } = useLabelUsageStats();
+
+  // Build usage stats map
+  const usageStats: Record<string, LabelUsageStat> = usageStatsData?.stats ?? {};
+  const usageStatsCurrency = usageStatsData?.currency ?? 'USD';
   
   // Mutations
   const createLabelMutation = useCreateLabel();
@@ -353,6 +359,8 @@ export default function CategoriesTab() {
                   onToggleExclude={handleToggleExclude}
                   expandedIds={expandedIds}
                   toggleExpand={toggleExpand}
+                  usageStats={usageStats}
+                  currency={usageStatsCurrency}
                 />
               ))}
             </div>

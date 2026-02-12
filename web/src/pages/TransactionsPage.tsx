@@ -2,6 +2,7 @@
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { TransactionList } from '../components/TransactionList';
+import { ActivityTimeline } from '../components/ActivityTimeline';
 import { TransactionForm } from '../components/TransactionForm';
 import { AddTransactionSheet } from '../components/AddTransactionSheet';
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog';
@@ -13,6 +14,7 @@ import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
+import { useTransactionTemplates } from '../hooks/useTransactionTemplates';
 import { useCurrency } from '../context/CurrencyContext';
 import {
   DatePreset,
@@ -44,9 +46,11 @@ import { logger } from '../services/logger';
 import type {
   Transaction,
   TransactionFilter,
+  TransactionUIType,
   CreateTransactionRequest,
   UpdateTransactionRequest,
 } from '../types/transactions';
+import type { TransactionTemplate } from '../hooks/useTransactionTemplates';
 
 export default function TransactionsPage() {
   // Currency context - backend returns summary already converted to primary currency
@@ -90,7 +94,11 @@ export default function TransactionsPage() {
   const { data: conversationsData } = useConversations();
   const conversations = conversationsData?.conversations ?? [];
   
+  // Transaction templates
+  const { addTemplate: saveTemplate } = useTransactionTemplates();
+  
   // UI state
+  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
   const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(
@@ -101,6 +109,16 @@ export default function TransactionsPage() {
   const [pendingRefreshTrigger, setPendingRefreshTrigger] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [templateDefaults, setTemplateDefaults] = useState<{
+    type?: TransactionUIType;
+    accountId?: string;
+    amount?: number;
+    title?: string;
+    payee?: string;
+    labelId?: string;
+    tagIds?: string[];
+    transferToAccountId?: string;
+  } | null>(null);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   
@@ -495,6 +513,43 @@ export default function TransactionsPage() {
     }, 300);
   }, [invalidateTransactions]);
 
+  // Handle Save as Template
+  const handleSaveAsTemplate = useCallback((transaction: Transaction) => {
+    const primaryLabel = labels.find(l => transaction.splits[0]?.labelId === l.id);
+    saveTemplate({
+      name: transaction.title || transaction.payee || primaryLabel?.name || 'Transaction',
+      icon: primaryLabel?.icon || '📝',
+      type: transaction.transferToAccountId ? 'Transfer' : transaction.type,
+      amount: transaction.amount,
+      accountId: transaction.accountId,
+      labelId: transaction.splits[0]?.labelId,
+      splits: transaction.splits.length > 1
+        ? transaction.splits.map(s => ({ labelId: s.labelId, amount: s.amount, notes: s.notes }))
+        : undefined,
+      title: transaction.title,
+      payee: transaction.payee,
+      tagIds: transaction.tagIds.length > 0 ? transaction.tagIds : undefined,
+      transferToAccountId: transaction.transferToAccountId,
+    });
+    showInfo('Saved as template');
+  }, [labels, saveTemplate, showInfo]);
+
+  // Handle Use Template - opens form pre-filled with template data
+  const handleUseTemplate = useCallback((template: TransactionTemplate) => {
+    setTemplateDefaults({
+      type: template.type,
+      accountId: template.accountId,
+      amount: template.amount,
+      title: template.title,
+      payee: template.payee,
+      labelId: template.labelId,
+      tagIds: template.tagIds,
+      transferToAccountId: template.transferToAccountId,
+    });
+    setEditingTransaction(null);
+    setIsFormOpen(true);
+  }, []);
+
   // Handle Accept P2P - opens form with transaction data for account/category assignment
   const handleAcceptP2P = useCallback((transaction: Transaction) => {
     // Open the form with this transaction's data so user can add account and categories
@@ -705,6 +760,7 @@ export default function TransactionsPage() {
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setEditingTransaction(null);
+    setTemplateDefaults(null);
     setFormError(null);
   };
 
@@ -927,6 +983,29 @@ export default function TransactionsPage() {
             </button>
           )}
         </div>
+        {/* View toggle */}
+        <button
+          onClick={() => setViewMode(prev => prev === 'list' ? 'timeline' : 'list')}
+          className={`flex items-center justify-center w-10 h-10 min-w-[44px] min-h-[44px] border rounded-lg transition-colors touch-manipulation ${
+            viewMode === 'timeline'
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+              : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+          }`}
+          title={viewMode === 'list' ? 'Switch to timeline view' : 'Switch to list view'}
+          aria-label={viewMode === 'list' ? 'Switch to timeline view' : 'Switch to list view'}
+        >
+          {viewMode === 'list' ? (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          )}
+        </button>
         <button
           onClick={() => setIsFilterOpen(!isFilterOpen)}
           className={`flex items-center gap-2 px-4 py-2 min-h-[44px] border rounded-lg transition-colors touch-manipulation ${
@@ -971,25 +1050,39 @@ export default function TransactionsPage() {
             await invalidateTransactions();
           }}
         >
-        <TransactionList
-          transactions={transactions}
-          accounts={accounts}
-          labels={labels}
-          tags={tags}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onUpdateStatus={handleUpdateStatus}
-          onViewLinkedTransaction={handleViewLinkedTransaction}
-          onAcceptP2P={handleAcceptP2P}
-          onDecline={handleDecline}
-          onViewInChat={handleViewInChat}
-          highlightedTransactionId={highlightedTransactionId}
-          isLoading={showLoadingSkeleton}
-          statusFilter={filter.status}
-          selectionMode={hasSelection}
-          selectedIds={selectedIds}
-          onToggleSelection={toggleSelection}
-        />
+        {viewMode === 'list' ? (
+          <TransactionList
+            transactions={transactions}
+            accounts={accounts}
+            labels={labels}
+            tags={tags}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onUpdateStatus={handleUpdateStatus}
+            onViewLinkedTransaction={handleViewLinkedTransaction}
+            onAcceptP2P={handleAcceptP2P}
+            onDecline={handleDecline}
+            onViewInChat={handleViewInChat}
+            onSaveAsTemplate={handleSaveAsTemplate}
+            highlightedTransactionId={highlightedTransactionId}
+            isLoading={showLoadingSkeleton}
+            statusFilter={filter.status}
+            selectionMode={hasSelection}
+            selectedIds={selectedIds}
+            onToggleSelection={toggleSelection}
+          />
+        ) : (
+          <ActivityTimeline
+            transactions={transactions}
+            accounts={accounts}
+            labels={labels}
+            tags={tags}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            highlightedTransactionId={highlightedTransactionId}
+            isLoading={showLoadingSkeleton}
+          />
+        )}
         
         {/* Loading More Indicator */}
         {isLoadingMore && (
@@ -1029,6 +1122,14 @@ export default function TransactionsPage() {
         isLoading={isSubmitting}
         autoLocationEnabled={true}
         error={formError}
+        defaultAccountId={templateDefaults?.accountId}
+        defaultType={templateDefaults?.type}
+        defaultAmount={templateDefaults?.amount}
+        defaultTitle={templateDefaults?.title}
+        defaultPayee={templateDefaults?.payee}
+        defaultLabelId={templateDefaults?.labelId}
+        defaultTagIds={templateDefaults?.tagIds}
+        defaultTransferToAccountId={templateDefaults?.transferToAccountId}
         onCreateTag={async (name) => {
           try {
             const newTag = await createTagMutation.mutateAsync({ name });
@@ -1049,6 +1150,7 @@ export default function TransactionsPage() {
         conversations={conversations}
         anchorRef={addSheetMode === 'dropdown' ? addButtonRef : undefined}
         mode={addSheetMode}
+        onUseTemplate={handleUseTemplate}
       />
       
       {/* Toast notifications */}

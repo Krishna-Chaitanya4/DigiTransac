@@ -5,6 +5,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { formatCurrency } from '../services/currencyService';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { Sparkline } from '../components/Sparkline';
 
 // Helper to convert and format currency - ensures proper conversion from source to target currency
 const convertAndFormat = (
@@ -19,24 +20,27 @@ const convertAndFormat = (
   const convertedAmount = convert(amount, sourceCurrency);
   return formatCurrency(convertedAmount, targetCurrency);
 };
-import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies, useInvalidateTransactions, useInvalidateBudgets, useInvalidateLabels } from '../hooks';
+import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies, useInvalidateTransactions, useInvalidateBudgets, useInvalidateLabels, useAccountSummary, useInvalidateAccounts, useRecurringTransactions } from '../hooks';
 import { BudgetCard } from '../components/budget';
 import { getDateRangeForPreset, formatDateToStartOfDay, formatDateToEndOfDay } from '../hooks/useTransactionFilters';
 import { DateRangePicker } from '../components/DatePicker';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ChartErrorBoundary } from '../components/error';
+import { accountTypeConfig } from '../services/accountService';
+import type { AccountType } from '../services/accountService';
+import { recurrenceFrequencyConfig } from '../types/transactions';
 
 type PeriodPreset = 'thisMonth' | 'lastMonth' | 'last3Months' | 'last6Months' | 'thisYear' | 'custom';
 
 // Widget IDs for reordering (excludes the fixed summary card)
-type WidgetId = 'categoryPair' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
+type WidgetId = 'netWorth' | 'recurring' | 'categoryPair' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
 
 // Collapsible section IDs for persistence
-type SectionId = 'summary' | 'categories' | 'incomeCategories' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
+type SectionId = 'summary' | 'netWorth' | 'recurring' | 'categories' | 'incomeCategories' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
 
 const COLLAPSED_SECTIONS_KEY = 'insights_collapsed_sections';
 const WIDGET_ORDER_KEY = 'insights_widget_order';
-const DEFAULT_WIDGET_ORDER: WidgetId[] = ['categoryPair', 'trends', 'budgets', 'averages', 'counterparties', 'byAccount', 'patterns', 'anomalies'];
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ['netWorth', 'recurring', 'categoryPair', 'trends', 'budgets', 'averages', 'counterparties', 'byAccount', 'patterns', 'anomalies'];
 
 // Helper to calculate percentage change
 function calculatePercentChange(current: number, previous: number): number | null {
@@ -629,10 +633,17 @@ export default function InsightsPage() {
     formatDate(periodEnd)
   );
   
+  // Account summary for net worth widget
+  const { data: accountSummary, isLoading: accountSummaryLoading } = useAccountSummary();
+  
+  // Recurring transactions for upcoming widget
+  const { data: recurringTransactions, isLoading: recurringLoading } = useRecurringTransactions();
+  
   // Invalidation hooks for pull-to-refresh
   const invalidateTransactions = useInvalidateTransactions();
   const invalidateBudgets = useInvalidateBudgets();
   const invalidateLabels = useInvalidateLabels();
+  const invalidateAccounts = useInvalidateAccounts();
   
   // Handle refresh - invalidate all queries
   const handleRefresh = useCallback(async () => {
@@ -640,8 +651,9 @@ export default function InsightsPage() {
       invalidateTransactions(),
       invalidateBudgets(),
       invalidateLabels(),
+      invalidateAccounts(),
     ]);
-  }, [invalidateTransactions, invalidateBudgets, invalidateLabels]);
+  }, [invalidateTransactions, invalidateBudgets, invalidateLabels, invalidateAccounts]);
 
   // Calculate true income/expense from category breakdown
   const financialSummary = useMemo(() => {
@@ -711,6 +723,21 @@ export default function InsightsPage() {
     };
   }, [prevTransactionSummary, systemFolders]);
   
+  // Compute sparkline data from daily trends
+  const sparklineData = useMemo(() => {
+    if (!analytics?.dailyTrend || analytics.dailyTrend.length === 0) {
+      return { income: [], expenses: [], net: [] };
+    }
+
+    // Use last 7 data points (or all if fewer)
+    const days = analytics.dailyTrend.slice(-7);
+    return {
+      income: days.map(d => d.credits),
+      expenses: days.map(d => d.debits),
+      net: days.map(d => d.net),
+    };
+  }, [analytics]);
+
   // Calculate income categories breakdown (mirror of expense categories)
   const incomeCategories = useMemo(() => {
     if (!analytics?.topCategories || !systemFolders.incomeCategoryIds.length) {
@@ -758,7 +785,7 @@ export default function InsightsPage() {
   return (
     <PullToRefreshContainer onRefresh={handleRefresh}>
       {/* Header with Period Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 animate-content-enter">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Insights</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -815,7 +842,7 @@ export default function InsightsPage() {
       )}
       
       {/* Welcome Card */}
-      <div className="bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-800 dark:to-blue-900 rounded-lg p-6 mb-6 text-white">
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-800 dark:to-blue-900 rounded-lg p-6 mb-6 text-white animate-content-enter">
         <h2 className="text-lg font-medium mb-2">
           Welcome back, {user?.fullName}!
         </h2>
@@ -880,10 +907,20 @@ export default function InsightsPage() {
             <>
               {/* Income */}
               <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/40 mb-3">
-                  <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-                  </svg>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/40">
+                    <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+                    </svg>
+                  </div>
+                  {!isLoading && sparklineData.income.length >= 2 && (
+                    <Sparkline
+                      data={sparklineData.income}
+                      color="#10B981"
+                      width={80}
+                      height={28}
+                    />
+                  )}
                 </div>
                 <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">Income</div>
                 <div className="text-3xl font-bold text-green-600 dark:text-green-400">
@@ -908,10 +945,20 @@ export default function InsightsPage() {
 
               {/* Expenses */}
               <div className="text-center p-6 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 rounded-xl">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/40 mb-3">
-                  <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/40">
+                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  {!isLoading && sparklineData.expenses.length >= 2 && (
+                    <Sparkline
+                      data={sparklineData.expenses}
+                      color="#EF4444"
+                      width={80}
+                      height={28}
+                    />
+                  )}
                 </div>
                 <div className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">Expenses</div>
                 <div className="text-3xl font-bold text-red-600 dark:text-red-400">
@@ -940,14 +987,24 @@ export default function InsightsPage() {
                   ? 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20'
                   : 'bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20'
               }`}>
-                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${
-                  financialSummary.netChange >= 0
-                    ? 'bg-blue-100 dark:bg-blue-900/40'
-                    : 'bg-orange-100 dark:bg-orange-900/40'
-                }`}>
-                  <svg className={`w-6 h-6 ${financialSummary.netChange >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
-                  </svg>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${
+                    financialSummary.netChange >= 0
+                      ? 'bg-blue-100 dark:bg-blue-900/40'
+                      : 'bg-orange-100 dark:bg-orange-900/40'
+                  }`}>
+                    <svg className={`w-6 h-6 ${financialSummary.netChange >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
+                    </svg>
+                  </div>
+                  {!isLoading && sparklineData.net.length >= 2 && (
+                    <Sparkline
+                      data={sparklineData.net}
+                      color={financialSummary.netChange >= 0 ? '#3B82F6' : '#F97316'}
+                      width={80}
+                      height={28}
+                    />
+                  )}
                 </div>
                 <div className={`text-sm font-medium mb-1 ${financialSummary.netChange >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
                   Net Savings
@@ -1072,6 +1129,359 @@ export default function InsightsPage() {
         };
         
         switch (widgetId) {
+          case 'netWorth':
+            return (
+              <WidgetWithErrorBoundary key="netWorth" name="Net Worth">
+              <CollapsibleSection
+                key="netWorth"
+                id="netWorth"
+                title="Net Worth"
+                subtitle={accountSummary ? `${Object.keys(accountSummary.balancesByType).length} account types` : undefined}
+                icon={
+                  <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                }
+                headerRight={
+                  <Link
+                    to="/accounts"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    View accounts →
+                  </Link>
+                }
+                isCollapsed={collapsedSections.has('netWorth')}
+                onToggle={toggleSection}
+                className="mb-6"
+                {...dragProps}
+              >
+                {accountSummaryLoading ? (
+                  <div className="space-y-4 pt-4">
+                    <div className="text-center">
+                      <div className="h-10 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto mb-2" />
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto" />
+                    </div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="grid grid-cols-2 gap-3">
+                      {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                      ))}
+                    </div>
+                  </div>
+                ) : accountSummary ? (
+                  <div className="space-y-5 pt-4">
+                    {/* Net Worth Hero */}
+                    <div className="text-center">
+                      <div className={`text-4xl font-bold ${
+                        accountSummary.netWorth >= 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {formatCurrency(accountSummary.netWorth, accountSummary.primaryCurrency)}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Total Net Worth in {accountSummary.primaryCurrency}
+                      </div>
+                    </div>
+
+                    {/* Assets vs Liabilities Bar */}
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                          <span className="text-gray-600 dark:text-gray-400">Assets</span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(accountSummary.totalAssets, accountSummary.primaryCurrency)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-red-600 dark:text-red-400">
+                            {formatCurrency(accountSummary.totalLiabilities, accountSummary.primaryCurrency)}
+                          </span>
+                          <span className="text-gray-600 dark:text-gray-400">Liabilities</span>
+                          <div className="w-3 h-3 rounded-full bg-red-500" />
+                        </div>
+                      </div>
+                      <div className="flex h-3 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {accountSummary.totalAssets > 0 && (
+                          <div
+                            className="bg-emerald-500 transition-all duration-500"
+                            style={{
+                              width: `${(accountSummary.totalAssets / (accountSummary.totalAssets + accountSummary.totalLiabilities)) * 100}%`
+                            }}
+                          />
+                        )}
+                        {accountSummary.totalLiabilities > 0 && (
+                          <div
+                            className="bg-red-500 transition-all duration-500"
+                            style={{
+                              width: `${(accountSummary.totalLiabilities / (accountSummary.totalAssets + accountSummary.totalLiabilities)) * 100}%`
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Breakdown by Account Type */}
+                    {Object.keys(accountSummary.balancesByType).length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">By Account Type</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {(Object.entries(accountSummary.balancesByType) as [string, number][])
+                            .filter(([, balance]) => balance !== 0)
+                            .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+                            .map(([type, balance]) => {
+                              const config = accountTypeConfig[type as AccountType];
+                              if (!config) return null;
+                              const isLiability = config.isLiability;
+                              const displayBalance = isLiability ? -balance : balance;
+                              return (
+                                <div
+                                  key={type}
+                                  className="flex items-center gap-2.5 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                                >
+                                  <div
+                                    className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                                    style={{ backgroundColor: `${config.defaultColor}20` }}
+                                  >
+                                    {config.icon}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{config.label}</div>
+                                    <div className={`text-sm font-semibold truncate ${
+                                      displayBalance >= 0
+                                        ? 'text-gray-900 dark:text-gray-100'
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`}>
+                                      {formatCurrency(displayBalance, accountSummary.primaryCurrency)}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Multi-currency note */}
+                    {Object.keys(accountSummary.balancesByCurrency).length > 1 && (
+                      <div className="text-xs text-gray-400 dark:text-gray-500 text-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                        Balances converted from {Object.keys(accountSummary.balancesByCurrency).length} currencies
+                        {accountSummary.ratesLastUpdated && (
+                          <> • Rates updated {new Date(accountSummary.ratesLastUpdated).toLocaleDateString()}</>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                    </svg>
+                    <p>Add accounts to see your net worth</p>
+                    <Link
+                      to="/accounts"
+                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700
+                        dark:from-blue-900 dark:to-blue-950 text-white rounded-lg text-sm font-medium
+                        hover:from-blue-700 hover:to-blue-800 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Account
+                    </Link>
+                  </div>
+                )}
+              </CollapsibleSection>
+              </WidgetWithErrorBoundary>
+            );
+
+          case 'recurring':
+            return (
+              <WidgetWithErrorBoundary key="recurring" name="Recurring Transactions">
+              <CollapsibleSection
+                key="recurring"
+                id="recurring"
+                title="Upcoming Recurring"
+                subtitle={recurringTransactions ? `${recurringTransactions.length} recurring transaction${recurringTransactions.length !== 1 ? 's' : ''}` : undefined}
+                icon={
+                  <svg className="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                }
+                headerRight={
+                  <Link
+                    to="/transactions"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    View all →
+                  </Link>
+                }
+                isCollapsed={collapsedSections.has('recurring')}
+                onToggle={toggleSection}
+                className="mb-6"
+                {...dragProps}
+              >
+                {recurringLoading ? (
+                  <div className="space-y-3 pt-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-lg animate-pulse" />
+                        <div className="flex-1">
+                          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-600 rounded animate-pulse mb-1" />
+                          <div className="h-3 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+                        </div>
+                        <div className="h-5 w-16 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                ) : recurringTransactions && recurringTransactions.length > 0 ? (
+                  <div className="space-y-2 pt-4">
+                    {(() => {
+                      // Sort by next occurrence (soonest first) and take top 5
+                      const upcoming = [...recurringTransactions]
+                        .filter(rt => rt.recurringRule?.nextOccurrence)
+                        .sort((a, b) => new Date(a.recurringRule.nextOccurrence).getTime() - new Date(b.recurringRule.nextOccurrence).getTime())
+                        .slice(0, 5);
+
+                      const now = new Date();
+
+                      return upcoming.map((rt) => {
+                        const nextDate = new Date(rt.recurringRule.nextOccurrence);
+                        const diffMs = nextDate.getTime() - now.getTime();
+                        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                        const freqConfig = recurrenceFrequencyConfig[rt.recurringRule.frequency];
+                        const isOverdue = diffDays < 0;
+                        const isToday = diffDays === 0;
+                        const isSoon = diffDays >= 1 && diffDays <= 3;
+
+                        // Countdown label
+                        let countdownLabel: string;
+                        let countdownColor: string;
+                        if (isOverdue) {
+                          countdownLabel = `${Math.abs(diffDays)}d overdue`;
+                          countdownColor = 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
+                        } else if (isToday) {
+                          countdownLabel = 'Today';
+                          countdownColor = 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400';
+                        } else if (isSoon) {
+                          countdownLabel = `In ${diffDays}d`;
+                          countdownColor = 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400';
+                        } else {
+                          countdownLabel = `In ${diffDays}d`;
+                          countdownColor = 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
+                        }
+
+                        return (
+                          <div
+                            key={rt.id}
+                            className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            {/* Type indicator */}
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
+                              rt.type === 'Receive'
+                                ? 'bg-green-100 dark:bg-green-900/30'
+                                : 'bg-red-100 dark:bg-red-900/30'
+                            }`}>
+                              {rt.type === 'Receive' ? '↓' : '↑'}
+                            </div>
+
+                            {/* Details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                  {rt.title || rt.payee || 'Recurring Transaction'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400 font-medium">
+                                  {freqConfig?.label ?? rt.recurringRule.frequency}
+                                </span>
+                                {rt.accountName && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                    {rt.accountName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Amount */}
+                            <div className="text-right flex-shrink-0">
+                              <div className={`text-sm font-semibold ${
+                                rt.type === 'Receive'
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}>
+                                {rt.type === 'Receive' ? '+' : '-'}
+                                {convertAndFormat(rt.amount, rt.currency, primaryCurrency, convert)}
+                              </div>
+                              <span className={`inline-block text-xs px-1.5 py-0.5 rounded-full font-medium mt-0.5 ${countdownColor}`}>
+                                {countdownLabel}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+
+                    {/* Monthly total estimate */}
+                    {(() => {
+                      const monthlyEstimate = recurringTransactions.reduce((total, rt) => {
+                        let multiplier = 1;
+                        switch (rt.recurringRule.frequency) {
+                          case 'Daily': multiplier = 30; break;
+                          case 'Weekly': multiplier = 4.33; break;
+                          case 'Biweekly': multiplier = 2.17; break;
+                          case 'Monthly': multiplier = 1; break;
+                          case 'Quarterly': multiplier = 1 / 3; break;
+                          case 'Yearly': multiplier = 1 / 12; break;
+                        }
+                        const sign = rt.type === 'Send' ? -1 : 1;
+                        return total + (rt.amount * multiplier * sign);
+                      }, 0);
+
+                      return (
+                        <div className="pt-3 mt-1 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-500 dark:text-gray-400">Est. monthly net impact</span>
+                            <span className={`font-semibold ${
+                              monthlyEstimate >= 0
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              {monthlyEstimate >= 0 ? '+' : ''}
+                              {convertAndFormat(Math.abs(monthlyEstimate), undefined, primaryCurrency, convert)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <p>No recurring transactions set up</p>
+                    <Link
+                      to="/transactions"
+                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700
+                        dark:from-blue-900 dark:to-blue-950 text-white rounded-lg text-sm font-medium
+                        hover:from-blue-700 hover:to-blue-800 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Transaction
+                    </Link>
+                  </div>
+                )}
+              </CollapsibleSection>
+              </WidgetWithErrorBoundary>
+            );
+
           case 'categoryPair':
             return (
               <WidgetWithErrorBoundary key="categoryPair" name="Categories">

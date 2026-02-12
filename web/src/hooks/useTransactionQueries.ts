@@ -13,6 +13,7 @@ import {
   batchMarkConfirmed,
   batchMarkPending,
   getCounterparties,
+  getRecurringTransactions,
   getTopCounterparties,
   getSpendingByAccount,
   getSpendingPatterns,
@@ -28,6 +29,7 @@ import type {
   CreateTransactionRequest,
   UpdateTransactionRequest,
   CounterpartyInfo,
+  RecurringTransaction,
   TopCounterpartiesResponse,
   SpendingByAccountResponse,
   SpendingPatternsResponse,
@@ -93,6 +95,16 @@ export function useTransactionAnalytics(
     queryKey: ['transactions', 'analytics', { startDate, endDate, accountId }],
     queryFn: () => getAnalytics(startDate, endDate, accountId),
     staleTime: 5 * 60 * 1000, // 5 minutes - analytics don't need to be real-time
+    enabled,
+  });
+}
+
+// Hook for fetching recurring transactions
+export function useRecurringTransactions(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.transactions.recurring,
+    queryFn: getRecurringTransactions,
+    staleTime: 5 * 60 * 1000, // 5 minutes
     enabled,
   });
 }
@@ -500,6 +512,7 @@ export type {
   TransactionSummary,
   TransactionListResponse,
   CounterpartyInfo,
+  RecurringTransaction,
   TransactionAnalytics,
   TopCounterpartiesResponse,
   SpendingByAccountResponse,

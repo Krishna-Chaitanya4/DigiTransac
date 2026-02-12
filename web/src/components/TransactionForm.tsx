@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
 import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
@@ -14,8 +14,11 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useCurrency } from '../context/CurrencyContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useHaptics } from '../hooks/useHaptics';
+import { useTransactions } from '../hooks';
+import { useRecentPayees } from '../hooks/useRecentPayees';
 import { getCurrentPosition, reverseGeocode } from '../services/locationService';
 import { logger } from '../services/logger';
+import { formatCurrency } from '../services/currencyService';
 import type {
   Transaction,
   TransactionType,
@@ -125,6 +128,12 @@ interface TransactionFormProps {
   tags: Tag[];
   defaultAccountId?: string;
   defaultType?: TransactionUIType;
+  defaultAmount?: number;
+  defaultTitle?: string;
+  defaultPayee?: string;
+  defaultLabelId?: string;
+  defaultTagIds?: string[];
+  defaultTransferToAccountId?: string;
   isLoading: boolean;
   autoLocationEnabled?: boolean;
   error?: string | null;
@@ -146,6 +155,12 @@ export function TransactionForm({
   tags,
   defaultAccountId,
   defaultType,
+  defaultAmount,
+  defaultTitle,
+  defaultPayee,
+  defaultLabelId,
+  defaultTagIds,
+  defaultTransferToAccountId,
   isLoading,
   autoLocationEnabled = true,
   error,
@@ -198,9 +213,109 @@ export function TransactionForm({
   
   // Track if we've already attempted auto-capture for this form session
   const locationCaptureAttemptedRef = useRef(false);
+  
+  // Duplicate warning dismissed state
+  const [duplicateWarningDismissed, setDuplicateWarningDismissed] = useState(false);
+  
+  // Payee autocomplete state
+  const { addPayee: recordPayee, getSuggestions } = useRecentPayees();
+  const [showPayeeSuggestions, setShowPayeeSuggestions] = useState(false);
+  const payeeSuggestions = useMemo(
+    () => getSuggestions(payee),
+    [getSuggestions, payee]
+  );
+  const payeeInputRef = useRef<HTMLInputElement>(null);
+  const payeeSuggestionsRef = useRef<HTMLDivElement>(null);
+  const [payeeSuggestionIndex, setPayeeSuggestionIndex] = useState(-1);
+
+  // Close payee suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        payeeSuggestionsRef.current &&
+        !payeeSuggestionsRef.current.contains(e.target as Node) &&
+        payeeInputRef.current &&
+        !payeeInputRef.current.contains(e.target as Node)
+      ) {
+        setShowPayeeSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handlePayeeSelect = useCallback((name: string) => {
+    setPayee(name);
+    setShowPayeeSuggestions(false);
+    setPayeeSuggestionIndex(-1);
+  }, []);
+
+  const handlePayeeKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showPayeeSuggestions || payeeSuggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setPayeeSuggestionIndex(prev =>
+        prev < payeeSuggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setPayeeSuggestionIndex(prev =>
+        prev > 0 ? prev - 1 : payeeSuggestions.length - 1
+      );
+    } else if (e.key === 'Enter' && payeeSuggestionIndex >= 0) {
+      e.preventDefault();
+      handlePayeeSelect(payeeSuggestions[payeeSuggestionIndex]);
+    } else if (e.key === 'Escape') {
+      setShowPayeeSuggestions(false);
+      setPayeeSuggestionIndex(-1);
+    }
+  }, [showPayeeSuggestions, payeeSuggestions, payeeSuggestionIndex, handlePayeeSelect]);
 
   // Get user's primary currency for fallback
   const { primaryCurrency } = useCurrency();
+  
+  // ──────────── Duplicate Detection ────────────
+  // Fetch recent transactions around the selected date to detect duplicates
+  const duplicateCheckFilter = useMemo(() => {
+    if (!accountId || amount <= 0 || !date || !isOpen || editingTransaction) return null;
+    // Search ±1 day from the selected date
+    const selectedDate = new Date(date + 'T12:00:00');
+    const dayBefore = new Date(selectedDate);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    const dayAfter = new Date(selectedDate);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return {
+      accountIds: [accountId],
+      startDate: `${fmt(dayBefore)}T00:00:00.000Z`,
+      endDate: `${fmt(dayAfter)}T23:59:59.999Z`,
+      pageSize: 20,
+    };
+  }, [accountId, amount, date, isOpen, editingTransaction]);
+  
+  const { data: recentTransactions } = useTransactions(
+    duplicateCheckFilter ?? { pageSize: 0 },
+    !!duplicateCheckFilter
+  );
+  
+  // Find potential duplicates: same account + similar amount (±1%) + within ±1 day
+  const potentialDuplicates = useMemo(() => {
+    if (!recentTransactions?.transactions || !duplicateCheckFilter || amount <= 0) return [];
+    const tolerance = amount * 0.01; // 1% tolerance
+    return recentTransactions.transactions.filter(t => {
+      // Skip the transaction being edited
+      if (editingTransaction && t.id === editingTransaction.id) return false;
+      // Match amount within tolerance
+      return Math.abs(t.amount - amount) <= Math.max(tolerance, 0.01);
+    });
+  }, [recentTransactions, duplicateCheckFilter, amount, editingTransaction]);
+  
+  // Reset dismissed state when key fields change
+  useEffect(() => {
+    setDuplicateWarningDismissed(false);
+  }, [amount, date, accountId]);
 
   // Derived values
   const selectedAccount = accounts.find(a => a.id === accountId);
@@ -265,20 +380,20 @@ export function TransactionForm({
         // Always start collapsed - user can expand if needed
         setShowAdvancedOptions(false);
       } else {
-        // Reset to defaults for new transaction
+        // Reset to defaults for new transaction (supports template pre-fill)
         const categoryLabels = labels.filter(l => l.type === 'Category');
         // Use defaultType if provided, otherwise 'Send'
         setType(defaultType || 'Send');
         setAccountId(defaultAccountId || accounts[0]?.id || '');
-        setAmount(0);
+        setAmount(defaultAmount || 0);
         setDate(toDateString(new Date(), undefined));
-        setTitle('');
-        setPayee('');
+        setTitle(defaultTitle || '');
+        setPayee(defaultPayee || '');
         setNotes('');
-        setSelectedLabelId(categoryLabels[0]?.id || '');
+        setSelectedLabelId(defaultLabelId || categoryLabels[0]?.id || '');
         setSplits([]);
-        setSelectedTagIds([]);
-        setTransferToAccountId('');
+        setSelectedTagIds(defaultTagIds || []);
+        setTransferToAccountId(defaultTransferToAccountId || '');
         setCounterpartyEmail(fixedCounterpartyEmail || '');
         setIsRecurring(false);
         setRecurrenceFrequency('Monthly');
@@ -376,6 +491,11 @@ export function TransactionForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Record payee in recent history for autocomplete
+    if (payee.trim()) {
+      recordPayee(payee.trim());
+    }
     
     const finalSplits = showSplits ? splits : [{ labelId: selectedLabelId, amount, notes: undefined }];
     // P2P applies to Send/Receive transactions with counterparty email
@@ -617,13 +737,66 @@ export function TransactionForm({
           placeholder="e.g., Grocery shopping" />
       </div>
 
-      {/* Payee/Payer */}
+      {/* Payee/Payer with Autocomplete */}
       {type !== 'Transfer' && !hidePayeeField && (
-        <div>
+        <div className="relative">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{type === 'Send' ? 'Payee' : 'Payer'}</label>
-          <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)}
+          <input
+            ref={payeeInputRef}
+            type="text"
+            value={payee}
+            onChange={(e) => {
+              setPayee(e.target.value);
+              setShowPayeeSuggestions(true);
+              setPayeeSuggestionIndex(-1);
+            }}
+            onFocus={() => setShowPayeeSuggestions(true)}
+            onKeyDown={handlePayeeKeyDown}
             className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-            placeholder={type === 'Send' ? 'e.g., Supermarket' : 'e.g., Employer'} />
+            placeholder={type === 'Send' ? 'e.g., Supermarket' : 'e.g., Employer'}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={showPayeeSuggestions && payeeSuggestions.length > 0}
+            aria-autocomplete="list"
+            aria-controls="payee-suggestions"
+            aria-activedescendant={payeeSuggestionIndex >= 0 ? `payee-suggestion-${payeeSuggestionIndex}` : undefined}
+          />
+          {/* Autocomplete dropdown */}
+          {showPayeeSuggestions && payeeSuggestions.length > 0 && (
+            <div
+              ref={payeeSuggestionsRef}
+              id="payee-suggestions"
+              role="listbox"
+              className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+            >
+              {payeeSuggestions.map((suggestion, idx) => (
+                <button
+                  key={suggestion}
+                  id={`payee-suggestion-${idx}`}
+                  role="option"
+                  aria-selected={idx === payeeSuggestionIndex}
+                  type="button"
+                  className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                    idx === payeeSuggestionIndex
+                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // Prevent blur before click
+                    handlePayeeSelect(suggestion);
+                  }}
+                  onMouseEnter={() => setPayeeSuggestionIndex(idx)}
+                >
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    {suggestion}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -667,6 +840,42 @@ export function TransactionForm({
       </div>
     </div>
   );
+
+  const renderDuplicateWarning = () => {
+    if (duplicateWarningDismissed || potentialDuplicates.length === 0 || editingTransaction) return null;
+    const dup = potentialDuplicates[0];
+    const dupDate = dup.dateLocal || dup.date.split('T')[0];
+    return (
+      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg mt-3">
+        <div className="flex items-start gap-2">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              Possible duplicate detected
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              {formatCurrency(dup.amount, dup.currency)} on {dupDate}
+              {dup.title && ` — "${dup.title}"`}
+              {dup.payee && ` (${dup.payee})`}
+              {potentialDuplicates.length > 1 && ` and ${potentialDuplicates.length - 1} more`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDuplicateWarningDismissed(true)}
+            className="p-1 text-amber-400 hover:text-amber-600 dark:text-amber-500 dark:hover:text-amber-300 flex-shrink-0"
+            aria-label="Dismiss duplicate warning"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const renderErrorMessage = () => error ? (
     <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm mt-4">
@@ -743,6 +952,7 @@ export function TransactionForm({
               {/* Step 2: Details (optional) */}
               {wizardStep === 2 && renderAdvancedFields()}
             </div>
+            {renderDuplicateWarning()}
             {renderErrorMessage()}
           </div>
 
@@ -830,6 +1040,7 @@ export function TransactionForm({
               {showAdvancedOptions && renderAdvancedFields()}
             </div>
 
+            {renderDuplicateWarning()}
             {renderErrorMessage()}
 
             {/* Actions */}
