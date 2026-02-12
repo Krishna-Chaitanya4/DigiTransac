@@ -190,7 +190,7 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
     } else {
       handleComplete();
     }
-  }, [currentStep, handleComplete]);
+  }, [currentStep, tourSteps.length, handleComplete]);
 
   const handlePrevious = useCallback(() => {
     if (currentStep > 0) {

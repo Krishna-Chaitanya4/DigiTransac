@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type RefObject } from 'react';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -296,32 +296,35 @@ export function useConfirmDialog() {
   const [state, setState] = useState<{
     isOpen: boolean;
     options: ConfirmOptions;
-    resolve: ((value: boolean) => void) | null;
   }>({
     isOpen: false,
     options: { title: '', message: '' },
-    resolve: null,
   });
+
+  // Store resolve in a ref to avoid dependency issues with React Compiler
+  const resolveRef: RefObject<((value: boolean) => void) | null> = useRef(null);
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
+      resolveRef.current = resolve;
       setState({
         isOpen: true,
         options,
-        resolve,
       });
     });
   }, []);
 
   const handleConfirm = useCallback(() => {
-    state.resolve?.(true);
-    setState(prev => ({ ...prev, isOpen: false, resolve: null }));
-  }, [state.resolve]);
+    resolveRef.current?.(true);
+    resolveRef.current = null;
+    setState(prev => ({ ...prev, isOpen: false }));
+  }, []);
 
   const handleCancel = useCallback(() => {
-    state.resolve?.(false);
-    setState(prev => ({ ...prev, isOpen: false, resolve: null }));
-  }, [state.resolve]);
+    resolveRef.current?.(false);
+    resolveRef.current = null;
+    setState(prev => ({ ...prev, isOpen: false }));
+  }, []);
 
   const dialogProps: ConfirmDialogProps = {
     isOpen: state.isOpen,
