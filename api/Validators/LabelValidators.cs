@@ -30,7 +30,8 @@ public class UpdateLabelRequestValidator : AbstractValidator<UpdateLabelRequest>
     {
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Label name is required")
-            .MaximumLength(100).WithMessage("Label name cannot exceed 100 characters");
+            .MaximumLength(100).WithMessage("Label name cannot exceed 100 characters")
+            .When(x => x.Name is not null);
         
         RuleFor(x => x.Color)
             .Matches(@"^#[0-9A-Fa-f]{6}$").When(x => !string.IsNullOrEmpty(x.Color))

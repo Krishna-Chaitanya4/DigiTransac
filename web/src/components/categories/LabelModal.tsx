@@ -34,10 +34,15 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [excludeFromAnalytics, setExcludeFromAnalytics] = useState(false);
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
 
   // Check if editing a system label
   const isSystemLabel = editingLabel?.isSystem ?? false;
+
+  // Check if parent is excluded (inherited exclusion)
+  const parentLabel = selectedParentId ? allLabels.find(l => l.id === selectedParentId) : null;
+  const isParentExcluded = parentLabel?.excludeFromAnalytics ?? false;
 
   useEffect(() => {
     if (editingLabel) {
@@ -45,11 +50,13 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
       setIcon(editingLabel.icon || '');
       setColor(editingLabel.color || '');
       setSelectedParentId(editingLabel.parentId);
+      setExcludeFromAnalytics(editingLabel.excludeFromAnalytics);
     } else {
       setName('');
       setIcon('');
       setColor('');
       setSelectedParentId(parentId);
+      setExcludeFromAnalytics(false);
     }
   }, [editingLabel, parentId, isOpen]);
 
@@ -76,6 +83,7 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
         icon: icon || null,
         color: color || null,
         parentId: selectedParentId,
+        excludeFromAnalytics,
       });
     } else {
       onSubmit({
@@ -84,6 +92,7 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
         parentId: selectedParentId,
         icon: icon || null,
         color: color || null,
+        excludeFromAnalytics,
       });
     }
   };
@@ -219,6 +228,49 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Exclude from Analytics toggle */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="excludeFromAnalytics" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Exclude from calculations
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {isParentExcluded
+                        ? 'Inherited from parent folder — always excluded'
+                        : labelType === 'Folder'
+                          ? 'Excludes this folder and all children from calculations'
+                          : 'Excludes this category from calculations'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isParentExcluded || excludeFromAnalytics}
+                    disabled={isParentExcluded}
+                    onClick={() => setExcludeFromAnalytics(!excludeFromAnalytics)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                      isParentExcluded
+                        ? 'bg-amber-300 dark:bg-amber-700 cursor-not-allowed opacity-60'
+                        : excludeFromAnalytics
+                          ? 'bg-amber-500 dark:bg-amber-600 cursor-pointer'
+                          : 'bg-gray-200 dark:bg-gray-600 cursor-pointer'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        (isParentExcluded || excludeFromAnalytics) ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {isParentExcluded && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ Parent folder is excluded — this label inherits the exclusion
+                  </p>
+                )}
               </div>
             </div>
 

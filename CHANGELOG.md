@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-02-12
+
+### Added
+- **Exclude from Analytics** - Per-label `excludeFromAnalytics` flag to hide categories/folders from analytics, budgets, and spending reports
+  - Backend: `excludeFromAnalytics` field on Label model with full CRUD support in DTOs and LabelService
+  - Backend: `BuildExcludedLabelIds` helper with parent-chain inheritance — excluding a folder excludes all children
+  - Backend: All 8 analytics methods (`GetSummaryAsync`, `GetAnalyticsAsync`, `GetTopCounterpartiesAsync`, `GetSpendingByAccountAsync`, `GetSpendingPatternsAsync`, `GetSpendingAnomaliesAsync`, `GetLocationInsightsAsync`, `GetTripGroupsAsync`) filter excluded labels
+  - Backend: `IsFullyExcluded` — transactions excluded only when ALL splits are in excluded categories
+  - Backend: `GetIncludedAmount` — partial exclusion returns sum of non-excluded splits with currency conversion
+  - Backend: BudgetService respects exclusion when fetching budget transactions
+  - Backend: Lazy migration sets `excludeFromAnalytics=true` on existing "Transfers" and "Adjustments" system labels
+  - Backend: Smart defaults — new system labels (Transfers, Adjustments) created with `excludeFromAnalytics=true`
+  - Frontend: Toggle button on each label in the tree view to exclude/include from analytics
+  - Frontend: Visual inheritance — child labels of excluded folders show "inherited" badge with dimmed appearance
+  - Frontend: Exclude toggle in create/edit label modal with parent-inherited state detection
+  - Frontend: Search results show "excluded" badge for excluded labels
+  - 9 unit tests covering `BuildExcludedLabelIds` (empty dict, no exclusions, direct exclusion, folder inheritance, nested inheritance, child-only, mixed, orphaned parent, root-level category)
+
+### Fixed
+- **MemoryCacheServiceTests** - Updated 3 pre-existing broken tests to match current `CacheOptions`/`CacheKeys` API
+
 ## [1.4.1] - 2026-02-12
 
 ### Fixed

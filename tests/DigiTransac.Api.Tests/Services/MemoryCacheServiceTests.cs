@@ -128,28 +128,26 @@ public class MemoryCacheServiceTests
     }
 
     [Fact]
-    public void CacheOptions_Presets_ShouldHaveCorrectValues()
+    public void CacheOptions_WithExpiration_ShouldSetAbsoluteExpiration()
     {
+        // Act
+        var options = CacheOptions.WithExpiration(TimeSpan.FromMinutes(5));
+
         // Assert
-        CacheOptions.Short.AbsoluteExpiration.Should().Be(TimeSpan.FromSeconds(30));
-        CacheOptions.Medium.AbsoluteExpiration.Should().Be(TimeSpan.FromMinutes(2));
-        CacheOptions.Long.AbsoluteExpiration.Should().Be(TimeSpan.FromMinutes(10));
-        CacheOptions.ExchangeRates.AbsoluteExpiration.Should().Be(TimeSpan.FromMinutes(5));
-        CacheOptions.ExchangeRates.Tags.Should().Contain("exchange-rates");
+        options.AbsoluteExpiration.Should().Be(TimeSpan.FromMinutes(5));
+        options.Tags.Should().BeNull();
     }
 
     [Fact]
-    public void CacheOptions_ForUser_ShouldIncludeUserTag()
+    public void CacheOptions_WithExpiration_ShouldIncludeTags()
     {
-        // Arrange
-        var userId = "user123";
-
         // Act
-        var options = CacheOptions.ForUser(userId);
+        var options = CacheOptions.WithExpiration(TimeSpan.FromMinutes(2), "user:123", "transactions");
 
         // Assert
-        options.Tags.Should().Contain($"user:{userId}");
         options.AbsoluteExpiration.Should().Be(TimeSpan.FromMinutes(2));
+        options.Tags.Should().Contain("user:123");
+        options.Tags.Should().Contain("transactions");
     }
 
     [Fact]
@@ -160,11 +158,11 @@ public class MemoryCacheServiceTests
         var transactionId = "tx456";
 
         // Assert
-        CacheKeys.UserLabels(userId).Should().Be("labels:user:user123");
-        CacheKeys.UserTags(userId).Should().Be("tags:user:user123");
-        CacheKeys.UserAccounts(userId).Should().Be("accounts:user:user123");
-        CacheKeys.Transaction(transactionId).Should().Be("transaction:tx456");
-        CacheKeys.UserDek(userId).Should().Be("dek:user:user123");
-        CacheKeys.ExchangeRates.Should().Be("exchange-rates:latest");
+        CacheKeys.UserAccounts(userId).Should().Be("digitransac:user:user123:accounts");
+        CacheKeys.Transaction(transactionId).Should().Be("digitransac:transaction:tx456");
+        CacheKeys.UserTransactions(userId).Should().Be("digitransac:user:user123:transactions");
+        CacheKeys.UserAnalytics(userId).Should().Be("digitransac:user:user123:analytics");
+        CacheKeys.UserBudgets(userId).Should().Be("digitransac:user:user123:budgets");
+        CacheKeys.UserCategories(userId).Should().Be("digitransac:user:user123:categories");
     }
 }

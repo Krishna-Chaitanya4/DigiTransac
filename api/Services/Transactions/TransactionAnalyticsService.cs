@@ -44,10 +44,12 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         Dictionary<string, decimal> Rates,
         Dictionary<string, Account> Accounts,
         Dictionary<string, Label> Labels,
+        HashSet<string> ExcludedLabelIds,
         byte[]? Dek);
 
     /// <summary>
     /// Fetches the shared analytics context (user, accounts, labels, rates, DEK).
+    /// Always fetches labels to support analytics exclusion filtering.
     /// </summary>
     private async Task<AnalyticsContext> FetchAnalyticsContextAsync(
         string userId,
@@ -59,12 +61,76 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var ratesResponse = await _exchangeRateService.GetRatesAsync();
         var accounts = (await _accountRepository.GetByUserIdAsync(userId, true))
             .ToDictionary(a => a.Id);
-        var labels = needsLabels
-            ? (await _labelRepository.GetByUserIdAsync(userId)).ToDictionary(l => l.Id)
-            : new Dictionary<string, Label>();
+        // Always fetch labels to compute excluded label IDs for analytics filtering
+        var allLabels = await _labelRepository.GetByUserIdAsync(userId);
+        var labelsDict = allLabels.ToDictionary(l => l.Id);
+        var excludedLabelIds = BuildExcludedLabelIds(labelsDict);
+        var labels = needsLabels ? labelsDict : new Dictionary<string, Label>();
         var dek = needsDek ? await _mapperService.GetUserDekAsync(userId) : null;
 
-        return new AnalyticsContext(primaryCurrency, ratesResponse.Rates, accounts, labels, dek);
+        return new AnalyticsContext(primaryCurrency, ratesResponse.Rates, accounts, labels, excludedLabelIds, dek);
+    }
+
+    /// <summary>
+    /// Builds a set of label IDs that should be excluded from analytics,
+    /// respecting folder inheritance (if a folder is excluded, all children are excluded).
+    /// </summary>
+    internal static HashSet<string> BuildExcludedLabelIds(Dictionary<string, Label> labels)
+    {
+        var excluded = new HashSet<string>();
+
+        foreach (var label in labels.Values)
+        {
+            if (label.ExcludeFromAnalytics)
+            {
+                excluded.Add(label.Id);
+                continue;
+            }
+
+            // Check parent chain for inherited exclusion
+            var current = label;
+            while (current?.ParentId != null)
+            {
+                if (labels.TryGetValue(current.ParentId, out var parent))
+                {
+                    if (parent.ExcludeFromAnalytics)
+                    {
+                        excluded.Add(label.Id);
+                        break;
+                    }
+                    current = parent;
+                }
+                else break;
+            }
+        }
+
+        return excluded;
+    }
+
+    /// <summary>
+    /// Checks if a transaction should be fully excluded from analytics.
+    /// A transaction is excluded only when ALL of its splits belong to excluded categories.
+    /// </summary>
+    private static bool IsFullyExcluded(Transaction t, HashSet<string> excludedLabelIds)
+    {
+        if (!t.Splits.Any()) return false;
+        return t.Splits.All(s => excludedLabelIds.Contains(s.LabelId));
+    }
+
+    /// <summary>
+    /// Gets the included (non-excluded) amount of a transaction, skipping excluded splits.
+    /// </summary>
+    private decimal GetIncludedAmount(
+        Transaction t,
+        HashSet<string> excludedLabelIds,
+        Dictionary<string, Account> accounts,
+        string primaryCurrency,
+        Dictionary<string, decimal> rates)
+    {
+        var transactionCurrency = GetTransactionCurrency(t, accounts, primaryCurrency);
+        return t.Splits
+            .Where(s => !excludedLabelIds.Contains(s.LabelId))
+            .Sum(s => _exchangeRateService.Convert(s.Amount, transactionCurrency, primaryCurrency, rates));
     }
 
     /// <summary>
@@ -127,19 +193,26 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             if (string.IsNullOrEmpty(t.AccountId))
                 continue;
 
+            // Skip fully excluded transactions (all splits in excluded categories)
+            if (IsFullyExcluded(t, ctx.ExcludedLabelIds))
+                continue;
+
             var transactionCurrency = GetTransactionCurrency(t, accountDict, primaryCurrency);
 
-            var convertedAmount = _exchangeRateService.Convert(
-                t.Amount, transactionCurrency, primaryCurrency, rates);
+            // Use included amount (sum of non-excluded splits) for totals
+            var includedAmount = GetIncludedAmount(t, ctx.ExcludedLabelIds, accountDict, primaryCurrency, rates);
 
             if (t.Type == TransactionType.Receive)
-                totalCredits += convertedAmount;
+                totalCredits += includedAmount;
             else if (t.Type == TransactionType.Send)
-                totalDebits += convertedAmount;
+                totalDebits += includedAmount;
                 
-            // Accumulate category totals with currency conversion
+            // Accumulate category totals with currency conversion, skipping excluded splits
             foreach (var split in t.Splits)
             {
+                if (ctx.ExcludedLabelIds.Contains(split.LabelId))
+                    continue;
+
                 var convertedSplitAmount = _exchangeRateService.Convert(
                     split.Amount, transactionCurrency, primaryCurrency, rates);
                     
@@ -148,14 +221,14 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 categoryTotals[split.LabelId] += convertedSplitAmount;
             }
             
-            // Accumulate tag totals with currency conversion
+            // Accumulate tag totals with currency conversion (using included amount)
             if (t.TagIds != null)
             {
                 foreach (var tagId in t.TagIds)
                 {
                     if (!tagTotals.ContainsKey(tagId))
                         tagTotals[tagId] = 0;
-                    tagTotals[tagId] += convertedAmount;
+                    tagTotals[tagId] += includedAmount;
                 }
             }
         }
@@ -192,13 +265,16 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Calculate category breakdown with currency conversion
+        // Calculate category breakdown with currency conversion, excluding analytics-excluded splits
         var categoryTotals = new Dictionary<string, (decimal amount, int count)>();
         foreach (var t in transactions.Where(t => !t.IsRecurringTemplate))
         {
             var transactionCurrency = GetTransactionCurrency(t, accounts, primaryCurrency);
             foreach (var split in t.Splits)
             {
+                if (ctx.ExcludedLabelIds.Contains(split.LabelId))
+                    continue;
+
                 if (!categoryTotals.ContainsKey(split.LabelId))
                 {
                     categoryTotals[split.LabelId] = (0, 0);
@@ -229,51 +305,48 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             })
             .ToList();
 
-        // Calculate spending trends (by month) with currency conversion
+        // Calculate spending trends (by month) with currency conversion, excluding analytics-excluded transactions
         var trends = transactions
-            .Where(t => !t.IsRecurringTemplate)
+            .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
             .GroupBy(t => t.Date.ToString("yyyy-MM"))
             .OrderBy(g => g.Key)
             .Select(g => new SpendingTrend(
                 g.Key,
                 g.Where(t => t.Type == TransactionType.Receive)
-                    .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
                 g.Where(t => t.Type == TransactionType.Send)
-                    .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
                 g.Where(t => t.Type == TransactionType.Receive)
-                    .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)) -
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)) -
                 g.Where(t => t.Type == TransactionType.Send)
-                    .Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
                 g.Count()
             ))
             .ToList();
 
-        // Calculate averages by type with currency conversion
-        var actualTransactions = transactions.Where(t => !t.IsRecurringTemplate).ToList();
+        // Calculate averages by type with currency conversion, excluding analytics-excluded transactions
+        var actualTransactions = transactions
+            .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds)).ToList();
         var receives = actualTransactions.Where(t => t.Type == TransactionType.Receive).ToList();
         var sends = actualTransactions.Where(t => t.Type == TransactionType.Send).ToList();
         // Transfers are now Send+Receive, detect by LinkedTransactionId for reporting
         var transfers = actualTransactions.Where(t => !string.IsNullOrEmpty(t.LinkedTransactionId)).ToList();
 
         var averagesByType = new AveragesByType(
-            receives.Any() ? Math.Round(receives.Average(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)), 2) : 0,
-            sends.Any() ? Math.Round(sends.Average(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)), 2) : 0,
-            transfers.Any() ? Math.Round(transfers.Average(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)), 2) : 0
+            receives.Any() ? Math.Round(receives.Average(t => GetIncludedAmount(
+                t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)), 2) : 0,
+            sends.Any() ? Math.Round(sends.Average(t => GetIncludedAmount(
+                t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)), 2) : 0,
+            transfers.Any() ? Math.Round(transfers.Average(t => GetIncludedAmount(
+                t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)), 2) : 0
         );
 
         // Calculate daily and monthly averages with currency conversion
         var dateRange = (endDate ?? DateTime.UtcNow) - (startDate ?? actualTransactions.Min(t => t.Date));
         var days = Math.Max(1, dateRange.Days);
         var months = Math.Max(1, days / 30.0);
-        var totalSends = sends.Sum(t => _exchangeRateService.Convert(
-            t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+        var totalSends = sends.Sum(t => GetIncludedAmount(
+            t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
 
         return new TransactionAnalyticsResponse(
             topCategories,
@@ -311,9 +384,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Filter only Send transactions (expenses)
+        // Filter only Send transactions (expenses), excluding analytics-excluded transactions
         var sendTransactions = transactions
-            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate)
+            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
             .ToList();
 
         // Collect counterparty user IDs and fetch their info
@@ -346,8 +420,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 return ("Payee", GetPayee(t), (string?)null);
             })
             .Select(g => {
-                var totalAmount = g.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+                var totalAmount = g.Sum(t => GetIncludedAmount(
+                    t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
                 return new {
                     Type = g.Key.Item1,
                     Name = g.Key.Item2,
@@ -405,7 +479,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        var actualTransactions = transactions.Where(t => !t.IsRecurringTemplate).ToList();
+        var actualTransactions = transactions
+            .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds)).ToList();
 
         // Group by account
         var allAccountGroups = actualTransactions
@@ -416,9 +491,9 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 var accountCurrency = account?.Currency ?? primaryCurrency;
 
                 var debits = g.Where(t => t.Type == TransactionType.Send)
-                    .Sum(t => _exchangeRateService.Convert(t.Amount, accountCurrency, primaryCurrency, rates));
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accountDict, primaryCurrency, rates));
                 var credits = g.Where(t => t.Type == TransactionType.Receive)
-                    .Sum(t => _exchangeRateService.Convert(t.Amount, accountCurrency, primaryCurrency, rates));
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accountDict, primaryCurrency, rates));
 
                 return new {
                     AccountId = g.Key,
@@ -477,9 +552,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Filter only Send transactions (expenses)
+        // Filter only Send transactions (expenses), excluding analytics-excluded transactions
         var sendTransactions = transactions
-            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate)
+            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
             .ToList();
 
         var dayNames = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
@@ -508,8 +584,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var byDayOfWeek = sendTransactions
             .GroupBy(t => GetTransactionDayOfWeek(t))
             .Select(g => {
-                var totalAmount = g.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+                var totalAmount = g.Sum(t => GetIncludedAmount(
+                    t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
                 return new DayOfWeekSpending(
                     g.Key,
                     dayNames[g.Key],
@@ -535,8 +611,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var byHourOfDay = sendTransactions
             .GroupBy(t => GetTransactionHour(t))
             .Select(g => {
-                var totalAmount = g.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+                var totalAmount = g.Sum(t => GetIncludedAmount(
+                    t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
                 var hourLabel = g.Key == 0 ? "12 AM" :
                                g.Key < 12 ? $"{g.Key} AM" :
                                g.Key == 12 ? "12 PM" :
@@ -594,9 +670,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Filter only Send transactions (expenses)
+        // Filter only Send transactions (expenses), excluding analytics-excluded transactions
         var sendTransactions = transactions
-            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate)
+            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
             .ToList();
 
         // Helper to get decrypted payee
@@ -615,7 +692,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         // Calculate statistics for anomaly detection
         var convertedAmounts = sendTransactions
-            .Select(t => _exchangeRateService.Convert(t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates))
+            .Select(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates))
             .ToList();
 
         var average = convertedAmounts.Average();
@@ -625,8 +702,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         // 1. Detect high-value transactions (outliers)
         foreach (var t in sendTransactions)
         {
-            var convertedAmount = _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates);
+            var convertedAmount = GetIncludedAmount(
+                t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates);
 
             if (convertedAmount > threshold && convertedAmount > average * 2)
             {
@@ -650,10 +727,12 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         // 2. Detect unusual category spending (categories with sudden spike)
         var categorySpending = sendTransactions
-            .SelectMany(t => t.Splits.Select(s => new {
-                LabelId = s.LabelId,
-                Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
-            }))
+            .SelectMany(t => t.Splits
+                .Where(s => !ctx.ExcludedLabelIds.Contains(s.LabelId))
+                .Select(s => new {
+                    LabelId = s.LabelId,
+                    Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
+                }))
             .GroupBy(x => x.LabelId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
 
@@ -671,12 +750,15 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var (historicalTransactions, _) = await _transactionRepository.GetFilteredAsync(userId, historicalFilter);
 
         var historicalCategorySpending = historicalTransactions
-            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate)
-            .SelectMany(t => t.Splits.Select(s => new {
-                LabelId = s.LabelId,
-                Amount = _exchangeRateService.Convert(
-                    s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
-            }))
+            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
+            .SelectMany(t => t.Splits
+                .Where(s => !ctx.ExcludedLabelIds.Contains(s.LabelId))
+                .Select(s => new {
+                    LabelId = s.LabelId,
+                    Amount = _exchangeRateService.Convert(
+                        s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
+                }))
             .GroupBy(x => x.LabelId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
 
@@ -713,11 +795,13 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var currentPayees = sendTransactions
             .Where(t => !string.IsNullOrEmpty(t.EncryptedPayee) || !string.IsNullOrEmpty(t.Title))
             .GroupBy(t => GetPayee(t) ?? "Unknown")
-            .ToDictionary(g => g.Key, g => g.Sum(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)));
+            .ToDictionary(g => g.Key, g => g.Sum(t => GetIncludedAmount(
+                t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)));
 
         var historicalPayees = historicalTransactions
-            .Where(t => t.Type == TransactionType.Send && (!string.IsNullOrEmpty(t.EncryptedPayee) || !string.IsNullOrEmpty(t.Title)))
+            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds)
+                && (!string.IsNullOrEmpty(t.EncryptedPayee) || !string.IsNullOrEmpty(t.Title)))
             .Select(t => GetPayee(t) ?? "Unknown")
             .Distinct()
             .ToHashSet();
@@ -783,9 +867,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, totalCount) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Filter transactions with location data
+        // Filter transactions with location data, excluding analytics-excluded transactions
         var transactionsWithLocation = transactions
-            .Where(t => t.Location != null && !t.IsRecurringTemplate)
+            .Where(t => t.Location != null && !t.IsRecurringTemplate
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
             .ToList();
 
         // Helper to decrypt longitude
@@ -813,8 +898,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         // Calculate total spending with location
         var totalSpendingWithLocation = transactionsWithLocation
             .Where(t => t.Type == TransactionType.Send)
-            .Sum(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+            .Sum(t => GetIncludedAmount(
+                t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
 
         // Group transactions by location (cluster nearby transactions within 500m)
         var locationClusters = new List<(double Lat, double Lon, string Name, string? City, string? Country, List<Transaction> Transactions)>();
@@ -852,8 +937,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                     .Where(t => t.Type == TransactionType.Send)
                     .ToList();
                 
-                var totalAmount = sendTransactions.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+                var totalAmount = sendTransactions.Sum(t => GetIncludedAmount(
+                    t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
 
                 // Find top category at this location
                 var categoryAmounts = sendTransactions
@@ -910,8 +995,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             if (nearbyTransactions.Any())
             {
                 var sendNearby = nearbyTransactions.Where(t => t.Type == TransactionType.Send).ToList();
-                var nearbyTotal = sendNearby.Sum(t => _exchangeRateService.Convert(
-                    t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+                var nearbyTotal = sendNearby.Sum(t => GetIncludedAmount(
+                    t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
 
                 // Get the most common location name
                 var locationName = nearbyTransactions
@@ -1005,8 +1090,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
         // Filter transactions with location data (Send type only for spending analysis)
+        // Filter transactions with location data, excluding analytics-excluded transactions
         var transactionsWithLocation = transactions
-            .Where(t => t.Location != null && !t.IsRecurringTemplate && t.Type == TransactionType.Send)
+            .Where(t => t.Location != null && !t.IsRecurringTemplate && t.Type == TransactionType.Send
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
             .OrderBy(t => t.Date)
             .ToList();
 
@@ -1087,15 +1174,17 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             var durationDays = Math.Max(1, (int)(regionEndDate - regionStartDate).TotalDays + 1);
 
             // Calculate total spending
-            var totalAmount = regionTransactions.Sum(t => _exchangeRateService.Convert(
-                t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates));
+            var totalAmount = regionTransactions.Sum(t => GetIncludedAmount(
+                t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
 
-            // Calculate category breakdown
+            // Calculate category breakdown, excluding analytics-excluded splits
             var categoryTotals = regionTransactions
-                .SelectMany(t => t.Splits.Select(s => new {
-                    LabelId = s.LabelId,
-                    Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
-                }))
+                .SelectMany(t => t.Splits
+                    .Where(s => !ctx.ExcludedLabelIds.Contains(s.LabelId))
+                    .Select(s => new {
+                        LabelId = s.LabelId,
+                        Amount = _exchangeRateService.Convert(s.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)
+                    }))
                 .GroupBy(x => x.LabelId)
                 .Select(g => {
                     var totalCat = g.Sum(x => x.Amount);
@@ -1120,8 +1209,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 .Select(g => new TripDaySpending(
                     DateTime.TryParse(g.Key, out var d) ? d : g.First().Date,
                     g.Key,
-                    g.Sum(t => _exchangeRateService.Convert(
-                        t.Amount, GetTransactionCurrency(t, accounts, primaryCurrency), primaryCurrency, rates)),
+                    g.Sum(t => GetIncludedAmount(
+                        t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
                     g.Count()
                 ))
                 .ToList();

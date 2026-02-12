@@ -42,6 +42,10 @@ public class LabelService : ILabelService
     public async Task<List<LabelTreeResponse>> GetTreeAsync(string userId, CancellationToken ct = default)
     {
         var labels = await _labelRepository.GetByUserIdAsync(userId, ct);
+
+        // Lazy migration: ensure system labels (Transfers/Adjustments) have excludeFromAnalytics=true
+        await MigrateSystemLabelExclusionsAsync(labels, ct);
+
         return BuildTree(labels, null);
     }
 
@@ -79,7 +83,8 @@ public class LabelService : ILabelService
             Icon = request.Icon,
             Color = request.Color,
             Order = 0,
-            IsSystem = false
+            IsSystem = false,
+            ExcludeFromAnalytics = request.ExcludeFromAnalytics ?? false
         };
 
         await _labelRepository.CreateAsync(label, ct);
@@ -94,43 +99,53 @@ public class LabelService : ILabelService
         if (label == null)
             return DomainErrors.Label.NotFound(id);
 
-        // System labels cannot be renamed or moved
-        if (label.IsSystem)
+        // Full update (Name provided) — handle rename, reparent, icon, color
+        if (request.Name is not null)
         {
-            if (request.Name?.Trim() != label.Name)
-                return Error.InvalidOperation("System labels cannot be renamed");
-            if (request.ParentId != label.ParentId)
-                return Error.InvalidOperation("System labels cannot be moved");
+            // System labels cannot be renamed or moved
+            if (label.IsSystem)
+            {
+                if (request.Name.Trim() != label.Name)
+                    return Error.InvalidOperation("System labels cannot be renamed");
+                if (request.ParentId != label.ParentId)
+                    return Error.InvalidOperation("System labels cannot be moved");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Name))
+                return Error.Validation("Name is required");
+
+            // Validate parent if changing
+            if (request.ParentId != label.ParentId && !string.IsNullOrEmpty(request.ParentId))
+            {
+                // Can't set self as parent
+                if (request.ParentId == id)
+                    return Error.Validation("Cannot set label as its own parent");
+
+                var parent = await _labelRepository.GetByIdAndUserIdAsync(request.ParentId, userId, ct);
+                if (parent == null)
+                    return Error.NotFound("Parent");
+                if (parent.Type != LabelType.Folder)
+                    return Error.Validation("Parent must be a folder");
+
+                // Check for circular reference (can't move folder under its own descendant)
+                if (label.Type == LabelType.Folder && await IsDescendantAsync(request.ParentId, id, userId))
+                    return Error.Validation("Cannot move folder under its own descendant");
+            }
+
+            label.Name = request.Name.Trim();
+            label.ParentId = request.ParentId;
+            label.Icon = request.Icon;
+            label.Color = request.Color;
         }
 
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return Error.Validation("Name is required");
-
-        // Validate parent if changing
-        if (request.ParentId != label.ParentId && !string.IsNullOrEmpty(request.ParentId))
-        {
-            // Can't set self as parent
-            if (request.ParentId == id)
-                return Error.Validation("Cannot set label as its own parent");
-
-            var parent = await _labelRepository.GetByIdAndUserIdAsync(request.ParentId, userId, ct);
-            if (parent == null)
-                return Error.NotFound("Parent");
-            if (parent.Type != LabelType.Folder)
-                return Error.Validation("Parent must be a folder");
-
-            // Check for circular reference (can't move folder under its own descendant)
-            if (label.Type == LabelType.Folder && await IsDescendantAsync(request.ParentId, id, userId))
-                return Error.Validation("Cannot move folder under its own descendant");
-        }
-
-        label.Name = request.Name.Trim();
-        label.ParentId = request.ParentId;
-        label.Icon = request.Icon;
-        label.Color = request.Color;
+        // These fields support partial updates (independent of Name)
         if (request.Order.HasValue)
         {
             label.Order = request.Order.Value;
+        }
+        if (request.ExcludeFromAnalytics.HasValue)
+        {
+            label.ExcludeFromAnalytics = request.ExcludeFromAnalytics.Value;
         }
 
         await _labelRepository.UpdateAsync(label, ct);
@@ -238,7 +253,7 @@ public class LabelService : ILabelService
         var order = 0;
 
         // Helper to create folder
-        Label CreateFolder(string name, string? parentId = null, string? icon = null, string? color = null, bool isSystem = false)
+        Label CreateFolder(string name, string? parentId = null, string? icon = null, string? color = null, bool isSystem = false, bool excludeFromAnalytics = false)
         {
             var folder = new Label
             {
@@ -250,14 +265,15 @@ public class LabelService : ILabelService
                 Icon = icon,
                 Color = color,
                 Order = order++,
-                IsSystem = isSystem || parentId == null  // Root folders are system by default
+                IsSystem = isSystem || parentId == null,  // Root folders are system by default
+                ExcludeFromAnalytics = excludeFromAnalytics
             };
             labels.Add(folder);
             return folder;
         }
 
         // Helper to create category
-        void CreateCategory(string name, string parentId, string? icon = null, string? color = null, bool isSystem = false)
+        void CreateCategory(string name, string parentId, string? icon = null, string? color = null, bool isSystem = false, bool excludeFromAnalytics = false)
         {
             labels.Add(new Label
             {
@@ -269,7 +285,8 @@ public class LabelService : ILabelService
                 Icon = icon,
                 Color = color,
                 Order = order++,
-                IsSystem = isSystem
+                IsSystem = isSystem,
+                ExcludeFromAnalytics = excludeFromAnalytics
             });
         }
 
@@ -342,19 +359,63 @@ public class LabelService : ILabelService
         }
 
         // Transfers (system category - used automatically for account transfers)
-        var transfers = CreateFolder("Transfers", null, "🔄", "#6b7280", isSystem: true);
+        // Excluded from analytics by default since transfers are not real income/expenses
+        var transfers = CreateFolder("Transfers", null, "🔄", "#6b7280", isSystem: true, excludeFromAnalytics: true);
         {
-            CreateCategory("Account Transfer", transfers.Id, "🔁", isSystem: true);
+            CreateCategory("Account Transfer", transfers.Id, "🔁", isSystem: true, excludeFromAnalytics: true);
         }
 
         // Adjustments (system category for balance adjustments)
-        var adjustments = CreateFolder("Adjustments", null, "⚖️", "#6b7280", isSystem: true);
+        // Excluded from analytics by default since adjustments are not real income/expenses
+        var adjustments = CreateFolder("Adjustments", null, "⚖️", "#6b7280", isSystem: true, excludeFromAnalytics: true);
         {
-            CreateCategory("Balance Adjustment", adjustments.Id, "⚖️", isSystem: true);
+            CreateCategory("Balance Adjustment", adjustments.Id, "⚖️", isSystem: true, excludeFromAnalytics: true);
         }
 
         await _labelRepository.CreateManyAsync(labels, ct);
         _logger.LogInformation("Created {Count} default labels for user {UserId}", labels.Count, userId);
+    }
+
+    /// <summary>
+    /// Lazy migration: ensures "Transfers" and "Adjustments" system labels (and their children)
+    /// have ExcludeFromAnalytics=true. This handles existing users created before this feature.
+    /// Idempotent — only writes when a fix is needed.
+    /// </summary>
+    private async Task MigrateSystemLabelExclusionsAsync(List<Label> labels, CancellationToken ct)
+    {
+        var systemFolderNames = new HashSet<string> { "Transfers", "Adjustments" };
+        var systemFolders = labels
+            .Where(l => l.IsSystem && l.Type == LabelType.Folder && systemFolderNames.Contains(l.Name))
+            .ToList();
+
+        var labelsToUpdate = new List<Label>();
+
+        foreach (var folder in systemFolders)
+        {
+            if (!folder.ExcludeFromAnalytics)
+            {
+                folder.ExcludeFromAnalytics = true;
+                labelsToUpdate.Add(folder);
+            }
+
+            // Also fix children under this system folder
+            var children = labels.Where(l => l.ParentId == folder.Id && !l.ExcludeFromAnalytics);
+            foreach (var child in children)
+            {
+                child.ExcludeFromAnalytics = true;
+                labelsToUpdate.Add(child);
+            }
+        }
+
+        if (labelsToUpdate.Count > 0)
+        {
+            foreach (var label in labelsToUpdate)
+            {
+                await _labelRepository.UpdateAsync(label, ct);
+            }
+            _logger.LogInformation(
+                "Migrated {Count} system labels to excludeFromAnalytics=true", labelsToUpdate.Count);
+        }
     }
 
     private async Task<bool> IsDescendantAsync(string potentialDescendantId, string ancestorId, string userId)
@@ -386,6 +447,7 @@ public class LabelService : ILabelService
                 l.Color,
                 l.Order,
                 l.IsSystem,
+                l.ExcludeFromAnalytics,
                 l.CreatedAt,
                 BuildTree(labels, l.Id)
             ))
@@ -403,6 +465,7 @@ public class LabelService : ILabelService
             label.Color,
             label.Order,
             label.IsSystem,
+            label.ExcludeFromAnalytics,
             label.CreatedAt
         );
     }
@@ -442,6 +505,7 @@ public class LabelService : ILabelService
                 ParentId = null,
                 Order = folderOrder,
                 IsSystem = true,
+                ExcludeFromAnalytics = true,
                 CreatedAt = DateTime.UtcNow
             };
             await _labelRepository.CreateAsync(adjustmentsFolder, ct);
@@ -464,6 +528,7 @@ public class LabelService : ILabelService
             ParentId = adjustmentsFolder.Id,
             Order = categoryOrder,
             IsSystem = true,
+            ExcludeFromAnalytics = true,
             CreatedAt = DateTime.UtcNow
         };
         await _labelRepository.CreateAsync(adjustmentCategory, ct);

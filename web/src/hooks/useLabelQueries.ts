@@ -46,6 +46,7 @@ export function useCreateLabel() {
           icon: newLabel.icon ?? null,
           order: previousLabels.length,
           isSystem: false,
+          excludeFromAnalytics: newLabel.excludeFromAnalytics ?? false,
           createdAt: new Date().toISOString(),
         };
         queryClient.setQueryData<Label[]>(queryKeys.labels.list(), [...previousLabels, optimisticLabel]);
