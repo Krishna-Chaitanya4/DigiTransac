@@ -3,6 +3,7 @@ using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Middleware;
 using DigiTransac.Api.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 
 namespace DigiTransac.Api.Extensions;
@@ -17,6 +18,10 @@ public static class MiddlewareExtensions
     /// </summary>
     public static WebApplication UseApplicationPipeline(this WebApplication app)
     {
+        // Forward headers MUST be first so RemoteIpAddress reflects the real client IP
+        // (Azure Container Apps / reverse proxies set X-Forwarded-For)
+        ConfigureForwardedHeaders(app);
+
         app.UseGlobalExceptionHandler();
         app.UseRequestLogging();
         ConfigureSecurityMiddleware(app);
@@ -33,6 +38,21 @@ public static class MiddlewareExtensions
         MapEndpoints(app);
 
         return app;
+    }
+
+    private static void ConfigureForwardedHeaders(WebApplication app)
+    {
+        var forwardedHeadersOptions = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+        };
+
+        // Clear default known networks/proxies so it trusts all proxies
+        // (Azure Container Apps uses internal envoy proxy with dynamic IPs)
+        forwardedHeadersOptions.KnownIPNetworks.Clear();
+        forwardedHeadersOptions.KnownProxies.Clear();
+
+        app.UseForwardedHeaders(forwardedHeadersOptions);
     }
 
     private static void ConfigureSecurityMiddleware(WebApplication app)

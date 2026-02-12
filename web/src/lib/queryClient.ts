@@ -40,6 +40,7 @@ function isClientError(error: unknown): boolean {
     if (message.includes('404') || message.includes('not found')) return true;
     if (message.includes('400') || message.includes('bad request')) return true;
     if (message.includes('422') || message.includes('validation')) return true;
+    if (message.includes('429') || message.includes('too many requests')) return true;
   }
   return false;
 }
@@ -96,11 +97,13 @@ export const queryClient = new QueryClient({
       gcTime: 10 * 60 * 1000,
       // Smart retry logic based on error type
       retry: (failureCount, error) => {
-        // Don't retry on client errors (4xx)
+        // Don't retry on client errors (4xx including 429)
         if (isClientError(error)) return false;
         // Retry up to 2 times for server errors
         return failureCount < 2;
       },
+      // Exponential backoff for retries (1s, 2s, 4s...)
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
       // Don't refetch on window focus for most queries
       refetchOnWindowFocus: false,
     },
