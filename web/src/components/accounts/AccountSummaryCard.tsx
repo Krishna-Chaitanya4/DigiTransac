@@ -61,8 +61,7 @@ export function AccountSummaryCard({ summary, onRefreshRates }: AccountSummaryCa
         <div>
           <p className="text-blue-200 dark:text-blue-300 text-sm">Liabilities</p>
           <p className="text-xl font-semibold">
-            {/* Show liabilities as negative to indicate money owed */}
-            {formatCurrencyWithCode(-summary.totalLiabilities, summary.primaryCurrency)}
+            {formatCurrencyWithCode(summary.totalLiabilities, summary.primaryCurrency)}
           </p>
         </div>
       </div>
