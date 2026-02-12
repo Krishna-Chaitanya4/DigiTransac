@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useHaptics } from './useHaptics';
 
 /** Ordered list of navigable tab routes for swipe navigation */
-const SWIPE_TABS = ['/insights', '/accounts', '/transactions'];
+const SWIPE_TABS = ['/chats', '/transactions', '/accounts', '/insights'];
 
 interface SwipeNavigationOptions {
   /** Minimum horizontal distance (px) to trigger navigation. Default: 80 */

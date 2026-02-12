@@ -7,16 +7,24 @@ interface TabItem {
   name: string;
   href: string;
   icon: React.ReactNode;
-  activeIcon?: React.ReactNode;
 }
 
 const primaryTabs: TabItem[] = [
   {
-    name: 'Insights',
-    href: '/insights',
+    name: 'Chats',
+    href: '/chats',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+      </svg>
+    ),
+  },
+  {
+    name: 'Transactions',
+    href: '/transactions',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
       </svg>
     ),
   },
@@ -29,30 +37,19 @@ const primaryTabs: TabItem[] = [
       </svg>
     ),
   },
+  {
+    name: 'Insights',
+    href: '/insights',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605" />
+      </svg>
+    ),
+  },
 ];
-
-const transactionsTab: TabItem = {
-  name: 'Transactions',
-  href: '/transactions',
-  icon: (
-    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-    </svg>
-  ),
-};
 
 // Pages accessible from the "More" menu
 export const moreMenuItems = [
-  {
-    name: 'Chats',
-    href: '/chats',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
-      </svg>
-    ),
-    description: 'Messages & P2P payments',
-  },
   {
     name: 'Budgets',
     href: '/budgets',
@@ -102,11 +99,7 @@ export const moreMenuItems = [
 // All "more" menu hrefs for detecting active state on the "More" tab
 const moreMenuHrefs = moreMenuItems.map(item => item.href);
 
-interface BottomTabBarProps {
-  onAddTransaction: () => void;
-}
-
-export function BottomTabBar({ onAddTransaction }: BottomTabBarProps) {
+export function BottomTabBar() {
   const location = useLocation();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const haptics = useHaptics();
@@ -125,13 +118,13 @@ export function BottomTabBar({ onAddTransaction }: BottomTabBarProps) {
         aria-label="Bottom navigation"
       >
         <div className="flex items-center justify-around h-16 px-1 pb-safe-bottom">
-          {/* Insights tab */}
+          {/* Primary tabs */}
           {primaryTabs.map((tab) => (
             <Link
               key={tab.name}
               to={tab.href}
               onClick={() => haptics.light()}
-              className={`flex flex-col items-center justify-center flex-1 h-full min-w-[64px] min-h-[48px] gap-0.5 transition-colors ${
+              className={`flex flex-col items-center justify-center flex-1 h-full min-w-[48px] min-h-[48px] gap-0.5 transition-colors ${
                 isActive(tab.href)
                   ? 'text-indigo-600 dark:text-indigo-400'
                   : 'text-gray-500 dark:text-gray-400'
@@ -145,41 +138,10 @@ export function BottomTabBar({ onAddTransaction }: BottomTabBarProps) {
             </Link>
           ))}
 
-          {/* Center Add button — raised FAB */}
-          <button
-            onClick={() => { haptics.medium(); onAddTransaction(); }}
-            className="flex flex-col items-center justify-center flex-1 h-full min-w-[64px] min-h-[48px] -mt-4"
-            aria-label="Add transaction"
-          >
-            <span className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform">
-              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-            </span>
-            <span className="text-[10px] font-medium leading-tight text-gray-500 dark:text-gray-400 mt-0.5">Add</span>
-          </button>
-
-          {/* Transactions tab */}
-          <Link
-            to={transactionsTab.href}
-            onClick={() => haptics.light()}
-            className={`flex flex-col items-center justify-center flex-1 h-full min-w-[64px] min-h-[48px] gap-0.5 transition-colors ${
-              isActive(transactionsTab.href)
-                ? 'text-indigo-600 dark:text-indigo-400'
-                : 'text-gray-500 dark:text-gray-400'
-            }`}
-            aria-current={isActive(transactionsTab.href) ? 'page' : undefined}
-          >
-            <span className={isActive(transactionsTab.href) ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'}>
-              {transactionsTab.icon}
-            </span>
-            <span className="text-[10px] font-medium leading-tight">{transactionsTab.name}</span>
-          </Link>
-
           {/* More tab */}
           <button
             onClick={() => { haptics.light(); setMoreMenuOpen(true); }}
-            className={`flex flex-col items-center justify-center flex-1 h-full min-w-[64px] min-h-[48px] gap-0.5 transition-colors ${
+            className={`flex flex-col items-center justify-center flex-1 h-full min-w-[48px] min-h-[48px] gap-0.5 transition-colors ${
               isMoreActive || moreMenuOpen
                 ? 'text-indigo-600 dark:text-indigo-400'
                 : 'text-gray-500 dark:text-gray-400'
@@ -198,9 +160,9 @@ export function BottomTabBar({ onAddTransaction }: BottomTabBarProps) {
       </nav>
 
       {/* More Menu bottom sheet */}
-      <MoreMenu 
-        isOpen={moreMenuOpen} 
-        onClose={() => setMoreMenuOpen(false)} 
+      <MoreMenu
+        isOpen={moreMenuOpen}
+        onClose={() => setMoreMenuOpen(false)}
       />
     </>
   );
