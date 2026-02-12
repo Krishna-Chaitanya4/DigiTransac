@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -104,7 +104,6 @@ export default function Layout() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const location = useLocation();
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const scrollDirection = useScrollDirection({ threshold: 10, topOffset: 50 });
   const mainRef = useRef<HTMLElement>(null);
@@ -124,12 +123,6 @@ export default function Layout() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
-
-  // Handle "Add Transaction" from the bottom tab bar
-  const handleAddTransaction = useCallback(() => {
-    // Navigate to transactions page and trigger the add sheet via URL state
-    navigate('/transactions', { state: { openAddSheet: true } });
-  }, [navigate]);
 
   // Derive current page title for mobile header
   const pageTitle = useMemo(() => {
@@ -348,7 +341,7 @@ export default function Layout() {
 
       {/* Bottom Tab Bar — mobile only */}
       {isMobile && (
-        <BottomTabBar onAddTransaction={handleAddTransaction} />
+        <BottomTabBar />
       )}
     </div>
   );
