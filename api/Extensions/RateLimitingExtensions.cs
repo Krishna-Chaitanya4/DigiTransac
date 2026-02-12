@@ -37,7 +37,7 @@ public static class RateLimitingExtensions
     {
         return PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                partitionKey: GetClientIpAddress(httpContext),
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = settings.PermitLimit,
@@ -51,7 +51,7 @@ public static class RateLimitingExtensions
     {
         options.AddPolicy("auth", httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                partitionKey: GetClientIpAddress(httpContext),
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = settings.AuthPermitLimit ?? 10,
@@ -65,7 +65,7 @@ public static class RateLimitingExtensions
     {
         options.AddPolicy("sensitive", httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                partitionKey: GetClientIpAddress(httpContext),
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = settings.SensitivePermitLimit ?? 5,
@@ -136,7 +136,27 @@ public static class RateLimitingExtensions
     {
         return httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? httpContext.User.FindFirstValue("sub")
-            ?? httpContext.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown";
+            ?? GetClientIpAddress(httpContext);
+    }
+
+    /// <summary>
+    /// Gets the real client IP address, checking X-Forwarded-For header first
+    /// (populated by UseForwardedHeaders middleware), then falling back to RemoteIpAddress.
+    /// This ensures correct IP resolution behind Azure Container Apps / reverse proxies.
+    /// </summary>
+    private static string GetClientIpAddress(HttpContext httpContext)
+    {
+        // UseForwardedHeaders sets RemoteIpAddress from X-Forwarded-For,
+        // but as a defense-in-depth fallback, also check the header directly
+        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(forwardedFor))
+        {
+            // Take the first (leftmost) IP — the original client
+            var clientIp = forwardedFor.Split(',', StringSplitOptions.TrimEntries).FirstOrDefault();
+            if (!string.IsNullOrEmpty(clientIp))
+                return clientIp;
+        }
+
+        return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 }

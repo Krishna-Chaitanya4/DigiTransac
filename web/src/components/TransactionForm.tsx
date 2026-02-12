@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
 import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
@@ -13,7 +13,6 @@ import {
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useCurrency } from '../context/CurrencyContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { useHaptics } from '../hooks/useHaptics';
 import { getCurrentPosition, reverseGeocode } from '../services/locationService';
 import { logger } from '../services/logger';
 import type {
@@ -442,46 +441,8 @@ export function TransactionForm({
     }
   };
 
-  // ──────────── Mobile Wizard State ────────────
+  // ──────────── Mobile Detection ────────────
   const isMobile = useIsMobile();
-  const haptics = useHaptics();
-  const [wizardStep, setWizardStep] = useState(0);
-
-  // Reset wizard step when form opens
-  useEffect(() => {
-    if (isOpen) setWizardStep(0);
-  }, [isOpen]);
-
-  // Wizard step definitions
-  const WIZARD_STEPS = useMemo(() => [
-    { label: 'Amount', icon: '💰' },
-    { label: 'Account', icon: '🏦' },
-    { label: 'Details', icon: '📝' },
-  ], []);
-
-  const canAdvanceStep = useMemo(() => {
-    switch (wizardStep) {
-      case 0: return amount > 0;
-      case 1: return !!accountId && (type !== 'Transfer' || !!transferToAccountId) &&
-                (type === 'Transfer' || showSplits ? splitsValid : !!selectedLabelId);
-      case 2: return true; // Details are all optional
-      default: return false;
-    }
-  }, [wizardStep, amount, accountId, type, transferToAccountId, showSplits, splitsValid, selectedLabelId]);
-
-  const handleNextStep = () => {
-    if (canAdvanceStep && wizardStep < WIZARD_STEPS.length - 1) {
-      haptics.light();
-      setWizardStep(s => s + 1);
-    }
-  };
-
-  const handlePrevStep = () => {
-    if (wizardStep > 0) {
-      haptics.light();
-      setWizardStep(s => s - 1);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -674,20 +635,16 @@ export function TransactionForm({
     </div>
   ) : null;
 
-  // ──────────── Mobile Wizard Layout ────────────
+  // ──────────── Mobile Single-Form Layout ────────────
   if (isMobile) {
     return (
       <div className="fixed inset-0 z-50 bg-white dark:bg-gray-800 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="transaction-form-title">
-        {/* Wizard Header */}
+        {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-gray-200 dark:border-gray-700">
-          <button type="button" onClick={wizardStep === 0 ? onClose : handlePrevStep}
+          <button type="button" onClick={onClose}
             className="flex items-center gap-1 p-2 -ml-2 min-h-[44px] min-w-[44px] text-gray-600 dark:text-gray-400 touch-manipulation"
-            aria-label={wizardStep === 0 ? 'Close' : 'Back'}>
-            {wizardStep === 0 ? (
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            ) : (
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
-            )}
+            aria-label="Close">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
           <h3 id="transaction-form-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {editingTransaction ? 'Edit Transaction' : 'New Transaction'}
@@ -695,72 +652,46 @@ export function TransactionForm({
           <div className="w-10" /> {/* Spacer for centering */}
         </div>
 
-        {/* Step Indicators */}
-        <div className="flex items-center justify-center gap-2 px-4 py-3">
-          {WIZARD_STEPS.map((step, i) => (
-            <button key={i} type="button" onClick={() => { if (i < wizardStep) { haptics.selection(); setWizardStep(i); } }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
-                i === wizardStep
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                  : i < wizardStep
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 cursor-pointer'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
-              }`}
-              disabled={i > wizardStep}
-              aria-current={i === wizardStep ? 'step' : undefined}>
-              <span>{step.icon}</span>
-              <span>{step.label}</span>
-              {i < wizardStep && (
-                <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Step Content — scrollable */}
+        {/* Scrollable Form Content */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             <div className="space-y-4 pt-2">
-              {/* Step 0: Type & Amount */}
-              {wizardStep === 0 && (
-                <>
-                  {renderTypeSelector()}
-                  {renderAmount()}
-                  {renderDatePicker()}
-                </>
-              )}
+              {renderTypeSelector()}
+              {renderAmount()}
+              {renderDatePicker()}
+              {renderAccountSelect()}
+              {renderTransferToAccount()}
+              {renderP2PEmail()}
+              {renderCategory()}
 
-              {/* Step 1: Account & Category */}
-              {wizardStep === 1 && (
-                <>
-                  {renderAccountSelect()}
-                  {renderTransferToAccount()}
-                  {renderP2PEmail()}
-                  {renderCategory()}
-                </>
-              )}
+              {/* Advanced Options Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors touch-manipulation min-h-[44px]"
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${showAdvancedOptions ? 'rotate-90' : ''}`}
+                  fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+                Advanced options
+              </button>
 
-              {/* Step 2: Details (optional) */}
-              {wizardStep === 2 && renderAdvancedFields()}
+              {showAdvancedOptions && renderAdvancedFields()}
             </div>
             {renderErrorMessage()}
           </div>
 
-          {/* Bottom Actions — fixed at bottom */}
+          {/* Bottom Submit Button — fixed at bottom */}
           <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 safe-area-bottom bg-white dark:bg-gray-800">
-            {wizardStep < WIZARD_STEPS.length - 1 ? (
-              <button type="button" onClick={handleNextStep} disabled={!canAdvanceStep}
-                className="w-full py-3.5 min-h-[48px] rounded-xl font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation transition-opacity">
-                Next: {WIZARD_STEPS[wizardStep + 1].label}
-              </button>
-            ) : (
-              <button type="submit"
-                disabled={isLoading || amount <= 0 || !accountId ||
-                  (type === 'Transfer' ? !transferToAccountId : ((!showSplits && !selectedLabelId) || (showSplits && !splitsValid)))}
-                className="w-full py-3.5 min-h-[48px] rounded-xl font-medium text-white bg-gradient-to-br from-green-600 to-green-700 dark:from-green-700 dark:to-green-800 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation transition-opacity">
-                {isLoading ? 'Saving...' : editingTransaction ? 'Update Transaction' : '✓ Add Transaction'}
-              </button>
-            )}
+            <button type="submit"
+              disabled={isLoading || amount <= 0 || !accountId ||
+                (type === 'Transfer' ? !transferToAccountId : ((!showSplits && !selectedLabelId) || (showSplits && !splitsValid)))}
+              className="w-full py-3.5 min-h-[48px] rounded-xl font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation transition-opacity">
+              {isLoading ? 'Saving...' : editingTransaction ? 'Update Transaction' : '✓ Add Transaction'}
+            </button>
           </div>
         </form>
       </div>
