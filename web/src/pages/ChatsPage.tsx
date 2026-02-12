@@ -491,7 +491,7 @@ export default function ChatsPage() {
   }
 
   return (
-  <div className="-m-4 -mb-8 sm:-m-6 sm:-mb-8 lg:-m-8 flex h-[calc(100vh-7rem)] sm:h-[calc(100vh-6.5rem)] lg:h-[calc(100vh-3.5rem)] bg-white dark:bg-gray-900 relative overflow-hidden">
+  <div className="fixed inset-x-0 top-12 bottom-16 z-20 lg:relative lg:inset-auto lg:-m-8 lg:z-auto flex lg:h-[calc(100vh-3.5rem)] bg-white dark:bg-gray-900 overflow-hidden">
     {/* Conversations sidebar */}
       <ConversationList
         conversations={conversations}
