@@ -31,7 +31,7 @@ public static class AccountEndpoints
             }
 
             var accounts = await accountService.GetAllAsync(userId, includeArchived ?? false, ct);
-            return ETagHelper.OkWithETag(httpContext, accounts, cacheMaxAgeSeconds: 30);
+            return ETagHelper.OkWithETag(httpContext, accounts);
         })
         .WithName("GetAccounts")
         .WithSummary("Get all accounts")

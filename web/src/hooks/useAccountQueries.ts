@@ -136,11 +136,16 @@ export function useAdjustBalance() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: AdjustBalanceRequest }) => 
+    mutationFn: ({ id, data }: { id: string; data: AdjustBalanceRequest }) =>
       adjustBalance(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    onSuccess: async () => {
+      // Await invalidation to ensure fresh data is fetched before UI updates
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all }),
+        // Balance adjustment creates a transaction visible in self-chat
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all }),
+      ]);
     },
   });
 }
