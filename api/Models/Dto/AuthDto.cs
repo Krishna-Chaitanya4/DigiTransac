@@ -12,10 +12,10 @@ public record CompleteRegistrationRequest(string Email, string VerificationToken
 // Legacy - keeping for now
 public record RegisterRequest(string Email, string Password, string FullName);
 
-public record LoginRequest(string Email, string Password);
+public record LoginRequest(string Email, string Password, bool RememberMe = false);
 
 // Full auth response with refresh token (used internally)
-public record AuthResponse(string AccessToken, string RefreshToken, string Email, string FullName, bool IsEmailVerified, string PrimaryCurrency);
+public record AuthResponse(string AccessToken, string RefreshToken, string Email, string FullName, bool IsEmailVerified, string PrimaryCurrency, bool RememberMe = true);
 
 // Auth response without refresh token (refresh token goes in HttpOnly cookie)
 public record AuthResponseWithoutRefresh(string AccessToken, string Email, string FullName, bool IsEmailVerified, string PrimaryCurrency);
@@ -70,8 +70,8 @@ public record LoginResponseWithoutRefresh(
     string? TwoFactorToken = null
 );
 
-public record TwoFactorLoginRequest(string TwoFactorToken, string Code);
+public record TwoFactorLoginRequest(string TwoFactorToken, string Code, bool RememberMe = false);
 
 // Email OTP backup for 2FA
 public record SendTwoFactorEmailOtpRequest(string TwoFactorToken);
-public record TwoFactorEmailOtpLoginRequest(string TwoFactorToken, string EmailCode);
+public record TwoFactorEmailOtpLoginRequest(string TwoFactorToken, string EmailCode, bool RememberMe = false);

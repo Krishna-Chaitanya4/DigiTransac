@@ -31,6 +31,9 @@ public class RefreshToken
     [BsonElement("deviceInfo")]
     public string? DeviceInfo { get; set; }
 
+    [BsonElement("rememberMe")]
+    public bool RememberMe { get; set; } = true;
+
     [BsonIgnore]
     public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
 

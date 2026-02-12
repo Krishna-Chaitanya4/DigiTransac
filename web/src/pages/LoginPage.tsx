@@ -8,6 +8,7 @@ import * as authService from '../services/authService';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -23,7 +24,7 @@ export default function LoginPage() {
   const [emailOtpMessage, setEmailOtpMessage] = useState('');
   const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false);
   
-  const { login, verifyTwoFactorLogin, verifyTwoFactorEmailOtp, sessionExpiredMessage, clearSessionExpiredMessage } = useAuth();
+  const { login, verifyTwoFactorLogin, verifyTwoFactorEmailOtp, sessionExpiredMessage, clearSessionExpiredMessage, isPwa } = useAuth();
   const navigate = useNavigate();
 
   // Show session expired message if present
@@ -34,13 +35,20 @@ export default function LoginPage() {
     }
   }, [sessionExpiredMessage, clearSessionExpiredMessage]);
 
+  // Auto-set rememberMe for PWA users
+  useEffect(() => {
+    if (isPwa) {
+      setRememberMe(true);
+    }
+  }, [isPwa]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, rememberMe);
       
       if (result.requiresTwoFactor && result.twoFactorToken) {
         setRequiresTwoFactor(true);
@@ -63,7 +71,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await verifyTwoFactorLogin(twoFactorToken, twoFactorCode);
+      await verifyTwoFactorLogin(twoFactorToken, twoFactorCode, rememberMe);
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid verification code');
@@ -94,7 +102,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await verifyTwoFactorEmailOtp(twoFactorToken, emailOtpCode);
+      await verifyTwoFactorEmailOtp(twoFactorToken, emailOtpCode, rememberMe);
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid verification code');
@@ -377,7 +385,16 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-800"
+              />
+              <span className="text-sm text-gray-600 dark:text-gray-400">Remember me</span>
+            </label>
             <Link to="/forgot-password" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
               Forgot your password?
             </Link>

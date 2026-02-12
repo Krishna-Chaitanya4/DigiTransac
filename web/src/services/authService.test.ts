@@ -158,7 +158,7 @@ describe('authService', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
+        body: JSON.stringify({ email: 'test@example.com', password: 'password123', rememberMe: false }),
       });
       expect(result.accessToken).toBe('access-token');
     });
@@ -207,7 +207,7 @@ describe('authService', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ twoFactorToken: '2fa-token', code: '123456' }),
+        body: JSON.stringify({ twoFactorToken: '2fa-token', code: '123456', rememberMe: false }),
       });
       expect(result.accessToken).toBe('access-token');
     });
@@ -550,7 +550,7 @@ describe('authService', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ twoFactorToken: '2fa-token', emailCode: '123456' }),
+          body: JSON.stringify({ twoFactorToken: '2fa-token', emailCode: '123456', rememberMe: false }),
         });
         expect(result.accessToken).toBe('access-token');
       });

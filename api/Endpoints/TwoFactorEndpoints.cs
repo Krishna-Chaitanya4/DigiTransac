@@ -141,8 +141,8 @@ public static class TwoFactorEndpoints
                 return Results.BadRequest(new ErrorResponse("Invalid or expired verification code"));
             }
 
-            // Set refresh token as HttpOnly cookie
-            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+            // Set refresh token as HttpOnly cookie (preserve rememberMe from login)
+            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays, request.RememberMe);
 
             return Results.Ok(new AuthResponseWithoutRefresh(
                 result.AccessToken,
@@ -198,8 +198,8 @@ public static class TwoFactorEndpoints
                 return Results.BadRequest(new ErrorResponse("Invalid or expired verification code"));
             }
 
-            // Set refresh token as HttpOnly cookie
-            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+            // Set refresh token as HttpOnly cookie (preserve rememberMe from login)
+            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays, request.RememberMe);
 
             return Results.Ok(new AuthResponseWithoutRefresh(
                 result.AccessToken,

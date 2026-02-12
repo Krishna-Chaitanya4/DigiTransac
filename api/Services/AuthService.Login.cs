@@ -49,7 +49,7 @@ public partial class AuthService
         await _auditService.LogLoginSuccessAsync(user.Id, user.Email);
 
         var accessToken = GenerateJwtToken(user);
-        var refreshToken = await GenerateRefreshTokenAsync(user.Id);
+        var refreshToken = await GenerateRefreshTokenAsync(user.Id, rememberMe: request.RememberMe);
         
         return new LoginResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }

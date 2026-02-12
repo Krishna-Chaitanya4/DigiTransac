@@ -106,27 +106,27 @@ export interface LoginResponse {
   twoFactorToken?: string;
 }
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
+export async function login(email: string, password: string, rememberMe: boolean = false): Promise<LoginResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     credentials: 'include', // Required for HttpOnly cookie
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, rememberMe }),
   });
   return handleResponse<LoginResponse>(response);
 }
 
 // Verify 2FA code during login (refresh token comes back in HttpOnly cookie)
-export async function verifyTwoFactorLogin(twoFactorToken: string, code: string): Promise<AuthResponse> {
+export async function verifyTwoFactorLogin(twoFactorToken: string, code: string, rememberMe: boolean = false): Promise<AuthResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/verify`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     credentials: 'include', // Required for HttpOnly cookie
-    body: JSON.stringify({ twoFactorToken, code }),
+    body: JSON.stringify({ twoFactorToken, code, rememberMe }),
   });
   return handleResponse<AuthResponse>(response);
 }
@@ -327,14 +327,14 @@ export async function sendTwoFactorEmailOtp(twoFactorToken: string): Promise<{ m
 }
 
 // Verify email OTP for 2FA login (refresh token comes back in HttpOnly cookie)
-export async function verifyTwoFactorEmailOtp(twoFactorToken: string, emailCode: string): Promise<AuthResponse> {
+export async function verifyTwoFactorEmailOtp(twoFactorToken: string, emailCode: string, rememberMe: boolean = false): Promise<AuthResponse> {
   const response = await fetchWithErrorHandling(`${API_BASE_URL}/auth/2fa/verify-email-code`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     credentials: 'include', // Required for HttpOnly cookie
-    body: JSON.stringify({ twoFactorToken, emailCode }),
+    body: JSON.stringify({ twoFactorToken, emailCode, rememberMe }),
   });
   return handleResponse<AuthResponse>(response);
 }

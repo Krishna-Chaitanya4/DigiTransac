@@ -78,7 +78,7 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(authService.login).toHaveBeenCalledWith('test@example.com', 'password123');
+      expect(authService.login).toHaveBeenCalledWith('test@example.com', 'password123', false);
     });
 
     await waitFor(() => {
@@ -319,7 +319,7 @@ describe('LoginPage', () => {
       await user.click(screen.getByRole('button', { name: /verify/i }));
 
       await waitFor(() => {
-        expect(authService.verifyTwoFactorLogin).toHaveBeenCalledWith('temp-2fa-token', '123456');
+        expect(authService.verifyTwoFactorLogin).toHaveBeenCalledWith('temp-2fa-token', '123456', false);
       });
 
       await waitFor(() => {
@@ -499,7 +499,7 @@ describe('LoginPage', () => {
       await user.click(screen.getByRole('button', { name: /verify/i }));
 
       await waitFor(() => {
-        expect(authService.verifyTwoFactorEmailOtp).toHaveBeenCalledWith('temp-2fa-token', '654321');
+        expect(authService.verifyTwoFactorEmailOtp).toHaveBeenCalledWith('temp-2fa-token', '654321', false);
       });
     });
 
