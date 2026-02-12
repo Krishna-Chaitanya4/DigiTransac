@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { CalculatorInput, QuickAmountButtons } from './CalculatorInput';
 import { DatePicker } from './DatePicker';
 import { SearchableCategoryDropdown } from './SearchableCategoryDropdown';
@@ -446,6 +447,10 @@ export function TransactionForm({
 
   if (!isOpen) return null;
 
+  // Render via portal to escape parent stacking contexts (e.g., ChatsPage's z-20 fixed container)
+  // This ensures the form's z-50 is in the root stacking context, above BottomTabBar (z-40) and header (z-30)
+  const renderInPortal = (content: React.ReactNode) => createPortal(content, document.body);
+
   // ──────────── Shared Field Renderers ────────────
   const renderTypeSelector = () => (
     <TransactionTypeSelector value={type} onChange={setType} showTransfer={showTransfer} />
@@ -637,7 +642,7 @@ export function TransactionForm({
 
   // ──────────── Mobile Single-Form Layout ────────────
   if (isMobile) {
-    return (
+    return renderInPortal(
       <div className="fixed inset-0 z-50 bg-white dark:bg-gray-800 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="transaction-form-title">
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-gray-200 dark:border-gray-700">
@@ -694,13 +699,13 @@ export function TransactionForm({
             </button>
           </div>
         </form>
-      </div>
-    );
-  }
-
-  // ──────────── Desktop Modal Layout (Unchanged) ────────────
-  return (
-    <div
+        </div>
+      );
+    }
+  
+    // ──────────── Desktop Modal Layout (Unchanged) ────────────
+    return renderInPortal(
+      <div
       className="fixed inset-0 z-50 overflow-y-auto"
       role="dialog"
       aria-modal="true"
