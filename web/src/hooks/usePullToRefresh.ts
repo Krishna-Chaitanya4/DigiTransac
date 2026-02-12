@@ -38,6 +38,20 @@ interface PullToRefreshState {
  * );
  * ```
  */
+/**
+ * Check if the element and all its scrollable ancestors are at scroll top.
+ * Walks up the DOM tree checking scrollTop of each ancestor, then checks window.scrollY.
+ * This handles both window-scroll layouts and nested overflow-scroll containers.
+ */
+function isAtScrollTop(el: HTMLElement): boolean {
+  let current: HTMLElement | null = el;
+  while (current && current !== document.documentElement) {
+    if (current.scrollTop > 0) return false;
+    current = current.parentElement;
+  }
+  return window.scrollY <= 0;
+}
+
 export function usePullToRefresh({
   onRefresh,
   threshold = 80,
@@ -62,10 +76,9 @@ export function usePullToRefresh({
     const container = containerRef.current;
     if (!container) return;
     
-    // Only start pull if at the top of the scroll container.
-    // Check both container.scrollTop (for overflow-scroll containers)
-    // and window.scrollY (for window-scroll layouts where container doesn't scroll).
-    if (container.scrollTop > 0 || window.scrollY > 0) return;
+    // Only start pull if at the top of the entire scroll chain
+    // (container, all scrollable ancestors, and window)
+    if (!isAtScrollTop(container)) return;
     
     startY.current = e.touches[0].clientY;
     currentY.current = e.touches[0].clientY;
@@ -78,8 +91,8 @@ export function usePullToRefresh({
     const container = containerRef.current;
     if (!container) return;
     
-    // Only continue if at top of scroll container (check both container and window)
-    if (container.scrollTop > 0 || window.scrollY > 0) {
+    // Only continue if at top of the entire scroll chain
+    if (!isAtScrollTop(container)) {
       startY.current = 0;
       setState(s => ({ ...s, isPulling: false, pullDistance: 0 }));
       return;
