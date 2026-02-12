@@ -1,6 +1,7 @@
 import { memo, useState, useCallback } from 'react';
 import { BudgetCard } from './BudgetCard';
 import { BudgetForm } from './BudgetForm';
+import { ConfirmDialog, useConfirmDialog } from '../ConfirmDialog';
 import { useBudgets, useCreateBudget, useUpdateBudget, useDeleteBudget } from '../../hooks';
 import { useLabels, useAccounts } from '../../hooks';
 import { formatCurrency } from '../../services/currencyService';
@@ -30,6 +31,7 @@ export const BudgetList = memo(function BudgetList({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const { confirm, dialogProps: confirmDialogProps } = useConfirmDialog();
 
   const handleCreateClick = useCallback(() => {
     setEditingBudget(null);
@@ -61,14 +63,20 @@ export const BudgetList = memo(function BudgetList({
 
   // Delete handler - available for future use (e.g., context menu or swipe action)
   const _handleDelete = useCallback(async (budgetId: string) => {
-    if (!confirm('Are you sure you want to delete this budget?')) return;
+    const confirmed = await confirm({
+      title: 'Delete budget?',
+      message: 'Are you sure you want to delete this budget? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     
     try {
       await deleteBudgetMutation.mutateAsync(budgetId);
     } catch {
       // Error handled by mutation cache
     }
-  }, [deleteBudgetMutation]);
+  }, [deleteBudgetMutation, confirm]);
   void _handleDelete; // Suppress unused warning
 
   const handleCardClick = useCallback((budget: Budget) => {
@@ -241,6 +249,9 @@ export const BudgetList = memo(function BudgetList({
         isLoading={createBudgetMutation.isPending || updateBudgetMutation.isPending}
         error={formError}
       />
+      
+      {/* Confirm dialog */}
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 });
