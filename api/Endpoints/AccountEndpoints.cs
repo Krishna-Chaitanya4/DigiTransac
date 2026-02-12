@@ -4,6 +4,7 @@ using DigiTransac.Api.Common;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
+using Microsoft.AspNetCore.Http;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -20,6 +21,7 @@ public static class AccountEndpoints
             bool? includeArchived,
             ClaimsPrincipal user,
             IAccountService accountService,
+            HttpContext httpContext,
             CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -29,7 +31,7 @@ public static class AccountEndpoints
             }
 
             var accounts = await accountService.GetAllAsync(userId, includeArchived ?? false, ct);
-            return Results.Ok(accounts);
+            return ETagHelper.OkWithETag(httpContext, accounts, cacheMaxAgeSeconds: 30);
         })
         .WithName("GetAccounts")
         .WithSummary("Get all accounts")

@@ -68,8 +68,11 @@ describe('AuthContext', () => {
   });
 
   it('should restore user from localStorage on mount', async () => {
+    // Use a valid non-expired JWT so proactive refresh doesn't fire
+    const validPayload = { sub: 'user-123', email: 'stored@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
+    const validToken = `header.${btoa(JSON.stringify(validPayload))}.signature`;
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
-    localStorage.setItem('digitransac_access_token', 'stored-token');
+    localStorage.setItem('digitransac_access_token', validToken);
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     render(
@@ -80,7 +83,7 @@ describe('AuthContext', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('user')).toHaveTextContent('stored@example.com');
-      expect(screen.getByTestId('token')).toHaveTextContent('stored-token');
+      expect(screen.getByTestId('token')).toHaveTextContent(validToken);
     });
   });
 
@@ -118,8 +121,11 @@ describe('AuthContext', () => {
 
   it('should logout and clear credentials', async () => {
     const user = userEvent.setup();
+    // Use a valid non-expired JWT so proactive refresh doesn't fire
+    const validPayload = { sub: 'user-123', email: 'stored@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
+    const validToken = `header.${btoa(JSON.stringify(validPayload))}.signature`;
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
-    localStorage.setItem('digitransac_access_token', 'stored-token');
+    localStorage.setItem('digitransac_access_token', validToken);
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     // Mock the revokeToken call
@@ -149,8 +155,11 @@ describe('AuthContext', () => {
 
   it('should logout all sessions and clear credentials', async () => {
     const user = userEvent.setup();
+    // Use a valid non-expired JWT so proactive refresh doesn't fire
+    const validPayload = { sub: 'user-123', email: 'stored@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
+    const validToken = `header.${btoa(JSON.stringify(validPayload))}.signature`;
     const storedUser = { email: 'stored@example.com', fullName: 'Stored User', isEmailVerified: true };
-    localStorage.setItem('digitransac_access_token', 'stored-token');
+    localStorage.setItem('digitransac_access_token', validToken);
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
     // Mock the revokeAllTokens call
@@ -183,8 +192,8 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('user')).toHaveTextContent('no-user');
     });
 
-    // Verify revokeAllTokens was called
-    expect(authService.revokeAllTokens).toHaveBeenCalledWith('stored-token');
+    // Verify revokeAllTokens was called with the valid token
+    expect(authService.revokeAllTokens).toHaveBeenCalledWith(validToken);
 
     // Verify localStorage was cleared (refresh token is in HttpOnly cookie, cleared by server)
     expect(localStorage.getItem('digitransac_access_token')).toBeNull();

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useAccounts, useLabels, useTags, useCreateTag, useCreateTransaction } from '../hooks';
 import {
   useConversations,
@@ -546,6 +547,13 @@ export default function ChatsPage() {
                 onScroll={handleScroll}
                 className="h-full overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800/50"
               >
+                <PullToRefreshContainer
+                  onRefresh={async () => {
+                    if (selectedUserId) {
+                      invalidateDetail(selectedUserId);
+                    }
+                  }}
+                >
                 {isLoadingMessages ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
@@ -612,6 +620,7 @@ export default function ChatsPage() {
                     <div ref={messagesEndRef} />
                   </>
                 )}
+                </PullToRefreshContainer>
               </div>
 
               {/* Scroll to bottom button */}

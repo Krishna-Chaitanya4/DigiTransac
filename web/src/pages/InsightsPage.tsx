@@ -760,7 +760,7 @@ export default function InsightsPage() {
       {/* Header with Period Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Insights</h1>
+          <h1 className="hidden lg:block text-2xl font-bold text-gray-900 dark:text-gray-100">Insights</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Financial overview for {periodLabel}
             {isOrderCustomized && (

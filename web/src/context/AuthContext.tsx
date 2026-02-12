@@ -4,15 +4,22 @@ import * as authService from '../services/authService';
 import { SESSION_EXPIRED_EVENT } from '../services/apiClient';
 import { setSentryUser, clearSentryUser } from '../services/sentry';
 
+// Detect if running as installed PWA (standalone mode)
+function isPwaStandalone(): boolean {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || (navigator as unknown as { standalone?: boolean }).standalone === true; // iOS Safari
+}
+
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
   isLoading: boolean;
+  isPwa: boolean;
   sessionExpiredMessage: string | null;
   clearSessionExpiredMessage: () => void;
-  login: (email: string, password: string) => Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }>;
-  verifyTwoFactorLogin: (twoFactorToken: string, code: string) => Promise<void>;
-  verifyTwoFactorEmailOtp: (twoFactorToken: string, emailCode: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }>;
+  verifyTwoFactorLogin: (twoFactorToken: string, code: string, rememberMe?: boolean) => Promise<void>;
+  verifyTwoFactorEmailOtp: (twoFactorToken: string, emailCode: string, rememberMe?: boolean) => Promise<void>;
   completeRegistration: (email: string, verificationToken: string, password: string, fullName: string, primaryCurrency?: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -47,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for existing tokens on mount
-    // Note: Refresh token is now stored in HttpOnly cookie (not accessible via JS)
+    // Check for existing tokens on mount and proactively refresh if expired
+    // This ensures PWA users stay logged in without needing to re-authenticate
     const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     const storedUser = localStorage.getItem(USER_KEY);
 
@@ -58,8 +65,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(parsedUser);
       // Set Sentry user for error tracking
       setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
+
+      // Proactively refresh if access token is expired or about to expire
+      // This prevents the first API call from failing and provides seamless PWA experience
+      if (isTokenExpired(storedAccessToken)) {
+        authService.refreshToken()
+          .then((response) => {
+            handleAuthSuccess(response);
+            setIsLoading(false);
+          })
+          .catch(() => {
+            // Refresh failed — token cookie expired or was cleared
+            // Keep user data so ProtectedRoute can show the app briefly,
+            // the next API call will trigger session-expired flow
+            setIsLoading(false);
+          });
+        return; // Don't set isLoading=false yet, wait for refresh
+      }
     }
     setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Listen for session expiration events
@@ -134,8 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [handleAuthSuccess, clearAuth]);
 
-  const login = async (email: string, password: string): Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }> => {
-    const response = await authService.login(email, password);
+  const pwaDetected = isPwaStandalone();
+
+  const login = async (email: string, password: string, rememberMe?: boolean): Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }> => {
+    // Default: PWA always remembers, browser only if explicitly requested
+    const shouldRemember = rememberMe ?? pwaDetected;
+    const response = await authService.login(email, password, shouldRemember);
     
     if (response.requiresTwoFactor && response.twoFactorToken) {
       return { requiresTwoFactor: true, twoFactorToken: response.twoFactorToken };
@@ -157,13 +186,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { requiresTwoFactor: false };
   };
 
-  const verifyTwoFactorLogin = async (twoFactorToken: string, code: string) => {
-    const response = await authService.verifyTwoFactorLogin(twoFactorToken, code);
+  const verifyTwoFactorLogin = async (twoFactorToken: string, code: string, rememberMe?: boolean) => {
+    const shouldRemember = rememberMe ?? pwaDetected;
+    const response = await authService.verifyTwoFactorLogin(twoFactorToken, code, shouldRemember);
     handleAuthSuccess(response);
   };
 
-  const verifyTwoFactorEmailOtp = async (twoFactorToken: string, emailCode: string) => {
-    const response = await authService.verifyTwoFactorEmailOtp(twoFactorToken, emailCode);
+  const verifyTwoFactorEmailOtp = async (twoFactorToken: string, emailCode: string, rememberMe?: boolean) => {
+    const shouldRemember = rememberMe ?? pwaDetected;
+    const response = await authService.verifyTwoFactorEmailOtp(twoFactorToken, emailCode, shouldRemember);
     handleAuthSuccess(response);
   };
 
@@ -255,10 +286,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      accessToken, 
+    <AuthContext.Provider value={{
+      user,
+      accessToken,
       isLoading,
+      isPwa: pwaDetected,
       sessionExpiredMessage,
       clearSessionExpiredMessage,
       login,

@@ -46,9 +46,10 @@ public static class AuthTokenEndpoints
             }
 
             // Set refresh token as HttpOnly cookie
+            // RememberMe=true → persistent cookie (30 days); false → session cookie (cleared on browser close)
             if (result.RefreshToken != null)
             {
-                cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+                cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays, request.RememberMe);
             }
 
             return Results.Ok(new LoginResponseWithoutRefresh(
@@ -90,8 +91,8 @@ public static class AuthTokenEndpoints
                 return Results.Unauthorized();
             }
 
-            // Set new refresh token as HttpOnly cookie
-            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays);
+            // Set new refresh token as HttpOnly cookie (preserve rememberMe preference from original login)
+            cookieService.SetRefreshTokenCookie(httpContext, result.RefreshToken, jwtSettings.Value.RefreshTokenExpireDays, result.RememberMe);
 
             return Results.Ok(new AuthResponseWithoutRefresh(
                 result.AccessToken,

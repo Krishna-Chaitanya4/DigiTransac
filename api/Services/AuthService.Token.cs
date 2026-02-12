@@ -38,16 +38,16 @@ public partial class AuthService
             return null;
         }
 
-        // Rotate refresh token (revoke old, create new)
+        // Rotate refresh token (revoke old, create new — preserve rememberMe preference)
         storedToken.RevokedAt = DateTime.UtcNow;
-        var newRefreshToken = await GenerateRefreshTokenAsync(user.Id);
+        var newRefreshToken = await GenerateRefreshTokenAsync(user.Id, rememberMe: storedToken.RememberMe);
         storedToken.ReplacedByToken = newRefreshToken.Token;
         await _refreshTokenRepository.UpdateAsync(storedToken);
 
         var accessToken = GenerateJwtToken(user);
 
         _logger.LogInformation("Token refreshed successfully for UserId: {UserId}", user.Id);
-        return new AuthResponse(accessToken, newRefreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
+        return new AuthResponse(accessToken, newRefreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency, storedToken.RememberMe);
     }
 
     public async Task<bool> RevokeTokenAsync(string refreshToken)

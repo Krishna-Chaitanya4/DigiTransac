@@ -23,7 +23,7 @@ export default function LabelsPage() {
 
   return (
     <PullToRefreshContainer onRefresh={handleRefresh}>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Labels</h1>
+      <h1 className="hidden lg:block text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Labels</h1>
       
       {/* Tabs */}
       <div className="border-b border-gray-200 dark:border-gray-700 mb-6">

@@ -724,7 +724,12 @@ export default function TransactionsPage() {
   // Just use it directly with the primaryCurrency from context
 
   return (
-    <div className="flex flex-col h-full">
+  <PullToRefreshContainer
+    onRefresh={async () => {
+      await invalidateTransactions();
+    }}
+  >
+  <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -961,16 +966,11 @@ export default function TransactionsPage() {
         onClose={() => setIsFilterOpen(false)}
       />
 
-      {/* Transaction List with Pull-to-Refresh */}
+      {/* Transaction List */}
       <div
         ref={listRef}
         className="flex-1 overflow-y-auto min-h-0"
       >
-        <PullToRefreshContainer
-          onRefresh={async () => {
-            await invalidateTransactions();
-          }}
-        >
         <TransactionList
           transactions={transactions}
           accounts={accounts}
@@ -998,13 +998,12 @@ export default function TransactionsPage() {
           </div>
         )}
         
-          {/* End of List */}
-          {!isLoading && !hasMore && transactions.length > 0 && (
-            <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
-              {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} • End of list
-            </div>
-          )}
-        </PullToRefreshContainer>
+        {/* End of List */}
+        {!isLoading && !hasMore && transactions.length > 0 && (
+          <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+            {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} • End of list
+          </div>
+        )}
       </div>
 
       {/* Bulk Actions Bar */}
@@ -1110,5 +1109,6 @@ export default function TransactionsPage() {
         </>
       )}
     </div>
+    </PullToRefreshContainer>
   );
 }

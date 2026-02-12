@@ -87,7 +87,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
         var response = await authClient.PostAsJsonAsync("/api/accounts", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     #endregion

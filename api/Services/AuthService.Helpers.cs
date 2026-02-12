@@ -10,14 +10,15 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    private async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, string? deviceInfo = null)
+    private async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, string? deviceInfo = null, bool rememberMe = true)
     {
         var refreshToken = new RefreshToken
         {
             UserId = userId,
             Token = GenerateSecureToken(),
             ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpireDays),
-            DeviceInfo = deviceInfo
+            DeviceInfo = deviceInfo,
+            RememberMe = rememberMe
         };
 
         await _refreshTokenRepository.CreateAsync(refreshToken);
