@@ -62,8 +62,10 @@ export function usePullToRefresh({
     const container = containerRef.current;
     if (!container) return;
     
-    // Only start pull if at the top of the scroll container
-    if (container.scrollTop > 0) return;
+    // Only start pull if at the top of the scroll container.
+    // Check both container.scrollTop (for overflow-scroll containers)
+    // and window.scrollY (for window-scroll layouts where container doesn't scroll).
+    if (container.scrollTop > 0 || window.scrollY > 0) return;
     
     startY.current = e.touches[0].clientY;
     currentY.current = e.touches[0].clientY;
@@ -76,8 +78,8 @@ export function usePullToRefresh({
     const container = containerRef.current;
     if (!container) return;
     
-    // Only continue if at top of container
-    if (container.scrollTop > 0) {
+    // Only continue if at top of scroll container (check both container and window)
+    if (container.scrollTop > 0 || window.scrollY > 0) {
       startY.current = 0;
       setState(s => ({ ...s, isPulling: false, pullDistance: 0 }));
       return;

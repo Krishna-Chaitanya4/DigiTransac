@@ -8,7 +8,7 @@ const SWIPE_TABS = ['/chats', '/transactions', '/accounts', '/insights'];
 interface SwipeNavigationOptions {
   /** Minimum horizontal distance (px) to trigger navigation. Default: 80 */
   minDistance?: number;
-  /** Maximum vertical distance (px) allowed during swipe. Default: 80 */
+  /** Maximum vertical distance (px) allowed during swipe. Default: 40 */
   maxVertical?: number;
   /** Maximum time (ms) allowed for the swipe gesture. Default: 400 */
   maxTime?: number;
@@ -32,7 +32,7 @@ export function useSwipeNavigation(
 ) {
   const {
     minDistance = 80,
-    maxVertical = 80,
+    maxVertical = 40,
     maxTime = 400,
     enabled = true,
   } = options;
@@ -62,10 +62,23 @@ export function useSwipeNavigation(
     if (!isTracking.current || !touchStart.current) return;
 
     const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStart.current.x);
     const dy = Math.abs(touch.clientY - touchStart.current.y);
 
-    // If vertical movement exceeds threshold, abort horizontal tracking
-    // This prevents interference with vertical scrolling
+    // Early direction detection: once the user has moved enough (>10px),
+    // check if the gesture is more vertical than horizontal.
+    // If vertical >= horizontal, this is a scroll — abort immediately.
+    const totalMovement = dx + dy;
+    if (totalMovement > 10) {
+      if (dy >= dx) {
+        // Vertical-dominant gesture → scrolling, not swiping
+        isTracking.current = false;
+        touchStart.current = null;
+        return;
+      }
+    }
+
+    // Also abort if vertical exceeds absolute threshold
     if (dy > maxVertical) {
       isTracking.current = false;
       touchStart.current = null;
@@ -81,6 +94,7 @@ export function useSwipeNavigation(
 
     const touch = e.changedTouches[0];
     const dx = touch.clientX - touchStart.current.x;
+    const absDx = Math.abs(dx);
     const dy = Math.abs(touch.clientY - touchStart.current.y);
     const elapsed = Date.now() - touchStart.current.time;
 
@@ -88,9 +102,12 @@ export function useSwipeNavigation(
     touchStart.current = null;
 
     // Validate the swipe gesture
-    if (Math.abs(dx) < minDistance) return;
+    if (absDx < minDistance) return;
     if (dy > maxVertical) return;
     if (elapsed > maxTime) return;
+    // Require the swipe to be at least 2x more horizontal than vertical
+    // This prevents diagonal scrolls from triggering navigation
+    if (absDx < dy * 2) return;
 
     // Find current tab index
     const currentIndex = SWIPE_TABS.indexOf(location.pathname);
