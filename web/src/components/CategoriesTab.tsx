@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { LabelTree, CreateLabelRequest, UpdateLabelRequest } from '../types/labels';
-import { 
+import {
   useLabels,
   useLabelsTree,
   useCreateLabel,
@@ -9,12 +9,12 @@ import {
   useDeleteLabelWithReassignment,
   useLabelTransactionCount,
 } from '../hooks';
-import { 
-  SearchResultItem, 
-  LabelTreeItem, 
-  LabelModal, 
+import {
+  SearchResultItem,
+  LabelTreeItem,
+  LabelModal,
   DeleteConfirmModal,
-  getLabelPath 
+  getLabelPath
 } from './categories';
 
 export default function CategoriesTab() {
@@ -133,6 +133,18 @@ export default function CategoriesTab() {
     setNewLabelType(label.type);
     setIsModalOpen(true);
   };
+
+  const handleToggleExclude = useCallback(async (label: LabelTree) => {
+    try {
+      setError(null);
+      await updateLabelMutation.mutateAsync({
+        id: label.id,
+        data: { excludeFromAnalytics: !label.excludeFromAnalytics },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update label');
+    }
+  }, [updateLabelMutation]);
 
   const handleDelete = (label: LabelTree) => {
     setLabelToDelete(label);
@@ -338,6 +350,7 @@ export default function CategoriesTab() {
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onAddChild={handleAddChild}
+                  onToggleExclude={handleToggleExclude}
                   expandedIds={expandedIds}
                   toggleExpand={toggleExpand}
                 />

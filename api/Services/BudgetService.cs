@@ -3,6 +3,7 @@ using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
+using DigiTransac.Api.Services.Transactions;
 
 namespace DigiTransac.Api.Services;
 
@@ -571,11 +572,15 @@ public class BudgetService : IBudgetService
     private async Task<List<Transaction>> GetBudgetTransactionsAsync(
         string userId, Budget budget, DateTime periodStart, DateTime periodEnd)
     {
+        // Fetch all labels once (shared for expansion and exclusion filtering)
+        var allLabels = await _labelRepository.GetByUserIdAsync(userId);
+        var labelDict = allLabels.ToDictionary(l => l.Id);
+
         // Expand label IDs to include all child categories (if folders are selected)
         List<string>? expandedLabelIds = null;
         if (budget.LabelIds.Any())
         {
-            expandedLabelIds = await ExpandLabelIdsAsync(userId, budget.LabelIds);
+            expandedLabelIds = ExpandLabelIds(budget.LabelIds, allLabels, labelDict);
         }
         
         // Build filter for expenses (Send transactions only)
@@ -589,17 +594,36 @@ public class BudgetService : IBudgetService
             .Build();
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
+
+        // Filter out transactions fully categorized under analytics-excluded labels
+        var excludedLabelIds = TransactionAnalyticsService.BuildExcludedLabelIds(labelDict);
+        if (excludedLabelIds.Count > 0)
+        {
+            transactions = transactions
+                .Where(t => !t.Splits.Any() || !t.Splits.All(s => excludedLabelIds.Contains(s.LabelId)))
+                .ToList();
+        }
+
         return transactions;
     }
     
     /// <summary>
     /// Expands a list of label IDs to include all child category IDs.
     /// If a folder is in the list, all categories underneath it (recursively) are included.
+    /// Async overload that fetches labels internally (used by CheckBudgetAlertsAsync).
     /// </summary>
     private async Task<List<string>> ExpandLabelIdsAsync(string userId, List<string> labelIds)
     {
         var allLabels = await _labelRepository.GetByUserIdAsync(userId);
         var labelDict = allLabels.ToDictionary(l => l.Id);
+        return ExpandLabelIds(labelIds, allLabels, labelDict);
+    }
+
+    /// <summary>
+    /// Synchronous overload that accepts pre-fetched label data to avoid redundant fetches.
+    /// </summary>
+    private List<string> ExpandLabelIds(List<string> labelIds, List<Label> allLabels, Dictionary<string, Label> labelDict)
+    {
         var expandedIds = new HashSet<string>(labelIds);
         
         // For each label ID, if it's a folder, add all child categories

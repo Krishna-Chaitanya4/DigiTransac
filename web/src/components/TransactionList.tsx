@@ -4,6 +4,7 @@ import type { Account } from '../services/accountService';
 import type { Label, Tag } from '../types/labels';
 import { getCurrencySymbol, formatCurrency } from '../services/currencyService';
 import { formatAmount } from '../utils/formatters';
+import { isLabelEffectivelyExcluded, isTransactionExcluded } from '../utils/labelExclusion';
 import { SwipeableRow, SwipeActionIcon } from './SwipeableRow';
 import { useCurrency } from '../context/CurrencyContext';
 
@@ -147,12 +148,13 @@ const TransactionRow = memo(function TransactionRow({
     >
       <div
         data-transaction-id={transaction.id}
-        className={`bg-white dark:bg-gray-800 rounded-lg border 
-          ${isConfirmed 
-            ? 'border-gray-200 dark:border-gray-700' 
+        className={`bg-white dark:bg-gray-800 rounded-lg border
+          ${isConfirmed
+            ? 'border-gray-200 dark:border-gray-700'
             : 'border-l-4 border-l-yellow-400 border-gray-200 dark:border-gray-700 dark:border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10'
-          } ${selectionMode && isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''} 
-          ${isHighlighted ? 'ring-2 ring-blue-500 ring-inset animate-pulse' : ''} overflow-hidden transition-all`}
+          } ${selectionMode && isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}
+          ${isHighlighted ? 'ring-2 ring-blue-500 ring-inset animate-pulse' : ''}
+          ${isTransactionExcluded(transaction, labelMap) ? 'opacity-60' : ''} overflow-hidden transition-all`}
       >
         {/* Main Row */}
         <div
@@ -199,6 +201,16 @@ const TransactionRow = memo(function TransactionRow({
               <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
                 {transaction.title || primaryLabel?.name || 'Transaction'}
               </span>
+              {isTransactionExcluded(transaction, labelMap) && (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded"
+                  title="Excluded from calculations"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                  </svg>
+                </span>
+              )}
               {transaction.parentTransactionId && (
                 <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 rounded">
                   🔄
@@ -262,10 +274,16 @@ const TransactionRow = memo(function TransactionRow({
                 <div className="space-y-1">
                   {transaction.splits.map((split, idx) => {
                     const label = labelMap.get(split.labelId);
+                    const splitExcluded = isLabelEffectivelyExcluded(split.labelId, labelMap);
                     return (
                       <div key={idx} className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-300">
+                        <span className={`text-gray-600 dark:text-gray-300 ${splitExcluded ? 'opacity-60' : ''}`}>
                           {label?.icon} {label?.name || 'Unknown'}
+                          {splitExcluded && (
+                            <svg className="w-3 h-3 inline ml-1 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                            </svg>
+                          )}
                         </span>
                         <span className="text-gray-900 dark:text-gray-100">
                           {currencySymbol}{formatAmount(split.amount, transaction.currency)}
@@ -632,12 +650,14 @@ export function TransactionList({
     setExpandedId(prev => prev === id ? null : id);
   }, []);
 
-  // Calculate daily totals
+  // Calculate daily totals (excluding transactions whose labels are all excluded from calculations)
   const dailyTotals = useMemo(() => {
     const totals: Record<string, number> = {};
     for (const dateString of sortedDates) {
       const dateTransactions = groupedTransactions[dateString];
       totals[dateString] = dateTransactions.reduce((sum, t) => {
+        // Skip fully-excluded transactions from daily totals
+        if (isTransactionExcluded(t, labelMap)) return sum;
         const convertedAmount = convert(t.amount, t.currency);
         if (t.type === 'Receive') return sum + convertedAmount;
         if (t.type === 'Send') return sum - convertedAmount;
@@ -645,7 +665,7 @@ export function TransactionList({
       }, 0);
     }
     return totals;
-  }, [sortedDates, groupedTransactions, convert]);
+  }, [sortedDates, groupedTransactions, convert, labelMap]);
 
   if (isLoading) {
     return (

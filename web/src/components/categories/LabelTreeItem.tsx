@@ -6,19 +6,24 @@ interface LabelTreeItemProps {
   onEdit: (label: LabelTree) => void;
   onDelete: (label: LabelTree) => void;
   onAddChild: (parentId: string, type: 'Folder' | 'Category') => void;
+  onToggleExclude: (label: LabelTree) => void;
   expandedIds: Set<string>;
   toggleExpand: (id: string) => void;
+  parentExcluded?: boolean;
 }
 
-export function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expandedIds, toggleExpand }: LabelTreeItemProps) {
+export function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, onToggleExclude, expandedIds, toggleExpand, parentExcluded = false }: LabelTreeItemProps) {
   const isExpanded = expandedIds.has(label.id);
   const hasChildren = label.children && label.children.length > 0;
   const isFolder = label.type === 'Folder';
   const isSystem = label.isSystem;
+  const isExcluded = label.excludeFromAnalytics;
+  const isInheritedExclude = parentExcluded && !isExcluded;
+  const effectivelyExcluded = isExcluded || parentExcluded;
 
   return (
     <div>
-      <div 
+      <div
         className={`flex items-center gap-2 py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg group ${level > 0 ? 'ml-6' : ''}`}
         style={{ marginLeft: level * 24 }}
       >
@@ -28,11 +33,11 @@ export function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expa
             onClick={() => toggleExpand(label.id)}
             className="w-5 h-5 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           >
-            <svg 
-              className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              strokeWidth={2} 
+            <svg
+              className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
               stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -43,14 +48,31 @@ export function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expa
         )}
 
         {/* Icon */}
-        <span className="text-lg" title={label.type}>
+        <span className={`text-lg ${effectivelyExcluded ? 'opacity-50' : ''}`} title={label.type}>
           {label.icon || (isFolder ? '📁' : '🏷️')}
         </span>
 
         {/* Name */}
-        <span className={`flex-1 text-sm ${isFolder ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
+        <span className={`flex-1 text-sm ${isFolder ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'} ${effectivelyExcluded ? 'opacity-50' : ''}`}>
           {label.name}
         </span>
+
+        {/* Exclude from calculations badge */}
+        {effectivelyExcluded && (
+          <span
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+              isInheritedExclude
+                ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
+                : 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+            }`}
+            title={isInheritedExclude ? 'Inherited from parent folder' : 'Excluded from calculations'}
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+            </svg>
+            {isInheritedExclude ? 'inherited' : 'excluded'}
+          </span>
+        )}
 
         {/* System label lock indicator */}
         {isSystem && (
@@ -63,14 +85,38 @@ export function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expa
 
         {/* Color indicator */}
         {label.color && (
-          <span 
-            className="w-3 h-3 rounded-full" 
+          <span
+            className="w-3 h-3 rounded-full"
             style={{ backgroundColor: label.color }}
           />
         )}
 
         {/* Actions - visible on mobile, hover on desktop */}
         <div className="flex md:opacity-0 md:group-hover:opacity-100 items-center gap-1 transition-opacity">
+          {/* Exclude from calculations toggle */}
+          {!parentExcluded && (
+            <button
+              onClick={() => onToggleExclude(label)}
+              className={`p-1 ${
+                isExcluded
+                  ? 'text-amber-500 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400'
+              }`}
+              title={isExcluded ? 'Include in calculations' : 'Exclude from calculations'}
+            >
+              {isExcluded ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              )}
+            </button>
+          )}
+
           {isFolder && (
             <>
               <button
@@ -130,8 +176,10 @@ export function LabelTreeItem({ label, level, onEdit, onDelete, onAddChild, expa
               onEdit={onEdit}
               onDelete={onDelete}
               onAddChild={onAddChild}
+              onToggleExclude={onToggleExclude}
               expandedIds={expandedIds}
               toggleExpand={toggleExpand}
+              parentExcluded={effectivelyExcluded}
             />
           ))}
         </div>

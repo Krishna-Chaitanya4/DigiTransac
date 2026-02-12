@@ -10,18 +10,31 @@ interface SearchResultItemProps {
 export function SearchResultItem({ label, path, onEdit, onDelete }: SearchResultItemProps) {
   const isFolder = label.type === 'Folder';
   const isSystem = label.isSystem;
+  const isExcluded = label.excludeFromAnalytics;
   
   return (
     <div className="flex items-center gap-2 py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg group">
-      <span className="text-lg">
+      <span className={`text-lg ${isExcluded ? 'opacity-50' : ''}`}>
         {label.icon || (isFolder ? '📁' : '🏷️')}
       </span>
       <div className="flex-1 min-w-0">
-        <span className={`text-sm ${isFolder ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
+        <span className={`text-sm ${isFolder ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'} ${isExcluded ? 'opacity-50' : ''}`}>
           {label.name}
         </span>
         <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{path}</p>
       </div>
+      {/* Exclude from calculations badge */}
+      {isExcluded && (
+        <span
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+          title="Excluded from calculations"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+          </svg>
+          excluded
+        </span>
+      )}
       {/* System label lock indicator */}
       {isSystem && (
         <span className="text-gray-400 dark:text-gray-500" title="System label - cannot be deleted or renamed">

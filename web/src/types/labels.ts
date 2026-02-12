@@ -8,6 +8,7 @@ export interface Label {
   color: string | null;
   order: number;
   isSystem: boolean;
+  excludeFromAnalytics: boolean;
   createdAt: string;
 }
 
@@ -21,14 +22,16 @@ export interface CreateLabelRequest {
   type: 'Folder' | 'Category';
   icon?: string | null;
   color?: string | null;
+  excludeFromAnalytics?: boolean;
 }
 
 export interface UpdateLabelRequest {
-  name: string;
+  name?: string;
   parentId?: string | null;
   icon?: string | null;
   color?: string | null;
   order?: number;
+  excludeFromAnalytics?: boolean;
 }
 
 // Tag types

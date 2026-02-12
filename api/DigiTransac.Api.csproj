@@ -12,6 +12,7 @@
   <!-- Allow test project to access internal types (Program class for WebApplicationFactory) -->
   <ItemGroup>
     <InternalsVisibleTo Include="DigiTransac.Tests" />
+    <InternalsVisibleTo Include="DigiTransac.Api.Tests" />
   </ItemGroup>
 
   <ItemGroup>

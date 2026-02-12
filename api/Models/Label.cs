@@ -43,6 +43,9 @@ public class Label
     [BsonElement("isSystem")]
     public bool IsSystem { get; set; } = false;
 
+    [BsonElement("excludeFromAnalytics")]
+    public bool ExcludeFromAnalytics { get; set; } = false;
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

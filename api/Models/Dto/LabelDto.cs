@@ -6,15 +6,17 @@ public record CreateLabelRequest(
     string? ParentId,
     string Type, // "Folder" or "Category"
     string? Icon,
-    string? Color
+    string? Color,
+    bool? ExcludeFromAnalytics = null
 );
 
 public record UpdateLabelRequest(
-    string Name,
-    string? ParentId,
-    string? Icon,
-    string? Color,
-    int? Order
+    string? Name = null,
+    string? ParentId = null,
+    string? Icon = null,
+    string? Color = null,
+    int? Order = null,
+    bool? ExcludeFromAnalytics = null
 );
 
 public record ReorderLabelsRequest(
@@ -36,6 +38,7 @@ public record LabelResponse(
     string? Color,
     int Order,
     bool IsSystem,
+    bool ExcludeFromAnalytics,
     DateTime CreatedAt
 );
 
@@ -48,6 +51,7 @@ public record LabelTreeResponse(
     string? Color,
     int Order,
     bool IsSystem,
+    bool ExcludeFromAnalytics,
     DateTime CreatedAt,
     List<LabelTreeResponse> Children
 );
