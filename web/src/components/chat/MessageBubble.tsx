@@ -6,6 +6,7 @@ import { useCurrency } from '../../context/CurrencyContext';
 // Time limits for message actions (in minutes)
 export const EDIT_TIME_LIMIT_MINUTES = 15;
 export const DELETE_TIME_LIMIT_MINUTES = 60;
+export const UNDO_DELETE_WINDOW_MINUTES = 1440; // 24 hours
 
 // Helper to check if a message can still be edited
 export const canEditMessage = (msg: ConversationMessage): boolean => {
@@ -23,6 +24,26 @@ export const canDeleteMessage = (msg: ConversationMessage): boolean => {
   return minutesElapsed <= DELETE_TIME_LIMIT_MINUTES;
 };
 
+// Helper to check if a deleted message can still be restored (undo)
+export const canUndoDelete = (msg: ConversationMessage): boolean => {
+  if (!msg.isFromMe || !msg.isDeleted || !msg.deletedAt) return false;
+  const deletedAt = new Date(msg.deletedAt);
+  const minutesElapsed = (Date.now() - deletedAt.getTime()) / (1000 * 60);
+  return minutesElapsed <= UNDO_DELETE_WINDOW_MINUTES;
+};
+
+// Helper to get remaining undo time as a human-readable string
+const getUndoTimeRemaining = (deletedAt: string): string => {
+  const deletedTime = new Date(deletedAt).getTime();
+  const expiresAt = deletedTime + UNDO_DELETE_WINDOW_MINUTES * 60 * 1000;
+  const remainingMs = expiresAt - Date.now();
+  if (remainingMs <= 0) return 'expired';
+  const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
+  const remainingMins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  if (remainingHours > 0) return `${remainingHours}h ${remainingMins}m left`;
+  return `${remainingMins}m left`;
+};
+
 interface MessageBubbleProps {
   message: ConversationMessage;
   showTime: boolean;
@@ -33,6 +54,7 @@ interface MessageBubbleProps {
   isSelfChat?: boolean; // When true, use isSystemGenerated for left/right positioning
   onMenuOpen: (message: ConversationMessage, position: { x: number; y: number; buttonTop: number }) => void;
   onScrollToReply: (messageId: string) => void;
+  onRestore?: (messageId: string) => void;
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -45,6 +67,7 @@ export const MessageBubble = memo(function MessageBubble({
   isSelfChat = false,
   onMenuOpen,
   onScrollToReply,
+  onRestore,
 }: MessageBubbleProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { primaryCurrency, formatInPrimaryCurrency } = useCurrency();
@@ -58,8 +81,10 @@ export const MessageBubble = memo(function MessageBubble({
   // Long press handlers for mobile
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
+      // Capture rect from currentTarget (the element with the handler) before setTimeout,
+      // since React synthetic event properties are nullified after the event callback.
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       longPressTimerRef.current = setTimeout(() => {
-        const rect = (e.target as HTMLElement).getBoundingClientRect();
         onMenuOpen(message, { x: rect.left, y: rect.bottom, buttonTop: rect.top });
       }, 500);
     },
@@ -81,6 +106,35 @@ export const MessageBubble = memo(function MessageBubble({
     },
     [message, onMenuOpen]
   );
+
+  // Deleted message (soft-deleted chat message) — check BEFORE type-specific rendering
+  // so that undo works for all message types (text, transaction, etc.)
+  if (message.isDeleted) {
+    const showUndo = canUndoDelete(message) && onRestore;
+    return (
+      <div
+        id={`msg-${message.id}`}
+        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-3`}
+      >
+        <div className="px-4 py-2 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 italic text-sm">
+          <span>This message was deleted</span>
+          {showUndo && (
+            <button
+              onClick={() => onRestore(message.id)}
+              className="ml-2 text-blue-500 dark:text-blue-400 not-italic font-medium hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+            >
+              Undo
+            </button>
+          )}
+          {showUndo && message.deletedAt && (
+            <span className="block text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 not-italic">
+              {getUndoTimeRemaining(message.deletedAt)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // Transaction message with deleted transaction (transaction was removed but chat message remains)
   if (message.type === 'Transaction' && !message.transaction) {
@@ -249,20 +303,6 @@ export const MessageBubble = memo(function MessageBubble({
               </div>
             )}
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Deleted message
-  if (message.isDeleted) {
-    return (
-      <div
-        id={`msg-${message.id}`}
-        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-3`}
-      >
-        <div className="px-4 py-2 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 italic text-sm">
-          This message was deleted
         </div>
       </div>
     );

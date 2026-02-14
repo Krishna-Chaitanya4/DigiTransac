@@ -22,7 +22,7 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
 }: MessageActionsMenuProps) {
   const navigate = useNavigate();
 
-  // Calculate menu position
+  // Calculate menu position with viewport clamping
   const optionCount =
     1 + // Reply is always available
     (message.type === 'Text' ? 1 : 0) + // Copy for text
@@ -31,9 +31,57 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
     (canDeleteMessage(message) ? 1 : 0); // Delete
 
   const menuHeight = optionCount * 40 + 8;
-  const spaceBelow = window.innerHeight - position.y;
+  const menuWidth = 180; // min-w-[140px] but can be wider; use 180 as estimate
+  const bottomTabBarHeight = 64; // Height of mobile bottom navigation bar
+  const edgePadding = 8; // Minimum padding from screen edges
+  const availableHeight = window.innerHeight - bottomTabBarHeight;
+  const spaceBelow = availableHeight - position.y;
   const spaceAbove = position.buttonTop;
   const openUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+
+  // Clamp horizontal position so menu stays on screen
+  const computeHorizontalStyle = (): React.CSSProperties => {
+    if (message.isFromMe) {
+      // Right-aligned: ensure menu doesn't go off left edge
+      const rightOffset = window.innerWidth - position.x - 24;
+      const menuLeft = window.innerWidth - rightOffset - menuWidth;
+      if (menuLeft < edgePadding) {
+        return { left: edgePadding };
+      }
+      return { right: rightOffset };
+    } else {
+      // Left-aligned: ensure menu doesn't go off right edge
+      const menuRight = position.x + menuWidth;
+      if (menuRight > window.innerWidth - edgePadding) {
+        return { right: edgePadding };
+      }
+      return { left: Math.max(edgePadding, position.x) };
+    }
+  };
+
+  // Clamp vertical position so menu stays within viewport (above bottom tab bar)
+  const computeVerticalStyle = (): React.CSSProperties => {
+    if (openUpward) {
+      const bottomValue = window.innerHeight - position.buttonTop + 4;
+      // Ensure menu top doesn't go above viewport
+      const menuTop = window.innerHeight - bottomValue - menuHeight;
+      if (menuTop < edgePadding) {
+        return { top: edgePadding };
+      }
+      return { bottom: bottomValue };
+    } else {
+      let topValue = position.y + 4;
+      // Ensure menu bottom doesn't go below available height (above tab bar)
+      if (topValue + menuHeight > availableHeight - edgePadding) {
+        topValue = availableHeight - menuHeight - edgePadding;
+      }
+      // Ensure menu doesn't go above viewport
+      if (topValue < edgePadding) {
+        topValue = edgePadding;
+      }
+      return { top: topValue };
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content || '');
@@ -50,13 +98,10 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
       <div
-        className="absolute bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden min-w-[140px]"
+        className="absolute bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden min-w-[140px] max-w-[calc(100vw-16px)]"
         style={{
-          ...(openUpward
-            ? { bottom: window.innerHeight - position.buttonTop + 4 }
-            : { top: position.y + 4 }),
-          left: message.isFromMe ? 'auto' : position.x,
-          right: message.isFromMe ? window.innerWidth - position.x - 24 : 'auto',
+          ...computeVerticalStyle(),
+          ...computeHorizontalStyle(),
         }}
         onClick={(e) => e.stopPropagation()}
       >

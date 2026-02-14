@@ -41,6 +41,7 @@ public record ConversationMessage(
     bool IsEdited,
     DateTime? EditedAt,
     bool IsDeleted,
+    DateTime? DeletedAt,
     string? ReplyToMessageId,
     ReplyPreview? ReplyTo,    // Preview of the replied message
     bool IsSystemGenerated = false,  // True if auto-created (recurring, import, etc.)

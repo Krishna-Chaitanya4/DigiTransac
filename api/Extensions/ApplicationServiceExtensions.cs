@@ -177,6 +177,7 @@ public static class ApplicationServiceExtensions
     private static void AddBackgroundServices(WebApplicationBuilder builder)
     {
         builder.Services.AddHostedService<RecurringTransactionBackgroundService>();
+        builder.Services.AddHostedService<DeletedMessageCleanupService>();
     }
 
     private static void AddValidatorsAndMediatR(WebApplicationBuilder builder)

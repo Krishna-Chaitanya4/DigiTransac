@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getConversations,
   getUnreadCount,
@@ -8,6 +8,7 @@ import {
   markAsRead,
   editMessage,
   deleteMessage,
+  restoreMessage,
   searchUserByEmail,
   getDisplayName,
   formatRelativeTime,
@@ -166,6 +167,16 @@ describe('conversationService', () => {
       await deleteMessage('msg123');
 
       expect(apiClient.delete).toHaveBeenCalledWith('/conversations/messages/msg123');
+    });
+  });
+
+  describe('restoreMessage', () => {
+    it('should post to restore endpoint', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue(undefined);
+
+      await restoreMessage('msg123');
+
+      expect(apiClient.post).toHaveBeenCalledWith('/conversations/messages/msg123/restore', {});
     });
   });
 

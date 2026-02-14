@@ -69,6 +69,7 @@ export {
   useSendMessage,
   useEditMessage,
   useDeleteMessage,
+  useRestoreMessage,
   useMarkAsRead,
   useUserSearch,
   useInvalidateConversations,

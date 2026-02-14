@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.14] - 2026-02-14
+
+### Added
+- **Chat Undo Delete** — Deleted chat messages can now be restored within a 24-hour window
+  - Backend: `RestoreMessageAsync` on `ChatMessageRepository` and `ConversationService` — validates ownership, checks undo window, verifies content not yet purged
+  - Backend: `PurgeExpiredDeletedMessagesAsync` repository method — sets `Content = null` for messages deleted beyond the undo window
+  - Backend: `DeletedMessageCleanupService` background service — runs hourly to permanently scrub content from expired deleted messages
+  - Backend: `POST /api/conversations/messages/{messageId}/restore` endpoint
+  - Backend: `DeletedAt` field added to `ConversationMessage` DTO for undo window calculation
+  - Frontend: `restoreMessage()` service function and `useRestoreMessage()` React Query hook
+  - Frontend: "Undo" button with countdown timer on deleted messages (visible only to sender within 24h)
+  - Frontend: `canUndoDelete()` and `getUndoTimeRemaining()` helper functions in `MessageBubble`
+  - Constants: `UndoDeleteWindowMinutes = 1440` (24 hours) in `ConversationConstants`
+
 ## [1.6.13] - 2026-02-14
 
 ### Fixed

@@ -215,6 +215,27 @@ public static class ConversationEndpoints
         .Produces<object>(200)
         .Produces<ErrorResponse>(400);
 
+        // Restore (undo delete) message
+        group.MapPost("/messages/{messageId}/restore", async (
+            string messageId,
+            ClaimsPrincipal user,
+            IConversationService conversationService,
+            CancellationToken ct) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await conversationService.RestoreMessageAsync(userId, messageId, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
+
+            return Results.Ok(new { message = "Message restored" });
+        })
+        .WithName("RestoreMessage")
+        .Produces<object>(200)
+        .Produces<ErrorResponse>(400);
+
         // Search user by email (for starting new conversations)
         group.MapGet("/search-user", async (
             string email,

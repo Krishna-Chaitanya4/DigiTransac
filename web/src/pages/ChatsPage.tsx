@@ -9,6 +9,7 @@ import {
   useOptimisticSendMessage,
   useEditMessage,
   useDeleteMessage,
+  useRestoreMessage,
   useMarkAsRead,
   useInvalidateConversations,
 } from '../hooks';
@@ -176,6 +177,7 @@ export default function ChatsPage() {
   const sendMessageMutation = useOptimisticSendMessage();
   const editMessageMutation = useEditMessage();
   const deleteMessageMutation = useDeleteMessage();
+  const restoreMessageMutation = useRestoreMessage();
   const markAsReadMutation = useMarkAsRead();
   const { invalidateList, invalidateDetail } = useInvalidateConversations();
 
@@ -347,6 +349,18 @@ export default function ChatsPage() {
       }
     },
     [deleteMessageMutation]
+  );
+
+  // Restore (undo delete) message
+  const handleRestoreMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await restoreMessageMutation.mutateAsync(messageId);
+      } catch (error) {
+        logger.error('Failed to restore message:', error);
+      }
+    },
+    [restoreMessageMutation]
   );
 
   // Start editing
@@ -600,6 +614,7 @@ export default function ChatsPage() {
                             isSelfChat={isSelfChat}
                             onMenuOpen={handleMenuOpen}
                             onScrollToReply={scrollToMessage}
+                            onRestore={handleRestoreMessage}
                           />
                         </div>
                       );

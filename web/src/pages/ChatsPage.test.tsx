@@ -85,6 +85,7 @@ vi.mock('../hooks', () => ({
   useOptimisticSendMessage: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useEditMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useDeleteMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useRestoreMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useMarkAsRead: vi.fn(() => ({ mutate: vi.fn() })),
   useInvalidateConversations: vi.fn(() => ({
     invalidateList: vi.fn(),

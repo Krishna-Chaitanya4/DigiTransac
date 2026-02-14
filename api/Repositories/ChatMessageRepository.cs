@@ -62,6 +62,17 @@ public interface IChatMessageRepository
     Task<bool> DeleteMessageAsync(string messageId, string senderUserId, CancellationToken ct = default);
     
     /// <summary>
+    /// Restore a soft-deleted message (undo delete)
+    /// </summary>
+    Task<bool> RestoreMessageAsync(string messageId, string senderUserId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Permanently scrub content from messages deleted longer than the undo window.
+    /// Sets Content to null so the message can never be restored.
+    /// </summary>
+    Task<int> PurgeExpiredDeletedMessagesAsync(TimeSpan undoWindow, CancellationToken ct = default);
+    
+    /// <summary>
     /// Create transaction message entry for a P2P transaction
     /// </summary>
     Task CreateTransactionMessageAsync(string senderUserId, string recipientUserId, string transactionId, CancellationToken ct = default);
@@ -320,6 +331,40 @@ public class ChatMessageRepository : IChatMessageRepository
         
         var result = await _chatMessages.UpdateOneAsync(filter, update, options: null, ct);
         return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> RestoreMessageAsync(string messageId, string senderUserId, CancellationToken ct = default)
+    {
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, true)
+        );
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.IsDeleted, false)
+            .Set(m => m.DeletedAt, (DateTime?)null);
+        
+        var result = await _chatMessages.UpdateOneAsync(filter, update, options: null, ct);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<int> PurgeExpiredDeletedMessagesAsync(TimeSpan undoWindow, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - undoWindow;
+        
+        // Find messages that are deleted, past the undo window, and still have content
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, true),
+            Builders<ChatMessage>.Filter.Lt(m => m.DeletedAt, cutoff),
+            Builders<ChatMessage>.Filter.Ne(m => m.Content, null)
+        );
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.Content, (string?)null);
+        
+        var result = await _chatMessages.UpdateManyAsync(filter, update, options: null, ct);
+        return (int)result.ModifiedCount;
     }
 
     public async Task CreateTransactionMessageAsync(

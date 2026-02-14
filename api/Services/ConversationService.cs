@@ -19,6 +19,9 @@ public static class ConversationConstants
     /// <summary>Time window in minutes during which messages can be deleted</summary>
     public const int DeleteWindowMinutes = 60;
     
+    /// <summary>Time window in minutes during which deleted messages can be restored (undo)</summary>
+    public const int UndoDeleteWindowMinutes = 1440; // 24 hours
+    
     /// <summary>Maximum length for message content</summary>
     public const int MaxMessageLength = 1000;
     
@@ -81,6 +84,11 @@ public interface IConversationService
     /// Delete a message
     /// </summary>
     Task<Result> DeleteMessageAsync(string userId, string messageId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Restore a deleted message (undo delete within the undo window)
+    /// </summary>
+    Task<Result> RestoreMessageAsync(string userId, string messageId, CancellationToken ct = default);
     
     /// <summary>
     /// Send money to another user (creates P2P transaction + chat message)
@@ -459,6 +467,7 @@ public class ConversationService : IConversationService
                 IsEdited: msg.IsEdited,
                 EditedAt: msg.EditedAt,
                 IsDeleted: msg.IsDeleted,
+                DeletedAt: msg.DeletedAt,
                 ReplyToMessageId: msg.ReplyToMessageId,
                 ReplyTo: null, // Will be populated below if needed
                 IsSystemGenerated: isSystemGenerated,
@@ -557,6 +566,7 @@ public class ConversationService : IConversationService
                     IsEdited: false,
                     EditedAt: null,
                     IsDeleted: false,
+                    DeletedAt: null,
                     ReplyToMessageId: null,
                     ReplyTo: null,
                     IsSystemGenerated: isSystemGenerated,
@@ -666,6 +676,7 @@ public class ConversationService : IConversationService
             IsEdited: false,
             EditedAt: null,
             IsDeleted: false,
+            DeletedAt: null,
             ReplyToMessageId: request.ReplyToMessageId,
             ReplyTo: replyPreview,
             IsSystemGenerated: false, // User-sent messages are not system-generated
@@ -761,6 +772,7 @@ public class ConversationService : IConversationService
             IsEdited: false,
             EditedAt: null,
             IsDeleted: false,
+            DeletedAt: null,
             ReplyToMessageId: null,
             ReplyTo: null,
             IsSystemGenerated: false, // User-initiated send money is not system-generated
@@ -820,6 +832,31 @@ public class ConversationService : IConversationService
         var success = await _chatMessageRepository.DeleteMessageAsync(messageId, userId, ct);
         if (!success)
             return Error.InternalError("Failed to delete message");
+        
+        return Result.Success();
+    }
+
+    public async Task<Result> RestoreMessageAsync(string userId, string messageId, CancellationToken ct = default)
+    {
+        var message = await _chatMessageRepository.GetByIdAsync(messageId, ct);
+        if (message == null || message.SenderUserId != userId)
+            return Error.NotFound("Message");
+        
+        if (!message.IsDeleted)
+            return Error.Validation("Message is not deleted");
+        
+        // Check undo window: must restore within 24 hours of deletion
+        if (message.DeletedAt.HasValue &&
+            DateTime.UtcNow - message.DeletedAt.Value > TimeSpan.FromMinutes(ConversationConstants.UndoDeleteWindowMinutes))
+            return Error.Validation("Undo window has expired. Messages can only be restored within 24 hours of deletion.");
+        
+        // Check if content has been permanently purged
+        if (message.Type == ChatMessageType.Text && message.Content == null)
+            return Error.Validation("Message content has been permanently removed and cannot be restored.");
+        
+        var success = await _chatMessageRepository.RestoreMessageAsync(messageId, userId, ct);
+        if (!success)
+            return Error.InternalError("Failed to restore message");
         
         return Result.Success();
     }
