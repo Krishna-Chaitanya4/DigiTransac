@@ -160,11 +160,11 @@ public class P2PTransactionService : IP2PTransactionService
         var linkedP2PTransaction = await _transactionRepository.GetLinkedP2PTransactionAsync(
             transaction.TransactionLinkId.Value, userId);
 
-        // Only delete if the counterparty's transaction is still Pending
+        // Only soft-delete if the counterparty's transaction is still Pending
         // If they've already confirmed it, leave it (it's their record now)
         if (linkedP2PTransaction != null && linkedP2PTransaction.Status == TransactionStatus.Pending)
         {
-            await _transactionRepository.DeleteByIdAsync(linkedP2PTransaction.Id);
+            await _transactionRepository.SoftDeleteAsync(linkedP2PTransaction.Id, linkedP2PTransaction.UserId);
         }
 
         return (true, "P2P linked transaction deleted");

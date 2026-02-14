@@ -213,6 +213,20 @@ public class Transaction
     [BsonRepresentation(BsonType.String)]
     public TransactionSource Source { get; set; } = TransactionSource.Manual;
 
+    /// <summary>
+    /// Whether this transaction has been soft-deleted.
+    /// Soft-deleted transactions are hidden from queries but can be restored within the undo window.
+    /// </summary>
+    [BsonElement("isDeleted")]
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// When the transaction was soft-deleted. Used to determine the undo window expiry.
+    /// After 24 hours, the transaction is permanently purged by the cleanup service.
+    /// </summary>
+    [BsonElement("deletedAt")]
+    public DateTime? DeletedAt { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

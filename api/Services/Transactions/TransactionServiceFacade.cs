@@ -51,6 +51,9 @@ public class TransactionServiceFacade : ITransactionService
     public Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default)
         => _coreService.DeleteAsync(id, userId, ct);
 
+    public Task<Result> RestoreAsync(string id, string userId, CancellationToken ct = default)
+        => _coreService.RestoreAsync(id, userId, ct);
+
     public Task<int> GetPendingCountAsync(string userId, CancellationToken ct = default)
         => _coreService.GetPendingCountAsync(userId, ct);
 

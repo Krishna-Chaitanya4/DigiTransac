@@ -45,6 +45,12 @@ public interface ITransactionRepository
     
     // Get transactions by IDs (for chat message resolution)
     Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId, CancellationToken ct = default);
+    
+    // Soft delete / restore
+    Task<bool> SoftDeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task<bool> RestoreAsync(string id, string userId, CancellationToken ct = default);
+    Task<Transaction?> GetDeletedByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<int> PurgeExpiredDeletedTransactionsAsync(TimeSpan undoWindow, CancellationToken ct = default);
 }
 
 public class TransactionRepository : ITransactionRepository
@@ -142,7 +148,7 @@ public class TransactionRepository : ITransactionRepository
 
     public async Task<Transaction?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        return await _transactions.Find(t => t.Id == id && t.UserId == userId).FirstOrDefaultAsync(ct);
+        return await _transactions.Find(t => t.Id == id && t.UserId == userId && !t.IsDeleted).FirstOrDefaultAsync(ct);
     }
 
     public async Task<(List<Transaction> Transactions, int TotalCount)> GetFilteredAsync(
@@ -155,6 +161,7 @@ public class TransactionRepository : ITransactionRepository
         {
             filterBuilder.Eq(t => t.UserId, userId),
             filterBuilder.Eq(t => t.IsRecurringTemplate, false), // Exclude templates from normal listings
+            filterBuilder.Eq(t => t.IsDeleted, false), // Exclude soft-deleted transactions
         };
         
         // Include/exclude pending P2P transactions (AccountId is null) based on status filter
@@ -313,7 +320,7 @@ public class TransactionRepository : ITransactionRepository
     public async Task<List<Transaction>> GetByAccountIdAsync(string accountId, string userId, CancellationToken ct = default)
     {
         return await _transactions
-            .Find(t => t.AccountId == accountId && t.UserId == userId && !t.IsRecurringTemplate)
+            .Find(t => t.AccountId == accountId && t.UserId == userId && !t.IsRecurringTemplate && !t.IsDeleted)
             .SortByDescending(t => t.Date)
             .ToListAsync(ct);
     }
@@ -409,7 +416,8 @@ public class TransactionRepository : ITransactionRepository
         {
             filterBuilder.Eq(t => t.AccountId, accountId),
             filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false)
+            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
+            filterBuilder.Eq(t => t.IsDeleted, false)
         };
 
         if (type.HasValue)
@@ -441,7 +449,8 @@ public class TransactionRepository : ITransactionRepository
         var filters = new List<FilterDefinition<Transaction>>
         {
             filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false)
+            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
+            filterBuilder.Eq(t => t.IsDeleted, false)
         };
 
         if (startDate.HasValue)
@@ -481,7 +490,8 @@ public class TransactionRepository : ITransactionRepository
         var filters = new List<FilterDefinition<Transaction>>
         {
             filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false)
+            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
+            filterBuilder.Eq(t => t.IsDeleted, false)
         };
 
         if (startDate.HasValue)
@@ -516,7 +526,8 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.AccountId, accountId),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
         );
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
     }
@@ -532,7 +543,8 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.In(t => t.AccountId, accountIdList),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
         );
 
         var pipeline = new[]
@@ -567,6 +579,7 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false),
             Builders<Transaction>.Filter.ElemMatch(t => t.Splits, s => s.LabelId == labelId)
         );
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
@@ -577,6 +590,7 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false),
             Builders<Transaction>.Filter.AnyEq(t => t.TagIds, tagId)
         );
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
@@ -617,7 +631,8 @@ public class TransactionRepository : ITransactionRepository
         // Count ALL pending transactions (not just P2P)
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending)
+            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
         );
         
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
@@ -640,7 +655,8 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Ne(t => t.CounterpartyUserId, null),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
         );
         
         return await _transactions.Find(filter)
@@ -654,7 +670,8 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.CounterpartyUserId, counterpartyUserId),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
         );
         
         return await _transactions.Find(filter)
@@ -670,9 +687,65 @@ public class TransactionRepository : ITransactionRepository
             
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.In(t => t.Id, idsList),
-            Builders<Transaction>.Filter.Eq(t => t.UserId, userId)
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
         );
         
         return await _transactions.Find(filter).ToListAsync(ct);
+    }
+
+    public async Task<bool> SoftDeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.Id, id),
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+        );
+
+        var update = Builders<Transaction>.Update
+            .Set(t => t.IsDeleted, true)
+            .Set(t => t.DeletedAt, DateTime.UtcNow);
+
+        UpdateResult result;
+        if (session != null)
+            result = await _transactions.UpdateOneAsync(session, filter, update, options: null, ct);
+        else
+            result = await _transactions.UpdateOneAsync(filter, update, options: null, ct);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<Transaction?> GetDeletedByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default)
+    {
+        return await _transactions.Find(t => t.Id == id && t.UserId == userId && t.IsDeleted).FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<bool> RestoreAsync(string id, string userId, CancellationToken ct = default)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.Id, id),
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, true)
+        );
+
+        var update = Builders<Transaction>.Update
+            .Set(t => t.IsDeleted, false)
+            .Set(t => t.DeletedAt, (DateTime?)null);
+
+        var result = await _transactions.UpdateOneAsync(filter, update, options: null, ct);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<int> PurgeExpiredDeletedTransactionsAsync(TimeSpan undoWindow, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - undoWindow;
+
+        // Permanently delete transactions that have been soft-deleted past the undo window
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, true),
+            Builders<Transaction>.Filter.Lt(t => t.DeletedAt, cutoff)
+        );
+
+        var result = await _transactions.DeleteManyAsync(filter, ct);
+        return (int)result.DeletedCount;
     }
 }

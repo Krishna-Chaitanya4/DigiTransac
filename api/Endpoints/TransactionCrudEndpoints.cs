@@ -243,7 +243,7 @@ public static class TransactionCrudEndpoints
         .Produces<ErrorResponse>(400)
         .Produces<ErrorResponse>(404);
 
-        // Delete transaction
+        // Delete transaction (soft-delete with 24-hour undo window)
         group.MapDelete("/{id}", async (
             string id,
             ClaimsPrincipal user,
@@ -260,10 +260,33 @@ public static class TransactionCrudEndpoints
                 : result.ToApiResult();
         })
         .WithName("DeleteTransaction")
-        .WithSummary("Delete a transaction")
-        .WithDescription("Permanently deletes a transaction and reverses the associated account balance change.")
+        .WithSummary("Soft-delete a transaction")
+        .WithDescription("Soft-deletes a transaction and reverses the associated account balance change. The transaction can be restored within 24 hours using the restore endpoint. After 24 hours, it is permanently purged.")
         .Produces(204)
         .Produces<ErrorResponse>(404);
+
+        // Restore a soft-deleted transaction (within 24-hour undo window)
+        group.MapPost("/{id}/restore", async (
+            string id,
+            ClaimsPrincipal user,
+            ITransactionService transactionService,
+            CancellationToken ct) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await transactionService.RestoreAsync(id, userId, ct);
+            return result.IsSuccess
+                ? Results.Ok()
+                : result.ToApiResult();
+        })
+        .WithName("RestoreTransaction")
+        .WithSummary("Restore a soft-deleted transaction")
+        .WithDescription("Restores a previously deleted transaction within the 24-hour undo window. Re-applies the balance change to the associated account.")
+        .Produces(200)
+        .Produces<ErrorResponse>(404)
+        .Produces<ErrorResponse>(400);
 
         // Delete recurring transaction
         group.MapDelete("/recurring/{id}", async (

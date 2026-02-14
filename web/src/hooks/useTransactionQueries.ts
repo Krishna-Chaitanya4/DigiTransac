@@ -7,6 +7,7 @@ import {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  restoreTransaction,
   updateStatus,
   getPendingCount,
   batchDelete,
@@ -140,7 +141,7 @@ export function useUpdateTransaction() {
   });
 }
 
-// Hook for deleting a transaction with optimistic update
+// Hook for deleting a transaction with optimistic update (soft-delete)
 export function useDeleteTransaction() {
   const queryClient = useQueryClient();
   
@@ -186,8 +187,22 @@ export function useDeleteTransaction() {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
     },
+    // No successMessage - the toast with undo button is shown by the page
+  });
+}
+
+// Hook for restoring a soft-deleted transaction
+export function useRestoreTransaction() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: string) => restoreTransaction(id),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
     meta: {
-      successMessage: 'Transaction deleted',
+      successMessage: 'Transaction restored',
     },
   });
 }

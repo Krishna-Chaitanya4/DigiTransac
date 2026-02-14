@@ -32,6 +32,7 @@ import {
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
+  useRestoreTransaction,
   useUpdateStatus,
   useBatchDelete,
   useBatchMarkConfirmed,
@@ -72,6 +73,7 @@ export default function TransactionsPage() {
   const createTransactionMutation = useCreateTransaction();
   const updateTransactionMutation = useUpdateTransaction();
   const deleteTransactionMutation = useDeleteTransaction();
+  const restoreTransactionMutation = useRestoreTransaction();
   const updateStatusMutation = useUpdateStatus();
   const batchDeleteMutation = useBatchDelete();
   const batchMarkConfirmedMutation = useBatchMarkConfirmed();
@@ -80,9 +82,8 @@ export default function TransactionsPage() {
   // Local transaction state for optimistic updates
   const [optimisticTransactions, setOptimisticTransactions] = useState<Transaction[] | null>(null);
 
-  // Pending deletes — IDs of transactions optimistically removed, awaiting undo window
-  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
-  const pendingDeleteTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // IDs of transactions being soft-deleted — instantly filtered from the list
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   
   // Toast notifications
   const { showInfo, toasts, dismissToast } = useToast();
@@ -197,12 +198,12 @@ export default function TransactionsPage() {
   
   const { data: summary } = useTransactionSummary(summaryFilter);
 
-  // Derived state — filter out pending deletes for instant removal
+  // Derived state
   const transactions = useMemo(() => {
     const base = optimisticTransactions ?? transactionResponse?.transactions ?? [];
-    if (pendingDeletes.size === 0) return base;
-    return base.filter(t => !pendingDeletes.has(t.id));
-  }, [optimisticTransactions, transactionResponse?.transactions, pendingDeletes]);
+    if (deletedIds.size === 0) return base;
+    return base.filter(t => !deletedIds.has(t.id));
+  }, [optimisticTransactions, transactionResponse?.transactions, deletedIds]);
   const hasMore = transactionResponse ? transactionResponse.page < transactionResponse.totalPages : false;
   const isLoading = isLoadingAccounts || isLoadingLabels || isLoadingTags || isLoadingTransactions;
   const isLoadingMore = isFetchingTransactions && currentPage > 1;
@@ -244,17 +245,6 @@ export default function TransactionsPage() {
     setOptimisticTransactions(null);
     clearSelection();
   }, [filter, debouncedSearchText, datePreset, customStartDate, customEndDate]);
-
-  // Cleanup pending delete timers on unmount — fire all immediately
-  useEffect(() => {
-    const timersRef = pendingDeleteTimersRef;
-    return () => {
-      timersRef.current.forEach((timeout) => {
-        clearTimeout(timeout);
-      });
-      timersRef.current.clear();
-    };
-  }, []);
 
   // Debounce search text
   useEffect(() => {
@@ -400,54 +390,40 @@ export default function TransactionsPage() {
     setIsFormOpen(true);
   };
 
-  // Handle delete with instant removal + delayed API call for undo support
-  const UNDO_DELAY_MS = 5000;
-
+  // Handle delete — instant soft-delete API call with undo via restore
   const handleDelete = (id: string) => {
     const transactionToDelete = transactions.find(t => t.id === id);
     if (!transactionToDelete) return;
 
-    // Cancel any existing timer for this ID
-    const existingTimer = pendingDeleteTimersRef.current.get(id);
-    if (existingTimer) clearTimeout(existingTimer);
+    // Instantly mark as deleted — filtered out by the memo
+    setDeletedIds(prev => new Set(prev).add(id));
 
-    // Mark as pending delete — instantly filters from rendered list
-    setPendingDeletes(prev => new Set(prev).add(id));
-
-    // Schedule the actual API call after the undo window
-    const timer = setTimeout(() => {
-      pendingDeleteTimersRef.current.delete(id);
-      deleteTransactionMutation.mutate(id, {
-        onSettled: () => {
-          // Remove from pending set after mutation completes
-          setPendingDeletes(prev => {
+    // Call soft-delete API immediately
+    deleteTransactionMutation.mutate(id, {
+      onSettled: () => {
+        // Clean up deletedIds after refetch has time to complete
+        // (by then transactionResponse won't include the deleted item)
+        setTimeout(() => {
+          setDeletedIds(prev => {
             const next = new Set(prev);
             next.delete(id);
             return next;
           });
-          setPendingRefreshTrigger(prev => prev + 1);
-        },
-      });
-    }, UNDO_DELAY_MS);
+        }, 3000);
+      },
+    });
 
-    pendingDeleteTimersRef.current.set(id, timer);
-
-    // Show undo toast
+    // Show undo toast — undo calls the restore API
     const toastId = showInfo('Transaction deleted', {
       label: 'Undo',
       onClick: () => {
-        // Cancel the pending delete — transaction is never sent to server
-        const t = pendingDeleteTimersRef.current.get(id);
-        if (t) {
-          clearTimeout(t);
-          pendingDeleteTimersRef.current.delete(id);
-        }
-        // Remove from pending set — item reappears instantly
-        setPendingDeletes(prev => {
+        // Remove from deleted set so it reappears instantly
+        setDeletedIds(prev => {
           const next = new Set(prev);
           next.delete(id);
           return next;
         });
+        restoreTransactionMutation.mutate(id);
         dismissToast(toastId);
       },
     });

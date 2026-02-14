@@ -9,6 +9,7 @@ export {
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
+  useRestoreTransaction,
   useUpdateStatus,
   useBatchDelete,
   useBatchMarkConfirmed,

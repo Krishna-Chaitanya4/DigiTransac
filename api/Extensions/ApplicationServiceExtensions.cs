@@ -178,6 +178,7 @@ public static class ApplicationServiceExtensions
     {
         builder.Services.AddHostedService<RecurringTransactionBackgroundService>();
         builder.Services.AddHostedService<DeletedMessageCleanupService>();
+        builder.Services.AddHostedService<DeletedTransactionCleanupService>();
     }
 
     private static void AddValidatorsAndMediatR(WebApplicationBuilder builder)

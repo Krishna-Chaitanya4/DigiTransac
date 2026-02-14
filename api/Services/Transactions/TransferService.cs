@@ -382,18 +382,18 @@ public class TransferService : ITransferService
             
             if (linkedAccount != null)
             {
-                // Execute delete and balance update atomically
+                // Execute soft-delete and balance update atomically
                 await using var unitOfWork = new Services.UnitOfWork.UnitOfWork(_mongoDbService);
                 await unitOfWork.ExecuteInTransactionAsync(async session =>
                 {
                     await _accountBalanceService.UpdateBalanceAsync(
                         linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, false, session);
-                    await _transactionRepository.DeleteAsync(linkedTransaction.Id, userId, session);
+                    await _transactionRepository.SoftDeleteAsync(linkedTransaction.Id, userId, session);
                 });
             }
             else
             {
-                await _transactionRepository.DeleteAsync(linkedTransaction.Id, userId);
+                await _transactionRepository.SoftDeleteAsync(linkedTransaction.Id, userId);
             }
         }
 

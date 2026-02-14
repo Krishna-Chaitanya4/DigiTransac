@@ -31,9 +31,14 @@ public interface ITransactionCoreService
     Task<Result<TransactionResponse>> UpdateAsync(string id, string userId, UpdateTransactionRequest request, CancellationToken ct = default);
     
     /// <summary>
-    /// Delete a transaction
+    /// Delete a transaction (soft-delete with 24-hour undo window)
     /// </summary>
     Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Restore a soft-deleted transaction within the undo window
+    /// </summary>
+    Task<Result> RestoreAsync(string id, string userId, CancellationToken ct = default);
     
     /// <summary>
     /// Get pending transaction count for a user

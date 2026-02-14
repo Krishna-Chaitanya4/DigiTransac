@@ -16,6 +16,7 @@ public interface ITransactionService
     Task<Result<TransactionResponse>> CreateAsync(string userId, CreateTransactionRequest request, CancellationToken ct = default);
     Task<Result<TransactionResponse>> UpdateAsync(string id, string userId, UpdateTransactionRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default);
+    Task<Result> RestoreAsync(string id, string userId, CancellationToken ct = default);
     
     // Recurring transactions
     Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId, CancellationToken ct = default);
