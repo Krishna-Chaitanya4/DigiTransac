@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.13] - 2026-02-14
+
+### Fixed
+- **Chat Transaction Menu on Mobile** — Transaction message cards in chat now support long-press to open the actions menu (including "View in Transactions"). Previously, the menu trigger only used `group-hover:opacity-100` which doesn't work on touch devices, and long-press handlers (`onTouchStart`/`onTouchEnd`/`onTouchMove`) were only attached to text message bubbles.
+- **Deleted Transactions in Chat** — When a transaction is deleted from the Transactions page, the corresponding chat message now shows a "Transaction deleted" placeholder card instead of rendering nothing. Previously, `message.type === 'Transaction'` with `message.transaction === null` fell through all rendering branches silently.
+- **MessageActionsMenu Option Count** — Fixed menu height calculation that counted "View in Transactions" for all transaction-type messages even when `message.transaction` was null (deleted transaction). Now correctly checks `message.transaction` existence.
+
 ## [1.6.12] - 2026-02-14
 
 ### Fixed

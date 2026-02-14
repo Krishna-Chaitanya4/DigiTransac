@@ -26,7 +26,7 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
   const optionCount =
     1 + // Reply is always available
     (message.type === 'Text' ? 1 : 0) + // Copy for text
-    (message.type === 'Transaction' ? 1 : 0) + // View in Transactions
+    (message.type === 'Transaction' && message.transaction ? 1 : 0) + // View in Transactions
     (canEditMessage(message) ? 1 : 0) + // Edit
     (canDeleteMessage(message) ? 1 : 0); // Delete
 
