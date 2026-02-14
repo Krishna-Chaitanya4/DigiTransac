@@ -29,7 +29,13 @@ public static class ETagHelper
     /// <returns>Either Results.StatusCode(304) or Results.Ok(data) with ETag header set.</returns>
     public static IResult OkWithETag<T>(HttpContext context, T data, int cacheMaxAgeSeconds = 0)
     {
-        var etag = ComputeETag(data);
+        // Serialize once and reuse for both ETag computation and response body
+        var json = JsonSerializer.Serialize(data, SerializerOptions);
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        var etag = Convert.ToBase64String(hashBytes, 0, 16)
+            .Replace("+", "-")
+            .Replace("/", "_")
+            .TrimEnd('=');
 
         // Check If-None-Match header
         if (HasMatchingETag(context, etag))
@@ -44,7 +50,8 @@ public static class ETagHelper
         context.Response.Headers.ETag = FormatETag(etag);
         SetCacheHeaders(context, cacheMaxAgeSeconds);
 
-        return Results.Ok(data);
+        // Return pre-serialized JSON to avoid double serialization
+        return Results.Text(json, "application/json", Encoding.UTF8);
     }
 
     /// <summary>

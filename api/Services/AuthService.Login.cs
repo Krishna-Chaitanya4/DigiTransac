@@ -11,7 +11,13 @@ public partial class AuthService
         _logger.LogInformation("Login attempt for {Email}", request.Email);
 
         var user = await _userRepository.GetByEmailAsync(request.Email);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+
+        // Constant-time comparison: always run BCrypt.Verify to prevent timing-based user enumeration.
+        // When user is null, verify against a dummy hash so the response time is consistent.
+        var passwordHash = user?.PasswordHash ?? "$2a$12$LJ3m4ys3Lz0Y3x0r5r5Q4eDpGh.X1PoMf6TkRdqj8XGz5q8y0Y5Ky";
+        var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, passwordHash);
+
+        if (user == null || !passwordValid)
         {
             _logger.LogWarning("Failed login attempt for {Email}", request.Email);
             

@@ -73,7 +73,7 @@ public static class TransactionAnalyticsEndpoints
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 50);
+            var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate, page ?? 1, Math.Min(pageSize ?? 50, 200));
             
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
         })

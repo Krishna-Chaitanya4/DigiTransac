@@ -75,16 +75,40 @@ public class TransactionExportService : ITransactionExportService
 
         foreach (var t in transactions)
         {
-            var categoryName = t.Splits.FirstOrDefault()?.LabelName ?? "";
-            var tagNames = string.Join(";", t.Tags.Select(tag => tag.Name));
-            var notes = (t.Notes ?? "").Replace("\"", "\"\"");
-            var title = (t.Title ?? "").Replace("\"", "\"\"");
-            var payee = (t.Payee ?? "").Replace("\"", "\"\"");
+            var categoryName = SanitizeCsvField(t.Splits.FirstOrDefault()?.LabelName ?? "");
+            var tagNames = SanitizeCsvField(string.Join(";", t.Tags.Select(tag => tag.Name)));
+            var notes = SanitizeCsvField(t.Notes ?? "");
+            var title = SanitizeCsvField(t.Title ?? "");
+            var payee = SanitizeCsvField(t.Payee ?? "");
+            var accountName = SanitizeCsvField(t.AccountName ?? "");
 
             csv.AppendLine(
-                $"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tagNames}\",{t.Status},\"{notes}\"");
+                $"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{accountName}\",\"{categoryName}\",\"{tagNames}\",{t.Status},\"{notes}\"");
         }
 
         return csv.ToString();
+    }
+
+    /// <summary>
+    /// Sanitizes a string for safe CSV output:
+    /// 1. Escapes double quotes by doubling them
+    /// 2. Prefixes formula injection characters (=, +, -, @, \t, \r) with a single quote
+    /// </summary>
+    private static string SanitizeCsvField(string value)
+    {
+        // Escape double quotes for CSV
+        var escaped = value.Replace("\"", "\"\"");
+
+        // Prevent CSV injection / formula injection in spreadsheet applications
+        if (escaped.Length > 0 && "=+-@".Contains(escaped[0]))
+        {
+            escaped = "'" + escaped;
+        }
+        else if (escaped.StartsWith("\t") || escaped.StartsWith("\r"))
+        {
+            escaped = "'" + escaped;
+        }
+
+        return escaped;
     }
 }

@@ -240,10 +240,12 @@ export default function ChatsPage() {
     }
   }, []);
 
-  // Mark as read when conversation loads
+  // Mark as read when conversation loads (only once per conversation selection)
+  const markedAsReadRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedUserId && conversationData) {
+    if (selectedUserId && conversationData && markedAsReadRef.current !== selectedUserId) {
       markAsReadMutation.mutate(selectedUserId);
+      markedAsReadRef.current = selectedUserId;
     }
   }, [selectedUserId, conversationData]);
 

@@ -307,6 +307,15 @@ export default function TransactionsPage() {
   }, [isLoading]);
 
   // Handle highlight from URL param (e.g., /transactions?highlight=abc123)
+  // Track timeouts for cleanup on unmount
+  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      timeoutRefs.current.forEach(clearTimeout);
+    };
+  }, []);
+
   useEffect(() => {
     const highlightId = searchParams.get('highlight');
     if (highlightId && transactions.length > 0) {
@@ -318,15 +327,17 @@ export default function TransactionsPage() {
       setSearchParams(searchParams, { replace: true });
       
       // Scroll to the transaction after a short delay
-      setTimeout(() => {
+      const scrollTimer = setTimeout(() => {
         const element = document.querySelector(`[data-transaction-id="${highlightId}"]`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);
+      timeoutRefs.current.push(scrollTimer);
       
       // Clear highlight after animation
-      setTimeout(() => setHighlightedTransactionId(null), 3000);
+      const clearTimer = setTimeout(() => setHighlightedTransactionId(null), 3000);
+      timeoutRefs.current.push(clearTimer);
     }
   }, [searchParams, setSearchParams, transactions.length]);
 

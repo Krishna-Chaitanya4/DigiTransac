@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.15] - 2026-02-14
+
+### Fixed — Security
+- **Password Change/Reset Token Revocation** — All refresh tokens are now revoked when a user changes or resets their password, preventing stolen tokens from retaining access
+- **Forgot-Password Email Enumeration** — Endpoint now always returns generic success message regardless of whether the email exists, fixing a code path that leaked failures before the generic response
+- **Login Timing Attack Mitigation** — BCrypt.Verify now runs against a dummy hash when the user doesn't exist, preventing timing-based email enumeration
+- **CSV Injection Prevention** — Transaction CSV export now sanitizes formula injection characters (`=`, `+`, `-`, `@`, `\t`, `\r`) and properly escapes quotes in all fields (AccountName, categoryName, tagNames were previously unescaped)
+- **Refresh Token Rate Limiting** — Added `.RequireRateLimiting("auth")` to the `/refresh-token` endpoint to prevent brute-force attacks
+- **Decryption Error Handling** — `DecryptIfNotEmpty` now catches only `CryptographicException` (returns null) and `FormatException` (legacy unencrypted data), instead of a catch-all that leaked ciphertext to callers
+- **Exception Message Leak** — `GlobalExceptionHandlerMiddleware` no longer exposes `ArgumentException.Message` or `InvalidOperationException.Message` to clients; uses generic messages instead
+- **Verification Code Range** — Fixed off-by-one in `GenerateVerificationCode`: upper bound changed from 999999 (exclusive) to 1000000 so code 999999 can be generated
+
+### Fixed — Bugs
+- **Offline Sync Broken** — `useOffline.ts` used wrong localStorage key (`'accessToken'` instead of `'digitransac_access_token'`); all offline queue sync operations silently failed
+- **Auth Crash on Corrupted Storage** — `AuthContext` initialization now wraps `JSON.parse(storedUser)` in try/catch; corrupted localStorage no longer causes unrecoverable white-screen crash
+- **Batch Delete Double Balance Reversal** — When both sides of a transfer were included in batch delete IDs, balances were reversed twice; now tracks processed IDs in a `HashSet` to skip already-handled linked transactions
+- **Batch Status Update Missing Balance** — Changing transaction status between Confirmed ↔ Pending/Declined now correctly adjusts account balances
+- **Recurring Transfer Currency Conversion** — Recurring transfers between accounts with different currencies now perform exchange rate conversion (previously used raw template amount with destination currency)
+- **Shared Mutable References in Recurring** — Recurring transaction instances now deep-copy `Splits`, `TagIds`, and `Location` from the template instead of sharing object references
+- **Email Change Stale Records** — `SendEmailChangeCodeAsync` now deletes existing verification records before creating new ones (was accumulating stale records unlike other flows)
+- **Account Deletion Not Atomic** — Removed misleading `ExecuteInTransactionAsync` wrapper from `DeleteAccountAsync` since repository `DeleteAll*` methods don't support `IClientSessionHandle`; operations now execute sequentially with user record deleted last for safety
+- **429 Rate Limit Retry** — 429 (Too Many Requests) is no longer treated as a non-retryable client error; rate-limited requests now benefit from exponential backoff retry
+- **markAsRead Spam** — Chat `markAsReadMutation` no longer fires on every React Query refetch; tracks last-marked conversation to prevent redundant API calls
+- **Uncleared Timeouts** — TransactionsPage highlight/undo `setTimeout` calls are now tracked in refs and cleaned up on unmount
+
+### Fixed — Performance
+- **Budget N+1 Labels Query** — `CheckBudgetAlertsAsync` now pre-fetches labels once before the budget loop instead of fetching per-budget; `GetBudgetTransactionsAsync` accepts optional pre-fetched labels
+- **Budget Parallel DB Calls** — `BuildBudgetResponseAsync` (single-budget overload) now parallelizes accounts, labels, rates, and user queries with `Task.WhenAll`
+- **ETag Double Serialization** — `OkWithETag` now serializes JSON once and uses `Results.Text()` for the response body, avoiding redundant serialization by `Results.Ok()`
+- **Analytics PageSize Clamped** — Analytics endpoints clamp `pageSize` to max 200; conversation message `limit` clamped to 200
+- **Batch Operation Max Size** — Batch operations now enforce a maximum of 100 IDs per request via FluentValidation
+- **Static Compiled Regex** — Email validation regex is now a `static readonly Regex` with `RegexOptions.Compiled` instead of being recompiled per call
+- **MailMessage Disposal** — All three `EmailService` send methods now dispose `MailMessage` after sending
+
+### Changed
+- **Optimistic Error Visibility** — MutationCache global error handler no longer skips error toasts for mutations with `onError` (optimistic rollback); users now see failure notifications after rollback
+
 ## [1.6.14] - 2026-02-14
 
 ### Added

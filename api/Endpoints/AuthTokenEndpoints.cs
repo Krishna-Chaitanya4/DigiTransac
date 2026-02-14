@@ -106,7 +106,8 @@ public static class AuthTokenEndpoints
         .WithDescription("Issues a new access token using the refresh token from HttpOnly cookie or request body. Also rotates the refresh token.")
         .Produces<AuthResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400)
-        .Produces(401);
+        .Produces(401)
+        .RequireRateLimiting("auth");
 
         // Revoke refresh token (logout from specific device)
         group.MapPost("/revoke-token", [Authorize] async (

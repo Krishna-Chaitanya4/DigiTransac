@@ -60,27 +60,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem(USER_KEY);
 
     if (storedAccessToken && storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setAccessToken(storedAccessToken);
-      setUser(parsedUser);
-      // Set Sentry user for error tracking
-      setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setAccessToken(storedAccessToken);
+        setUser(parsedUser);
+        // Set Sentry user for error tracking
+        setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
 
-      // Proactively refresh if access token is expired or about to expire
-      // This prevents the first API call from failing and provides seamless PWA experience
-      if (isTokenExpired(storedAccessToken)) {
-        authService.refreshToken()
-          .then((response) => {
-            handleAuthSuccess(response);
-            setIsLoading(false);
-          })
-          .catch(() => {
-            // Refresh failed — token cookie expired or was cleared
-            // Keep user data so ProtectedRoute can show the app briefly,
-            // the next API call will trigger session-expired flow
-            setIsLoading(false);
-          });
-        return; // Don't set isLoading=false yet, wait for refresh
+        // Proactively refresh if access token is expired or about to expire
+        // This prevents the first API call from failing and provides seamless PWA experience
+        if (isTokenExpired(storedAccessToken)) {
+          authService.refreshToken()
+            .then((response) => {
+              handleAuthSuccess(response);
+              setIsLoading(false);
+            })
+            .catch(() => {
+              // Refresh failed — token cookie expired or was cleared
+              // Keep user data so ProtectedRoute can show the app briefly,
+              // the next API call will trigger session-expired flow
+              setIsLoading(false);
+            });
+          return; // Don't set isLoading=false yet, wait for refresh
+        }
+      } catch {
+        // Corrupted localStorage data — clear and start fresh
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
       }
     }
     setIsLoading(false);

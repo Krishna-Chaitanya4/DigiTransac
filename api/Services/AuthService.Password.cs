@@ -46,6 +46,9 @@ public partial class AuthService
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         await _userRepository.UpdateAsync(user);
 
+        // Revoke all existing refresh tokens so stolen tokens can't be reused
+        await _refreshTokenRepository.DeleteByUserIdAsync(userId);
+
         _logger.LogInformation("Password changed successfully for UserId: {UserId}", userId);
         
         // Audit log for successful password change
@@ -163,6 +166,9 @@ public partial class AuthService
         }
         
         await _userRepository.UpdateAsync(user);
+
+        // Revoke all existing refresh tokens so stolen tokens can't be reused
+        await _refreshTokenRepository.DeleteByUserIdAsync(user.Id);
 
         // Clean up verification record
         await _emailVerificationRepository.DeleteByEmailAsync(request.Email, VerificationPurpose.PasswordReset);

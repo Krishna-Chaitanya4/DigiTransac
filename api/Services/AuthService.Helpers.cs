@@ -51,8 +51,8 @@ public partial class AuthService
 
     private static string GenerateVerificationCode()
     {
-        // Generate 6-digit code
-        return RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+        // Generate 6-digit code (upper bound is exclusive, so use 1000000)
+        return RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
     }
 
     private static string GenerateSecureToken()
@@ -62,14 +62,16 @@ public partial class AuthService
         return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
     }
 
+    private static readonly Regex EmailRegex = new(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private static bool IsValidEmail(string email)
     {
         if (string.IsNullOrWhiteSpace(email))
             return false;
 
-        // Basic email validation pattern
-        var pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
-        return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
+        return EmailRegex.IsMatch(email);
     }
 
     private static (bool IsValid, string Message) ValidatePassword(string password)

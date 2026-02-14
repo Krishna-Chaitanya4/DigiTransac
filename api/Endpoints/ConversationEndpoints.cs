@@ -56,7 +56,7 @@ public static class ConversationEndpoints
                 return Results.Unauthorized();
 
             var conversation = await conversationService.GetConversationAsync(
-                userId, counterpartyUserId, limit ?? 50, before, ct);
+                userId, counterpartyUserId, Math.Min(limit ?? 50, 200), before, ct);
             return Results.Ok(conversation);
         })
         .WithName("GetConversation")

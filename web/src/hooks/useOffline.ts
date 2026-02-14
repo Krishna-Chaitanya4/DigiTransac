@@ -1,5 +1,6 @@
 import { useState, useEffect, useSyncExternalStore, useCallback, useRef } from 'react';
 import { logger } from '../services/logger';
+import { getStoredAccessToken } from '../services/tokenStorage';
 
 function subscribe(callback: () => void) {
   window.addEventListener('online', callback);
@@ -183,7 +184,7 @@ async function loadQueue(): Promise<OfflineAction[]> {
 }
 
 async function executeAction(action: OfflineAction): Promise<void> {
-  const token = localStorage.getItem('accessToken');
+  const token = getStoredAccessToken();
   if (!token) throw new Error('No auth token');
 
   const API_BASE_URL = '/api';

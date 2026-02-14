@@ -25,13 +25,14 @@ public static class AuthPasswordEndpoints
             if (validationError != null) return validationError;
 
             var result = await authService.SendPasswordResetCodeAsync(request.Email);
-            
+
+            // Always return generic success to prevent email enumeration,
+            // regardless of whether the service call succeeded or found the email
             if (result.IsFailure)
             {
-                return result.ToApiResult();
+                // Log for server-side diagnostics but never reveal to client
             }
 
-            // Always return success to not reveal if email exists
             return Results.Ok(new VerificationResponse("If an account with that email exists, a reset code has been sent"));
         })
         .WithName("ForgotPassword")
