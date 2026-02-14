@@ -79,6 +79,10 @@ export default function TransactionsPage() {
   
   // Local transaction state for optimistic updates
   const [optimisticTransactions, setOptimisticTransactions] = useState<Transaction[] | null>(null);
+
+  // Pending deletes — IDs of transactions optimistically removed, awaiting undo window
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
+  const pendingDeleteTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   
   // Toast notifications
   const { showInfo, toasts, dismissToast } = useToast();
@@ -193,8 +197,12 @@ export default function TransactionsPage() {
   
   const { data: summary } = useTransactionSummary(summaryFilter);
 
-  // Derived state
-  const transactions = optimisticTransactions ?? transactionResponse?.transactions ?? [];
+  // Derived state — filter out pending deletes for instant removal
+  const transactions = useMemo(() => {
+    const base = optimisticTransactions ?? transactionResponse?.transactions ?? [];
+    if (pendingDeletes.size === 0) return base;
+    return base.filter(t => !pendingDeletes.has(t.id));
+  }, [optimisticTransactions, transactionResponse?.transactions, pendingDeletes]);
   const hasMore = transactionResponse ? transactionResponse.page < transactionResponse.totalPages : false;
   const isLoading = isLoadingAccounts || isLoadingLabels || isLoadingTags || isLoadingTransactions;
   const isLoadingMore = isFetchingTransactions && currentPage > 1;
@@ -236,6 +244,17 @@ export default function TransactionsPage() {
     setOptimisticTransactions(null);
     clearSelection();
   }, [filter, debouncedSearchText, datePreset, customStartDate, customEndDate]);
+
+  // Cleanup pending delete timers on unmount — fire all immediately
+  useEffect(() => {
+    const timersRef = pendingDeleteTimersRef;
+    return () => {
+      timersRef.current.forEach((timeout) => {
+        clearTimeout(timeout);
+      });
+      timersRef.current.clear();
+    };
+  }, []);
 
   // Debounce search text
   useEffect(() => {
@@ -381,45 +400,57 @@ export default function TransactionsPage() {
     setIsFormOpen(true);
   };
 
-  // Handle delete with optimistic UI and undo
-  const handleDelete = async (id: string) => {
-    // Find the transaction to delete
+  // Handle delete with instant removal + delayed API call for undo support
+  const UNDO_DELAY_MS = 5000;
+
+  const handleDelete = (id: string) => {
     const transactionToDelete = transactions.find(t => t.id === id);
     if (!transactionToDelete) return;
-    
-    // Optimistically remove from UI immediately
-    const originalIndex = transactions.findIndex(t => t.id === id);
-    setOptimisticTransactions(prev => {
-      const list = prev ?? transactions;
-      return list.filter(t => t.id !== id);
-    });
-    
+
+    // Cancel any existing timer for this ID
+    const existingTimer = pendingDeleteTimersRef.current.get(id);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    // Mark as pending delete — instantly filters from rendered list
+    setPendingDeletes(prev => new Set(prev).add(id));
+
+    // Schedule the actual API call after the undo window
+    const timer = setTimeout(() => {
+      pendingDeleteTimersRef.current.delete(id);
+      deleteTransactionMutation.mutate(id, {
+        onSettled: () => {
+          // Remove from pending set after mutation completes
+          setPendingDeletes(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+          setPendingRefreshTrigger(prev => prev + 1);
+        },
+      });
+    }, UNDO_DELAY_MS);
+
+    pendingDeleteTimersRef.current.set(id, timer);
+
     // Show undo toast
     const toastId = showInfo('Transaction deleted', {
       label: 'Undo',
       onClick: () => {
-        // Restore transaction in the same position
-        setOptimisticTransactions(prev => {
-          const list = prev ?? transactions;
-          const newList = [...list];
-          newList.splice(originalIndex, 0, transactionToDelete);
-          return newList;
+        // Cancel the pending delete — transaction is never sent to server
+        const t = pendingDeleteTimersRef.current.get(id);
+        if (t) {
+          clearTimeout(t);
+          pendingDeleteTimersRef.current.delete(id);
+        }
+        // Remove from pending set — item reappears instantly
+        setPendingDeletes(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
         });
         dismissToast(toastId);
       },
     });
-    
-    try {
-      await deleteTransactionMutation.mutateAsync(id);
-      // Clear optimistic state - query cache is updated
-      setOptimisticTransactions(null);
-      setPendingRefreshTrigger(prev => prev + 1);
-    } catch (err) {
-      logger.error('Failed to delete transaction:', err);
-      // Restore transaction on error
-      setOptimisticTransactions(null);
-      dismissToast(toastId);
-    }
   };
 
   // Handle update status with undo toast
