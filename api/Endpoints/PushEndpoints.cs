@@ -37,6 +37,7 @@ public static class PushEndpoints
             IPushSubscriptionRepository subscriptionRepository,
             HttpContext httpContext) =>
         {
+            var ct = httpContext.RequestAborted;
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
             {
@@ -52,7 +53,7 @@ public static class PushEndpoints
             }
 
             // Check if subscription already exists
-            var existing = await subscriptionRepository.GetByEndpointAsync(request.Endpoint);
+            var existing = await subscriptionRepository.GetByEndpointAsync(request.Endpoint, ct);
             if (existing != null)
             {
                 // Update the existing subscription if it belongs to this user
@@ -63,13 +64,13 @@ public static class PushEndpoints
                     existing.UserAgent = httpContext.Request.Headers.UserAgent.ToString();
                     existing.DeviceName = request.DeviceName;
                     existing.IsEnabled = true;
-                    await subscriptionRepository.UpdateAsync(existing);
+                    await subscriptionRepository.UpdateAsync(existing, ct);
                     return Results.Ok(new { message = "Subscription updated", subscriptionId = existing.Id });
                 }
                 else
                 {
                     // Endpoint belongs to another user - remove it and create new
-                    await subscriptionRepository.DeleteByEndpointAsync(request.Endpoint);
+                    await subscriptionRepository.DeleteByEndpointAsync(request.Endpoint, ct);
                 }
             }
 
@@ -86,7 +87,7 @@ public static class PushEndpoints
                 IsEnabled = true
             };
 
-            await subscriptionRepository.CreateAsync(subscription);
+            await subscriptionRepository.CreateAsync(subscription, ct);
 
             return Results.Ok(new { message = "Subscribed to push notifications", subscriptionId = subscription.Id });
         })
@@ -99,8 +100,10 @@ public static class PushEndpoints
         group.MapPost("/unsubscribe", [Authorize] async (
             [FromBody] UnsubscribeRequest request,
             ClaimsPrincipal user,
-            IPushSubscriptionRepository subscriptionRepository) =>
+            IPushSubscriptionRepository subscriptionRepository,
+            HttpContext httpContext) =>
         {
+            var ct = httpContext.RequestAborted;
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
             {
@@ -112,13 +115,13 @@ public static class PushEndpoints
                 return Results.BadRequest(new { message = "Endpoint is required" });
             }
 
-            var subscription = await subscriptionRepository.GetByEndpointAsync(request.Endpoint);
+            var subscription = await subscriptionRepository.GetByEndpointAsync(request.Endpoint, ct);
             if (subscription == null || subscription.UserId != userId)
             {
                 return Results.NotFound(new { message = "Subscription not found" });
             }
 
-            await subscriptionRepository.DeleteByEndpointAsync(request.Endpoint);
+            await subscriptionRepository.DeleteByEndpointAsync(request.Endpoint, ct);
 
             return Results.Ok(new { message = "Unsubscribed from push notifications" });
         })
@@ -131,15 +134,17 @@ public static class PushEndpoints
         // Get user's push subscriptions
         group.MapGet("/subscriptions", [Authorize] async (
             ClaimsPrincipal user,
-            IPushSubscriptionRepository subscriptionRepository) =>
+            IPushSubscriptionRepository subscriptionRepository,
+            HttpContext httpContext) =>
         {
+            var ct = httpContext.RequestAborted;
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
             {
                 return Results.Unauthorized();
             }
 
-            var subscriptions = await subscriptionRepository.GetByUserIdAsync(userId);
+            var subscriptions = await subscriptionRepository.GetByUserIdAsync(userId, ct);
             
             return Results.Ok(subscriptions.Select(s => new
             {
@@ -159,8 +164,10 @@ public static class PushEndpoints
         group.MapDelete("/subscriptions/{id}", [Authorize] async (
             string id,
             ClaimsPrincipal user,
-            IPushSubscriptionRepository subscriptionRepository) =>
+            IPushSubscriptionRepository subscriptionRepository,
+            HttpContext httpContext) =>
         {
+            var ct = httpContext.RequestAborted;
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
             {
@@ -168,13 +175,13 @@ public static class PushEndpoints
             }
 
             // Verify the subscription belongs to this user by fetching all user subscriptions
-            var subscriptions = await subscriptionRepository.GetByUserIdAsync(userId);
+            var subscriptions = await subscriptionRepository.GetByUserIdAsync(userId, ct);
             if (!subscriptions.Any(s => s.Id == id))
             {
                 return Results.NotFound(new { message = "Subscription not found" });
             }
 
-            await subscriptionRepository.DeleteAsync(id);
+            await subscriptionRepository.DeleteAsync(id, ct);
 
             return Results.Ok(new { message = "Subscription deleted" });
         })
@@ -186,8 +193,10 @@ public static class PushEndpoints
         // Test push notification (for debugging - send a test notification to self)
         group.MapPost("/test", [Authorize] async (
             ClaimsPrincipal user,
-            IWebPushService webPushService) =>
+            IWebPushService webPushService,
+            HttpContext httpContext) =>
         {
+            var ct = httpContext.RequestAborted;
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
             {
@@ -201,7 +210,7 @@ public static class PushEndpoints
                 Url: "/"
             );
 
-            var sentCount = await webPushService.SendToUserAsync(userId, payload);
+            var sentCount = await webPushService.SendToUserAsync(userId, payload, ct);
 
             return Results.Ok(new { message = $"Test notification sent to {sentCount} device(s)" });
         })

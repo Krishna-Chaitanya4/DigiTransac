@@ -68,10 +68,10 @@ export default function PushNotificationSettings() {
         setSuccessMessage('Push notifications disabled');
       } else {
         // Request permission first
-        const granted = await requestNotificationPermission();
+        const permission = await requestNotificationPermission();
         setPermissionState(Notification.permission);
         
-        if (!granted) {
+        if (permission !== 'granted') {
           setError('Notification permission was denied. Please enable it in your browser settings.');
           return;
         }

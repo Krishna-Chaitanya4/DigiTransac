@@ -155,3 +155,24 @@ public class SecuritySettings
     public bool UseSecureCookies { get; set; } = true;
     public string CookieDomain { get; set; } = "";
 }
+
+/// <summary>
+/// Configuration for Web Push (VAPID) notifications
+/// </summary>
+public class WebPushSettings
+{
+    /// <summary>
+    /// VAPID public key - shared with the frontend for subscription
+    /// </summary>
+    public string PublicKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// VAPID private key - kept secret on the server
+    /// </summary>
+    public string PrivateKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Contact email for the VAPID subject (e.g., "mailto:admin@example.com")
+    /// </summary>
+    public string Subject { get; set; } = string.Empty;
+}

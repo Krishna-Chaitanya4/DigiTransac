@@ -39,6 +39,7 @@ public static class ApplicationServiceExtensions
         builder.Services.Configure<EncryptionSettings>(builder.Configuration.GetSection("Encryption"));
         builder.Services.Configure<SecuritySettings>(builder.Configuration.GetSection("Security"));
         builder.Services.Configure<RateLimitSettings>(builder.Configuration.GetSection("RateLimit"));
+        builder.Services.Configure<WebPushSettings>(builder.Configuration.GetSection("WebPush"));
 
         var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>()!;
         builder.Services.AddSingleton(emailSettings);

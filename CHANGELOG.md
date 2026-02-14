@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.12] - 2026-02-14
+
+### Fixed
+- **Push Notification Permission Bug** — `PushNotificationSettings.tsx` `handleToggle` incorrectly checked `requestNotificationPermission()` return value as boolean (`if (!granted)`) instead of comparing the `NotificationPermission` string (`if (permission !== 'granted')`). The "permission denied" error message never displayed because all string values (`"granted"`, `"denied"`, `"default"`) are truthy.
+
+### Changed
+- **WebPushSettings → Options Pattern** — Moved `WebPushSettings` class from `WebPushService.cs` to `AppSettings.cs` and registered via `builder.Services.Configure<WebPushSettings>()` for consistency with all other settings classes. `WebPushService` now injects `IOptions<WebPushSettings>` instead of manually binding from `IConfiguration`.
+- **CancellationToken in WebPush** — Added `CancellationToken` parameter to all `IWebPushService` methods (`SendToUserAsync`, `SendToSubscriptionAsync`) and all `IPushSubscriptionRepository` methods, propagated through to MongoDB driver calls. Push endpoints now pass `HttpContext.RequestAborted`.
+
 ## [1.6.0] - 2026-02-12
 
 ### Added
