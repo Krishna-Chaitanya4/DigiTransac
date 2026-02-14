@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CurrencyProvider, useCurrency } from './CurrencyContext';
 import { AuthProvider } from './AuthContext';
 import { BrowserRouter } from 'react-router-dom';
@@ -53,15 +54,26 @@ function setupAuthenticatedUser(primaryCurrency = 'USD') {
   }));
 }
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+    },
+  });
+}
+
 function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = createTestQueryClient();
   return render(
-    <BrowserRouter>
-      <AuthProvider>
-        <CurrencyProvider>
-          {ui}
-        </CurrencyProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <CurrencyProvider>
+            {ui}
+          </CurrencyProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -175,24 +187,14 @@ describe('CurrencyContext', () => {
     expect(result.converted).toBeNull(); // Same currency, no conversion needed
   });
 
-  it('should use cached rates from localStorage', async () => {
-    // Pre-populate cache
-    const cacheData = {
-      rates: { USD: 1, INR: 83 },
-      lastUpdated: '2024-01-01T00:00:00Z',
-      cachedAt: Date.now(), // Fresh cache
-    };
-    localStorage.setItem('digitransac_exchange_rates', JSON.stringify(cacheData));
-    
-    setupAuthenticatedUser('USD');
-
+  it('should not fetch rates when user is not authenticated', async () => {
     renderWithProviders(<TestConsumer />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('has-rates')).toHaveTextContent('has-rates');
+      expect(screen.getByTestId('has-rates')).toHaveTextContent('no-rates');
     });
 
-    // Should not call API when cache is valid
+    // Should not call API when not authenticated
     expect(currencyService.getExchangeRates).not.toHaveBeenCalled();
   });
 

@@ -6,7 +6,7 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    public async Task<Result> DeleteAccountAsync(string userId, string password)
+    public async Task<Result> DeleteAccountAsync(string userId, string password, CancellationToken ct = default)
     {
         _logger.LogInformation("Delete account request for UserId: {UserId}", userId);
 
@@ -102,7 +102,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result> UpdateNameAsync(string userId, string newName)
+    public async Task<Result> UpdateNameAsync(string userId, string newName, CancellationToken ct = default)
     {
         _logger.LogInformation("Update name request for UserId: {UserId}", userId);
 
@@ -130,7 +130,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result> SendEmailChangeCodeAsync(string userId, string newEmail)
+    public async Task<Result> SendEmailChangeCodeAsync(string userId, string newEmail, CancellationToken ct = default)
     {
         _logger.LogInformation("Email change request for UserId: {UserId} to {NewEmail}", userId, newEmail);
 
@@ -187,7 +187,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code)
+    public async Task<Result> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code, CancellationToken ct = default)
     {
         _logger.LogInformation("Verifying email change for UserId: {UserId}", userId);
 

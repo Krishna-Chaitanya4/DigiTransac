@@ -17,7 +17,8 @@ public interface ITransferService
         CreateTransactionRequest request,
         Account sourceAccount,
         Account destinationAccount,
-        byte[] dek);
+        byte[] dek,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Sync changes to the linked transaction when the source is updated
@@ -26,12 +27,14 @@ public interface ITransferService
         Transaction transaction,
         UpdateTransactionRequest request,
         string userId,
-        byte[] dek);
+        byte[] dek,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Delete a transfer and its linked transaction, reversing balances
     /// </summary>
     Task<(bool Success, string Message)> DeleteTransferAsync(
         string userId,
-        Transaction transaction);
+        Transaction transaction,
+        CancellationToken ct = default);
 }

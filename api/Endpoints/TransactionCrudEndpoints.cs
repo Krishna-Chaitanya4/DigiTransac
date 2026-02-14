@@ -34,7 +34,8 @@ public static class TransactionCrudEndpoints
             int? pageSize,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -78,7 +79,7 @@ public static class TransactionCrudEndpoints
                 SearchLabelIds: null, SearchTagIds: null, SearchAccountIds: null,
                 CounterpartyUserIds: counterpartyUserIdList);
 
-            var result = await transactionService.GetAllAsync(userId, filter);
+            var result = await transactionService.GetAllAsync(userId, filter, ct);
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 30);
         })
         .WithName("GetTransactions")
@@ -89,13 +90,14 @@ public static class TransactionCrudEndpoints
         // Get counterparties for filter dropdown
         group.MapGet("/counterparties", async (
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var counterparties = await transactionService.GetCounterpartiesAsync(userId);
+            var counterparties = await transactionService.GetCounterpartiesAsync(userId, ct);
             return Results.Ok(counterparties);
         })
         .WithName("GetTransactionCounterparties")
@@ -116,7 +118,8 @@ public static class TransactionCrudEndpoints
             string? status,
             bool? hasLinkedTransaction,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -140,7 +143,7 @@ public static class TransactionCrudEndpoints
                 startDate, endDate, accountIdList, typeList, labelIdList, tagIdList,
                 minAmount, maxAmount, null, status, null, 1, int.MaxValue, hasLinkedTransaction);
 
-            var summary = await transactionService.GetSummaryAsync(userId, filter);
+            var summary = await transactionService.GetSummaryAsync(userId, filter, ct);
             return Results.Ok(summary);
         })
         .WithName("GetTransactionSummary")
@@ -151,13 +154,14 @@ public static class TransactionCrudEndpoints
         // Get recurring transactions
         group.MapGet("/recurring", async (
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var recurring = await transactionService.GetRecurringAsync(userId);
+            var recurring = await transactionService.GetRecurringAsync(userId, ct);
             return Results.Ok(recurring);
         })
         .WithName("GetRecurringTransactions")
@@ -170,13 +174,14 @@ public static class TransactionCrudEndpoints
         group.MapGet("/{id:regex(^[a-fA-F0-9]{{24}}$)}", async (
             string id,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var transaction = await transactionService.GetByIdAsync(id, userId);
+            var transaction = await transactionService.GetByIdAsync(id, userId, ct);
             if (transaction == null)
                 return Results.NotFound(new ErrorResponse("Transaction not found"));
 
@@ -193,7 +198,8 @@ public static class TransactionCrudEndpoints
             CreateTransactionRequest request,
             ClaimsPrincipal user,
             ITransactionService transactionService,
-            IValidator<CreateTransactionRequest> validator) =>
+            IValidator<CreateTransactionRequest> validator,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -202,7 +208,7 @@ public static class TransactionCrudEndpoints
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await transactionService.CreateAsync(userId, request);
+            var result = await transactionService.CreateAsync(userId, request, ct);
             return result.ToApiResult(t => Results.Created($"/api/transactions/{t.Id}", t));
         })
         .WithName("CreateTransaction")
@@ -217,7 +223,8 @@ public static class TransactionCrudEndpoints
             UpdateTransactionRequest request,
             ClaimsPrincipal user,
             ITransactionService transactionService,
-            IValidator<UpdateTransactionRequest> validator) =>
+            IValidator<UpdateTransactionRequest> validator,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -226,7 +233,7 @@ public static class TransactionCrudEndpoints
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await transactionService.UpdateAsync(id, userId, request);
+            var result = await transactionService.UpdateAsync(id, userId, request, ct);
             return result.ToApiResult();
         })
         .WithName("UpdateTransaction")
@@ -240,13 +247,14 @@ public static class TransactionCrudEndpoints
         group.MapDelete("/{id}", async (
             string id,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await transactionService.DeleteAsync(id, userId);
+            var result = await transactionService.DeleteAsync(id, userId, ct);
             return result.IsSuccess
                 ? Results.NoContent()
                 : result.ToApiResult();
@@ -262,13 +270,14 @@ public static class TransactionCrudEndpoints
             string id,
             bool? deleteFutureInstances,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var (success, message) = await transactionService.DeleteRecurringAsync(id, userId, deleteFutureInstances ?? false);
+            var (success, message) = await transactionService.DeleteRecurringAsync(id, userId, deleteFutureInstances ?? false, ct);
             if (!success)
                 return Results.NotFound(new ErrorResponse(message));
 
@@ -283,13 +292,14 @@ public static class TransactionCrudEndpoints
         // Pending Transaction Count
         group.MapGet("/pending/count", async (
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var count = await transactionService.GetPendingCountAsync(userId);
+            var count = await transactionService.GetPendingCountAsync(userId, ct);
             return Results.Ok(new { count });
         })
         .WithName("GetPendingCount")
@@ -307,7 +317,8 @@ public static class TransactionCrudEndpoints
             string? tagIds,
             string? format,
             ClaimsPrincipal user,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -321,7 +332,7 @@ public static class TransactionCrudEndpoints
                 tagIds?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
                 null, null, null, null, null, null, null);
 
-            var transactions = await transactionService.GetAllForExportAsync(userId, filter);
+            var transactions = await transactionService.GetAllForExportAsync(userId, filter, ct);
 
             var exportFormat = format?.ToLowerInvariant() ?? "json";
             

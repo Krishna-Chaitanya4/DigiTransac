@@ -5,7 +5,7 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    public async Task<AuthResponse?> RefreshTokenAsync(string refreshToken)
+    public async Task<AuthResponse?> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)
     {
         _logger.LogInformation("Token refresh attempt");
 
@@ -50,7 +50,7 @@ public partial class AuthService
         return new AuthResponse(accessToken, newRefreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency, storedToken.RememberMe);
     }
 
-    public async Task<bool> RevokeTokenAsync(string refreshToken)
+    public async Task<bool> RevokeTokenAsync(string refreshToken, CancellationToken ct = default)
     {
         var storedToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
         
@@ -66,7 +66,7 @@ public partial class AuthService
         return true;
     }
 
-    public async Task RevokeAllUserTokensAsync(string userId)
+    public async Task RevokeAllUserTokensAsync(string userId, CancellationToken ct = default)
     {
         await _refreshTokenRepository.RevokeAllByUserIdAsync(userId);
         _logger.LogInformation("All refresh tokens revoked for UserId: {UserId}", userId);

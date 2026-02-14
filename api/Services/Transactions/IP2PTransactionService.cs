@@ -18,26 +18,29 @@ public interface IP2PTransactionService
         Account account,
         User counterparty,
         Guid transactionLinkId,
-        byte[] dek);
+        byte[] dek,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Sync changes to the counterparty's pending transaction
     /// </summary>
     Task SyncP2PTransactionAsync(
         Transaction transaction,
-        UpdateTransactionRequest request);
+        UpdateTransactionRequest request,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Delete a P2P transaction (deletes counterparty's if still pending)
     /// </summary>
     Task<(bool Success, string Message)> DeleteP2PTransactionAsync(
         string userId,
-        Transaction transaction);
+        Transaction transaction,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Get all counterparties the user has transacted with
     /// </summary>
-    Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId);
+    Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId, CancellationToken ct = default);
     
     /// <summary>
     /// Accept a pending P2P transaction and assign it to an account
@@ -45,7 +48,8 @@ public interface IP2PTransactionService
     Task<(bool Success, string Message, TransactionResponse? Transaction)> AcceptP2PTransactionAsync(
         string transactionId,
         string userId,
-        string accountId);
+        string accountId,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Reject a pending P2P transaction
@@ -53,5 +57,6 @@ public interface IP2PTransactionService
     Task<(bool Success, string Message)> RejectP2PTransactionAsync(
         string transactionId,
         string userId,
-        string? reason);
+        string? reason,
+        CancellationToken ct = default);
 }

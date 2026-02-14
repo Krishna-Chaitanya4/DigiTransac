@@ -72,8 +72,8 @@ public class AuthServiceTests
             .ReturnsAsync(_testDek);
 
         // Setup refresh token repository to return the token passed to it
-        _refreshTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<RefreshToken>()))
-            .ReturnsAsync((RefreshToken t) => t);
+        _refreshTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RefreshToken t, CancellationToken _) => t);
 
         // Setup chat message repository for welcome message creation
         _chatMessageRepositoryMock.Setup(x => x.CreateSystemMessageAsync(
@@ -567,8 +567,8 @@ public class AuthServiceTests
             .ReturnsAsync(user);
         _userRepositoryMock.Setup(x => x.GetByEmailAsync(newEmail))
             .ReturnsAsync((User?)null);
-        _emailVerificationRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<EmailVerification>()))
-            .ReturnsAsync((EmailVerification v) => v);
+        _emailVerificationRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<EmailVerification>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((EmailVerification v, CancellationToken _) => v);
         _emailServiceMock.Setup(x => x.SendVerificationCodeAsync(newEmail, It.IsAny<string>()))
             .Returns(Task.CompletedTask);
 

@@ -7,7 +7,7 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    public async Task<Result> SendVerificationCodeAsync(string email)
+    public async Task<Result> SendVerificationCodeAsync(string email, CancellationToken ct = default)
     {
         _logger.LogInformation("Sending verification code to {Email}", email);
 
@@ -51,7 +51,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result<string>> VerifyCodeAsync(string email, string code)
+    public async Task<Result<string>> VerifyCodeAsync(string email, string code, CancellationToken ct = default)
     {
         _logger.LogInformation("Verifying code for {Email}", email);
 
@@ -74,7 +74,7 @@ public partial class AuthService
         return verification.VerificationToken;
     }
 
-    public async Task<AuthResponse?> CompleteRegistrationAsync(CompleteRegistrationRequest request)
+    public async Task<AuthResponse?> CompleteRegistrationAsync(CompleteRegistrationRequest request, CancellationToken ct = default)
     {
         _logger.LogInformation("Completing registration for {Email}", request.Email);
 

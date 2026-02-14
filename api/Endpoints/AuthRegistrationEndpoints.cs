@@ -19,12 +19,13 @@ public static class AuthRegistrationEndpoints
         group.MapPost("/send-verification", async (
             SendVerificationRequest request, 
             IValidator<SendVerificationRequest> validator,
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.SendVerificationCodeAsync(request.Email);
+            var result = await authService.SendVerificationCodeAsync(request.Email, ct);
             
             if (result.IsFailure)
             {
@@ -44,12 +45,13 @@ public static class AuthRegistrationEndpoints
         group.MapPost("/verify-code", async (
             VerifyCodeRequest request, 
             IValidator<VerifyCodeRequest> validator,
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.VerifyCodeAsync(request.Email, request.Code);
+            var result = await authService.VerifyCodeAsync(request.Email, request.Code, ct);
             
             if (result.IsFailure)
             {
@@ -72,12 +74,13 @@ public static class AuthRegistrationEndpoints
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.CompleteRegistrationAsync(request);
+            var result = await authService.CompleteRegistrationAsync(request, ct);
             if (result == null)
             {
                 return Results.BadRequest(new ErrorResponse("Invalid or expired verification token"));

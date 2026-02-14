@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.16] - 2026-02-14
+
+### Changed — Architecture
+- **CancellationToken Propagation** — Added `CancellationToken ct = default` to all async methods across repositories (TransactionRepository, RefreshTokenRepository, EmailVerificationRepository, AuditLogRepository, ExchangeRateRepository), service interfaces (IAuthService, ITransactionService + sub-services, IExchangeRateService, ITransactionImportService), service implementations, and endpoint handlers; tokens are now forwarded from HTTP request through service layer to MongoDB driver calls
+- **CurrencyContext → React Query** — Replaced manual `useState`/`useEffect`/`useCallback` with `useQuery` from TanStack React Query for exchange rate fetching; eliminates manual localStorage caching (React Query's `staleTime`/`gcTime` handles it), reduces code from 167 to 103 lines while preserving the same `useCurrency()` API surface
+- **InsightsPage Decomposition** — Split ~1931-line monolith into 14 focused files under `pages/insights/`: types, helpers, shared widgets (`InsightWidgets.tsx`), `FinancialSummaryWidget`, `CategoryPairWidget`, `TrendsWidget`, `BudgetsWidget`, `AveragesWidget`, `CounterpartiesWidget`, `ByAccountWidget`, `PatternsWidget`, `AnomaliesWidget`, and orchestrator `InsightsPage.tsx`; old import path re-exports for backward compatibility
+
 ## [1.6.15] - 2026-02-14
 
 ### Fixed — Security

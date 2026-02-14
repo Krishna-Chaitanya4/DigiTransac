@@ -129,12 +129,13 @@ public static class TwoFactorEndpoints
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.VerifyTwoFactorLoginAsync(request.TwoFactorToken, request.Code);
+            var result = await authService.VerifyTwoFactorLoginAsync(request.TwoFactorToken, request.Code, ct);
             
             if (result == null)
             {
@@ -160,12 +161,13 @@ public static class TwoFactorEndpoints
         group.MapPost("/send-email-code", async (
             [FromBody] SendTwoFactorEmailOtpRequest request, 
             IValidator<SendTwoFactorEmailOtpRequest> validator,
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.SendTwoFactorEmailOtpAsync(request.TwoFactorToken);
+            var result = await authService.SendTwoFactorEmailOtpAsync(request.TwoFactorToken, ct);
             
             if (result.IsFailure)
             {
@@ -186,12 +188,13 @@ public static class TwoFactorEndpoints
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.VerifyTwoFactorEmailOtpAsync(request.TwoFactorToken, request.EmailCode);
+            var result = await authService.VerifyTwoFactorEmailOtpAsync(request.TwoFactorToken, request.EmailCode, ct);
             
             if (result == null)
             {

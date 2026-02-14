@@ -13,7 +13,8 @@ public interface ITransactionBatchService
     /// </summary>
     Task<BatchOperationResponse> BatchDeleteAsync(
         string userId, 
-        List<string> ids);
+        List<string> ids,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Update status of multiple transactions at once
@@ -21,5 +22,6 @@ public interface ITransactionBatchService
     Task<BatchOperationResponse> BatchUpdateStatusAsync(
         string userId, 
         List<string> ids, 
-        string status);
+        string status,
+        CancellationToken ct = default);
 }

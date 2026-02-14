@@ -57,5 +57,5 @@ public interface ITransactionMapperService
     /// <summary>
     /// Get the user's DEK (Data Encryption Key), generating if needed
     /// </summary>
-    Task<byte[]?> GetUserDekAsync(string userId);
+    Task<byte[]?> GetUserDekAsync(string userId, CancellationToken ct = default);
 }

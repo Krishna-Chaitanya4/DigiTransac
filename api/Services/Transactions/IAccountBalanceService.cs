@@ -18,7 +18,8 @@ public interface IAccountBalanceService
     /// <param name="amount">Transaction amount</param>
     /// <param name="isAdding">True if adding transaction, false if removing</param>
     /// <param name="session">Optional MongoDB session for transactions</param>
-    Task UpdateBalanceAsync(Account account, TransactionType type, decimal amount, bool isAdding, IClientSessionHandle? session = null);
+    /// <param name="ct">Cancellation token</param>
+    Task UpdateBalanceAsync(Account account, TransactionType type, decimal amount, bool isAdding, IClientSessionHandle? session = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -33,10 +34,10 @@ public class AccountBalanceService : IAccountBalanceService
         _accountRepository = accountRepository;
     }
 
-    public async Task UpdateBalanceAsync(Account account, TransactionType type, decimal amount, bool isAdding, IClientSessionHandle? session = null)
+    public async Task UpdateBalanceAsync(Account account, TransactionType type, decimal amount, bool isAdding, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         ApplyBalanceChange(account, type, amount, isAdding);
-        await _accountRepository.UpdateAsync(account, session);
+        await _accountRepository.UpdateAsync(account, session, ct);
     }
 
     private static void ApplyBalanceChange(Account account, TransactionType type, decimal amount, bool isAdding)

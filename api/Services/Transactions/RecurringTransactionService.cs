@@ -45,7 +45,7 @@ public class RecurringTransactionService : IRecurringTransactionService
         _logger = logger;
     }
 
-    public async Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId)
+    public async Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId, CancellationToken ct = default)
     {
         var templates = await _transactionRepository.GetRecurringTemplatesAsync(userId);
         var dek = await _mapperService.GetUserDekAsync(userId);
@@ -61,7 +61,8 @@ public class RecurringTransactionService : IRecurringTransactionService
         string userId,
         CreateTransactionRequest request,
         Account account,
-        byte[] dek)
+        byte[] dek,
+        CancellationToken ct = default)
     {
         if (request.RecurringRule == null)
             return (false, "Recurring rule is required", null, null);
@@ -201,7 +202,8 @@ public class RecurringTransactionService : IRecurringTransactionService
     public async Task<(bool Success, string Message)> DeleteRecurringAsync(
         string id,
         string userId,
-        bool deleteFutureInstances)
+        bool deleteFutureInstances,
+        CancellationToken ct = default)
     {
         var template = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (template == null || !template.IsRecurringTemplate)

@@ -6,7 +6,7 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    public async Task<LoginResponse> LoginAsync(LoginRequest request)
+    public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
         _logger.LogInformation("Login attempt for {Email}", request.Email);
 
@@ -60,7 +60,7 @@ public partial class AuthService
         return new LoginResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
-    public async Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorTokenString, string code)
+    public async Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorTokenString, string code, CancellationToken ct = default)
     {
         var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
         if (twoFactorToken == null)
@@ -101,7 +101,7 @@ public partial class AuthService
         return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
-    public async Task<Result> SendTwoFactorEmailOtpAsync(string twoFactorTokenString)
+    public async Task<Result> SendTwoFactorEmailOtpAsync(string twoFactorTokenString, CancellationToken ct = default)
     {
         var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
         if (twoFactorToken == null)
@@ -136,7 +136,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorTokenString, string emailCode)
+    public async Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorTokenString, string emailCode, CancellationToken ct = default)
     {
         var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
         if (twoFactorToken == null)
@@ -189,7 +189,7 @@ public partial class AuthService
         return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
-    public async Task<User?> GetCurrentUserAsync(string userId)
+    public async Task<User?> GetCurrentUserAsync(string userId, CancellationToken ct = default)
     {
         return await _userRepository.GetByIdAsync(userId);
     }

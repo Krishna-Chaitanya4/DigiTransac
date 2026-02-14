@@ -26,7 +26,8 @@ public class TransactionBatchService : ITransactionBatchService
 
     public async Task<BatchOperationResponse> BatchDeleteAsync(
         string userId,
-        List<string> ids)
+        List<string> ids,
+        CancellationToken ct = default)
     {
         var successCount = 0;
         var failedIds = new List<string>();
@@ -131,7 +132,8 @@ public class TransactionBatchService : ITransactionBatchService
     public async Task<BatchOperationResponse> BatchUpdateStatusAsync(
         string userId,
         List<string> ids,
-        string status)
+        string status,
+        CancellationToken ct = default)
     {
         if (!Enum.TryParse<TransactionStatus>(status, true, out var parsedStatus))
         {

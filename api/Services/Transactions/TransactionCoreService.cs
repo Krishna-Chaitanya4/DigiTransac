@@ -60,7 +60,7 @@ public class TransactionCoreService : ITransactionCoreService
         _publisher = publisher;
     }
 
-    public async Task<TransactionResponse?> GetByIdAsync(string id, string userId)
+    public async Task<TransactionResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null) return null;
@@ -83,7 +83,7 @@ public class TransactionCoreService : ITransactionCoreService
             counterpartyUsers);
     }
 
-    public async Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter)
+    public async Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter, CancellationToken ct = default)
     {
         // Get accounts, labels, tags for mapping — create dictionaries once for reuse
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
@@ -159,7 +159,8 @@ public class TransactionCoreService : ITransactionCoreService
 
     public async Task<Result<TransactionResponse>> CreateAsync(
         string userId,
-        CreateTransactionRequest request)
+        CreateTransactionRequest request,
+        CancellationToken ct = default)
     {
         // Validate account
         var account = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId);
@@ -393,7 +394,8 @@ public class TransactionCoreService : ITransactionCoreService
     public async Task<Result<TransactionResponse>> UpdateAsync(
         string id,
         string userId,
-        UpdateTransactionRequest request)
+        UpdateTransactionRequest request,
+        CancellationToken ct = default)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null)
@@ -577,7 +579,7 @@ public class TransactionCoreService : ITransactionCoreService
         return Result.Success(response);
     }
 
-    public async Task<Result> DeleteAsync(string id, string userId)
+    public async Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null)
@@ -631,7 +633,7 @@ public class TransactionCoreService : ITransactionCoreService
         return Result.Success();
     }
 
-    public async Task<int> GetPendingCountAsync(string userId)
+    public async Task<int> GetPendingCountAsync(string userId, CancellationToken ct = default)
     {
         return await _transactionRepository.GetPendingCountAsync(userId);
     }

@@ -10,7 +10,7 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    private async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, string? deviceInfo = null, bool rememberMe = true)
+    private async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, string? deviceInfo = null, bool rememberMe = true, CancellationToken ct = default)
     {
         var refreshToken = new RefreshToken
         {

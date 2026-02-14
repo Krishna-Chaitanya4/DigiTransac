@@ -102,8 +102,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(
@@ -153,8 +153,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(
@@ -194,8 +194,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(
@@ -234,8 +234,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(

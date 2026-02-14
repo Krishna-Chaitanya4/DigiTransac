@@ -15,12 +15,12 @@ public interface ITransactionImportService
     /// <summary>
     /// Preview import to show validation results before committing
     /// </summary>
-    Task<ImportPreviewResponse> PreviewImportAsync(string userId, ImportPreviewRequest request);
+    Task<ImportPreviewResponse> PreviewImportAsync(string userId, ImportPreviewRequest request, CancellationToken ct = default);
     
     /// <summary>
     /// Execute the actual import
     /// </summary>
-    Task<BulkImportResponse> ImportAsync(string userId, BulkImportRequest request);
+    Task<BulkImportResponse> ImportAsync(string userId, BulkImportRequest request, CancellationToken ct = default);
     
     /// <summary>
     /// Parse CSV content into transaction requests
@@ -30,7 +30,7 @@ public interface ITransactionImportService
     /// <summary>
     /// Parse CSV from raw content (text or base64) and preview results
     /// </summary>
-    Task<ImportPreviewResponse> ParseAndPreviewAsync(string userId, CsvParseRequest request);
+    Task<ImportPreviewResponse> ParseAndPreviewAsync(string userId, CsvParseRequest request, CancellationToken ct = default);
 }
 
 public class TransactionImportService : ITransactionImportService
@@ -70,7 +70,7 @@ public class TransactionImportService : ITransactionImportService
         _logger = logger;
     }
 
-    public async Task<ImportPreviewResponse> PreviewImportAsync(string userId, ImportPreviewRequest request)
+    public async Task<ImportPreviewResponse> PreviewImportAsync(string userId, ImportPreviewRequest request, CancellationToken ct = default)
     {
         _logger.LogInformation("Previewing import of {Count} transactions for user {UserId}", 
             request.Transactions.Count, userId);
@@ -203,7 +203,7 @@ public class TransactionImportService : ITransactionImportService
         );
     }
 
-    public async Task<BulkImportResponse> ImportAsync(string userId, BulkImportRequest request)
+    public async Task<BulkImportResponse> ImportAsync(string userId, BulkImportRequest request, CancellationToken ct = default)
     {
         _logger.LogInformation("Importing {Count} transactions for user {UserId}", 
             request.Transactions.Count, userId);
@@ -373,7 +373,7 @@ public class TransactionImportService : ITransactionImportService
         );
     }
 
-    public async Task<ImportPreviewResponse> ParseAndPreviewAsync(string userId, CsvParseRequest request)
+    public async Task<ImportPreviewResponse> ParseAndPreviewAsync(string userId, CsvParseRequest request, CancellationToken ct = default)
     {
         // Extract CSV content from request
         string csvContent;

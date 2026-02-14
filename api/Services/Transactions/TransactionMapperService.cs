@@ -27,7 +27,7 @@ public class TransactionMapperService : ITransactionMapperService
         _encryptionService = encryptionService;
     }
 
-    public async Task<byte[]?> GetUserDekAsync(string userId)
+    public async Task<byte[]?> GetUserDekAsync(string userId, CancellationToken ct = default)
     {
         var cachedDek = _dekCacheService.GetDek(userId);
         if (cachedDek != null) return cachedDek;

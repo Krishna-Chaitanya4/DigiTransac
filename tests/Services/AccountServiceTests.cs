@@ -586,8 +586,8 @@ public class AccountServiceTests
 
         _accountRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingAccount);
-        _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+        _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         var request = new AdjustBalanceRequest(NewBalance: 7500, Notes: "Adjustment note");
 
@@ -633,8 +633,8 @@ public class AccountServiceTests
 
         _accountRepositoryMock.Setup(x => x.GetByIdAndUserIdAsync("1", TestUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingAccount);
-        _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+        _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         var request = new AdjustBalanceRequest(NewBalance: 3000, Notes: null);
 

@@ -52,7 +52,8 @@ public class TransferService : ITransferService
         CreateTransactionRequest request,
         Account sourceAccount,
         Account destinationAccount,
-        byte[] dek)
+        byte[] dek,
+        CancellationToken ct = default)
     {
         // Convert amount if currencies differ
         decimal convertedAmount = request.Amount;
@@ -243,7 +244,8 @@ public class TransferService : ITransferService
         Transaction transaction,
         UpdateTransactionRequest request,
         string userId,
-        byte[] dek)
+        byte[] dek,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(transaction.LinkedTransactionId))
             return (true, "No linked transaction to sync");
@@ -364,7 +366,8 @@ public class TransferService : ITransferService
 
     public async Task<(bool Success, string Message)> DeleteTransferAsync(
         string userId,
-        Transaction transaction)
+        Transaction transaction,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(transaction.LinkedTransactionId))
             return (true, "No linked transaction to delete");

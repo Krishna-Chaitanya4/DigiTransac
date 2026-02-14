@@ -36,7 +36,8 @@ public class TransactionExportService : ITransactionExportService
 
     public async Task<List<TransactionResponse>> GetAllForExportAsync(
         string userId,
-        TransactionFilterRequest filter)
+        TransactionFilterRequest filter,
+        CancellationToken ct = default)
     {
         // Get unlimited transactions for export (no pagination)
         var exportFilter = filter with { Page = null, PageSize = null };
@@ -66,7 +67,8 @@ public class TransactionExportService : ITransactionExportService
 
     public async Task<string> ExportToCsvAsync(
         string userId,
-        TransactionFilterRequest filter)
+        TransactionFilterRequest filter,
+        CancellationToken ct = default)
     {
         var transactions = await GetAllForExportAsync(userId, filter);
 

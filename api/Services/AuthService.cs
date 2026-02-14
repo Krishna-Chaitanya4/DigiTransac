@@ -11,35 +11,35 @@ namespace DigiTransac.Api.Services;
 public interface IAuthService
 {
     // Registration verification flow
-    Task<Result> SendVerificationCodeAsync(string email);
-    Task<Result<string>> VerifyCodeAsync(string email, string code);
-    Task<AuthResponse?> CompleteRegistrationAsync(CompleteRegistrationRequest request);
+    Task<Result> SendVerificationCodeAsync(string email, CancellationToken ct = default);
+    Task<Result<string>> VerifyCodeAsync(string email, string code, CancellationToken ct = default);
+    Task<AuthResponse?> CompleteRegistrationAsync(CompleteRegistrationRequest request, CancellationToken ct = default);
     
     // Login
-    Task<LoginResponse> LoginAsync(LoginRequest request);
-    Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorToken, string code);
-    Task<Result> SendTwoFactorEmailOtpAsync(string twoFactorToken);
-    Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorToken, string emailCode);
-    Task<User?> GetCurrentUserAsync(string userId);
+    Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default);
+    Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorToken, string code, CancellationToken ct = default);
+    Task<Result> SendTwoFactorEmailOtpAsync(string twoFactorToken, CancellationToken ct = default);
+    Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorToken, string emailCode, CancellationToken ct = default);
+    Task<User?> GetCurrentUserAsync(string userId, CancellationToken ct = default);
     
     // Token refresh
-    Task<AuthResponse?> RefreshTokenAsync(string refreshToken);
-    Task<bool> RevokeTokenAsync(string refreshToken);
-    Task RevokeAllUserTokensAsync(string userId);
+    Task<AuthResponse?> RefreshTokenAsync(string refreshToken, CancellationToken ct = default);
+    Task<bool> RevokeTokenAsync(string refreshToken, CancellationToken ct = default);
+    Task RevokeAllUserTokensAsync(string userId, CancellationToken ct = default);
     
     // Account management
-    Task<Result> DeleteAccountAsync(string userId, string password);
-    Task<Result> UpdateNameAsync(string userId, string newName);
-    Task<Result> SendEmailChangeCodeAsync(string userId, string newEmail);
-    Task<Result> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code);
+    Task<Result> DeleteAccountAsync(string userId, string password, CancellationToken ct = default);
+    Task<Result> UpdateNameAsync(string userId, string newName, CancellationToken ct = default);
+    Task<Result> SendEmailChangeCodeAsync(string userId, string newEmail, CancellationToken ct = default);
+    Task<Result> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code, CancellationToken ct = default);
     
     // Password management
-    Task<Result> ChangePasswordAsync(string userId, string currentPassword, string newPassword);
+    Task<Result> ChangePasswordAsync(string userId, string currentPassword, string newPassword, CancellationToken ct = default);
     
     // Forgot password flow
-    Task<Result> SendPasswordResetCodeAsync(string email);
-    Task<Result<string>> VerifyPasswordResetCodeAsync(string email, string code);
-    Task<Result> ResetPasswordAsync(ResetPasswordRequest request);
+    Task<Result> SendPasswordResetCodeAsync(string email, CancellationToken ct = default);
+    Task<Result<string>> VerifyPasswordResetCodeAsync(string email, string code, CancellationToken ct = default);
+    Task<Result> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct = default);
 }
 
 /// <summary>

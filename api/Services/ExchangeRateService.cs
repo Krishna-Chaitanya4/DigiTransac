@@ -9,10 +9,10 @@ namespace DigiTransac.Api.Services;
 
 public interface IExchangeRateService
 {
-    Task<ExchangeRateResponse> GetRatesAsync(string? baseCurrency = null);
-    Task<ExchangeRateResponse> RefreshRatesAsync();
+    Task<ExchangeRateResponse> GetRatesAsync(string? baseCurrency = null, CancellationToken ct = default);
+    Task<ExchangeRateResponse> RefreshRatesAsync(CancellationToken ct = default);
     decimal Convert(decimal amount, string fromCurrency, string toCurrency, Dictionary<string, decimal> rates);
-    Task<List<CurrencyResponse>> GetSupportedCurrenciesAsync();
+    Task<List<CurrencyResponse>> GetSupportedCurrenciesAsync(CancellationToken ct = default);
 }
 
 public class ExchangeRateService : IExchangeRateService
@@ -50,7 +50,7 @@ public class ExchangeRateService : IExchangeRateService
         _environment = environment;
     }
 
-    public async Task<ExchangeRateResponse> GetRatesAsync(string? baseCurrency = null)
+    public async Task<ExchangeRateResponse> GetRatesAsync(string? baseCurrency = null, CancellationToken ct = default)
     {
         // Try memory cache first for fastest response
         var cacheKey = $"{RatesCacheKey}_{baseCurrency ?? "USD"}";
@@ -93,7 +93,7 @@ public class ExchangeRateService : IExchangeRateService
         return response;
     }
 
-    public async Task<ExchangeRateResponse> RefreshRatesAsync()
+    public async Task<ExchangeRateResponse> RefreshRatesAsync(CancellationToken ct = default)
     {
         // Rate limiting with request coalescing
         // If a refresh is already in progress, wait for it instead of making another API call
@@ -277,7 +277,7 @@ public class ExchangeRateService : IExchangeRateService
         return Math.Round(result, 2);
     }
 
-    public Task<List<CurrencyResponse>> GetSupportedCurrenciesAsync()
+    public Task<List<CurrencyResponse>> GetSupportedCurrenciesAsync(CancellationToken ct = default)
     {
         var currencies = CurrencyConfig.Currencies
             .Select(kvp => new CurrencyResponse(kvp.Key, kvp.Value.Name, kvp.Value.Symbol))
