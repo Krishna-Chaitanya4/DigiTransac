@@ -41,6 +41,8 @@ export interface TransactionMessageData {
   status: 'Pending' | 'Confirmed' | 'Declined';
   accountName: string | null;
   primaryCategory?: TransactionCategoryInfo | null;
+  isDeleted: boolean;
+  deletedAt?: string | null;
 }
 
 export interface ReplyPreview {

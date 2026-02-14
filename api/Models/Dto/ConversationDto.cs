@@ -83,7 +83,9 @@ public record TransactionMessageData(
     string? Notes,
     string Status,            // "Pending", "Confirmed", "Declined"
     string? AccountName,      // The account used (null if pending)
-    TransactionCategoryInfo? PrimaryCategory = null  // Primary category (first split)
+    TransactionCategoryInfo? PrimaryCategory = null,  // Primary category (first split)
+    bool IsDeleted = false,           // Whether the transaction is soft-deleted
+    DateTime? DeletedAt = null        // When the transaction was soft-deleted
 );
 
 public record ConversationDetailResponse(

@@ -269,16 +269,29 @@ public class ConversationService : IConversationService
             {
                 lastActivityAt = latestMessage.CreatedAt;
                 lastMessageType = latestMessage.Type.ToString();
-                if (latestMessage.Type == ChatMessageType.Text)
+                
+                // Check if the message itself was deleted
+                if (latestMessage.IsDeleted)
+                {
+                    lastMessagePreview = "This message was deleted";
+                }
+                else if (latestMessage.Type == ChatMessageType.Text)
                 {
                     lastMessagePreview = TruncateString(latestMessage.Content, ConversationConstants.PreviewTruncateLength);
                 }
                 else if (latestMessage.Type == ChatMessageType.Transaction && !string.IsNullOrEmpty(latestMessage.TransactionId))
                 {
                     // For transaction messages, fetch the actual transaction to generate preview
-                    // This is especially important for self-chat where latestTx is null
-                    var msgTransaction = latestTx ?? await _transactionRepository.GetByIdAndUserIdAsync(latestMessage.TransactionId, userId);
-                    lastMessagePreview = GetTransactionPreview(msgTransaction, userId);
+                    // Use GetByIdAsync (not GetByIdAndUserIdAsync) to include soft-deleted transactions
+                    var msgTransaction = latestTx ?? await _transactionRepository.GetByIdAsync(latestMessage.TransactionId);
+                    if (msgTransaction != null && msgTransaction.IsDeleted)
+                    {
+                        lastMessagePreview = "This transaction was deleted";
+                    }
+                    else
+                    {
+                        lastMessagePreview = GetTransactionPreview(msgTransaction, userId);
+                    }
                 }
                 else
                 {
@@ -289,7 +302,14 @@ public class ConversationService : IConversationService
             {
                 lastActivityAt = latestTx.Date;
                 lastMessageType = "Transaction";
-                lastMessagePreview = GetTransactionPreview(latestTx, userId);
+                if (latestTx.IsDeleted)
+                {
+                    lastMessagePreview = "This transaction was deleted";
+                }
+                else
+                {
+                    lastMessagePreview = GetTransactionPreview(latestTx, userId);
+                }
             }
             else
             {
@@ -429,7 +449,9 @@ public class ConversationService : IConversationService
                         Notes: null, // Don't expose notes in preview
                         Status: tx.Status.ToString(),
                         AccountName: account?.Name,
-                        PrimaryCategory: GetPrimaryCategoryInfo(tx, labels)
+                        PrimaryCategory: GetPrimaryCategoryInfo(tx, labels),
+                        IsDeleted: tx.IsDeleted,
+                        DeletedAt: tx.DeletedAt
                     );
                 }
             }
@@ -540,7 +562,9 @@ public class ConversationService : IConversationService
                     Notes: null,
                     Status: tx.Status.ToString(),
                     AccountName: account?.Name,
-                    PrimaryCategory: GetPrimaryCategoryInfo(tx, labels)
+                    PrimaryCategory: GetPrimaryCategoryInfo(tx, labels),
+                    IsDeleted: tx.IsDeleted,
+                    DeletedAt: tx.DeletedAt
                 );
                 
                 // Determine sender based on transaction type
@@ -755,7 +779,9 @@ public class ConversationService : IConversationService
             Notes: null,
             Status: transaction.Status,
             AccountName: account?.Name,
-            PrimaryCategory: GetPrimaryCategoryInfo(transaction)
+            PrimaryCategory: GetPrimaryCategoryInfo(transaction),
+            IsDeleted: transaction.IsDeleted,
+            DeletedAt: transaction.DeletedAt
         );
         
         var response = new ConversationMessage(

@@ -132,7 +132,10 @@ public class TransactionMapperService : ITransactionMapperService
             // Timezone-aware date/time fields (for global travel support & analytics)
             t.DateLocal,
             t.TimeLocal,
-            t.DateTimezone);
+            t.DateTimezone,
+            // Soft-delete support
+            t.IsDeleted,
+            t.DeletedAt);
     }
 
     public RecurringTransactionResponse MapToRecurringResponse(

@@ -55,6 +55,7 @@ interface MessageBubbleProps {
   onMenuOpen: (message: ConversationMessage, position: { x: number; y: number; buttonTop: number }) => void;
   onScrollToReply: (messageId: string) => void;
   onRestore?: (messageId: string) => void;
+  onRestoreTransaction?: (transactionId: string) => void;
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -68,6 +69,7 @@ export const MessageBubble = memo(function MessageBubble({
   onMenuOpen,
   onScrollToReply,
   onRestore,
+  onRestoreTransaction,
 }: MessageBubbleProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { primaryCurrency, formatInPrimaryCurrency } = useCurrency();
@@ -126,17 +128,52 @@ export const MessageBubble = memo(function MessageBubble({
               Undo
             </button>
           )}
-          {showUndo && message.deletedAt && (
-            <span className="block text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 not-italic">
-              {getUndoTimeRemaining(message.deletedAt)}
-            </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Soft-deleted transaction (transaction data still available, within undo window)
+  if (message.type === 'Transaction' && message.transaction?.isDeleted) {
+    const tx = message.transaction;
+    const canUndo = tx.deletedAt && onRestoreTransaction && message.isFromMe &&
+      (Date.now() - new Date(tx.deletedAt).getTime()) / (1000 * 60) <= UNDO_DELETE_WINDOW_MINUTES;
+    return (
+      <div
+        id={`msg-${message.id}`}
+        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}
+      >
+        <div className="min-w-[130px] max-w-[190px] rounded-xl p-3 shadow-md bg-gray-200 dark:bg-gray-700 opacity-60">
+          <div className="flex flex-col items-center gap-1.5 text-gray-500 dark:text-gray-400">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span className="text-xs italic">This transaction was deleted</span>
+            {canUndo && (
+              <button
+                onClick={() => onRestoreTransaction(tx.transactionId)}
+                className="text-xs text-blue-500 dark:text-blue-400 not-italic font-medium hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+              >
+                Undo
+              </button>
+            )}
+            {canUndo && tx.deletedAt && (
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 not-italic">
+                {getUndoTimeRemaining(tx.deletedAt)}
+              </span>
+            )}
+          </div>
+          {showTime && (
+            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5 text-right">
+              {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
           )}
         </div>
       </div>
     );
   }
 
-  // Transaction message with deleted transaction (transaction was removed but chat message remains)
+  // Transaction message with hard-deleted transaction (purged, no data available)
   if (message.type === 'Transaction' && !message.transaction) {
     return (
       <div
@@ -148,7 +185,7 @@ export const MessageBubble = memo(function MessageBubble({
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            <span className="text-xs italic">Transaction deleted</span>
+            <span className="text-xs italic">This transaction was deleted</span>
           </div>
           {showTime && (
             <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5 text-right">

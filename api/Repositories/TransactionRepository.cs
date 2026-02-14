@@ -666,12 +666,11 @@ public class TransactionRepository : ITransactionRepository
 
     public async Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId, CancellationToken ct = default)
     {
-        // Get all P2P transactions with a specific counterparty
+        // Get all P2P transactions with a specific counterparty (including soft-deleted for chat undo)
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.CounterpartyUserId, counterpartyUserId),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
         );
         
         return await _transactions.Find(filter)
@@ -687,8 +686,7 @@ public class TransactionRepository : ITransactionRepository
             
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.In(t => t.Id, idsList),
-            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId)
         );
         
         return await _transactions.Find(filter).ToListAsync(ct);

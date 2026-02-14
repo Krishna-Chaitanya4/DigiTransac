@@ -80,7 +80,8 @@ public static class TransactionCrudEndpoints
                 CounterpartyUserIds: counterpartyUserIdList);
 
             var result = await transactionService.GetAllAsync(userId, filter, ct);
-            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 30);
+            // no-cache: always revalidate with server; ETag still provides 304 when data unchanged
+            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetTransactions")
         .WithSummary("Get transactions")

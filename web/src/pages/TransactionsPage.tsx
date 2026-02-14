@@ -32,7 +32,6 @@ import {
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
-  useRestoreTransaction,
   useUpdateStatus,
   useBatchDelete,
   useBatchMarkConfirmed,
@@ -73,7 +72,6 @@ export default function TransactionsPage() {
   const createTransactionMutation = useCreateTransaction();
   const updateTransactionMutation = useUpdateTransaction();
   const deleteTransactionMutation = useDeleteTransaction();
-  const restoreTransactionMutation = useRestoreTransaction();
   const updateStatusMutation = useUpdateStatus();
   const batchDeleteMutation = useBatchDelete();
   const batchMarkConfirmedMutation = useBatchMarkConfirmed();
@@ -81,9 +79,6 @@ export default function TransactionsPage() {
   
   // Local transaction state for optimistic updates
   const [optimisticTransactions, setOptimisticTransactions] = useState<Transaction[] | null>(null);
-
-  // IDs of transactions being soft-deleted — instantly filtered from the list
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   
   // Toast notifications
   const { showInfo, toasts, dismissToast } = useToast();
@@ -200,10 +195,8 @@ export default function TransactionsPage() {
 
   // Derived state
   const transactions = useMemo(() => {
-    const base = optimisticTransactions ?? transactionResponse?.transactions ?? [];
-    if (deletedIds.size === 0) return base;
-    return base.filter(t => !deletedIds.has(t.id));
-  }, [optimisticTransactions, transactionResponse?.transactions, deletedIds]);
+    return optimisticTransactions ?? transactionResponse?.transactions ?? [];
+  }, [optimisticTransactions, transactionResponse?.transactions]);
   const hasMore = transactionResponse ? transactionResponse.page < transactionResponse.totalPages : false;
   const isLoading = isLoadingAccounts || isLoadingLabels || isLoadingTags || isLoadingTransactions;
   const isLoadingMore = isFetchingTransactions && currentPage > 1;
@@ -390,43 +383,9 @@ export default function TransactionsPage() {
     setIsFormOpen(true);
   };
 
-  // Handle delete — instant soft-delete API call with undo via restore
+  // Handle delete — instant soft-delete (optimistic removal from React Query cache)
   const handleDelete = (id: string) => {
-    const transactionToDelete = transactions.find(t => t.id === id);
-    if (!transactionToDelete) return;
-
-    // Instantly mark as deleted — filtered out by the memo
-    setDeletedIds(prev => new Set(prev).add(id));
-
-    // Call soft-delete API immediately
-    deleteTransactionMutation.mutate(id, {
-      onSettled: () => {
-        // Clean up deletedIds after refetch has time to complete
-        // (by then transactionResponse won't include the deleted item)
-        setTimeout(() => {
-          setDeletedIds(prev => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
-        }, 3000);
-      },
-    });
-
-    // Show undo toast — undo calls the restore API
-    const toastId = showInfo('Transaction deleted', {
-      label: 'Undo',
-      onClick: () => {
-        // Remove from deleted set so it reappears instantly
-        setDeletedIds(prev => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        restoreTransactionMutation.mutate(id);
-        dismissToast(toastId);
-      },
-    });
+    deleteTransactionMutation.mutate(id);
   };
 
   // Handle update status with undo toast

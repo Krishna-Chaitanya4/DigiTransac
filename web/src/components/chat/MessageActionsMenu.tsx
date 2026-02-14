@@ -10,6 +10,7 @@ interface MessageActionsMenuProps {
   onReply: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDeleteTransaction?: (transactionId: string) => void;
 }
 
 export const MessageActionsMenu = memo(function MessageActionsMenu({
@@ -19,16 +20,20 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
   onReply,
   onEdit,
   onDelete,
+  onDeleteTransaction,
 }: MessageActionsMenuProps) {
   const navigate = useNavigate();
 
   // Calculate menu position with viewport clamping
+  const isTransactionMessage = message.type === 'Transaction' && message.transaction && !message.transaction.isDeleted;
+  const canDeleteMsg = message.type !== 'Transaction' && canDeleteMessage(message);
   const optionCount =
     1 + // Reply is always available
     (message.type === 'Text' ? 1 : 0) + // Copy for text
-    (message.type === 'Transaction' && message.transaction ? 1 : 0) + // View in Transactions
+    (isTransactionMessage ? 1 : 0) + // View in Transactions
     (canEditMessage(message) ? 1 : 0) + // Edit
-    (canDeleteMessage(message) ? 1 : 0); // Delete
+    (canDeleteMsg ? 1 : 0) + // Delete (text messages only)
+    (isTransactionMessage && onDeleteTransaction ? 1 : 0); // Delete Transaction
 
   const menuHeight = optionCount * 40 + 8;
   const menuWidth = 180; // min-w-[140px] but can be wider; use 180 as estimate
@@ -181,8 +186,8 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
           </button>
         )}
 
-        {/* Delete - only for own messages within time limit */}
-        {canDeleteMessage(message) && (
+        {/* Delete - only for own non-transaction messages within time limit */}
+        {canDeleteMsg && (
           <button
             onClick={() => {
               onDelete();
@@ -199,6 +204,27 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
               />
             </svg>
             <span>Delete</span>
+          </button>
+        )}
+
+        {/* Delete Transaction - for transaction messages */}
+        {isTransactionMessage && onDeleteTransaction && (
+          <button
+            onClick={() => {
+              onDeleteTransaction(message.transaction!.transactionId);
+              onClose();
+            }}
+            className="w-full px-4 py-2.5 text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            <span>Delete Transaction</span>
           </button>
         )}
       </div>
