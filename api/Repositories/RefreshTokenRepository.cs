@@ -6,13 +6,13 @@ namespace DigiTransac.Api.Repositories;
 
 public interface IRefreshTokenRepository
 {
-    Task<RefreshToken?> GetByTokenAsync(string token);
-    Task<IEnumerable<RefreshToken>> GetByUserIdAsync(string userId);
-    Task<RefreshToken> CreateAsync(RefreshToken refreshToken);
-    Task UpdateAsync(RefreshToken refreshToken);
-    Task RevokeAllByUserIdAsync(string userId);
-    Task DeleteByUserIdAsync(string userId);
-    Task DeleteExpiredAsync();
+    Task<RefreshToken?> GetByTokenAsync(string token, CancellationToken ct = default);
+    Task<IEnumerable<RefreshToken>> GetByUserIdAsync(string userId, CancellationToken ct = default);
+    Task<RefreshToken> CreateAsync(RefreshToken refreshToken, CancellationToken ct = default);
+    Task UpdateAsync(RefreshToken refreshToken, CancellationToken ct = default);
+    Task RevokeAllByUserIdAsync(string userId, CancellationToken ct = default);
+    Task DeleteByUserIdAsync(string userId, CancellationToken ct = default);
+    Task DeleteExpiredAsync(CancellationToken ct = default);
 }
 
 public class RefreshTokenRepository : IRefreshTokenRepository
@@ -40,51 +40,51 @@ public class RefreshTokenRepository : IRefreshTokenRepository
         _refreshTokens.Indexes.CreateOne(new CreateIndexModel<RefreshToken>(ttlIndex, ttlOptions));
     }
 
-    public async Task<RefreshToken?> GetByTokenAsync(string token)
+    public async Task<RefreshToken?> GetByTokenAsync(string token, CancellationToken ct = default)
     {
         return await _refreshTokens
             .Find(t => t.Token == token)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<IEnumerable<RefreshToken>> GetByUserIdAsync(string userId)
+    public async Task<IEnumerable<RefreshToken>> GetByUserIdAsync(string userId, CancellationToken ct = default)
     {
         return await _refreshTokens
             .Find(t => t.UserId == userId)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<RefreshToken> CreateAsync(RefreshToken refreshToken)
+    public async Task<RefreshToken> CreateAsync(RefreshToken refreshToken, CancellationToken ct = default)
     {
-        await _refreshTokens.InsertOneAsync(refreshToken);
+        await _refreshTokens.InsertOneAsync(refreshToken, options: null, ct);
         return refreshToken;
     }
 
-    public async Task UpdateAsync(RefreshToken refreshToken)
+    public async Task UpdateAsync(RefreshToken refreshToken, CancellationToken ct = default)
     {
-        await _refreshTokens.ReplaceOneAsync(t => t.Id == refreshToken.Id, refreshToken);
+        await _refreshTokens.ReplaceOneAsync(t => t.Id == refreshToken.Id, refreshToken, options: (ReplaceOptions?)null, ct);
     }
 
-    public async Task RevokeAllByUserIdAsync(string userId)
+    public async Task RevokeAllByUserIdAsync(string userId, CancellationToken ct = default)
     {
         var update = Builders<RefreshToken>.Update
             .Set(t => t.RevokedAt, DateTime.UtcNow);
         
         await _refreshTokens.UpdateManyAsync(
             t => t.UserId == userId && t.RevokedAt == null,
-            update
+            update, options: null, ct
         );
     }
 
-    public async Task DeleteByUserIdAsync(string userId)
+    public async Task DeleteByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        await _refreshTokens.DeleteManyAsync(t => t.UserId == userId);
+        await _refreshTokens.DeleteManyAsync(t => t.UserId == userId, ct);
     }
 
-    public async Task DeleteExpiredAsync()
+    public async Task DeleteExpiredAsync(CancellationToken ct = default)
     {
         await _refreshTokens.DeleteManyAsync(
-            t => t.ExpiresAt < DateTime.UtcNow && t.RevokedAt != null
+            t => t.ExpiresAt < DateTime.UtcNow && t.RevokedAt != null, ct
         );
     }
 }

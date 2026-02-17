@@ -367,7 +367,10 @@ public class BudgetService : IBudgetService
         {
             // Get all active budgets for the user
             var budgets = await _budgetRepository.GetByUserIdAsync(userId, isActive: true);
-            
+
+            // Pre-fetch labels once to avoid N+1 queries in the loop
+            var allLabels = await _labelRepository.GetByUserIdAsync(userId);
+
             foreach (var budget in budgets)
             {
                 // Check if this budget is relevant to the transaction
@@ -378,7 +381,7 @@ public class BudgetService : IBudgetService
                 // For label checking, expand budget label IDs to include all child categories
                 if (budget.LabelIds.Any() && labelIds != null)
                 {
-                    var expandedBudgetLabelIds = await ExpandLabelIdsAsync(userId, budget.LabelIds);
+                    var expandedBudgetLabelIds = await ExpandLabelIdsAsync(userId, budget.LabelIds, allLabels);
                     if (!expandedBudgetLabelIds.Intersect(labelIds).Any())
                         isRelevant = false;
                 }
@@ -387,7 +390,7 @@ public class BudgetService : IBudgetService
 
                 // Calculate current spending
                 var (periodStart, periodEnd) = GetCurrentPeriodDates(budget);
-                var transactions = await GetBudgetTransactionsAsync(userId, budget, periodStart, periodEnd);
+                var transactions = await GetBudgetTransactionsAsync(userId, budget, periodStart, periodEnd, allLabels);
                 var amountSpent = transactions.Sum(t => t.Amount);
                 var percentUsed = budget.Amount > 0 ? (amountSpent / budget.Amount) * 100 : 0;
 
@@ -456,12 +459,19 @@ public class BudgetService : IBudgetService
     /// </summary>
     private async Task<BudgetResponse> BuildBudgetResponseAsync(Budget budget, string userId)
     {
-        var accounts = await _accountRepository.GetByUserIdAsync(userId, ct: default);
-        var accountDict = accounts.ToDictionary(a => a.Id);
-        var labels = await _labelRepository.GetByUserIdAsync(userId);
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        // Parallelize independent DB calls
+        var accountsTask = _accountRepository.GetByUserIdAsync(userId, ct: default);
+        var labelsTask = _labelRepository.GetByUserIdAsync(userId);
+        var ratesTask = _exchangeRateService.GetRatesAsync();
+        var userTask = _userRepository.GetByIdAsync(userId);
+
+        await Task.WhenAll(accountsTask, labelsTask, ratesTask, userTask);
+
+        var accountDict = (await accountsTask).ToDictionary(a => a.Id);
+        var labels = await labelsTask;
+        var ratesResponse = await ratesTask;
         var rates = ratesResponse?.Rates ?? new Dictionary<string, decimal>();
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await userTask;
         var primaryCurrency = user?.PrimaryCurrency ?? "USD";
         
         return await BuildBudgetResponseAsync(budget, userId, accountDict, labels, rates, primaryCurrency);
@@ -570,10 +580,10 @@ public class BudgetService : IBudgetService
     }
 
     private async Task<List<Transaction>> GetBudgetTransactionsAsync(
-        string userId, Budget budget, DateTime periodStart, DateTime periodEnd)
+        string userId, Budget budget, DateTime periodStart, DateTime periodEnd, List<Label>? prefetchedLabels = null)
     {
-        // Fetch all labels once (shared for expansion and exclusion filtering)
-        var allLabels = await _labelRepository.GetByUserIdAsync(userId);
+        // Use pre-fetched labels or fetch once
+        var allLabels = prefetchedLabels ?? await _labelRepository.GetByUserIdAsync(userId);
         var labelDict = allLabels.ToDictionary(l => l.Id);
 
         // Expand label IDs to include all child categories (if folders are selected)
@@ -617,6 +627,15 @@ public class BudgetService : IBudgetService
         var allLabels = await _labelRepository.GetByUserIdAsync(userId);
         var labelDict = allLabels.ToDictionary(l => l.Id);
         return ExpandLabelIds(labelIds, allLabels, labelDict);
+    }
+
+    /// <summary>
+    /// Overload that accepts pre-fetched labels to avoid redundant DB calls.
+    /// </summary>
+    private Task<List<string>> ExpandLabelIdsAsync(string userId, List<string> labelIds, List<Label> allLabels)
+    {
+        var labelDict = allLabels.ToDictionary(l => l.Id);
+        return Task.FromResult(ExpandLabelIds(labelIds, allLabels, labelDict));
     }
 
     /// <summary>

@@ -40,7 +40,8 @@ function isClientError(error: unknown): boolean {
     if (message.includes('404') || message.includes('not found')) return true;
     if (message.includes('400') || message.includes('bad request')) return true;
     if (message.includes('422') || message.includes('validation')) return true;
-    if (message.includes('429') || message.includes('too many requests')) return true;
+    // Note: 429 (Too Many Requests) is intentionally NOT treated as a client error
+    // so that rate-limited requests benefit from retry with exponential backoff
   }
   return false;
 }
@@ -69,13 +70,11 @@ export const queryClient = new QueryClient({
         error: getErrorMessage(error)
       });
       
-      // Skip if mutation has its own onError handler defined
-      if (mutation.options.onError) return;
-      
-      // Skip if mutation explicitly disables error toast
+      // Skip if mutation explicitly opts out of error toast
       if (mutation.options.meta?.skipErrorToast === true) return;
       
-      // Show error toast for unhandled mutation errors
+      // Show error toast — even for mutations with onError (optimistic rollback),
+      // the user still needs to know the operation failed
       toast.error(getErrorMessage(error));
     },
     onSuccess: (_data, _variables, _context, mutation) => {

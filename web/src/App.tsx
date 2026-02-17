@@ -15,7 +15,7 @@ const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 const ChatsPage = lazy(() => import('./pages/ChatsPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const LabelsPage = lazy(() => import('./pages/LabelsPage'));
-const InsightsPage = lazy(() => import('./pages/InsightsPage'));
+const InsightsPage = lazy(() => import('./pages/insights'));
 const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
 const SpendingMapPage = lazy(() => import('./pages/SpendingMapPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));

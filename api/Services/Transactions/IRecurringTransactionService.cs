@@ -12,7 +12,7 @@ public interface IRecurringTransactionService
     /// <summary>
     /// Get all recurring transaction templates for a user
     /// </summary>
-    Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId);
+    Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId, CancellationToken ct = default);
     
     /// <summary>
     /// Create a recurring transaction template and its first instance
@@ -21,7 +21,8 @@ public interface IRecurringTransactionService
         string userId,
         CreateTransactionRequest request,
         Account account,
-        byte[] dek);
+        byte[] dek,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Delete a recurring template (optionally delete future instances)
@@ -29,7 +30,8 @@ public interface IRecurringTransactionService
     Task<(bool Success, string Message)> DeleteRecurringAsync(
         string id,
         string userId,
-        bool deleteFutureInstances);
+        bool deleteFutureInstances,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Process all pending recurring transactions (called by background service)

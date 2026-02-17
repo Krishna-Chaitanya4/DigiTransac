@@ -47,6 +47,18 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
+// Get the time-to-live of a token in milliseconds (0 if expired)
+function getTokenTtlMs(token: string): number {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000;
+    const remaining = exp - Date.now();
+    return remaining > 0 ? remaining : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -60,27 +72,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem(USER_KEY);
 
     if (storedAccessToken && storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setAccessToken(storedAccessToken);
-      setUser(parsedUser);
-      // Set Sentry user for error tracking
-      setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setAccessToken(storedAccessToken);
+        setUser(parsedUser);
+        // Set Sentry user for error tracking
+        setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
 
-      // Proactively refresh if access token is expired or about to expire
-      // This prevents the first API call from failing and provides seamless PWA experience
-      if (isTokenExpired(storedAccessToken)) {
-        authService.refreshToken()
-          .then((response) => {
-            handleAuthSuccess(response);
-            setIsLoading(false);
-          })
-          .catch(() => {
-            // Refresh failed — token cookie expired or was cleared
-            // Keep user data so ProtectedRoute can show the app briefly,
-            // the next API call will trigger session-expired flow
-            setIsLoading(false);
-          });
-        return; // Don't set isLoading=false yet, wait for refresh
+        // Proactively refresh if access token is expired or about to expire
+        // This prevents the first API call from failing and provides seamless PWA experience
+        if (isTokenExpired(storedAccessToken)) {
+          authService.refreshToken()
+            .then((response) => {
+              handleAuthSuccess(response);
+              setIsLoading(false);
+            })
+            .catch(() => {
+              // Refresh failed — token cookie expired or was cleared
+              // Keep user data so ProtectedRoute can show the app briefly,
+              // the next API call will trigger session-expired flow
+              setIsLoading(false);
+            });
+          return; // Don't set isLoading=false yet, wait for refresh
+        }
+      } catch {
+        // Corrupted localStorage data — clear and start fresh
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
       }
     }
     setIsLoading(false);
@@ -104,6 +122,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
   }, []);
+
+  // Proactive token refresh: schedule a refresh 60 seconds before the access token expires
+  // Also refresh when the app regains visibility (user returns from another tab/app)
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function scheduleRefresh() {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!token) return;
+
+      // Refresh 60 seconds before expiry (minimum 5 s delay to avoid tight loops)
+      const ttl = getTokenTtlMs(token);
+      const delay = Math.max(ttl - 60_000, 5_000);
+
+      refreshTimer = setTimeout(async () => {
+        try {
+          const response = await authService.refreshToken();
+          handleAuthSuccess(response);
+          scheduleRefresh(); // re-schedule for the new token
+        } catch {
+          // Refresh failed — don't force logout yet;
+          // the 401 interceptor in apiClient will handle it on the next API call
+        }
+      }, delay);
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (token && isTokenExpired(token)) {
+          // Token expired while tab was hidden — refresh immediately
+          authService.refreshToken()
+            .then((response) => {
+              handleAuthSuccess(response);
+              scheduleRefresh();
+            })
+            .catch(() => {
+              // Will be caught by 401 interceptor on next API call
+            });
+        } else {
+          scheduleRefresh();
+        }
+      }
+    }
+
+    scheduleRefresh();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken]); // Re-schedule whenever the access token changes
 
   const handleAuthSuccess = useCallback((authResponse: AuthResponse) => {
     const userData: User = { 

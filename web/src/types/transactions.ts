@@ -85,6 +85,9 @@ export interface Transaction {
   dateLocal?: string;     // "YYYY-MM-DD" - the human-intended calendar date (always display this if available)
   timeLocal?: string;     // "HH:mm" - the local time (e.g., "14:30")
   dateTimezone?: string;  // IANA timezone e.g., "Asia/Kolkata" (original timezone at creation)
+  // Soft-delete support (24-hour undo window)
+  isDeleted: boolean;
+  deletedAt?: string | null;
 }
 
 export interface TransactionListResponse {

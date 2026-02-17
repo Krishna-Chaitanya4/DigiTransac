@@ -6,7 +6,7 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    public async Task<Result> DeleteAccountAsync(string userId, string password)
+    public async Task<Result> DeleteAccountAsync(string userId, string password, CancellationToken ct = default)
     {
         _logger.LogInformation("Delete account request for UserId: {UserId}", userId);
 
@@ -36,56 +36,68 @@ public partial class AuthService
             return DomainErrors.Auth.InvalidPassword;
         }
 
-        // Delete all associated data within a transaction for atomicity
+        // Delete all associated data
+        // Note: DeleteAll* repository methods don't support IClientSessionHandle,
+        // so we execute sequentially with best-effort cleanup on failure.
+        // A partial failure is logged but doesn't leave dangling auth state since
+        // the user record is deleted last.
         _logger.LogInformation("Deleting all data for user: {Email}", userEmail);
 
         try
         {
-            await _unitOfWork.ExecuteInTransactionAsync(async (session) =>
+            // 1. Delete all transactions for the user
+            await _transactionRepository.DeleteAllByUserIdAsync(userId);
+            _logger.LogInformation("Deleted transactions for user: {UserId}", userId);
+
+            // 2. Nullify counterparty references on other users' P2P transactions
+            //    (prevents dangling LinkedTransactionId/CounterpartyUserId pointers)
+            var nullifiedCount = await _transactionRepository.NullifyCounterpartyReferencesAsync(userId);
+            if (nullifiedCount > 0)
+                _logger.LogInformation("Nullified {Count} counterparty transaction references for user: {UserId}", nullifiedCount, userId);
+
+            // 3. Delete all accounts for the user
+            await _accountRepository.DeleteAllByUserIdAsync(userId);
+            _logger.LogInformation("Deleted accounts for user: {UserId}", userId);
+
+            // 4. Delete all labels for the user
+            await _labelRepository.DeleteAllByUserIdAsync(userId);
+            _logger.LogInformation("Deleted labels for user: {UserId}", userId);
+
+            // 5. Delete all tags for the user
+            await _tagRepository.DeleteAllByUserIdAsync(userId);
+            _logger.LogInformation("Deleted tags for user: {UserId}", userId);
+
+            // 6. Delete all budgets for the user
+            await _budgetRepository.DeleteAllByUserIdAsync(userId);
+            _logger.LogInformation("Deleted budgets for user: {UserId}", userId);
+
+            // 7. Anonymize chat messages for the counterparty (so their history isn't destroyed)
+            //    then delete messages where the user is the sole participant (self-chat)
+            await _chatMessageRepository.AnonymizeByUserIdAsync(userId);
+            _logger.LogInformation("Anonymized and cleaned chat messages for user: {UserId}", userId);
+
+            // 8. Delete all push notification subscriptions for the user
+            await _pushSubscriptionRepository.DeleteByUserIdAsync(userId);
+            _logger.LogInformation("Deleted push subscriptions for user: {UserId}", userId);
+
+            // 9. Delete all refresh tokens for the user
+            await _refreshTokenRepository.DeleteByUserIdAsync(userId);
+            _logger.LogInformation("Deleted refresh tokens for user: {UserId}", userId);
+
+            // 10. Delete all two-factor tokens for the user
+            await _twoFactorTokenRepository.DeleteAllByUserIdAsync(userId);
+            _logger.LogInformation("Deleted two-factor tokens for user: {UserId}", userId);
+
+            // 11. Delete all email verifications for the user
+            await _emailVerificationRepository.DeleteAllByEmailAsync(userEmail);
+            _logger.LogInformation("Deleted email verifications for user: {UserId}", userId);
+
+            // 12. Delete the user record (last, so partial failure still leaves a valid user)
+            var deleted = await _userRepository.DeleteAsync(userId);
+            if (!deleted)
             {
-                // 1. Delete all transactions for the user
-                await _transactionRepository.DeleteAllByUserIdAsync(userId);
-                _logger.LogInformation("Deleted transactions for user: {UserId}", userId);
-
-                // 2. Delete all accounts for the user
-                await _accountRepository.DeleteAllByUserIdAsync(userId);
-                _logger.LogInformation("Deleted accounts for user: {UserId}", userId);
-
-                // 3. Delete all labels for the user
-                await _labelRepository.DeleteAllByUserIdAsync(userId);
-                _logger.LogInformation("Deleted labels for user: {UserId}", userId);
-
-                // 4. Delete all tags for the user
-                await _tagRepository.DeleteAllByUserIdAsync(userId);
-                _logger.LogInformation("Deleted tags for user: {UserId}", userId);
-
-                // 5. Delete all budgets for the user
-                await _budgetRepository.DeleteAllByUserIdAsync(userId);
-                _logger.LogInformation("Deleted budgets for user: {UserId}", userId);
-
-                // 6. Delete all chat messages for the user (both sent and received)
-                await _chatMessageRepository.DeleteAllByUserIdAsync(userId);
-                _logger.LogInformation("Deleted chat messages for user: {UserId}", userId);
-
-                // 7. Delete all refresh tokens for the user
-                await _refreshTokenRepository.DeleteByUserIdAsync(userId);
-                _logger.LogInformation("Deleted refresh tokens for user: {UserId}", userId);
-
-                // 8. Delete all two-factor tokens for the user
-                await _twoFactorTokenRepository.DeleteAllByUserIdAsync(userId);
-                _logger.LogInformation("Deleted two-factor tokens for user: {UserId}", userId);
-
-                // 9. Delete all email verifications for the user
-                await _emailVerificationRepository.DeleteAllByEmailAsync(userEmail);
-                _logger.LogInformation("Deleted email verifications for user: {UserId}", userId);
-
-                // 10. Delete the user record
-                var deleted = await _userRepository.DeleteAsync(userId);
-                if (!deleted)
-                {
-                    throw new InvalidOperationException($"Failed to delete user record for UserId: {userId}");
-                }
-            });
+                throw new InvalidOperationException($"Failed to delete user record for UserId: {userId}");
+            }
         }
         catch (Exception ex)
         {
@@ -101,7 +113,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result> UpdateNameAsync(string userId, string newName)
+    public async Task<Result> UpdateNameAsync(string userId, string newName, CancellationToken ct = default)
     {
         _logger.LogInformation("Update name request for UserId: {UserId}", userId);
 
@@ -129,7 +141,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result> SendEmailChangeCodeAsync(string userId, string newEmail)
+    public async Task<Result> SendEmailChangeCodeAsync(string userId, string newEmail, CancellationToken ct = default)
     {
         _logger.LogInformation("Email change request for UserId: {UserId} to {NewEmail}", userId, newEmail);
 
@@ -164,6 +176,9 @@ public partial class AuthService
         // Generate and send verification code
         var code = GenerateVerificationCode();
         
+        // Delete any existing email change verification for this email
+        await _emailVerificationRepository.DeleteByEmailAsync(normalizedNewEmail, VerificationPurpose.EmailChange);
+
         // Store verification with EmailChange purpose
         var verification = new EmailVerification
         {
@@ -183,7 +198,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code)
+    public async Task<Result> VerifyAndUpdateEmailAsync(string userId, string newEmail, string code, CancellationToken ct = default)
     {
         _logger.LogInformation("Verifying email change for UserId: {UserId}", userId);
 

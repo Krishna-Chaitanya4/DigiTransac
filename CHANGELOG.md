@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.16] - 2026-02-14
+
+### Changed — Architecture
+- **CancellationToken Propagation** — Added `CancellationToken ct = default` to all async methods across repositories (TransactionRepository, RefreshTokenRepository, EmailVerificationRepository, AuditLogRepository, ExchangeRateRepository), service interfaces (IAuthService, ITransactionService + sub-services, IExchangeRateService, ITransactionImportService), service implementations, and endpoint handlers; tokens are now forwarded from HTTP request through service layer to MongoDB driver calls
+- **CurrencyContext → React Query** — Replaced manual `useState`/`useEffect`/`useCallback` with `useQuery` from TanStack React Query for exchange rate fetching; eliminates manual localStorage caching (React Query's `staleTime`/`gcTime` handles it), reduces code from 167 to 103 lines while preserving the same `useCurrency()` API surface
+- **InsightsPage Decomposition** — Split ~1931-line monolith into 14 focused files under `pages/insights/`: types, helpers, shared widgets (`InsightWidgets.tsx`), `FinancialSummaryWidget`, `CategoryPairWidget`, `TrendsWidget`, `BudgetsWidget`, `AveragesWidget`, `CounterpartiesWidget`, `ByAccountWidget`, `PatternsWidget`, `AnomaliesWidget`, and orchestrator `InsightsPage.tsx`; old import path re-exports for backward compatibility
+
+## [1.6.15] - 2026-02-14
+
+### Fixed — Security
+- **Password Change/Reset Token Revocation** — All refresh tokens are now revoked when a user changes or resets their password, preventing stolen tokens from retaining access
+- **Forgot-Password Email Enumeration** — Endpoint now always returns generic success message regardless of whether the email exists, fixing a code path that leaked failures before the generic response
+- **Login Timing Attack Mitigation** — BCrypt.Verify now runs against a dummy hash when the user doesn't exist, preventing timing-based email enumeration
+- **CSV Injection Prevention** — Transaction CSV export now sanitizes formula injection characters (`=`, `+`, `-`, `@`, `\t`, `\r`) and properly escapes quotes in all fields (AccountName, categoryName, tagNames were previously unescaped)
+- **Refresh Token Rate Limiting** — Added `.RequireRateLimiting("auth")` to the `/refresh-token` endpoint to prevent brute-force attacks
+- **Decryption Error Handling** — `DecryptIfNotEmpty` now catches only `CryptographicException` (returns null) and `FormatException` (legacy unencrypted data), instead of a catch-all that leaked ciphertext to callers
+- **Exception Message Leak** — `GlobalExceptionHandlerMiddleware` no longer exposes `ArgumentException.Message` or `InvalidOperationException.Message` to clients; uses generic messages instead
+- **Verification Code Range** — Fixed off-by-one in `GenerateVerificationCode`: upper bound changed from 999999 (exclusive) to 1000000 so code 999999 can be generated
+
+### Fixed — Bugs
+- **Offline Sync Broken** — `useOffline.ts` used wrong localStorage key (`'accessToken'` instead of `'digitransac_access_token'`); all offline queue sync operations silently failed
+- **Auth Crash on Corrupted Storage** — `AuthContext` initialization now wraps `JSON.parse(storedUser)` in try/catch; corrupted localStorage no longer causes unrecoverable white-screen crash
+- **Batch Delete Double Balance Reversal** — When both sides of a transfer were included in batch delete IDs, balances were reversed twice; now tracks processed IDs in a `HashSet` to skip already-handled linked transactions
+- **Batch Status Update Missing Balance** — Changing transaction status between Confirmed ↔ Pending/Declined now correctly adjusts account balances
+- **Recurring Transfer Currency Conversion** — Recurring transfers between accounts with different currencies now perform exchange rate conversion (previously used raw template amount with destination currency)
+- **Shared Mutable References in Recurring** — Recurring transaction instances now deep-copy `Splits`, `TagIds`, and `Location` from the template instead of sharing object references
+- **Email Change Stale Records** — `SendEmailChangeCodeAsync` now deletes existing verification records before creating new ones (was accumulating stale records unlike other flows)
+- **Account Deletion Not Atomic** — Removed misleading `ExecuteInTransactionAsync` wrapper from `DeleteAccountAsync` since repository `DeleteAll*` methods don't support `IClientSessionHandle`; operations now execute sequentially with user record deleted last for safety
+- **429 Rate Limit Retry** — 429 (Too Many Requests) is no longer treated as a non-retryable client error; rate-limited requests now benefit from exponential backoff retry
+- **markAsRead Spam** — Chat `markAsReadMutation` no longer fires on every React Query refetch; tracks last-marked conversation to prevent redundant API calls
+- **Uncleared Timeouts** — TransactionsPage highlight/undo `setTimeout` calls are now tracked in refs and cleaned up on unmount
+
+### Fixed — Performance
+- **Budget N+1 Labels Query** — `CheckBudgetAlertsAsync` now pre-fetches labels once before the budget loop instead of fetching per-budget; `GetBudgetTransactionsAsync` accepts optional pre-fetched labels
+- **Budget Parallel DB Calls** — `BuildBudgetResponseAsync` (single-budget overload) now parallelizes accounts, labels, rates, and user queries with `Task.WhenAll`
+- **ETag Double Serialization** — `OkWithETag` now serializes JSON once and uses `Results.Text()` for the response body, avoiding redundant serialization by `Results.Ok()`
+- **Analytics PageSize Clamped** — Analytics endpoints clamp `pageSize` to max 200; conversation message `limit` clamped to 200
+- **Batch Operation Max Size** — Batch operations now enforce a maximum of 100 IDs per request via FluentValidation
+- **Static Compiled Regex** — Email validation regex is now a `static readonly Regex` with `RegexOptions.Compiled` instead of being recompiled per call
+- **MailMessage Disposal** — All three `EmailService` send methods now dispose `MailMessage` after sending
+
+### Changed
+- **Optimistic Error Visibility** — MutationCache global error handler no longer skips error toasts for mutations with `onError` (optimistic rollback); users now see failure notifications after rollback
+
+## [1.6.14] - 2026-02-14
+
+### Added
+- **Chat Undo Delete** — Deleted chat messages can now be restored within a 24-hour window
+  - Backend: `RestoreMessageAsync` on `ChatMessageRepository` and `ConversationService` — validates ownership, checks undo window, verifies content not yet purged
+  - Backend: `PurgeExpiredDeletedMessagesAsync` repository method — sets `Content = null` for messages deleted beyond the undo window
+  - Backend: `DeletedMessageCleanupService` background service — runs hourly to permanently scrub content from expired deleted messages
+  - Backend: `POST /api/conversations/messages/{messageId}/restore` endpoint
+  - Backend: `DeletedAt` field added to `ConversationMessage` DTO for undo window calculation
+  - Frontend: `restoreMessage()` service function and `useRestoreMessage()` React Query hook
+  - Frontend: "Undo" button with countdown timer on deleted messages (visible only to sender within 24h)
+  - Frontend: `canUndoDelete()` and `getUndoTimeRemaining()` helper functions in `MessageBubble`
+  - Constants: `UndoDeleteWindowMinutes = 1440` (24 hours) in `ConversationConstants`
+
+## [1.6.13] - 2026-02-14
+
+### Fixed
+- **Chat Transaction Menu on Mobile** — Transaction message cards in chat now support long-press to open the actions menu (including "View in Transactions"). Previously, the menu trigger only used `group-hover:opacity-100` which doesn't work on touch devices, and long-press handlers (`onTouchStart`/`onTouchEnd`/`onTouchMove`) were only attached to text message bubbles.
+- **Deleted Transactions in Chat** — When a transaction is deleted from the Transactions page, the corresponding chat message now shows a "Transaction deleted" placeholder card instead of rendering nothing. Previously, `message.type === 'Transaction'` with `message.transaction === null` fell through all rendering branches silently.
+- **MessageActionsMenu Option Count** — Fixed menu height calculation that counted "View in Transactions" for all transaction-type messages even when `message.transaction` was null (deleted transaction). Now correctly checks `message.transaction` existence.
+
+## [1.6.12] - 2026-02-14
+
+### Fixed
+- **Push Notification Permission Bug** — `PushNotificationSettings.tsx` `handleToggle` incorrectly checked `requestNotificationPermission()` return value as boolean (`if (!granted)`) instead of comparing the `NotificationPermission` string (`if (permission !== 'granted')`). The "permission denied" error message never displayed because all string values (`"granted"`, `"denied"`, `"default"`) are truthy.
+
+### Changed
+- **WebPushSettings → Options Pattern** — Moved `WebPushSettings` class from `WebPushService.cs` to `AppSettings.cs` and registered via `builder.Services.Configure<WebPushSettings>()` for consistency with all other settings classes. `WebPushService` now injects `IOptions<WebPushSettings>` instead of manually binding from `IConfiguration`.
+- **CancellationToken in WebPush** — Added `CancellationToken` parameter to all `IWebPushService` methods (`SendToUserAsync`, `SendToSubscriptionAsync`) and all `IPushSubscriptionRepository` methods, propagated through to MongoDB driver calls. Push endpoints now pass `HttpContext.RequestAborted`.
+
 ## [1.6.0] - 2026-02-12
 
 ### Added

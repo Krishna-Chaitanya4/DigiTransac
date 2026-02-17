@@ -62,6 +62,17 @@ public interface IChatMessageRepository
     Task<bool> DeleteMessageAsync(string messageId, string senderUserId, CancellationToken ct = default);
     
     /// <summary>
+    /// Restore a soft-deleted message (undo delete)
+    /// </summary>
+    Task<bool> RestoreMessageAsync(string messageId, string senderUserId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Permanently scrub content from messages deleted longer than the undo window.
+    /// Sets Content to null so the message can never be restored.
+    /// </summary>
+    Task<int> PurgeExpiredDeletedMessagesAsync(TimeSpan undoWindow, CancellationToken ct = default);
+    
+    /// <summary>
     /// Create transaction message entry for a P2P transaction
     /// </summary>
     Task CreateTransactionMessageAsync(string senderUserId, string recipientUserId, string transactionId, CancellationToken ct = default);
@@ -75,6 +86,18 @@ public interface IChatMessageRepository
     /// Delete all messages where the user is sender or recipient (for account deletion)
     /// </summary>
     Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Anonymize a deleted user's chat presence: delete self-chat messages,
+    /// and null out sender/recipient IDs on P2P messages so the counterparty keeps their history.
+    /// </summary>
+    Task AnonymizeByUserIdAsync(string userId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Nullify TransactionId on chat messages that reference any of the given transaction IDs.
+    /// Called during purge to prevent orphaned references after hard-delete.
+    /// </summary>
+    Task<int> NullifyTransactionReferencesAsync(IEnumerable<string> transactionIds, CancellationToken ct = default);
 }
 
 public class ChatMessageRepository : IChatMessageRepository
@@ -214,7 +237,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, counterpartyUserId),
             Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         return (int)await _chatMessages.CountDocumentsAsync(filter, options: null, ct);
@@ -230,7 +253,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.In(m => m.SenderUserId, counterpartyIdList),
             Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         var pipeline = _chatMessages.Aggregate()
@@ -246,7 +269,7 @@ public class ChatMessageRepository : IChatMessageRepository
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         return (int)await _chatMessages.CountDocumentsAsync(filter, options: null, ct);
@@ -294,7 +317,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
             Builders<ChatMessage>.Filter.Eq(m => m.Type, ChatMessageType.Text),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         var update = Builders<ChatMessage>.Update
@@ -311,7 +334,7 @@ public class ChatMessageRepository : IChatMessageRepository
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         var update = Builders<ChatMessage>.Update
@@ -320,6 +343,40 @@ public class ChatMessageRepository : IChatMessageRepository
         
         var result = await _chatMessages.UpdateOneAsync(filter, update, options: null, ct);
         return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> RestoreMessageAsync(string messageId, string senderUserId, CancellationToken ct = default)
+    {
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, true)
+        );
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.IsDeleted, false)
+            .Set(m => m.DeletedAt, (DateTime?)null);
+        
+        var result = await _chatMessages.UpdateOneAsync(filter, update, options: null, ct);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<int> PurgeExpiredDeletedMessagesAsync(TimeSpan undoWindow, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - undoWindow;
+        
+        // Find messages that are deleted, past the undo window, and still have content
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, true),
+            Builders<ChatMessage>.Filter.Lt(m => m.DeletedAt, cutoff),
+            Builders<ChatMessage>.Filter.Ne(m => m.Content, null)
+        );
+
+        var update = Builders<ChatMessage>.Update
+            .Set(m => m.Content, (string?)null);
+        
+        var result = await _chatMessages.UpdateManyAsync(filter, update, options: null, ct);
+        return (int)result.ModifiedCount;
     }
 
     public async Task CreateTransactionMessageAsync(
@@ -381,5 +438,47 @@ public class ChatMessageRepository : IChatMessageRepository
         
         var result = await _chatMessages.DeleteManyAsync(filter, ct);
         return result.DeletedCount > 0;
+    }
+
+    public async Task AnonymizeByUserIdAsync(string userId, CancellationToken ct = default)
+    {
+        // Step 1: Delete self-chat messages (where user is both sender AND recipient)
+        var selfChatFilter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, userId),
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId)
+        );
+        await _chatMessages.DeleteManyAsync(selfChatFilter, ct);
+
+        // Step 2: Anonymize messages SENT by the deleted user to others
+        //         (counterparty is the recipient — they keep their chat history)
+        var sentFilter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, userId),
+            Builders<ChatMessage>.Filter.Ne(m => m.RecipientUserId, userId)
+        );
+        var sentUpdate = Builders<ChatMessage>.Update
+            .Set(m => m.SenderUserId, "deleted");
+        await _chatMessages.UpdateManyAsync(sentFilter, sentUpdate, options: null, ct);
+
+        // Step 3: Anonymize messages RECEIVED by the deleted user from others
+        //         (counterparty is the sender — they keep their chat history)
+        var receivedFilter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
+            Builders<ChatMessage>.Filter.Ne(m => m.SenderUserId, userId)
+        );
+        var receivedUpdate = Builders<ChatMessage>.Update
+            .Set(m => m.RecipientUserId, "deleted");
+        await _chatMessages.UpdateManyAsync(receivedFilter, receivedUpdate, options: null, ct);
+    }
+
+    public async Task<int> NullifyTransactionReferencesAsync(IEnumerable<string> transactionIds, CancellationToken ct = default)
+    {
+        var idsList = transactionIds.ToList();
+        if (idsList.Count == 0) return 0;
+
+        var filter = Builders<ChatMessage>.Filter.In(m => m.TransactionId, idsList);
+        var update = Builders<ChatMessage>.Update.Set(m => m.TransactionId, (string?)null);
+
+        var result = await _chatMessages.UpdateManyAsync(filter, update, options: null, ct);
+        return (int)result.ModifiedCount;
     }
 }

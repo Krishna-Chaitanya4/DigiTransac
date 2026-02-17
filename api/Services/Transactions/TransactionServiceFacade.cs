@@ -34,64 +34,67 @@ public class TransactionServiceFacade : ITransactionService
     }
 
     // Core Service Methods
-    public Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter)
-        => _coreService.GetAllAsync(userId, filter);
+    public Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter, CancellationToken ct = default)
+        => _coreService.GetAllAsync(userId, filter, ct);
 
-    public Task<TransactionResponse?> GetByIdAsync(string id, string userId)
-        => _coreService.GetByIdAsync(id, userId);
+    public Task<TransactionResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default)
+        => _coreService.GetByIdAsync(id, userId, ct);
 
     public Task<Result<TransactionResponse>> CreateAsync(
-        string userId, CreateTransactionRequest request)
-        => _coreService.CreateAsync(userId, request);
+        string userId, CreateTransactionRequest request, CancellationToken ct = default)
+        => _coreService.CreateAsync(userId, request, ct);
 
     public Task<Result<TransactionResponse>> UpdateAsync(
-        string id, string userId, UpdateTransactionRequest request)
-        => _coreService.UpdateAsync(id, userId, request);
+        string id, string userId, UpdateTransactionRequest request, CancellationToken ct = default)
+        => _coreService.UpdateAsync(id, userId, request, ct);
 
-    public Task<Result> DeleteAsync(string id, string userId)
-        => _coreService.DeleteAsync(id, userId);
+    public Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default)
+        => _coreService.DeleteAsync(id, userId, ct);
 
-    public Task<int> GetPendingCountAsync(string userId)
-        => _coreService.GetPendingCountAsync(userId);
+    public Task<Result> RestoreAsync(string id, string userId, CancellationToken ct = default)
+        => _coreService.RestoreAsync(id, userId, ct);
+
+    public Task<int> GetPendingCountAsync(string userId, CancellationToken ct = default)
+        => _coreService.GetPendingCountAsync(userId, ct);
 
     // Recurring Service Methods
-    public Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId)
-        => _recurringService.GetRecurringAsync(userId);
+    public Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId, CancellationToken ct = default)
+        => _recurringService.GetRecurringAsync(userId, ct);
 
-    public Task<(bool Success, string Message)> DeleteRecurringAsync(string id, string userId, bool deleteFutureInstances)
-        => _recurringService.DeleteRecurringAsync(id, userId, deleteFutureInstances);
+    public Task<(bool Success, string Message)> DeleteRecurringAsync(string id, string userId, bool deleteFutureInstances, CancellationToken ct = default)
+        => _recurringService.DeleteRecurringAsync(id, userId, deleteFutureInstances, ct);
 
     public Task ProcessRecurringTransactionsAsync()
         => _recurringService.ProcessRecurringTransactionsAsync();
 
     // Analytics Service Methods
-    public Task<TransactionSummaryResponse> GetSummaryAsync(string userId, TransactionFilterRequest filter)
-        => _analyticsService.GetSummaryAsync(userId, filter);
+    public Task<TransactionSummaryResponse> GetSummaryAsync(string userId, TransactionFilterRequest filter, CancellationToken ct = default)
+        => _analyticsService.GetSummaryAsync(userId, filter, ct);
 
     public Task<TransactionAnalyticsResponse> GetAnalyticsAsync(
-        string userId, DateTime? startDate, DateTime? endDate, string? accountId)
-        => _analyticsService.GetAnalyticsAsync(userId, startDate, endDate, accountId);
+        string userId, DateTime? startDate, DateTime? endDate, string? accountId, CancellationToken ct = default)
+        => _analyticsService.GetAnalyticsAsync(userId, startDate, endDate, accountId, ct);
 
     // Export Service Methods
-    public Task<List<TransactionResponse>> GetAllForExportAsync(string userId, TransactionFilterRequest filter)
-        => _exportService.GetAllForExportAsync(userId, filter);
+    public Task<List<TransactionResponse>> GetAllForExportAsync(string userId, TransactionFilterRequest filter, CancellationToken ct = default)
+        => _exportService.GetAllForExportAsync(userId, filter, ct);
 
     // Batch Service Methods
-    public Task<BatchOperationResponse> BatchDeleteAsync(string userId, List<string> ids)
-        => _batchService.BatchDeleteAsync(userId, ids);
+    public Task<BatchOperationResponse> BatchDeleteAsync(string userId, List<string> ids, CancellationToken ct = default)
+        => _batchService.BatchDeleteAsync(userId, ids, ct);
 
-    public Task<BatchOperationResponse> BatchUpdateStatusAsync(string userId, List<string> ids, string status)
-        => _batchService.BatchUpdateStatusAsync(userId, ids, status);
+    public Task<BatchOperationResponse> BatchUpdateStatusAsync(string userId, List<string> ids, string status, CancellationToken ct = default)
+        => _batchService.BatchUpdateStatusAsync(userId, ids, status, ct);
 
     // P2P Service Methods
-    public Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId)
-        => _p2pService.GetCounterpartiesAsync(userId);
+    public Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId, CancellationToken ct = default)
+        => _p2pService.GetCounterpartiesAsync(userId, ct);
 
     public Task<(bool Success, string Message, TransactionResponse? Transaction)> AcceptP2PTransactionAsync(
-        string transactionId, string userId, string accountId)
-        => _p2pService.AcceptP2PTransactionAsync(transactionId, userId, accountId);
+        string transactionId, string userId, string accountId, CancellationToken ct = default)
+        => _p2pService.AcceptP2PTransactionAsync(transactionId, userId, accountId, ct);
 
     public Task<(bool Success, string Message)> RejectP2PTransactionAsync(
-        string transactionId, string userId, string? reason)
-        => _p2pService.RejectP2PTransactionAsync(transactionId, userId, reason);
+        string transactionId, string userId, string? reason, CancellationToken ct = default)
+        => _p2pService.RejectP2PTransactionAsync(transactionId, userId, reason, ct);
 }

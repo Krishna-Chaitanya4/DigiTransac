@@ -147,8 +147,8 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
                 .Returns(testDek);
 
             // Setup default mock behaviors for RefreshTokenRepository
-            RefreshTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<RefreshToken>()))
-                .ReturnsAsync((RefreshToken token) => token);
+            RefreshTokenRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((RefreshToken token, CancellationToken _) => token);
             RefreshTokenRepositoryMock.Setup(x => x.GetByTokenAsync(It.IsAny<string>()))
                 .ReturnsAsync((RefreshToken?)null);
             RefreshTokenRepositoryMock.Setup(x => x.RevokeAllByUserIdAsync(It.IsAny<string>()))

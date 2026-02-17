@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
-import { useAccounts, useLabels, useTags, useCreateTag, useCreateTransaction } from '../hooks';
+import { useAccounts, useLabels, useTags, useCreateTag, useCreateTransaction, useRestoreTransaction, useDeleteTransaction } from '../hooks';
 import {
   useConversations,
   useConversation,
   useOptimisticSendMessage,
   useEditMessage,
   useDeleteMessage,
+  useRestoreMessage,
   useMarkAsRead,
   useInvalidateConversations,
+  conversationKeys,
 } from '../hooks';
 import { useNotifications } from '../hooks/useNotifications';
 import {
@@ -60,6 +63,7 @@ const isDifferentDay = (date1: string, date2: string): boolean => {
 export default function ChatsPage() {
   // Auth context
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
   // URL params for deep linking (e.g., from "View in Chat" on transactions)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -176,6 +180,9 @@ export default function ChatsPage() {
   const sendMessageMutation = useOptimisticSendMessage();
   const editMessageMutation = useEditMessage();
   const deleteMessageMutation = useDeleteMessage();
+  const restoreMessageMutation = useRestoreMessage();
+  const restoreTransactionMutation = useRestoreTransaction();
+  const deleteTransactionMutation = useDeleteTransaction();
   const markAsReadMutation = useMarkAsRead();
   const { invalidateList, invalidateDetail } = useInvalidateConversations();
 
@@ -238,10 +245,12 @@ export default function ChatsPage() {
     }
   }, []);
 
-  // Mark as read when conversation loads
+  // Mark as read when conversation loads (only once per conversation selection)
+  const markedAsReadRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedUserId && conversationData) {
+    if (selectedUserId && conversationData && markedAsReadRef.current !== selectedUserId) {
       markAsReadMutation.mutate(selectedUserId);
+      markedAsReadRef.current = selectedUserId;
     }
   }, [selectedUserId, conversationData]);
 
@@ -347,6 +356,83 @@ export default function ChatsPage() {
       }
     },
     [deleteMessageMutation]
+  );
+
+  // Restore (undo delete) message
+  const handleRestoreMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await restoreMessageMutation.mutateAsync(messageId);
+      } catch (error) {
+        logger.error('Failed to restore message:', error);
+      }
+    },
+    [restoreMessageMutation]
+  );
+
+  // Helper to optimistically toggle isDeleted on a transaction in the conversation cache
+  const optimisticToggleTransactionDeleted = useCallback(
+    (transactionId: string, isDeleted: boolean) => {
+      if (!selectedUserId) return;
+      queryClient.setQueryData<ConversationDetailResponse>(
+        conversationKeys.detail(selectedUserId),
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            messages: old.messages.map((msg) =>
+              msg.transaction?.transactionId === transactionId
+                ? {
+                    ...msg,
+                    transaction: {
+                      ...msg.transaction,
+                      isDeleted,
+                      deletedAt: isDeleted ? new Date().toISOString() : null,
+                    },
+                  }
+                : msg
+            ),
+          };
+        }
+      );
+    },
+    [queryClient, selectedUserId]
+  );
+
+  // Restore (undo delete) transaction
+  const handleRestoreTransaction = useCallback(
+    (transactionId: string) => {
+      // Optimistically show the transaction as restored in chat
+      optimisticToggleTransactionDeleted(transactionId, false);
+      restoreTransactionMutation.mutate(transactionId, {
+        onSettled: () => {
+          // Refetch conversation detail and list preview
+          if (selectedUserId) {
+            invalidateDetail(selectedUserId);
+          }
+          invalidateList();
+        },
+      });
+    },
+    [restoreTransactionMutation, optimisticToggleTransactionDeleted, selectedUserId, invalidateDetail, invalidateList]
+  );
+
+  // Delete transaction (soft-delete from chat context menu)
+  const handleDeleteTransaction = useCallback(
+    (transactionId: string) => {
+      // Optimistically show the transaction as deleted in chat
+      optimisticToggleTransactionDeleted(transactionId, true);
+      deleteTransactionMutation.mutate(transactionId, {
+        onSettled: () => {
+          // Refetch conversation detail and list preview
+          if (selectedUserId) {
+            invalidateDetail(selectedUserId);
+          }
+          invalidateList();
+        },
+      });
+    },
+    [deleteTransactionMutation, optimisticToggleTransactionDeleted, selectedUserId, invalidateDetail, invalidateList]
   );
 
   // Start editing
@@ -600,6 +686,8 @@ export default function ChatsPage() {
                             isSelfChat={isSelfChat}
                             onMenuOpen={handleMenuOpen}
                             onScrollToReply={scrollToMessage}
+                            onRestore={handleRestoreMessage}
+                            onRestoreTransaction={handleRestoreTransaction}
                           />
                         </div>
                       );
@@ -729,6 +817,7 @@ export default function ChatsPage() {
           onReply={() => setReplyTo(menuMessage)}
           onEdit={() => startEditing(menuMessage)}
           onDelete={() => handleDeleteMessage(menuMessage.id)}
+          onDeleteTransaction={handleDeleteTransaction}
         />
       )}
 

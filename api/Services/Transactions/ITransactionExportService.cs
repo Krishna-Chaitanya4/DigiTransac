@@ -13,12 +13,14 @@ public interface ITransactionExportService
     /// </summary>
     Task<List<TransactionResponse>> GetAllForExportAsync(
         string userId, 
-        TransactionFilterRequest filter);
+        TransactionFilterRequest filter,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Export transactions to CSV format
     /// </summary>
     Task<string> ExportToCsvAsync(
         string userId, 
-        TransactionFilterRequest filter);
+        TransactionFilterRequest filter,
+        CancellationToken ct = default);
 }

@@ -13,7 +13,8 @@ public interface ITransactionAnalyticsService
     /// </summary>
     Task<TransactionSummaryResponse> GetSummaryAsync(
         string userId,
-        TransactionFilterRequest filter);
+        TransactionFilterRequest filter,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Get detailed analytics (trends, averages, breakdowns)
@@ -22,7 +23,8 @@ public interface ITransactionAnalyticsService
         string userId,
         DateTime? startDate,
         DateTime? endDate,
-        string? accountId);
+        string? accountId,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Get top counterparties (payees) with spending breakdown
@@ -32,7 +34,8 @@ public interface ITransactionAnalyticsService
         DateTime? startDate,
         DateTime? endDate,
         int page = 1,
-        int pageSize = 10);
+        int pageSize = 10,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Get spending breakdown by account
@@ -42,7 +45,8 @@ public interface ITransactionAnalyticsService
         DateTime? startDate,
         DateTime? endDate,
         int page = 1,
-        int pageSize = 50);
+        int pageSize = 50,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Get spending patterns by day of week and hour of day
@@ -50,7 +54,8 @@ public interface ITransactionAnalyticsService
     Task<SpendingPatternsResponse> GetSpendingPatternsAsync(
         string userId,
         DateTime? startDate,
-        DateTime? endDate);
+        DateTime? endDate,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Detect spending anomalies and generate alerts
@@ -60,7 +65,8 @@ public interface ITransactionAnalyticsService
         DateTime? startDate,
         DateTime? endDate,
         int page = 1,
-        int pageSize = 10);
+        int pageSize = 10,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Get location-based spending insights.
@@ -73,7 +79,8 @@ public interface ITransactionAnalyticsService
         DateTime? endDate,
         double? latitude = null,
         double? longitude = null,
-        double radiusKm = 1.0);
+        double radiusKm = 1.0,
+        CancellationToken ct = default);
     
     /// <summary>
     /// Detect trips based on geographic clustering of transactions.
@@ -85,11 +92,13 @@ public interface ITransactionAnalyticsService
     /// <param name="homeLatitude">User's home latitude (optional, for excluding home location)</param>
     /// <param name="homeLongitude">User's home longitude (optional, for excluding home location)</param>
     /// <param name="minTripDistanceKm">Minimum distance from home to consider a trip (default 50km)</param>
+    /// <param name="ct">Cancellation token</param>
     Task<TripGroupsResponse> GetTripGroupsAsync(
         string userId,
         DateTime? startDate,
         DateTime? endDate,
         double? homeLatitude = null,
         double? homeLongitude = null,
-        double minTripDistanceKm = 50.0);
+        double minTripDistanceKm = 50.0,
+        CancellationToken ct = default);
 }

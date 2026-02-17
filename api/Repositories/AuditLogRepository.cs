@@ -6,10 +6,10 @@ namespace DigiTransac.Api.Repositories;
 
 public interface IAuditLogRepository
 {
-    Task<AuditLog> CreateAsync(AuditLog auditLog);
-    Task<(List<AuditLog> Logs, int TotalCount)> GetByUserIdAsync(string userId, int page = 1, int pageSize = 50);
-    Task<(List<AuditLog> Logs, int TotalCount)> GetByActionAsync(AuditAction action, int page = 1, int pageSize = 50);
-    Task<(List<AuditLog> Logs, int TotalCount)> GetByCategoryAsync(AuditCategory category, int page = 1, int pageSize = 50);
+    Task<AuditLog> CreateAsync(AuditLog auditLog, CancellationToken ct = default);
+    Task<(List<AuditLog> Logs, int TotalCount)> GetByUserIdAsync(string userId, int page = 1, int pageSize = 50, CancellationToken ct = default);
+    Task<(List<AuditLog> Logs, int TotalCount)> GetByActionAsync(AuditAction action, int page = 1, int pageSize = 50, CancellationToken ct = default);
+    Task<(List<AuditLog> Logs, int TotalCount)> GetByCategoryAsync(AuditCategory category, int page = 1, int pageSize = 50, CancellationToken ct = default);
     Task<(List<AuditLog> Logs, int TotalCount)> SearchAsync(
         string? userId = null,
         AuditAction? action = null,
@@ -18,9 +18,10 @@ public interface IAuditLogRepository
         DateTime? startDate = null,
         DateTime? endDate = null,
         int page = 1,
-        int pageSize = 50);
-    Task<List<AuditLog>> GetRecentFailedLoginsAsync(string email, TimeSpan window);
-    Task<int> GetFailedLoginCountAsync(string email, TimeSpan window);
+        int pageSize = 50,
+        CancellationToken ct = default);
+    Task<List<AuditLog>> GetRecentFailedLoginsAsync(string email, TimeSpan window, CancellationToken ct = default);
+    Task<int> GetFailedLoginCountAsync(string email, TimeSpan window, CancellationToken ct = default);
 }
 
 public class AuditLogRepository : IAuditLogRepository
@@ -63,29 +64,29 @@ public class AuditLogRepository : IAuditLogRepository
         _auditLogs.Indexes.CreateMany(indexModels);
     }
 
-    public async Task<AuditLog> CreateAsync(AuditLog auditLog)
+    public async Task<AuditLog> CreateAsync(AuditLog auditLog, CancellationToken ct = default)
     {
         auditLog.Timestamp = DateTime.UtcNow;
-        await _auditLogs.InsertOneAsync(auditLog);
+        await _auditLogs.InsertOneAsync(auditLog, options: null, ct);
         return auditLog;
     }
 
-    public async Task<(List<AuditLog> Logs, int TotalCount)> GetByUserIdAsync(string userId, int page = 1, int pageSize = 50)
+    public async Task<(List<AuditLog> Logs, int TotalCount)> GetByUserIdAsync(string userId, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         var filter = Builders<AuditLog>.Filter.Eq(a => a.UserId, userId);
-        return await GetPaginatedAsync(filter, page, pageSize);
+        return await GetPaginatedAsync(filter, page, pageSize, ct);
     }
 
-    public async Task<(List<AuditLog> Logs, int TotalCount)> GetByActionAsync(AuditAction action, int page = 1, int pageSize = 50)
+    public async Task<(List<AuditLog> Logs, int TotalCount)> GetByActionAsync(AuditAction action, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         var filter = Builders<AuditLog>.Filter.Eq(a => a.Action, action);
-        return await GetPaginatedAsync(filter, page, pageSize);
+        return await GetPaginatedAsync(filter, page, pageSize, ct);
     }
 
-    public async Task<(List<AuditLog> Logs, int TotalCount)> GetByCategoryAsync(AuditCategory category, int page = 1, int pageSize = 50)
+    public async Task<(List<AuditLog> Logs, int TotalCount)> GetByCategoryAsync(AuditCategory category, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         var filter = Builders<AuditLog>.Filter.Eq(a => a.Category, category);
-        return await GetPaginatedAsync(filter, page, pageSize);
+        return await GetPaginatedAsync(filter, page, pageSize, ct);
     }
 
     public async Task<(List<AuditLog> Logs, int TotalCount)> SearchAsync(
@@ -96,7 +97,8 @@ public class AuditLogRepository : IAuditLogRepository
         DateTime? startDate = null,
         DateTime? endDate = null,
         int page = 1,
-        int pageSize = 50)
+        int pageSize = 50,
+        CancellationToken ct = default)
     {
         var filterBuilder = Builders<AuditLog>.Filter;
         var filters = new List<FilterDefinition<AuditLog>>();
@@ -135,10 +137,10 @@ public class AuditLogRepository : IAuditLogRepository
             ? filterBuilder.And(filters) 
             : filterBuilder.Empty;
 
-        return await GetPaginatedAsync(combinedFilter, page, pageSize);
+        return await GetPaginatedAsync(combinedFilter, page, pageSize, ct);
     }
 
-    public async Task<List<AuditLog>> GetRecentFailedLoginsAsync(string email, TimeSpan window)
+    public async Task<List<AuditLog>> GetRecentFailedLoginsAsync(string email, TimeSpan window, CancellationToken ct = default)
     {
         var cutoff = DateTime.UtcNow - window;
         var filter = Builders<AuditLog>.Filter.And(
@@ -150,10 +152,10 @@ public class AuditLogRepository : IAuditLogRepository
         return await _auditLogs
             .Find(filter)
             .SortByDescending(a => a.Timestamp)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<int> GetFailedLoginCountAsync(string email, TimeSpan window)
+    public async Task<int> GetFailedLoginCountAsync(string email, TimeSpan window, CancellationToken ct = default)
     {
         var cutoff = DateTime.UtcNow - window;
         var filter = Builders<AuditLog>.Filter.And(
@@ -162,23 +164,24 @@ public class AuditLogRepository : IAuditLogRepository
             Builders<AuditLog>.Filter.Gte(a => a.Timestamp, cutoff)
         );
 
-        return (int)await _auditLogs.CountDocumentsAsync(filter);
+        return (int)await _auditLogs.CountDocumentsAsync(filter, options: null, ct);
     }
 
     private async Task<(List<AuditLog> Logs, int TotalCount)> GetPaginatedAsync(
         FilterDefinition<AuditLog> filter, 
         int page, 
-        int pageSize)
+        int pageSize,
+        CancellationToken ct = default)
     {
         var skip = (page - 1) * pageSize;
         
-        var totalCount = await _auditLogs.CountDocumentsAsync(filter);
+        var totalCount = await _auditLogs.CountDocumentsAsync(filter, options: null, ct);
         var logs = await _auditLogs
             .Find(filter)
             .SortByDescending(a => a.Timestamp)
             .Skip(skip)
             .Limit(pageSize)
-            .ToListAsync();
+            .ToListAsync(ct);
 
         return (logs, (int)totalCount);
     }

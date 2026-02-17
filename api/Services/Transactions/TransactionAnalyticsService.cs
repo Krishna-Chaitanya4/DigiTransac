@@ -163,7 +163,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
     public async Task<TransactionSummaryResponse> GetSummaryAsync(
         string userId,
-        TransactionFilterRequest filter)
+        TransactionFilterRequest filter,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching transaction summary for user {UserId}", userId);
 
@@ -247,7 +248,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         string userId,
         DateTime? startDate,
         DateTime? endDate,
-        string? accountId)
+        string? accountId,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching analytics for user {UserId}, period {Start} to {End}", userId, startDate, endDate);
 
@@ -362,7 +364,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         DateTime? startDate,
         DateTime? endDate,
         int page = 1,
-        int pageSize = 10)
+        int pageSize = 10,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching top counterparties for user {UserId}", userId);
 
@@ -461,7 +464,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         DateTime? startDate,
         DateTime? endDate,
         int page = 1,
-        int pageSize = 50)
+        int pageSize = 50,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching spending by account for user {UserId}", userId);
 
@@ -534,7 +538,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
     public async Task<SpendingPatternsResponse> GetSpendingPatternsAsync(
         string userId,
         DateTime? startDate,
-        DateTime? endDate)
+        DateTime? endDate,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching spending patterns for user {UserId}", userId);
 
@@ -650,7 +655,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         DateTime? startDate,
         DateTime? endDate,
         int page = 1,
-        int pageSize = 10)
+        int pageSize = 10,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching spending anomalies for user {UserId}", userId);
 
@@ -847,7 +853,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         DateTime? endDate,
         double? latitude = null,
         double? longitude = null,
-        double radiusKm = 1.0)
+        double radiusKm = 1.0,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching location insights for user {UserId}", userId);
 
@@ -1069,7 +1076,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         DateTime? endDate,
         double? homeLatitude = null,
         double? homeLongitude = null,
-        double minTripDistanceKm = 50.0)
+        double minTripDistanceKm = 50.0,
+        CancellationToken ct = default)
     {
         _logger.LogDebug("Fetching trip groups for user {UserId}", userId);
 

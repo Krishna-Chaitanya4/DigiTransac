@@ -27,6 +27,9 @@ export const ConversationItem = memo(function ConversationItem({
   const isSentTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('sent');
   const isReceivedTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('received');
   
+  // Check for deleted message/transaction previews
+  const isDeletedPreview = previewText === 'This message was deleted' || previewText === 'This transaction was deleted';
+  
   // Check if we have transaction totals to show
   const hasTransactions = (conversation.totalSent ?? 0) > 0 || (conversation.totalReceived ?? 0) > 0;
   const currency = conversation.primaryCurrency ?? 'INR';
@@ -64,13 +67,15 @@ export const ConversationItem = memo(function ConversationItem({
 
         {/* Last message preview - enhanced for transactions with directional colors */}
         <p className={`text-sm truncate mt-0.5 ${
-          isSentTransaction
-            ? 'text-red-500 dark:text-red-400 font-medium'
-            : isReceivedTransaction
-              ? 'text-emerald-600 dark:text-emerald-400 font-medium'
-              : isTransactionPreview
-                ? 'text-blue-600 dark:text-blue-400 font-medium'
-                : 'text-gray-600 dark:text-gray-400'
+          isDeletedPreview
+            ? 'text-gray-400 dark:text-gray-500 italic'
+            : isSentTransaction
+              ? 'text-red-500 dark:text-red-400 font-medium'
+              : isReceivedTransaction
+                ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                : isTransactionPreview
+                  ? 'text-blue-600 dark:text-blue-400 font-medium'
+                  : 'text-gray-600 dark:text-gray-400'
         }`}>
           {conversation.lastMessagePreview || 'No messages yet'}
         </p>

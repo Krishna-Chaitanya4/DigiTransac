@@ -75,6 +75,11 @@ export async function deleteMessage(messageId: string): Promise<void> {
   await apiClient.delete(`/conversations/messages/${messageId}`);
 }
 
+// Restore (undo delete) a message
+export async function restoreMessage(messageId: string): Promise<void> {
+  await apiClient.post(`/conversations/messages/${messageId}/restore`, {});
+}
+
 // Search for a user by email
 export async function searchUserByEmail(email: string): Promise<UserSearchResponse> {
   return apiClient.get<UserSearchResponse>(`/conversations/search-user?email=${encodeURIComponent(email)}`);

@@ -23,12 +23,13 @@ public static class AuthTokenEndpoints
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.LoginAsync(request);
+            var result = await authService.LoginAsync(request, ct);
             
             // Check if credentials were invalid
             if (result.AccessToken == null && !result.RequiresTwoFactor)
@@ -73,7 +74,8 @@ public static class AuthTokenEndpoints
             IAuthService authService,
             ICookieService cookieService,
             IOptions<JwtSettings> jwtSettings,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            CancellationToken ct) =>
         {
             // Try to get refresh token from cookie first, then from request body (for backward compatibility)
             var refreshToken = cookieService.GetRefreshTokenFromCookie(httpContext) ?? request?.RefreshToken;
@@ -83,7 +85,7 @@ public static class AuthTokenEndpoints
                 return Results.BadRequest(new ErrorResponse("Refresh token is required"));
             }
 
-            var result = await authService.RefreshTokenAsync(refreshToken);
+            var result = await authService.RefreshTokenAsync(refreshToken, ct);
             if (result == null)
             {
                 // Clear the invalid cookies
@@ -106,14 +108,16 @@ public static class AuthTokenEndpoints
         .WithDescription("Issues a new access token using the refresh token from HttpOnly cookie or request body. Also rotates the refresh token.")
         .Produces<AuthResponseWithoutRefresh>(200)
         .Produces<ErrorResponse>(400)
-        .Produces(401);
+        .Produces(401)
+        .RequireRateLimiting("auth");
 
         // Revoke refresh token (logout from specific device)
         group.MapPost("/revoke-token", [Authorize] async (
             RefreshTokenRequest? request, 
             IAuthService authService,
             ICookieService cookieService,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            CancellationToken ct) =>
         {
             // Try to get refresh token from cookie first, then from request body
             var refreshToken = cookieService.GetRefreshTokenFromCookie(httpContext) ?? request?.RefreshToken;
@@ -123,7 +127,7 @@ public static class AuthTokenEndpoints
                 return Results.BadRequest(new ErrorResponse("Refresh token is required"));
             }
 
-            var revoked = await authService.RevokeTokenAsync(refreshToken);
+            var revoked = await authService.RevokeTokenAsync(refreshToken, ct);
             
             // Always clear the cookies on logout attempt
             cookieService.ClearRefreshTokenCookie(httpContext);
@@ -147,7 +151,8 @@ public static class AuthTokenEndpoints
             ClaimsPrincipal user, 
             IAuthService authService,
             ICookieService cookieService,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -155,7 +160,7 @@ public static class AuthTokenEndpoints
                 return Results.Unauthorized();
             }
 
-            await authService.RevokeAllUserTokensAsync(userId);
+            await authService.RevokeAllUserTokensAsync(userId, ct);
             
             // Clear the cookies on current device
             cookieService.ClearRefreshTokenCookie(httpContext);

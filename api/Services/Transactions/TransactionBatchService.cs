@@ -26,10 +26,12 @@ public class TransactionBatchService : ITransactionBatchService
 
     public async Task<BatchOperationResponse> BatchDeleteAsync(
         string userId,
-        List<string> ids)
+        List<string> ids,
+        CancellationToken ct = default)
     {
         var successCount = 0;
         var failedIds = new List<string>();
+        var processedIds = new HashSet<string>();
 
         // Batch-fetch all transactions upfront to avoid N+1
         var transactions = await _transactionRepository.GetByIdsAsync(ids, userId);
@@ -66,6 +68,9 @@ public class TransactionBatchService : ITransactionBatchService
             if (!string.IsNullOrEmpty(transaction.LinkedTransactionId) &&
                 transactionMap.TryGetValue(transaction.LinkedTransactionId, out var linkedTransaction))
             {
+                // Mark linked transaction as processed to avoid double reversal
+                processedIds.Add(linkedTransaction.Id);
+
                 // Linked transaction was in the batch — handle it
                 if (!string.IsNullOrEmpty(linkedTransaction.AccountId) &&
                     accountMap.TryGetValue(linkedTransaction.AccountId, out var linkedAccount))
@@ -108,6 +113,7 @@ public class TransactionBatchService : ITransactionBatchService
             if (deleted)
             {
                 successCount++;
+                processedIds.Add(id);
             }
             else
             {
@@ -126,7 +132,8 @@ public class TransactionBatchService : ITransactionBatchService
     public async Task<BatchOperationResponse> BatchUpdateStatusAsync(
         string userId,
         List<string> ids,
-        string status)
+        string status,
+        CancellationToken ct = default)
     {
         if (!Enum.TryParse<TransactionStatus>(status, true, out var parsedStatus))
         {
@@ -137,6 +144,10 @@ public class TransactionBatchService : ITransactionBatchService
         var transactions = await _transactionRepository.GetByIdsAsync(ids, userId);
         var transactionMap = transactions.ToDictionary(t => t.Id);
 
+        // Batch-fetch accounts for balance adjustments
+        var accounts = await _accountRepository.GetByUserIdAsync(userId, includeArchived: true);
+        var accountMap = accounts.ToDictionary(a => a.Id);
+
         var successCount = 0;
         var failedIds = new List<string>();
 
@@ -146,6 +157,28 @@ public class TransactionBatchService : ITransactionBatchService
             {
                 failedIds.Add(id);
                 continue;
+            }
+
+            var oldStatus = transaction.Status;
+
+            // Adjust balance when status changes affect confirmed state
+            if (oldStatus != parsedStatus && !string.IsNullOrEmpty(transaction.AccountId) &&
+                accountMap.TryGetValue(transaction.AccountId, out var account))
+            {
+                // Was Confirmed, now becoming non-Confirmed → reverse the balance
+                if (oldStatus == TransactionStatus.Confirmed &&
+                    parsedStatus != TransactionStatus.Confirmed)
+                {
+                    await _accountBalanceService.UpdateBalanceAsync(
+                        account, transaction.Type, transaction.Amount, false);
+                }
+                // Was non-Confirmed, now becoming Confirmed → apply the balance
+                else if (oldStatus != TransactionStatus.Confirmed &&
+                         parsedStatus == TransactionStatus.Confirmed)
+                {
+                    await _accountBalanceService.UpdateBalanceAsync(
+                        account, transaction.Type, transaction.Amount, true);
+                }
             }
 
             transaction.Status = parsedStatus;

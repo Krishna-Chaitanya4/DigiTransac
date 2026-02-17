@@ -60,7 +60,7 @@ public class TransactionCoreService : ITransactionCoreService
         _publisher = publisher;
     }
 
-    public async Task<TransactionResponse?> GetByIdAsync(string id, string userId)
+    public async Task<TransactionResponse?> GetByIdAsync(string id, string userId, CancellationToken ct = default)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null) return null;
@@ -83,7 +83,7 @@ public class TransactionCoreService : ITransactionCoreService
             counterpartyUsers);
     }
 
-    public async Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter)
+    public async Task<TransactionListResponse> GetAllAsync(string userId, TransactionFilterRequest filter, CancellationToken ct = default)
     {
         // Get accounts, labels, tags for mapping — create dictionaries once for reuse
         var accounts = await _accountRepository.GetByUserIdAsync(userId, true);
@@ -159,7 +159,8 @@ public class TransactionCoreService : ITransactionCoreService
 
     public async Task<Result<TransactionResponse>> CreateAsync(
         string userId,
-        CreateTransactionRequest request)
+        CreateTransactionRequest request,
+        CancellationToken ct = default)
     {
         // Validate account
         var account = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId);
@@ -393,7 +394,8 @@ public class TransactionCoreService : ITransactionCoreService
     public async Task<Result<TransactionResponse>> UpdateAsync(
         string id,
         string userId,
-        UpdateTransactionRequest request)
+        UpdateTransactionRequest request,
+        CancellationToken ct = default)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null)
@@ -577,7 +579,7 @@ public class TransactionCoreService : ITransactionCoreService
         return Result.Success(response);
     }
 
-    public async Task<Result> DeleteAsync(string id, string userId)
+    public async Task<Result> DeleteAsync(string id, string userId, CancellationToken ct = default)
     {
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (transaction == null)
@@ -590,19 +592,19 @@ public class TransactionCoreService : ITransactionCoreService
             account = await _accountRepository.GetByIdAndUserIdAsync(transaction.AccountId, userId);
         }
 
-        // Delete linked transfer transaction (uses its own UoW internally)
+        // Soft-delete linked transfer transaction (uses its own UoW internally)
         if (!string.IsNullOrEmpty(transaction.LinkedTransactionId))
         {
             await _transferService.DeleteTransferAsync(userId, transaction);
         }
 
-        // Delete P2P linked transaction
+        // Soft-delete P2P linked transaction
         if (transaction.TransactionLinkId.HasValue && !string.IsNullOrEmpty(transaction.CounterpartyUserId))
         {
             await _p2pService.DeleteP2PTransactionAsync(userId, transaction);
         }
 
-        // Execute delete and balance reversal atomically
+        // Execute soft-delete and balance reversal atomically
         if (account != null)
         {
             await using var unitOfWork = new Services.UnitOfWork.UnitOfWork(_mongoDbService);
@@ -610,12 +612,12 @@ public class TransactionCoreService : ITransactionCoreService
             {
                 await _accountBalanceService.UpdateBalanceAsync(
                     account, transaction.Type, transaction.Amount, false, session);
-                await _transactionRepository.DeleteAsync(id, userId, session);
+                await _transactionRepository.SoftDeleteAsync(id, userId, session);
             });
         }
         else
         {
-            await _transactionRepository.DeleteAsync(id, userId);
+            await _transactionRepository.SoftDeleteAsync(id, userId);
         }
 
         // Publish TransactionDeletedEvent
@@ -631,7 +633,84 @@ public class TransactionCoreService : ITransactionCoreService
         return Result.Success();
     }
 
-    public async Task<int> GetPendingCountAsync(string userId)
+    public async Task<Result> RestoreAsync(string id, string userId, CancellationToken ct = default)
+    {
+        var transaction = await _transactionRepository.GetDeletedByIdAndUserIdAsync(id, userId);
+        if (transaction == null)
+            return DomainErrors.Transaction.NotFound(id);
+
+        // Check if within 24-hour undo window
+        var undoWindow = TimeSpan.FromMinutes(ConversationConstants.UndoDeleteWindowMinutes);
+        if (transaction.DeletedAt == null || DateTime.UtcNow - transaction.DeletedAt.Value > undoWindow)
+            return Result.Failure(new Error("Transaction.UndoExpired", "The undo window for this transaction has expired."));
+
+        // Get account for balance re-application
+        Account? account = null;
+        if (!transaction.IsRecurringTemplate && !string.IsNullOrEmpty(transaction.AccountId))
+        {
+            account = await _accountRepository.GetByIdAndUserIdAsync(transaction.AccountId, userId);
+        }
+
+        // Restore linked transfer transaction
+        if (!string.IsNullOrEmpty(transaction.LinkedTransactionId))
+        {
+            var linkedTransaction = await _transactionRepository.GetDeletedByIdAndUserIdAsync(
+                transaction.LinkedTransactionId, userId);
+            if (linkedTransaction != null)
+            {
+                var linkedAccount = !string.IsNullOrEmpty(linkedTransaction.AccountId)
+                    ? await _accountRepository.GetByIdAndUserIdAsync(linkedTransaction.AccountId, userId)
+                    : null;
+
+                // Restore linked transfer atomically: balance + restore in same transaction
+                if (linkedAccount != null)
+                {
+                    await using var unitOfWork = new Services.UnitOfWork.UnitOfWork(_mongoDbService);
+                    await unitOfWork.ExecuteInTransactionAsync(async session =>
+                    {
+                        await _accountBalanceService.UpdateBalanceAsync(
+                            linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, true, session);
+                        await _transactionRepository.RestoreAsync(linkedTransaction.Id, userId, session);
+                    });
+                }
+                else
+                {
+                    await _transactionRepository.RestoreAsync(linkedTransaction.Id, userId);
+                }
+            }
+        }
+
+        // Restore P2P linked transaction (if it was soft-deleted)
+        if (transaction.TransactionLinkId.HasValue && !string.IsNullOrEmpty(transaction.CounterpartyUserId))
+        {
+            var linkedP2P = await _transactionRepository.GetLinkedP2PTransactionAsync(
+                transaction.TransactionLinkId.Value, userId);
+            if (linkedP2P != null && linkedP2P.IsDeleted)
+            {
+                await _transactionRepository.RestoreAsync(linkedP2P.Id, linkedP2P.UserId);
+            }
+        }
+
+        // Re-apply balance and restore transaction atomically
+        if (account != null)
+        {
+            await using var unitOfWork = new Services.UnitOfWork.UnitOfWork(_mongoDbService);
+            await unitOfWork.ExecuteInTransactionAsync(async session =>
+            {
+                await _accountBalanceService.UpdateBalanceAsync(
+                    account, transaction.Type, transaction.Amount, true, session);
+                await _transactionRepository.RestoreAsync(id, userId, session);
+            });
+        }
+        else
+        {
+            await _transactionRepository.RestoreAsync(id, userId);
+        }
+
+        return Result.Success();
+    }
+
+    public async Task<int> GetPendingCountAsync(string userId, CancellationToken ct = default)
     {
         return await _transactionRepository.GetPendingCountAsync(userId);
     }

@@ -21,13 +21,14 @@ public static class TransactionAnalyticsEndpoints
             string? accountId,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionService transactionService) =>
+            ITransactionService transactionService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var analytics = await transactionService.GetAnalyticsAsync(userId, startDate, endDate, accountId);
+            var analytics = await transactionService.GetAnalyticsAsync(userId, startDate, endDate, accountId, ct);
             
             return ETagHelper.OkWithETag(httpContext, analytics, cacheMaxAgeSeconds: 300);
         })
@@ -44,13 +45,14 @@ public static class TransactionAnalyticsEndpoints
             int? pageSize,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionAnalyticsService analyticsService) =>
+            ITransactionAnalyticsService analyticsService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetTopCounterpartiesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10);
+            var result = await analyticsService.GetTopCounterpartiesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10, ct);
             
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
         })
@@ -67,13 +69,14 @@ public static class TransactionAnalyticsEndpoints
             int? pageSize,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionAnalyticsService analyticsService) =>
+            ITransactionAnalyticsService analyticsService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 50);
+            var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate, page ?? 1, Math.Min(pageSize ?? 50, 200), ct);
             
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
         })
@@ -88,13 +91,14 @@ public static class TransactionAnalyticsEndpoints
             DateTime? endDate,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionAnalyticsService analyticsService) =>
+            ITransactionAnalyticsService analyticsService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetSpendingPatternsAsync(userId, startDate, endDate);
+            var result = await analyticsService.GetSpendingPatternsAsync(userId, startDate, endDate, ct);
             
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
         })
@@ -111,13 +115,14 @@ public static class TransactionAnalyticsEndpoints
             int? pageSize,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionAnalyticsService analyticsService) =>
+            ITransactionAnalyticsService analyticsService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var result = await analyticsService.GetSpendingAnomaliesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10);
+            var result = await analyticsService.GetSpendingAnomaliesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10, ct);
             
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
         })
@@ -135,7 +140,8 @@ public static class TransactionAnalyticsEndpoints
             double? radiusKm,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionAnalyticsService analyticsService) =>
+            ITransactionAnalyticsService analyticsService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -147,7 +153,8 @@ public static class TransactionAnalyticsEndpoints
                 endDate,
                 latitude,
                 longitude,
-                radiusKm ?? 1.0);
+                radiusKm ?? 1.0,
+                ct);
             
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
         })
@@ -165,7 +172,8 @@ public static class TransactionAnalyticsEndpoints
             double? minTripDistanceKm,
             ClaimsPrincipal user,
             HttpContext httpContext,
-            ITransactionAnalyticsService analyticsService) =>
+            ITransactionAnalyticsService analyticsService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -177,7 +185,8 @@ public static class TransactionAnalyticsEndpoints
                 endDate,
                 homeLatitude,
                 homeLongitude,
-                minTripDistanceKm ?? 50.0);
+                minTripDistanceKm ?? 50.0,
+                ct);
             
             return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
         })

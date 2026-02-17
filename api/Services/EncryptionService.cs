@@ -133,10 +133,15 @@ public class EncryptionService : IEncryptionService
         {
             return Decrypt(cipherText, dek);
         }
-        catch
+        catch (CryptographicException)
         {
-            // If decryption fails, return the original value
-            // This handles migration of unencrypted data
+            // Decryption failed (wrong key, corrupted data) — return null
+            // to avoid leaking ciphertext to the caller
+            return null;
+        }
+        catch (FormatException)
+        {
+            // Not valid Base64 — likely unencrypted legacy data, return as-is
             return cipherText;
         }
     }

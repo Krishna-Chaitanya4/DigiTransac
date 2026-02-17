@@ -111,12 +111,12 @@ public sealed class GlobalExceptionHandlerMiddleware
             ArgumentException argEx => (
                 HttpStatusCode.BadRequest,
                 "Invalid Argument",
-                argEx.Message),
+                "The request contains an invalid argument."),
 
             InvalidOperationException invalidOpEx => (
-                HttpStatusCode.Conflict,
-                "Invalid Operation",
-                invalidOpEx.Message),
+                HttpStatusCode.InternalServerError,
+                "Operation Failed",
+                "An operation failed. Please try again later."),
 
             OperationCanceledException => (
                 (HttpStatusCode)499,

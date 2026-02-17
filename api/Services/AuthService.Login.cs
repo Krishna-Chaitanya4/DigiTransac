@@ -6,12 +6,18 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    public async Task<LoginResponse> LoginAsync(LoginRequest request)
+    public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
         _logger.LogInformation("Login attempt for {Email}", request.Email);
 
         var user = await _userRepository.GetByEmailAsync(request.Email);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+
+        // Constant-time comparison: always run BCrypt.Verify to prevent timing-based user enumeration.
+        // When user is null, verify against a dummy hash so the response time is consistent.
+        var passwordHash = user?.PasswordHash ?? "$2a$12$LJ3m4ys3Lz0Y3x0r5r5Q4eDpGh.X1PoMf6TkRdqj8XGz5q8y0Y5Ky";
+        var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, passwordHash);
+
+        if (user == null || !passwordValid)
         {
             _logger.LogWarning("Failed login attempt for {Email}", request.Email);
             
@@ -54,7 +60,7 @@ public partial class AuthService
         return new LoginResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
-    public async Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorTokenString, string code)
+    public async Task<AuthResponse?> VerifyTwoFactorLoginAsync(string twoFactorTokenString, string code, CancellationToken ct = default)
     {
         var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
         if (twoFactorToken == null)
@@ -95,7 +101,7 @@ public partial class AuthService
         return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
-    public async Task<Result> SendTwoFactorEmailOtpAsync(string twoFactorTokenString)
+    public async Task<Result> SendTwoFactorEmailOtpAsync(string twoFactorTokenString, CancellationToken ct = default)
     {
         var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
         if (twoFactorToken == null)
@@ -130,7 +136,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorTokenString, string emailCode)
+    public async Task<AuthResponse?> VerifyTwoFactorEmailOtpAsync(string twoFactorTokenString, string emailCode, CancellationToken ct = default)
     {
         var twoFactorToken = await _twoFactorTokenRepository.GetByTokenAsync(twoFactorTokenString);
         if (twoFactorToken == null)
@@ -183,7 +189,7 @@ public partial class AuthService
         return new AuthResponse(accessToken, refreshToken.Token, user.Email, user.FullName, user.IsEmailVerified, user.PrimaryCurrency);
     }
 
-    public async Task<User?> GetCurrentUserAsync(string userId)
+    public async Task<User?> GetCurrentUserAsync(string userId, CancellationToken ct = default)
     {
         return await _userRepository.GetByIdAsync(userId);
     }

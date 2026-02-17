@@ -5,6 +5,7 @@ import {
   sendMessage,
   editMessage,
   deleteMessage,
+  restoreMessage,
   markAsRead,
   searchUserByEmail,
 } from '../services/conversationService';
@@ -78,6 +79,19 @@ export function useDeleteMessage() {
 
   return useMutation({
     mutationFn: (messageId: string) => deleteMessage(messageId),
+    onSuccess: () => {
+      // Invalidate all conversation data
+      queryClient.invalidateQueries({ queryKey: conversationKeys.all });
+    },
+  });
+}
+
+// Hook to restore (undo delete) a message
+export function useRestoreMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (messageId: string) => restoreMessage(messageId),
     onSuccess: () => {
       // Invalidate all conversation data
       queryClient.invalidateQueries({ queryKey: conversationKeys.all });
@@ -165,6 +179,7 @@ export function useOptimisticSendMessage() {
           isEdited: false,
           editedAt: null,
           isDeleted: false,
+          deletedAt: null,
           replyToMessageId: request.replyToMessageId || null,
           replyTo: null,
         };

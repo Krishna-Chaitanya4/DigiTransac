@@ -19,6 +19,7 @@ public class RecurringTransactionService : IRecurringTransactionService
     private readonly IChatMessageRepository _chatMessageRepository;
     private readonly IAccountBalanceService _accountBalanceService;
     private readonly ITransactionMapperService _mapperService;
+    private readonly IExchangeRateService _exchangeRateService;
     private readonly IPublisher _publisher;
     private readonly ILogger<RecurringTransactionService> _logger;
 
@@ -29,6 +30,7 @@ public class RecurringTransactionService : IRecurringTransactionService
         IChatMessageRepository chatMessageRepository,
         IAccountBalanceService accountBalanceService,
         ITransactionMapperService mapperService,
+        IExchangeRateService exchangeRateService,
         IPublisher publisher,
         ILogger<RecurringTransactionService> logger)
     {
@@ -38,11 +40,12 @@ public class RecurringTransactionService : IRecurringTransactionService
         _chatMessageRepository = chatMessageRepository;
         _accountBalanceService = accountBalanceService;
         _mapperService = mapperService;
+        _exchangeRateService = exchangeRateService;
         _publisher = publisher;
         _logger = logger;
     }
 
-    public async Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId)
+    public async Task<List<RecurringTransactionResponse>> GetRecurringAsync(string userId, CancellationToken ct = default)
     {
         var templates = await _transactionRepository.GetRecurringTemplatesAsync(userId);
         var dek = await _mapperService.GetUserDekAsync(userId);
@@ -58,7 +61,8 @@ public class RecurringTransactionService : IRecurringTransactionService
         string userId,
         CreateTransactionRequest request,
         Account account,
-        byte[] dek)
+        byte[] dek,
+        CancellationToken ct = default)
     {
         if (request.RecurringRule == null)
             return (false, "Recurring rule is required", null, null);
@@ -144,9 +148,17 @@ public class RecurringTransactionService : IRecurringTransactionService
             Title = request.Title,
             EncryptedPayee = template.EncryptedPayee,
             EncryptedNotes = template.EncryptedNotes,
-            Splits = template.Splits,
-            TagIds = template.TagIds,
-            Location = template.Location,
+            // Deep-copy lists/objects to avoid shared mutable references with the template
+            Splits = template.Splits.Select(s => new TransactionSplit { LabelId = s.LabelId, Amount = s.Amount, Notes = s.Notes }).ToList(),
+            TagIds = template.TagIds != null ? new List<string>(template.TagIds) : new List<string>(),
+            Location = template.Location != null ? new TransactionLocation
+            {
+                Latitude = template.Location.Latitude,
+                EncryptedLongitude = template.Location.EncryptedLongitude,
+                EncryptedPlaceName = template.Location.EncryptedPlaceName,
+                City = template.Location.City,
+                Country = template.Location.Country
+            } : null,
             ParentTransactionId = template.Id,
             IsRecurringTemplate = false,
             Status = TransactionStatus.Confirmed,
@@ -190,7 +202,8 @@ public class RecurringTransactionService : IRecurringTransactionService
     public async Task<(bool Success, string Message)> DeleteRecurringAsync(
         string id,
         string userId,
-        bool deleteFutureInstances)
+        bool deleteFutureInstances,
+        CancellationToken ct = default)
     {
         var template = await _transactionRepository.GetByIdAndUserIdAsync(id, userId);
         if (template == null || !template.IsRecurringTemplate)
@@ -257,9 +270,17 @@ public class RecurringTransactionService : IRecurringTransactionService
                     Title = template.Title,
                     EncryptedPayee = template.EncryptedPayee,
                     EncryptedNotes = template.EncryptedNotes,
-                    Splits = template.Splits,
-                    TagIds = template.TagIds,
-                    Location = template.Location,
+                    // Deep-copy lists/objects to avoid shared mutable references with the template
+                    Splits = template.Splits.Select(s => new TransactionSplit { LabelId = s.LabelId, Amount = s.Amount, Notes = s.Notes }).ToList(),
+                    TagIds = template.TagIds != null ? new List<string>(template.TagIds) : new List<string>(),
+                    Location = template.Location != null ? new TransactionLocation
+                    {
+                        Latitude = template.Location.Latitude,
+                        EncryptedLongitude = template.Location.EncryptedLongitude,
+                        EncryptedPlaceName = template.Location.EncryptedPlaceName,
+                        City = template.Location.City,
+                        Country = template.Location.Country
+                    } : null,
                     ParentTransactionId = template.Id,
                     Source = TransactionSource.Recurring
                 };
@@ -288,12 +309,31 @@ public class RecurringTransactionService : IRecurringTransactionService
                     var transferToAccount = await _accountRepository.GetByIdAsync(template.TransferToAccountId);
                     if (transferToAccount != null)
                     {
+                        // Convert amount if currencies differ between source and destination accounts
+                        decimal convertedAmount = template.Amount;
+                        if (!account.Currency.Equals(transferToAccount.Currency, StringComparison.OrdinalIgnoreCase))
+                        {
+                            try
+                            {
+                                var ratesResponse = await _exchangeRateService.GetRatesAsync();
+                                convertedAmount = _exchangeRateService.Convert(
+                                    template.Amount,
+                                    account.Currency,
+                                    transferToAccount.Currency,
+                                    ratesResponse.Rates);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to convert currency for recurring transfer {TemplateId}, using original amount", template.Id);
+                            }
+                        }
+
                         var linkedTransaction = new Transaction
                         {
                             UserId = template.UserId,
                             AccountId = transferToAccount.Id,
                             Type = TransactionType.Receive,
-                            Amount = template.Amount,
+                            Amount = convertedAmount,
                             Currency = transferToAccount.Currency,
                             Date = recurringDerivedDate,
                             // Timezone-aware date fields (source of truth for Date)
@@ -303,8 +343,8 @@ public class RecurringTransactionService : IRecurringTransactionService
                             Title = template.Title,
                             EncryptedPayee = template.EncryptedPayee,
                             EncryptedNotes = template.EncryptedNotes,
-                            Splits = template.Splits,
-                            TagIds = template.TagIds,
+                            Splits = template.Splits.Select(s => new TransactionSplit { LabelId = s.LabelId, Amount = s.Amount, Notes = s.Notes }).ToList(),
+                            TagIds = template.TagIds != null ? new List<string>(template.TagIds) : new List<string>(),
                             LinkedTransactionId = newTransaction.Id,
                             ParentTransactionId = template.Id,
                             Source = TransactionSource.Recurring
@@ -314,7 +354,7 @@ public class RecurringTransactionService : IRecurringTransactionService
                         newTransaction.LinkedTransactionId = linkedTransaction.Id;
                         await _transactionRepository.UpdateAsync(newTransaction);
                         await _accountBalanceService.UpdateBalanceAsync(
-                            transferToAccount, TransactionType.Receive, template.Amount, true);
+                            transferToAccount, TransactionType.Receive, convertedAmount, true);
                     }
                 }
 

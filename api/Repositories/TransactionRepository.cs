@@ -8,43 +8,51 @@ namespace DigiTransac.Api.Repositories;
 
 public interface ITransactionRepository
 {
-    Task<Transaction?> GetByIdAsync(string id);
-    Task<Transaction?> GetByIdAndUserIdAsync(string id, string userId);
-    Task<(List<Transaction> Transactions, int TotalCount)> GetFilteredAsync(string userId, TransactionFilterRequest filter);
-    Task<List<Transaction>> GetByAccountIdAsync(string accountId, string userId);
-    Task<List<Transaction>> GetRecurringTemplatesAsync(string userId);
-    Task<List<Transaction>> GetPendingRecurringAsync(DateTime beforeDate);
-    Task<Transaction> CreateAsync(Transaction transaction, IClientSessionHandle? session = null);
-    Task CreateManyAsync(List<Transaction> transactions, IClientSessionHandle? session = null);
-    Task UpdateAsync(Transaction transaction, IClientSessionHandle? session = null);
-    Task<bool> DeleteAsync(string id, string userId, IClientSessionHandle? session = null);
-    Task<bool> DeleteByIdAsync(string id, IClientSessionHandle? session = null);
-    Task<bool> DeleteAllByUserIdAsync(string userId);
-    Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId);
-    Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null);
-    Task<Dictionary<string, decimal>> GetSumByLabelAsync(string userId, DateTime? startDate, DateTime? endDate);
-    Task<Dictionary<string, decimal>> GetSumByTagAsync(string userId, DateTime? startDate, DateTime? endDate);
+    Task<Transaction?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<Transaction?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<(List<Transaction> Transactions, int TotalCount)> GetFilteredAsync(string userId, TransactionFilterRequest filter, CancellationToken ct = default);
+    Task<List<Transaction>> GetByAccountIdAsync(string accountId, string userId, CancellationToken ct = default);
+    Task<List<Transaction>> GetRecurringTemplatesAsync(string userId, CancellationToken ct = default);
+    Task<List<Transaction>> GetPendingRecurringAsync(DateTime beforeDate, CancellationToken ct = default);
+    Task<Transaction> CreateAsync(Transaction transaction, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task CreateManyAsync(List<Transaction> transactions, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task UpdateAsync(Transaction transaction, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task<bool> DeleteByIdAsync(string id, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
+    Task<int> NullifyCounterpartyReferencesAsync(string deletedUserId, CancellationToken ct = default);
+    Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId, CancellationToken ct = default);
+    Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null, CancellationToken ct = default);
+    Task<Dictionary<string, decimal>> GetSumByLabelAsync(string userId, DateTime? startDate, DateTime? endDate, CancellationToken ct = default);
+    Task<Dictionary<string, decimal>> GetSumByTagAsync(string userId, DateTime? startDate, DateTime? endDate, CancellationToken ct = default);
     
     // Count methods for validation before deletion
-    Task<int> GetCountByAccountIdAsync(string accountId, string userId);
-    Task<Dictionary<string, int>> GetCountsByAccountIdsAsync(IEnumerable<string> accountIds, string userId);
-    Task<int> GetCountByLabelIdAsync(string labelId, string userId);
-    Task<int> GetCountByTagIdAsync(string tagId, string userId);
+    Task<int> GetCountByAccountIdAsync(string accountId, string userId, CancellationToken ct = default);
+    Task<Dictionary<string, int>> GetCountsByAccountIdsAsync(IEnumerable<string> accountIds, string userId, CancellationToken ct = default);
+    Task<int> GetCountByLabelIdAsync(string labelId, string userId, CancellationToken ct = default);
+    Task<int> GetCountByTagIdAsync(string tagId, string userId, CancellationToken ct = default);
     
     // Reassignment methods
-    Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId);
-    Task RemoveTagFromAllAsync(string tagId, string userId);
+    Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId, CancellationToken ct = default);
+    Task RemoveTagFromAllAsync(string tagId, string userId, CancellationToken ct = default);
     
     // Pending transactions
-    Task<int> GetPendingCountAsync(string userId);
-    Task<Transaction?> GetLinkedP2PTransactionAsync(Guid transactionLinkId, string excludeUserId);
+    Task<int> GetPendingCountAsync(string userId, CancellationToken ct = default);
+    Task<Transaction?> GetLinkedP2PTransactionAsync(Guid transactionLinkId, string excludeUserId, CancellationToken ct = default);
     
     // P2P conversation queries
-    Task<List<Transaction>> GetP2PTransactionsAsync(string userId);
-    Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId);
+    Task<List<Transaction>> GetP2PTransactionsAsync(string userId, CancellationToken ct = default);
+    Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId, CancellationToken ct = default);
     
     // Get transactions by IDs (for chat message resolution)
-    Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId);
+    Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId, CancellationToken ct = default);
+    
+    // Soft delete / restore
+    Task<bool> SoftDeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task<bool> RestoreAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
+    Task<Transaction?> GetDeletedByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<List<string>> GetExpiredDeletedTransactionIdsAsync(TimeSpan undoWindow, CancellationToken ct = default);
+    Task<int> PurgeExpiredDeletedTransactionsAsync(TimeSpan undoWindow, CancellationToken ct = default);
 }
 
 public class TransactionRepository : ITransactionRepository
@@ -124,7 +132,13 @@ public class TransactionRepository : ITransactionRepository
                 new(Builders<Transaction>.IndexKeys
                     .Ascending(t => t.UserId)
                     .Ascending("Location.City"),
-                    new CreateIndexOptions { Name = "idx_userId_location_city", Sparse = true })
+                    new CreateIndexOptions { Name = "idx_userId_location_city", Sparse = true }),
+                
+                // Soft-delete purge query (IsDeleted + DeletedAt)
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.IsDeleted)
+                    .Ascending(t => t.DeletedAt),
+                    new CreateIndexOptions { Name = "idx_isDeleted_deletedAt", Sparse = true })
             };
 
             _transactions.Indexes.CreateMany(indexModels);
@@ -135,25 +149,27 @@ public class TransactionRepository : ITransactionRepository
         }
     }
 
-    public async Task<Transaction?> GetByIdAsync(string id)
+    public async Task<Transaction?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        return await _transactions.Find(t => t.Id == id).FirstOrDefaultAsync();
+        return await _transactions.Find(t => t.Id == id).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Transaction?> GetByIdAndUserIdAsync(string id, string userId)
+    public async Task<Transaction?> GetByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default)
     {
-        return await _transactions.Find(t => t.Id == id && t.UserId == userId).FirstOrDefaultAsync();
+        return await _transactions.Find(t => t.Id == id && t.UserId == userId && !t.IsDeleted).FirstOrDefaultAsync(ct);
     }
 
     public async Task<(List<Transaction> Transactions, int TotalCount)> GetFilteredAsync(
         string userId, 
-        TransactionFilterRequest filter)
+        TransactionFilterRequest filter,
+        CancellationToken ct = default)
     {
         var filterBuilder = Builders<Transaction>.Filter;
         var filters = new List<FilterDefinition<Transaction>>
         {
             filterBuilder.Eq(t => t.UserId, userId),
             filterBuilder.Eq(t => t.IsRecurringTemplate, false), // Exclude templates from normal listings
+            filterBuilder.Ne(t => t.IsDeleted, true), // Exclude soft-deleted transactions (Ne(true) matches both false and missing field)
         };
         
         // Include/exclude pending P2P transactions (AccountId is null) based on status filter
@@ -297,118 +313,133 @@ public class TransactionRepository : ITransactionRepository
         var pageSize = filter.PageSize ?? 50;
         var skip = (page - 1) * pageSize;
 
-        var totalCount = await _transactions.CountDocumentsAsync(combinedFilter);
+        var totalCount = await _transactions.CountDocumentsAsync(combinedFilter, options: null, ct);
         var transactions = await _transactions
             .Find(combinedFilter)
             .SortByDescending(t => t.Date)
             .ThenByDescending(t => t.CreatedAt)
             .Skip(skip)
             .Limit(pageSize)
-            .ToListAsync();
+            .ToListAsync(ct);
 
         return (transactions, (int)totalCount);
     }
 
-    public async Task<List<Transaction>> GetByAccountIdAsync(string accountId, string userId)
+    public async Task<List<Transaction>> GetByAccountIdAsync(string accountId, string userId, CancellationToken ct = default)
     {
         return await _transactions
-            .Find(t => t.AccountId == accountId && t.UserId == userId && !t.IsRecurringTemplate)
+            .Find(t => t.AccountId == accountId && t.UserId == userId && !t.IsRecurringTemplate && !t.IsDeleted)
             .SortByDescending(t => t.Date)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<List<Transaction>> GetRecurringTemplatesAsync(string userId)
+    public async Task<List<Transaction>> GetRecurringTemplatesAsync(string userId, CancellationToken ct = default)
     {
         return await _transactions
             .Find(t => t.UserId == userId && t.IsRecurringTemplate)
             .SortBy(t => t.RecurringRule!.NextOccurrence)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<List<Transaction>> GetPendingRecurringAsync(DateTime beforeDate)
+    public async Task<List<Transaction>> GetPendingRecurringAsync(DateTime beforeDate, CancellationToken ct = default)
     {
         return await _transactions
             .Find(t => t.IsRecurringTemplate && 
                        t.RecurringRule != null && 
                        t.RecurringRule.NextOccurrence <= beforeDate &&
                        (t.RecurringRule.EndDate == null || t.RecurringRule.EndDate >= beforeDate))
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<Transaction> CreateAsync(Transaction transaction, IClientSessionHandle? session = null)
+    public async Task<Transaction> CreateAsync(Transaction transaction, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         if (session != null)
-            await _transactions.InsertOneAsync(session, transaction);
+            await _transactions.InsertOneAsync(session, transaction, options: null, ct);
         else
-            await _transactions.InsertOneAsync(transaction);
+            await _transactions.InsertOneAsync(transaction, options: null, ct);
         return transaction;
     }
 
-    public async Task CreateManyAsync(List<Transaction> transactions, IClientSessionHandle? session = null)
+    public async Task CreateManyAsync(List<Transaction> transactions, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         if (transactions.Count > 0)
         {
             if (session != null)
-                await _transactions.InsertManyAsync(session, transactions);
+                await _transactions.InsertManyAsync(session, transactions, options: null, ct);
             else
-                await _transactions.InsertManyAsync(transactions);
+                await _transactions.InsertManyAsync(transactions, options: null, ct);
         }
     }
 
-    public async Task UpdateAsync(Transaction transaction, IClientSessionHandle? session = null)
+    public async Task UpdateAsync(Transaction transaction, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         transaction.UpdatedAt = DateTime.UtcNow;
         if (session != null)
             await _transactions.ReplaceOneAsync(
                 session,
                 t => t.Id == transaction.Id && t.UserId == transaction.UserId,
-                transaction);
+                transaction, options: (ReplaceOptions?)null, ct);
         else
             await _transactions.ReplaceOneAsync(
                 t => t.Id == transaction.Id && t.UserId == transaction.UserId,
-                transaction);
+                transaction, options: (ReplaceOptions?)null, ct);
     }
 
-    public async Task<bool> DeleteAsync(string id, string userId, IClientSessionHandle? session = null)
+    public async Task<bool> DeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         DeleteResult result;
         if (session != null)
-            result = await _transactions.DeleteOneAsync(session, t => t.Id == id && t.UserId == userId);
+            result = await _transactions.DeleteOneAsync(session, t => t.Id == id && t.UserId == userId, options: null, ct);
         else
-            result = await _transactions.DeleteOneAsync(t => t.Id == id && t.UserId == userId);
+            result = await _transactions.DeleteOneAsync(t => t.Id == id && t.UserId == userId, ct);
         return result.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteByIdAsync(string id, IClientSessionHandle? session = null)
+    public async Task<bool> DeleteByIdAsync(string id, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         DeleteResult result;
         if (session != null)
-            result = await _transactions.DeleteOneAsync(session, t => t.Id == id);
+            result = await _transactions.DeleteOneAsync(session, t => t.Id == id, options: null, ct);
         else
-            result = await _transactions.DeleteOneAsync(t => t.Id == id);
+            result = await _transactions.DeleteOneAsync(t => t.Id == id, ct);
         return result.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteAllByUserIdAsync(string userId)
+    public async Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        var result = await _transactions.DeleteManyAsync(t => t.UserId == userId);
+        var result = await _transactions.DeleteManyAsync(t => t.UserId == userId, ct);
         return result.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId)
+    public async Task<int> NullifyCounterpartyReferencesAsync(string deletedUserId, CancellationToken ct = default)
     {
-        var result = await _transactions.DeleteManyAsync(t => t.AccountId == accountId && t.UserId == userId);
+        // Find transactions belonging to OTHER users that reference the deleted user as counterparty
+        var filter = Builders<Transaction>.Filter.Eq(t => t.CounterpartyUserId, deletedUserId);
+
+        var update = Builders<Transaction>.Update
+            .Set(t => t.CounterpartyUserId, (string?)null)
+            .Set(t => t.LinkedTransactionId, (string?)null)
+            .Set(t => t.TransactionLinkId, (Guid?)null);
+
+        var result = await _transactions.UpdateManyAsync(filter, update, options: null, ct);
+        return (int)result.ModifiedCount;
+    }
+
+    public async Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId, CancellationToken ct = default)
+    {
+        var result = await _transactions.DeleteManyAsync(t => t.AccountId == accountId && t.UserId == userId, ct);
         return result.DeletedCount > 0;
     }
 
-    public async Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null)
+    public async Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null, CancellationToken ct = default)
     {
         var filterBuilder = Builders<Transaction>.Filter;
         var filters = new List<FilterDefinition<Transaction>>
         {
             filterBuilder.Eq(t => t.AccountId, accountId),
             filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false)
+            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
+            filterBuilder.Ne(t => t.IsDeleted, true)
         };
 
         if (type.HasValue)
@@ -426,20 +457,22 @@ public class TransactionRepository : ITransactionRepository
                 { "total", new BsonDocument("$sum", "$amount") }
             });
 
-        var result = await pipeline.FirstOrDefaultAsync();
+        var result = await pipeline.FirstOrDefaultAsync(ct);
         return result?["total"].ToDecimal() ?? 0m;
     }
 
     public async Task<Dictionary<string, decimal>> GetSumByLabelAsync(
         string userId, 
         DateTime? startDate, 
-        DateTime? endDate)
+        DateTime? endDate,
+        CancellationToken ct = default)
     {
         var filterBuilder = Builders<Transaction>.Filter;
         var filters = new List<FilterDefinition<Transaction>>
         {
             filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false)
+            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
+            filterBuilder.Ne(t => t.IsDeleted, true)
         };
 
         if (startDate.HasValue)
@@ -461,7 +494,7 @@ public class TransactionRepository : ITransactionRepository
                 { "total", new BsonDocument("$sum", "$splits.amount") }
             });
 
-        var results = await pipeline.ToListAsync();
+        var results = await pipeline.ToListAsync(ct);
         return results
             .Where(r => !r["_id"].IsBsonNull)
             .ToDictionary(
@@ -472,13 +505,15 @@ public class TransactionRepository : ITransactionRepository
     public async Task<Dictionary<string, decimal>> GetSumByTagAsync(
         string userId, 
         DateTime? startDate, 
-        DateTime? endDate)
+        DateTime? endDate,
+        CancellationToken ct = default)
     {
         var filterBuilder = Builders<Transaction>.Filter;
         var filters = new List<FilterDefinition<Transaction>>
         {
             filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false)
+            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
+            filterBuilder.Ne(t => t.IsDeleted, true)
         };
 
         if (startDate.HasValue)
@@ -500,7 +535,7 @@ public class TransactionRepository : ITransactionRepository
                 { "total", new BsonDocument("$sum", "$amount") }
             });
 
-        var results = await pipeline.ToListAsync();
+        var results = await pipeline.ToListAsync(ct);
         return results
             .Where(r => !r["_id"].IsBsonNull)
             .ToDictionary(
@@ -508,17 +543,18 @@ public class TransactionRepository : ITransactionRepository
                 r => r["total"].ToDecimal());
     }
 
-    public async Task<int> GetCountByAccountIdAsync(string accountId, string userId)
+    public async Task<int> GetCountByAccountIdAsync(string accountId, string userId, CancellationToken ct = default)
     {
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.AccountId, accountId),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
-        return (int)await _transactions.CountDocumentsAsync(filter);
+        return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
     }
 
-    public async Task<Dictionary<string, int>> GetCountsByAccountIdsAsync(IEnumerable<string> accountIds, string userId)
+    public async Task<Dictionary<string, int>> GetCountsByAccountIdsAsync(IEnumerable<string> accountIds, string userId, CancellationToken ct = default)
     {
         var accountIdList = accountIds.ToList();
         if (accountIdList.Count == 0)
@@ -529,7 +565,8 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.In(t => t.AccountId, accountIdList),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
 
         var pipeline = new[]
@@ -542,7 +579,7 @@ public class TransactionRepository : ITransactionRepository
             })
         };
 
-        var results = await _transactions.Aggregate<BsonDocument>(pipeline).ToListAsync();
+        var results = await _transactions.Aggregate<BsonDocument>(pipeline).ToListAsync(ct);
         
         // Initialize with zero for all account IDs
         var counts = accountIdList.ToDictionary(id => id, _ => 0);
@@ -558,28 +595,30 @@ public class TransactionRepository : ITransactionRepository
         return counts;
     }
 
-    public async Task<int> GetCountByLabelIdAsync(string labelId, string userId)
+    public async Task<int> GetCountByLabelIdAsync(string labelId, string userId, CancellationToken ct = default)
     {
         // Count transactions that have this label in any of their splits
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true),
             Builders<Transaction>.Filter.ElemMatch(t => t.Splits, s => s.LabelId == labelId)
         );
-        return (int)await _transactions.CountDocumentsAsync(filter);
+        return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
     }
 
-    public async Task<int> GetCountByTagIdAsync(string tagId, string userId)
+    public async Task<int> GetCountByTagIdAsync(string tagId, string userId, CancellationToken ct = default)
     {
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true),
             Builders<Transaction>.Filter.AnyEq(t => t.TagIds, tagId)
         );
-        return (int)await _transactions.CountDocumentsAsync(filter);
+        return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
     }
 
-    public async Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId)
+    public async Task ReassignLabelAsync(string fromLabelId, string toLabelId, string userId, CancellationToken ct = default)
     {
         // Update all splits that use fromLabelId to use toLabelId instead
         var filter = Builders<Transaction>.Filter.And(
@@ -595,10 +634,10 @@ public class TransactionRepository : ITransactionRepository
                 new BsonDocument("elem.labelId", new ObjectId(fromLabelId)))
         };
         
-        await _transactions.UpdateManyAsync(filter, update, new UpdateOptions { ArrayFilters = arrayFilters });
+        await _transactions.UpdateManyAsync(filter, update, new UpdateOptions { ArrayFilters = arrayFilters }, ct);
     }
 
-    public async Task RemoveTagFromAllAsync(string tagId, string userId)
+    public async Task RemoveTagFromAllAsync(string tagId, string userId, CancellationToken ct = default)
     {
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
@@ -606,21 +645,22 @@ public class TransactionRepository : ITransactionRepository
         );
         
         var update = Builders<Transaction>.Update.Pull(t => t.TagIds, tagId);
-        await _transactions.UpdateManyAsync(filter, update);
+        await _transactions.UpdateManyAsync(filter, update, options: null, ct);
     }
 
-    public async Task<int> GetPendingCountAsync(string userId)
+    public async Task<int> GetPendingCountAsync(string userId, CancellationToken ct = default)
     {
         // Count ALL pending transactions (not just P2P)
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending)
+            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
         
-        return (int)await _transactions.CountDocumentsAsync(filter);
+        return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
     }
 
-    public async Task<Transaction?> GetLinkedP2PTransactionAsync(Guid transactionLinkId, string excludeUserId)
+    public async Task<Transaction?> GetLinkedP2PTransactionAsync(Guid transactionLinkId, string excludeUserId, CancellationToken ct = default)
     {
         // Find the linked transaction (same TransactionLinkId but different user)
         var filter = Builders<Transaction>.Filter.And(
@@ -628,26 +668,27 @@ public class TransactionRepository : ITransactionRepository
             Builders<Transaction>.Filter.Ne(t => t.UserId, excludeUserId)
         );
         
-        return await _transactions.Find(filter).FirstOrDefaultAsync();
+        return await _transactions.Find(filter).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<List<Transaction>> GetP2PTransactionsAsync(string userId)
+    public async Task<List<Transaction>> GetP2PTransactionsAsync(string userId, CancellationToken ct = default)
     {
         // Get all P2P transactions (those with CounterpartyUserId set)
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Ne(t => t.CounterpartyUserId, null),
-            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false)
+            Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
         
         return await _transactions.Find(filter)
             .SortByDescending(t => t.Date)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId)
+    public async Task<List<Transaction>> GetP2PTransactionsWithCounterpartyAsync(string userId, string counterpartyUserId, CancellationToken ct = default)
     {
-        // Get all P2P transactions with a specific counterparty
+        // Get all P2P transactions with a specific counterparty (including soft-deleted for chat undo)
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.CounterpartyUserId, counterpartyUserId),
@@ -656,10 +697,10 @@ public class TransactionRepository : ITransactionRepository
         
         return await _transactions.Find(filter)
             .SortByDescending(t => t.Date)
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId)
+    public async Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId, CancellationToken ct = default)
     {
         var idsList = ids.ToList();
         if (idsList.Count == 0)
@@ -670,6 +711,79 @@ public class TransactionRepository : ITransactionRepository
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId)
         );
         
-        return await _transactions.Find(filter).ToListAsync();
+        return await _transactions.Find(filter).ToListAsync(ct);
+    }
+
+    public async Task<bool> SoftDeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.Id, id),
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
+        );
+
+        var update = Builders<Transaction>.Update
+            .Set(t => t.IsDeleted, true)
+            .Set(t => t.DeletedAt, DateTime.UtcNow);
+
+        UpdateResult result;
+        if (session != null)
+            result = await _transactions.UpdateOneAsync(session, filter, update, options: null, ct);
+        else
+            result = await _transactions.UpdateOneAsync(filter, update, options: null, ct);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<Transaction?> GetDeletedByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default)
+    {
+        return await _transactions.Find(t => t.Id == id && t.UserId == userId && t.IsDeleted).FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<bool> RestoreAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default)
+    {
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.Id, id),
+            Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, true)
+        );
+
+        var update = Builders<Transaction>.Update
+            .Set(t => t.IsDeleted, false)
+            .Set(t => t.DeletedAt, (DateTime?)null);
+
+        UpdateResult result;
+        if (session != null)
+            result = await _transactions.UpdateOneAsync(session, filter, update, options: null, ct);
+        else
+            result = await _transactions.UpdateOneAsync(filter, update, options: null, ct);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<List<string>> GetExpiredDeletedTransactionIdsAsync(TimeSpan undoWindow, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - undoWindow;
+
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, true),
+            Builders<Transaction>.Filter.Lt(t => t.DeletedAt, cutoff)
+        );
+
+        return await _transactions.Find(filter)
+            .Project(t => t.Id)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> PurgeExpiredDeletedTransactionsAsync(TimeSpan undoWindow, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - undoWindow;
+
+        // Permanently delete transactions that have been soft-deleted past the undo window
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, true),
+            Builders<Transaction>.Filter.Lt(t => t.DeletedAt, cutoff)
+        );
+
+        var result = await _transactions.DeleteManyAsync(filter, ct);
+        return (int)result.DeletedCount;
     }
 }

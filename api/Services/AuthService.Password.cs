@@ -6,7 +6,7 @@ namespace DigiTransac.Api.Services;
 
 public partial class AuthService
 {
-    public async Task<Result> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+    public async Task<Result> ChangePasswordAsync(string userId, string currentPassword, string newPassword, CancellationToken ct = default)
     {
         _logger.LogInformation("Password change attempt for UserId: {UserId}", userId);
 
@@ -46,6 +46,9 @@ public partial class AuthService
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         await _userRepository.UpdateAsync(user);
 
+        // Revoke all existing refresh tokens so stolen tokens can't be reused
+        await _refreshTokenRepository.DeleteByUserIdAsync(userId);
+
         _logger.LogInformation("Password changed successfully for UserId: {UserId}", userId);
         
         // Audit log for successful password change
@@ -54,7 +57,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result> SendPasswordResetCodeAsync(string email)
+    public async Task<Result> SendPasswordResetCodeAsync(string email, CancellationToken ct = default)
     {
         _logger.LogInformation("Sending password reset code to {Email}", email);
 
@@ -99,7 +102,7 @@ public partial class AuthService
         return Result.Success();
     }
 
-    public async Task<Result<string>> VerifyPasswordResetCodeAsync(string email, string code)
+    public async Task<Result<string>> VerifyPasswordResetCodeAsync(string email, string code, CancellationToken ct = default)
     {
         _logger.LogInformation("Verifying password reset code for {Email}", email);
 
@@ -122,7 +125,7 @@ public partial class AuthService
         return verification.VerificationToken;
     }
 
-    public async Task<Result> ResetPasswordAsync(ResetPasswordRequest request)
+    public async Task<Result> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct = default)
     {
         _logger.LogInformation("Resetting password for {Email}", request.Email);
 
@@ -163,6 +166,9 @@ public partial class AuthService
         }
         
         await _userRepository.UpdateAsync(user);
+
+        // Revoke all existing refresh tokens so stolen tokens can't be reused
+        await _refreshTokenRepository.DeleteByUserIdAsync(user.Id);
 
         // Clean up verification record
         await _emailVerificationRepository.DeleteByEmailAsync(request.Email, VerificationPurpose.PasswordReset);

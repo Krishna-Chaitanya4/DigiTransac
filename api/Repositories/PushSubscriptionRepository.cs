@@ -10,42 +10,42 @@ public interface IPushSubscriptionRepository
     /// <summary>
     /// Get all push subscriptions for a user
     /// </summary>
-    Task<List<PushSubscription>> GetByUserIdAsync(string userId);
+    Task<List<PushSubscription>> GetByUserIdAsync(string userId, CancellationToken ct = default);
 
     /// <summary>
     /// Get a subscription by its endpoint
     /// </summary>
-    Task<PushSubscription?> GetByEndpointAsync(string endpoint);
+    Task<PushSubscription?> GetByEndpointAsync(string endpoint, CancellationToken ct = default);
 
     /// <summary>
     /// Create a new push subscription
     /// </summary>
-    Task<PushSubscription> CreateAsync(PushSubscription subscription);
+    Task<PushSubscription> CreateAsync(PushSubscription subscription, CancellationToken ct = default);
 
     /// <summary>
     /// Update a subscription (e.g., update lastUsedAt)
     /// </summary>
-    Task UpdateAsync(PushSubscription subscription);
+    Task UpdateAsync(PushSubscription subscription, CancellationToken ct = default);
 
     /// <summary>
     /// Delete a subscription by ID
     /// </summary>
-    Task<bool> DeleteAsync(string id);
+    Task<bool> DeleteAsync(string id, CancellationToken ct = default);
 
     /// <summary>
     /// Delete a subscription by endpoint
     /// </summary>
-    Task<bool> DeleteByEndpointAsync(string endpoint);
+    Task<bool> DeleteByEndpointAsync(string endpoint, CancellationToken ct = default);
 
     /// <summary>
     /// Delete all subscriptions for a user
     /// </summary>
-    Task<long> DeleteByUserIdAsync(string userId);
+    Task<long> DeleteByUserIdAsync(string userId, CancellationToken ct = default);
 
     /// <summary>
     /// Mark a subscription's last used time
     /// </summary>
-    Task UpdateLastUsedAsync(string id);
+    Task UpdateLastUsedAsync(string id, CancellationToken ct = default);
 }
 
 public class PushSubscriptionRepository : IPushSubscriptionRepository
@@ -91,34 +91,34 @@ public class PushSubscriptionRepository : IPushSubscriptionRepository
         }
     }
 
-    public async Task<List<PushSubscription>> GetByUserIdAsync(string userId)
+    public async Task<List<PushSubscription>> GetByUserIdAsync(string userId, CancellationToken ct = default)
     {
         var filter = Builders<PushSubscription>.Filter.Eq(s => s.UserId, userId) &
                      Builders<PushSubscription>.Filter.Eq(s => s.IsEnabled, true);
-        return await _subscriptions.Find(filter).ToListAsync();
+        return await _subscriptions.Find(filter).ToListAsync(ct);
     }
 
-    public async Task<PushSubscription?> GetByEndpointAsync(string endpoint)
+    public async Task<PushSubscription?> GetByEndpointAsync(string endpoint, CancellationToken ct = default)
     {
-        return await _subscriptions.Find(s => s.Endpoint == endpoint).FirstOrDefaultAsync();
+        return await _subscriptions.Find(s => s.Endpoint == endpoint).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<PushSubscription> CreateAsync(PushSubscription subscription)
+    public async Task<PushSubscription> CreateAsync(PushSubscription subscription, CancellationToken ct = default)
     {
-        await _subscriptions.InsertOneAsync(subscription);
+        await _subscriptions.InsertOneAsync(subscription, cancellationToken: ct);
         _logger.LogInformation("Created push subscription {Id} for user {UserId}", subscription.Id, subscription.UserId);
         return subscription;
     }
 
-    public async Task UpdateAsync(PushSubscription subscription)
+    public async Task UpdateAsync(PushSubscription subscription, CancellationToken ct = default)
     {
-        await _subscriptions.ReplaceOneAsync(s => s.Id == subscription.Id, subscription);
+        await _subscriptions.ReplaceOneAsync(s => s.Id == subscription.Id, subscription, cancellationToken: ct);
     }
 
-    public async Task<bool> DeleteAsync(string id)
+    public async Task<bool> DeleteAsync(string id, CancellationToken ct = default)
     {
         var filter = Builders<PushSubscription>.Filter.Eq("_id", new ObjectId(id));
-        var result = await _subscriptions.DeleteOneAsync(filter);
+        var result = await _subscriptions.DeleteOneAsync(filter, ct);
         if (result.DeletedCount > 0)
         {
             _logger.LogInformation("Deleted push subscription {Id}", id);
@@ -126,9 +126,9 @@ public class PushSubscriptionRepository : IPushSubscriptionRepository
         return result.DeletedCount > 0;
     }
 
-    public async Task<bool> DeleteByEndpointAsync(string endpoint)
+    public async Task<bool> DeleteByEndpointAsync(string endpoint, CancellationToken ct = default)
     {
-        var result = await _subscriptions.DeleteOneAsync(s => s.Endpoint == endpoint);
+        var result = await _subscriptions.DeleteOneAsync(s => s.Endpoint == endpoint, ct);
         if (result.DeletedCount > 0)
         {
             _logger.LogInformation("Deleted push subscription by endpoint");
@@ -136,16 +136,16 @@ public class PushSubscriptionRepository : IPushSubscriptionRepository
         return result.DeletedCount > 0;
     }
 
-    public async Task<long> DeleteByUserIdAsync(string userId)
+    public async Task<long> DeleteByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        var result = await _subscriptions.DeleteManyAsync(s => s.UserId == userId);
+        var result = await _subscriptions.DeleteManyAsync(s => s.UserId == userId, ct);
         _logger.LogInformation("Deleted {Count} push subscriptions for user {UserId}", result.DeletedCount, userId);
         return result.DeletedCount;
     }
 
-    public async Task UpdateLastUsedAsync(string id)
+    public async Task UpdateLastUsedAsync(string id, CancellationToken ct = default)
     {
         var update = Builders<PushSubscription>.Update.Set(s => s.LastUsedAt, DateTime.UtcNow);
-        await _subscriptions.UpdateOneAsync(s => s.Id == id, update);
+        await _subscriptions.UpdateOneAsync(s => s.Id == id, update, cancellationToken: ct);
     }
 }

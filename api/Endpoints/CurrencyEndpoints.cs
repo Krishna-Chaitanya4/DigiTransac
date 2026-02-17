@@ -16,9 +16,9 @@ public static class CurrencyEndpoints
             .WithTags("Currencies");
 
         // Get supported currencies (public)
-        group.MapGet("/", async (IExchangeRateService exchangeRateService) =>
+        group.MapGet("/", async (IExchangeRateService exchangeRateService, CancellationToken ct) =>
         {
-            var currencies = await exchangeRateService.GetSupportedCurrenciesAsync();
+            var currencies = await exchangeRateService.GetSupportedCurrenciesAsync(ct);
             return Results.Ok(currencies);
         })
         .WithName("GetSupportedCurrencies")
@@ -26,9 +26,9 @@ public static class CurrencyEndpoints
         .CacheOutput("ExchangeRates");
 
         // Get exchange rates (public)
-        group.MapGet("/rates", async (IExchangeRateService exchangeRateService) =>
+        group.MapGet("/rates", async (IExchangeRateService exchangeRateService, CancellationToken ct) =>
         {
-            var rates = await exchangeRateService.GetRatesAsync();
+            var rates = await exchangeRateService.GetRatesAsync(null, ct);
             return Results.Ok(rates);
         })
         .WithName("GetExchangeRates")
@@ -36,7 +36,7 @@ public static class CurrencyEndpoints
         .CacheOutput("ExchangeRates");
 
         // Force refresh exchange rates (authenticated)
-        group.MapPost("/rates/refresh", async (ClaimsPrincipal user, IExchangeRateService exchangeRateService) =>
+        group.MapPost("/rates/refresh", async (ClaimsPrincipal user, IExchangeRateService exchangeRateService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -46,7 +46,7 @@ public static class CurrencyEndpoints
 
             try
             {
-                var rates = await exchangeRateService.RefreshRatesAsync();
+                var rates = await exchangeRateService.RefreshRatesAsync(ct);
                 return Results.Ok(rates);
             }
             catch (InvalidOperationException ex)
@@ -64,7 +64,7 @@ public static class CurrencyEndpoints
         .Produces(500);
 
         // Get user's primary currency preference
-        group.MapGet("/preference", async (ClaimsPrincipal user, IUserRepository userRepository) =>
+        group.MapGet("/preference", async (ClaimsPrincipal user, IUserRepository userRepository, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -72,7 +72,7 @@ public static class CurrencyEndpoints
                 return Results.Unauthorized();
             }
 
-            var dbUser = await userRepository.GetByIdAsync(userId);
+            var dbUser = await userRepository.GetByIdAsync(userId, ct);
             if (dbUser == null)
             {
                 return Results.NotFound(new ErrorResponse("User not found"));
@@ -90,7 +90,8 @@ public static class CurrencyEndpoints
             UpdatePrimaryCurrencyRequest request,
             ClaimsPrincipal user,
             IUserRepository userRepository,
-            IValidator<UpdatePrimaryCurrencyRequest> validator) =>
+            IValidator<UpdatePrimaryCurrencyRequest> validator,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -103,14 +104,14 @@ public static class CurrencyEndpoints
 
             var currencyCode = request.Currency.ToUpperInvariant();
 
-            var dbUser = await userRepository.GetByIdAsync(userId);
+            var dbUser = await userRepository.GetByIdAsync(userId, ct);
             if (dbUser == null)
             {
                 return Results.NotFound(new ErrorResponse("User not found"));
             }
 
             dbUser.PrimaryCurrency = currencyCode;
-            await userRepository.UpdateAsync(dbUser);
+            await userRepository.UpdateAsync(dbUser, ct);
 
             return Results.Ok(new { 
                 message = "Primary currency updated successfully",

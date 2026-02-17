@@ -183,7 +183,8 @@ public class BatchOperationRequestValidator : AbstractValidator<BatchOperationRe
     public BatchOperationRequestValidator()
     {
         RuleFor(x => x.Ids)
-            .NotEmpty().WithMessage("No transaction IDs provided");
+            .NotEmpty().WithMessage("No transaction IDs provided")
+            .Must(ids => ids.Count <= 100).WithMessage("Cannot process more than 100 transactions at once");
         
         RuleFor(x => x.Action)
             .NotEmpty().WithMessage("Action is required")

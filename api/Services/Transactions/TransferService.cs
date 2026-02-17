@@ -52,7 +52,8 @@ public class TransferService : ITransferService
         CreateTransactionRequest request,
         Account sourceAccount,
         Account destinationAccount,
-        byte[] dek)
+        byte[] dek,
+        CancellationToken ct = default)
     {
         // Convert amount if currencies differ
         decimal convertedAmount = request.Amount;
@@ -243,7 +244,8 @@ public class TransferService : ITransferService
         Transaction transaction,
         UpdateTransactionRequest request,
         string userId,
-        byte[] dek)
+        byte[] dek,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(transaction.LinkedTransactionId))
             return (true, "No linked transaction to sync");
@@ -364,7 +366,8 @@ public class TransferService : ITransferService
 
     public async Task<(bool Success, string Message)> DeleteTransferAsync(
         string userId,
-        Transaction transaction)
+        Transaction transaction,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(transaction.LinkedTransactionId))
             return (true, "No linked transaction to delete");
@@ -379,18 +382,18 @@ public class TransferService : ITransferService
             
             if (linkedAccount != null)
             {
-                // Execute delete and balance update atomically
+                // Execute soft-delete and balance update atomically
                 await using var unitOfWork = new Services.UnitOfWork.UnitOfWork(_mongoDbService);
                 await unitOfWork.ExecuteInTransactionAsync(async session =>
                 {
                     await _accountBalanceService.UpdateBalanceAsync(
                         linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, false, session);
-                    await _transactionRepository.DeleteAsync(linkedTransaction.Id, userId, session);
+                    await _transactionRepository.SoftDeleteAsync(linkedTransaction.Id, userId, session);
                 });
             }
             else
             {
-                await _transactionRepository.DeleteAsync(linkedTransaction.Id, userId);
+                await _transactionRepository.SoftDeleteAsync(linkedTransaction.Id, userId);
             }
         }
 

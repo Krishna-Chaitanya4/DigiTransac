@@ -1,34 +1,15 @@
 using System.Text.Json;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
+using DigiTransac.Api.Settings;
 using Lib.Net.Http.WebPush;
 using Lib.Net.Http.WebPush.Authentication;
+using Microsoft.Extensions.Options;
 
 namespace DigiTransac.Api.Services;
 
 // Type alias to avoid ambiguity with Lib.Net.Http.WebPush.PushSubscription
 using AppPushSubscription = DigiTransac.Api.Models.PushSubscription;
-
-/// <summary>
-/// Configuration for Web Push (VAPID)
-/// </summary>
-public class WebPushSettings
-{
-    /// <summary>
-    /// VAPID public key - shared with the frontend for subscription
-    /// </summary>
-    public string PublicKey { get; set; } = string.Empty;
-
-    /// <summary>
-    /// VAPID private key - kept secret on the server
-    /// </summary>
-    public string PrivateKey { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Contact email for the VAPID subject (e.g., "mailto:admin@example.com")
-    /// </summary>
-    public string Subject { get; set; } = string.Empty;
-}
 
 /// <summary>
 /// Interface for sending Web Push notifications
@@ -43,12 +24,12 @@ public interface IWebPushService
     /// <summary>
     /// Send a push notification to all subscriptions for a user
     /// </summary>
-    Task<int> SendToUserAsync(string userId, PushNotificationPayload payload);
+    Task<int> SendToUserAsync(string userId, PushNotificationPayload payload, CancellationToken ct = default);
 
     /// <summary>
     /// Send a push notification to a specific subscription
     /// </summary>
-    Task<bool> SendToSubscriptionAsync(AppPushSubscription subscription, PushNotificationPayload payload);
+    Task<bool> SendToSubscriptionAsync(AppPushSubscription subscription, PushNotificationPayload payload, CancellationToken ct = default);
 }
 
 public class WebPushService : IWebPushService
@@ -59,16 +40,13 @@ public class WebPushService : IWebPushService
     private readonly WebPushSettings _settings;
 
     public WebPushService(
-        IConfiguration configuration,
+        IOptions<WebPushSettings> options,
         IPushSubscriptionRepository subscriptionRepository,
         ILogger<WebPushService> logger)
     {
         _subscriptionRepository = subscriptionRepository;
         _logger = logger;
-
-        // Load settings from configuration
-        _settings = new WebPushSettings();
-        configuration.GetSection("WebPush").Bind(_settings);
+        _settings = options.Value;
 
         // Validate configuration
         if (string.IsNullOrEmpty(_settings.PublicKey) || string.IsNullOrEmpty(_settings.PrivateKey))
@@ -103,7 +81,7 @@ public class WebPushService : IWebPushService
         return _settings.PublicKey;
     }
 
-    public async Task<int> SendToUserAsync(string userId, PushNotificationPayload payload)
+    public async Task<int> SendToUserAsync(string userId, PushNotificationPayload payload, CancellationToken ct = default)
     {
         if (_pushClient == null)
         {
@@ -111,7 +89,7 @@ public class WebPushService : IWebPushService
             return 0;
         }
 
-        var subscriptions = await _subscriptionRepository.GetByUserIdAsync(userId);
+        var subscriptions = await _subscriptionRepository.GetByUserIdAsync(userId, ct);
         if (subscriptions.Count == 0)
         {
             _logger.LogDebug("No push subscriptions found for user {UserId}", userId);
@@ -125,11 +103,11 @@ public class WebPushService : IWebPushService
         {
             try
             {
-                var success = await SendToSubscriptionAsync(subscription, payload);
+                var success = await SendToSubscriptionAsync(subscription, payload, ct);
                 if (success)
                 {
                     successCount++;
-                    await _subscriptionRepository.UpdateLastUsedAsync(subscription.Id);
+                    await _subscriptionRepository.UpdateLastUsedAsync(subscription.Id, ct);
                 }
                 else
                 {
@@ -147,7 +125,7 @@ public class WebPushService : IWebPushService
         foreach (var id in failedSubscriptionIds)
         {
             _logger.LogInformation("Removing failed push subscription {SubscriptionId}", id);
-            await _subscriptionRepository.DeleteAsync(id);
+            await _subscriptionRepository.DeleteAsync(id, ct);
         }
 
         _logger.LogInformation("Sent push notification to {SuccessCount}/{TotalCount} subscriptions for user {UserId}",
@@ -156,7 +134,7 @@ public class WebPushService : IWebPushService
         return successCount;
     }
 
-    public async Task<bool> SendToSubscriptionAsync(AppPushSubscription subscription, PushNotificationPayload payload)
+    public async Task<bool> SendToSubscriptionAsync(AppPushSubscription subscription, PushNotificationPayload payload, CancellationToken ct = default)
     {
         if (_pushClient == null)
         {
@@ -202,7 +180,7 @@ public class WebPushService : IWebPushService
                 Urgency = PushMessageUrgency.High
             };
 
-            await _pushClient.RequestPushMessageDeliveryAsync(pushSubscription, pushMessage);
+            await _pushClient.RequestPushMessageDeliveryAsync(pushSubscription, pushMessage, ct);
 
             _logger.LogDebug("Push notification sent successfully to subscription {SubscriptionId}", subscription.Id);
             return true;

@@ -17,7 +17,7 @@ public static class AuthProfileEndpoints
     public static RouteGroupBuilder MapAuthProfileEndpoints(this RouteGroupBuilder group)
     {
         // Get current user
-        group.MapGet("/me", [Authorize] async (ClaimsPrincipal user, IAuthService authService) =>
+        group.MapGet("/me", [Authorize] async (ClaimsPrincipal user, IAuthService authService, CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -25,7 +25,7 @@ public static class AuthProfileEndpoints
                 return Results.Unauthorized();
             }
 
-            var currentUser = await authService.GetCurrentUserAsync(userId);
+            var currentUser = await authService.GetCurrentUserAsync(userId, ct);
             if (currentUser == null)
             {
                 return Results.NotFound();
@@ -49,7 +49,8 @@ public static class AuthProfileEndpoints
             [FromBody] DeleteAccountRequest request, 
             IValidator<DeleteAccountRequest> validator,
             ClaimsPrincipal user, 
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -60,7 +61,7 @@ public static class AuthProfileEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.DeleteAccountAsync(userId, request.Password);
+            var result = await authService.DeleteAccountAsync(userId, request.Password, ct);
             
             if (result.IsFailure)
             {
@@ -81,7 +82,8 @@ public static class AuthProfileEndpoints
             [FromBody] UpdateNameRequest request, 
             IValidator<UpdateNameRequest> validator,
             ClaimsPrincipal user, 
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -92,7 +94,7 @@ public static class AuthProfileEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.UpdateNameAsync(userId, request.FullName);
+            var result = await authService.UpdateNameAsync(userId, request.FullName, ct);
             
             if (result.IsFailure)
             {
@@ -113,7 +115,8 @@ public static class AuthProfileEndpoints
             [FromBody] UpdateEmailRequest request, 
             IValidator<UpdateEmailRequest> validator,
             ClaimsPrincipal user, 
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -124,7 +127,7 @@ public static class AuthProfileEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.SendEmailChangeCodeAsync(userId, request.NewEmail);
+            var result = await authService.SendEmailChangeCodeAsync(userId, request.NewEmail, ct);
             
             if (result.IsFailure)
             {
@@ -145,7 +148,8 @@ public static class AuthProfileEndpoints
             [FromBody] VerifyEmailChangeRequest request, 
             IValidator<VerifyEmailChangeRequest> validator,
             ClaimsPrincipal user, 
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -156,7 +160,7 @@ public static class AuthProfileEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.VerifyAndUpdateEmailAsync(userId, request.NewEmail, request.Code);
+            var result = await authService.VerifyAndUpdateEmailAsync(userId, request.NewEmail, request.Code, ct);
             
             if (result.IsFailure)
             {

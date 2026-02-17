@@ -65,6 +65,7 @@ public class GmailEmailService : IEmailService
             mailMessage.To.Add(email);
 
             await smtpClient.SendMailAsync(mailMessage);
+            mailMessage.Dispose();
 
             _logger.LogInformation("Verification email sent successfully to {Email}", email);
         }
@@ -107,6 +108,7 @@ public class GmailEmailService : IEmailService
             mailMessage.To.Add(email);
 
             await smtpClient.SendMailAsync(mailMessage);
+            mailMessage.Dispose();
 
             _logger.LogInformation("Password reset email sent successfully to {Email}", email);
         }
@@ -148,8 +150,7 @@ public class GmailEmailService : IEmailService
 
             mailMessage.To.Add(email);
 
-            await smtpClient.SendMailAsync(mailMessage);
-
+            await smtpClient.SendMailAsync(mailMessage);            mailMessage.Dispose();
             _logger.LogInformation("2FA backup code email sent successfully to {Email}", email);
         }
         catch (Exception ex)

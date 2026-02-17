@@ -19,19 +19,21 @@ public static class AuthPasswordEndpoints
         group.MapPost("/forgot-password", async (
             ForgotPasswordRequest request, 
             IValidator<ForgotPasswordRequest> validator,
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.SendPasswordResetCodeAsync(request.Email);
-            
+            var result = await authService.SendPasswordResetCodeAsync(request.Email, ct);
+
+            // Always return generic success to prevent email enumeration,
+            // regardless of whether the service call succeeded or found the email
             if (result.IsFailure)
             {
-                return result.ToApiResult();
+                // Log for server-side diagnostics but never reveal to client
             }
 
-            // Always return success to not reveal if email exists
             return Results.Ok(new VerificationResponse("If an account with that email exists, a reset code has been sent"));
         })
         .WithName("ForgotPassword")
@@ -45,12 +47,13 @@ public static class AuthPasswordEndpoints
         group.MapPost("/verify-reset-code", async (
             VerifyCodeRequest request, 
             IValidator<VerifyCodeRequest> validator,
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.VerifyPasswordResetCodeAsync(request.Email, request.Code);
+            var result = await authService.VerifyPasswordResetCodeAsync(request.Email, request.Code, ct);
             
             if (result.IsFailure)
             {
@@ -70,12 +73,13 @@ public static class AuthPasswordEndpoints
         group.MapPost("/reset-password", async (
             ResetPasswordRequest request, 
             IValidator<ResetPasswordRequest> validator,
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.ResetPasswordAsync(request);
+            var result = await authService.ResetPasswordAsync(request, ct);
             
             if (result.IsFailure)
             {
@@ -96,7 +100,8 @@ public static class AuthPasswordEndpoints
             ChangePasswordRequest request,
             IValidator<ChangePasswordRequest> validator,
             ClaimsPrincipal user,
-            IAuthService authService) =>
+            IAuthService authService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -107,7 +112,7 @@ public static class AuthPasswordEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var result = await authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+            var result = await authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword, ct);
             
             if (result.IsFailure)
             {

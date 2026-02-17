@@ -16,7 +16,8 @@ public static class TransactionImportEndpoints
         group.MapPost("/import/parse", async (
             CsvParseRequest request,
             ClaimsPrincipal user,
-            ITransactionImportService importService) =>
+            ITransactionImportService importService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -28,7 +29,7 @@ public static class TransactionImportEndpoints
             if (string.IsNullOrWhiteSpace(request.AccountId))
                 return Results.BadRequest(new ErrorResponse("AccountId is required"));
 
-            var result = await importService.ParseAndPreviewAsync(userId, request);
+            var result = await importService.ParseAndPreviewAsync(userId, request, ct);
             return Results.Ok(result);
         })
         .WithName("ParseAndPreviewImport")
@@ -40,7 +41,8 @@ public static class TransactionImportEndpoints
         group.MapPost("/import/preview", async (
             ImportPreviewRequest request,
             ClaimsPrincipal user,
-            ITransactionImportService importService) =>
+            ITransactionImportService importService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -52,7 +54,7 @@ public static class TransactionImportEndpoints
             if (request.Transactions == null || request.Transactions.Count == 0)
                 return Results.BadRequest(new ErrorResponse("At least one transaction is required"));
 
-            var result = await importService.PreviewImportAsync(userId, request);
+            var result = await importService.PreviewImportAsync(userId, request, ct);
             return Results.Ok(result);
         })
         .WithName("PreviewTransactionImport")
@@ -64,7 +66,8 @@ public static class TransactionImportEndpoints
         group.MapPost("/import", async (
             BulkImportRequest request,
             ClaimsPrincipal user,
-            ITransactionImportService importService) =>
+            ITransactionImportService importService,
+            CancellationToken ct) =>
         {
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -79,7 +82,7 @@ public static class TransactionImportEndpoints
             if (request.Transactions.Count > 1000)
                 return Results.BadRequest(new ErrorResponse("Maximum 1000 transactions per import"));
 
-            var result = await importService.ImportAsync(userId, request);
+            var result = await importService.ImportAsync(userId, request, ct);
             
             if (result.FailedCount == request.Transactions.Count)
                 return Results.BadRequest(result);

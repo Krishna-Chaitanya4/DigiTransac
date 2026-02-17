@@ -41,6 +41,8 @@ export interface TransactionMessageData {
   status: 'Pending' | 'Confirmed' | 'Declined';
   accountName: string | null;
   primaryCategory?: TransactionCategoryInfo | null;
+  isDeleted: boolean;
+  deletedAt?: string | null;
 }
 
 export interface ReplyPreview {
@@ -65,6 +67,7 @@ export interface ConversationMessage {
   isEdited: boolean;
   editedAt: string | null;
   isDeleted: boolean;
+  deletedAt: string | null;
   replyToMessageId: string | null;
   replyTo: ReplyPreview | null;
   isSystemGenerated?: boolean; // True if auto-created (recurring, import, etc.)

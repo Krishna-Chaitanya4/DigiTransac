@@ -27,7 +27,7 @@ public class TransactionMapperService : ITransactionMapperService
         _encryptionService = encryptionService;
     }
 
-    public async Task<byte[]?> GetUserDekAsync(string userId)
+    public async Task<byte[]?> GetUserDekAsync(string userId, CancellationToken ct = default)
     {
         var cachedDek = _dekCacheService.GetDek(userId);
         if (cachedDek != null) return cachedDek;
@@ -132,7 +132,10 @@ public class TransactionMapperService : ITransactionMapperService
             // Timezone-aware date/time fields (for global travel support & analytics)
             t.DateLocal,
             t.TimeLocal,
-            t.DateTimezone);
+            t.DateTimezone,
+            // Soft-delete support
+            t.IsDeleted,
+            t.DeletedAt);
     }
 
     public RecurringTransactionResponse MapToRecurringResponse(

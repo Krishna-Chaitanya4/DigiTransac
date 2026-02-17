@@ -6,6 +6,7 @@ import { useCurrency } from '../../context/CurrencyContext';
 // Time limits for message actions (in minutes)
 export const EDIT_TIME_LIMIT_MINUTES = 15;
 export const DELETE_TIME_LIMIT_MINUTES = 60;
+export const UNDO_DELETE_WINDOW_MINUTES = 1440; // 24 hours
 
 // Helper to check if a message can still be edited
 export const canEditMessage = (msg: ConversationMessage): boolean => {
@@ -23,6 +24,26 @@ export const canDeleteMessage = (msg: ConversationMessage): boolean => {
   return minutesElapsed <= DELETE_TIME_LIMIT_MINUTES;
 };
 
+// Helper to check if a deleted message can still be restored (undo)
+export const canUndoDelete = (msg: ConversationMessage): boolean => {
+  if (!msg.isFromMe || !msg.isDeleted || !msg.deletedAt) return false;
+  const deletedAt = new Date(msg.deletedAt);
+  const minutesElapsed = (Date.now() - deletedAt.getTime()) / (1000 * 60);
+  return minutesElapsed <= UNDO_DELETE_WINDOW_MINUTES;
+};
+
+// Helper to check if a deleted transaction can still be restored (undo)
+const canUndoTransactionDelete = (
+  message: ConversationMessage,
+  onRestoreTransaction: ((id: string) => void) | undefined
+): boolean => {
+  if (message.type !== 'Transaction' || !message.transaction?.isDeleted) return false;
+  const tx = message.transaction;
+  if (!tx.deletedAt || !onRestoreTransaction || !message.isFromMe) return false;
+  const minutesElapsed = (Date.now() - new Date(tx.deletedAt).getTime()) / (1000 * 60);
+  return minutesElapsed <= UNDO_DELETE_WINDOW_MINUTES;
+};
+
 interface MessageBubbleProps {
   message: ConversationMessage;
   showTime: boolean;
@@ -33,6 +54,8 @@ interface MessageBubbleProps {
   isSelfChat?: boolean; // When true, use isSystemGenerated for left/right positioning
   onMenuOpen: (message: ConversationMessage, position: { x: number; y: number; buttonTop: number }) => void;
   onScrollToReply: (messageId: string) => void;
+  onRestore?: (messageId: string) => void;
+  onRestoreTransaction?: (transactionId: string) => void;
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -45,6 +68,8 @@ export const MessageBubble = memo(function MessageBubble({
   isSelfChat = false,
   onMenuOpen,
   onScrollToReply,
+  onRestore,
+  onRestoreTransaction,
 }: MessageBubbleProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { primaryCurrency, formatInPrimaryCurrency } = useCurrency();
@@ -58,8 +83,10 @@ export const MessageBubble = memo(function MessageBubble({
   // Long press handlers for mobile
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
+      // Capture rect from currentTarget (the element with the handler) before setTimeout,
+      // since React synthetic event properties are nullified after the event callback.
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       longPressTimerRef.current = setTimeout(() => {
-        const rect = (e.target as HTMLElement).getBoundingClientRect();
         onMenuOpen(message, { x: rect.left, y: rect.bottom, buttonTop: rect.top });
       }, 500);
     },
@@ -81,6 +108,88 @@ export const MessageBubble = memo(function MessageBubble({
     },
     [message, onMenuOpen]
   );
+
+  // Deleted message (soft-deleted chat message) — check BEFORE type-specific rendering
+  // so that undo works for all message types (text, transaction, etc.)
+  if (message.isDeleted) {
+    const showUndo = canUndoDelete(message) && onRestore;
+    return (
+      <div
+        id={`msg-${message.id}`}
+        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-3`}
+      >
+        <div className="px-4 py-2 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 italic text-sm">
+          <span>This message was deleted</span>
+          {showUndo && (
+            <button
+              onClick={() => onRestore(message.id)}
+              className="ml-2 text-blue-500 dark:text-blue-400 not-italic font-medium hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+            >
+              Undo
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Soft-deleted transaction (transaction data still available, within undo window)
+  if (message.type === 'Transaction' && message.transaction?.isDeleted) {
+    const tx = message.transaction;
+    const canUndo = canUndoTransactionDelete(message, onRestoreTransaction);
+    return (
+      <div
+        id={`msg-${message.id}`}
+        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}
+      >
+        <div className="min-w-[130px] max-w-[190px] rounded-xl p-3 shadow-md bg-gray-200 dark:bg-gray-700 opacity-60">
+          <div className="flex flex-col items-center gap-1.5 text-gray-500 dark:text-gray-400">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span className="text-xs italic">This transaction was deleted</span>
+            {canUndo && onRestoreTransaction && (
+              <button
+                onClick={() => onRestoreTransaction(tx.transactionId)}
+                className="text-xs text-blue-500 dark:text-blue-400 not-italic font-medium hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+              >
+                Undo
+              </button>
+            )}
+          </div>
+          {showTime && (
+            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5 text-right">
+              {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Transaction message with hard-deleted transaction (purged, no data available)
+  if (message.type === 'Transaction' && !message.transaction) {
+    return (
+      <div
+        id={`msg-${message.id}`}
+        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}
+      >
+        <div className="min-w-[130px] max-w-[190px] rounded-xl p-3 shadow-md bg-gray-200 dark:bg-gray-700 opacity-75">
+          <div className="flex flex-col items-center gap-1.5 text-gray-500 dark:text-gray-400">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span className="text-xs italic">This transaction was deleted</span>
+          </div>
+          {showTime && (
+            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5 text-right">
+              {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // Transaction message
   if (message.type === 'Transaction' && message.transaction) {
@@ -121,6 +230,9 @@ export const MessageBubble = memo(function MessageBubble({
         <div className="relative">
           <div
             className={`min-w-[130px] max-w-[190px] rounded-xl p-3 shadow-md ${getCardBackground()}`}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={clearLongPress}
+            onTouchMove={clearLongPress}
           >
             {/* Menu trigger */}
             <button
@@ -222,20 +334,6 @@ export const MessageBubble = memo(function MessageBubble({
               </div>
             )}
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Deleted message
-  if (message.isDeleted) {
-    return (
-      <div
-        id={`msg-${message.id}`}
-        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-3`}
-      >
-        <div className="px-4 py-2 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 italic text-sm">
-          This message was deleted
         </div>
       </div>
     );

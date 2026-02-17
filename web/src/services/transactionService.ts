@@ -132,9 +132,14 @@ export async function updateTransaction(id: string, request: UpdateTransactionRe
   return apiClient.put<Transaction>(`/transactions/${id}`, request);
 }
 
-// Delete transaction
+// Delete transaction (soft-delete with 24-hour undo window)
 export async function deleteTransaction(id: string): Promise<void> {
   return apiClient.delete(`/transactions/${id}`);
+}
+
+// Restore a soft-deleted transaction (within 24-hour undo window)
+export async function restoreTransaction(id: string): Promise<void> {
+  return apiClient.post(`/transactions/${id}/restore`);
 }
 
 // Delete recurring transaction

@@ -194,7 +194,9 @@ export default function TransactionsPage() {
   const { data: summary } = useTransactionSummary(summaryFilter);
 
   // Derived state
-  const transactions = optimisticTransactions ?? transactionResponse?.transactions ?? [];
+  const transactions = useMemo(() => {
+    return optimisticTransactions ?? transactionResponse?.transactions ?? [];
+  }, [optimisticTransactions, transactionResponse?.transactions]);
   const hasMore = transactionResponse ? transactionResponse.page < transactionResponse.totalPages : false;
   const isLoading = isLoadingAccounts || isLoadingLabels || isLoadingTags || isLoadingTransactions;
   const isLoadingMore = isFetchingTransactions && currentPage > 1;
@@ -307,6 +309,15 @@ export default function TransactionsPage() {
   }, [isLoading]);
 
   // Handle highlight from URL param (e.g., /transactions?highlight=abc123)
+  // Track timeouts for cleanup on unmount
+  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      timeoutRefs.current.forEach(clearTimeout);
+    };
+  }, []);
+
   useEffect(() => {
     const highlightId = searchParams.get('highlight');
     if (highlightId && transactions.length > 0) {
@@ -318,15 +329,17 @@ export default function TransactionsPage() {
       setSearchParams(searchParams, { replace: true });
       
       // Scroll to the transaction after a short delay
-      setTimeout(() => {
+      const scrollTimer = setTimeout(() => {
         const element = document.querySelector(`[data-transaction-id="${highlightId}"]`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);
+      timeoutRefs.current.push(scrollTimer);
       
       // Clear highlight after animation
-      setTimeout(() => setHighlightedTransactionId(null), 3000);
+      const clearTimer = setTimeout(() => setHighlightedTransactionId(null), 3000);
+      timeoutRefs.current.push(clearTimer);
     }
   }, [searchParams, setSearchParams, transactions.length]);
 
@@ -370,45 +383,9 @@ export default function TransactionsPage() {
     setIsFormOpen(true);
   };
 
-  // Handle delete with optimistic UI and undo
-  const handleDelete = async (id: string) => {
-    // Find the transaction to delete
-    const transactionToDelete = transactions.find(t => t.id === id);
-    if (!transactionToDelete) return;
-    
-    // Optimistically remove from UI immediately
-    const originalIndex = transactions.findIndex(t => t.id === id);
-    setOptimisticTransactions(prev => {
-      const list = prev ?? transactions;
-      return list.filter(t => t.id !== id);
-    });
-    
-    // Show undo toast
-    const toastId = showInfo('Transaction deleted', {
-      label: 'Undo',
-      onClick: () => {
-        // Restore transaction in the same position
-        setOptimisticTransactions(prev => {
-          const list = prev ?? transactions;
-          const newList = [...list];
-          newList.splice(originalIndex, 0, transactionToDelete);
-          return newList;
-        });
-        dismissToast(toastId);
-      },
-    });
-    
-    try {
-      await deleteTransactionMutation.mutateAsync(id);
-      // Clear optimistic state - query cache is updated
-      setOptimisticTransactions(null);
-      setPendingRefreshTrigger(prev => prev + 1);
-    } catch (err) {
-      logger.error('Failed to delete transaction:', err);
-      // Restore transaction on error
-      setOptimisticTransactions(null);
-      dismissToast(toastId);
-    }
+  // Handle delete — instant soft-delete (optimistic removal from React Query cache)
+  const handleDelete = (id: string) => {
+    deleteTransactionMutation.mutate(id);
   };
 
   // Handle update status with undo toast

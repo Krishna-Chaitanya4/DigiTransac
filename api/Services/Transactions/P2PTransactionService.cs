@@ -48,7 +48,8 @@ public class P2PTransactionService : IP2PTransactionService
         Account account,
         User counterparty,
         Guid transactionLinkId,
-        byte[] dek)
+        byte[] dek,
+        CancellationToken ct = default)
     {
         // Determine counterparty's transaction type (opposite of user's)
         var userType = Enum.Parse<TransactionType>(request.Type, true);
@@ -96,7 +97,8 @@ public class P2PTransactionService : IP2PTransactionService
 
     public async Task SyncP2PTransactionAsync(
         Transaction transaction,
-        UpdateTransactionRequest request)
+        UpdateTransactionRequest request,
+        CancellationToken ct = default)
     {
         if (!transaction.TransactionLinkId.HasValue || 
             string.IsNullOrEmpty(transaction.CounterpartyUserId))
@@ -148,7 +150,8 @@ public class P2PTransactionService : IP2PTransactionService
 
     public async Task<(bool Success, string Message)> DeleteP2PTransactionAsync(
         string userId,
-        Transaction transaction)
+        Transaction transaction,
+        CancellationToken ct = default)
     {
         if (!transaction.TransactionLinkId.HasValue || 
             string.IsNullOrEmpty(transaction.CounterpartyUserId))
@@ -157,17 +160,17 @@ public class P2PTransactionService : IP2PTransactionService
         var linkedP2PTransaction = await _transactionRepository.GetLinkedP2PTransactionAsync(
             transaction.TransactionLinkId.Value, userId);
 
-        // Only delete if the counterparty's transaction is still Pending
+        // Only soft-delete if the counterparty's transaction is still Pending
         // If they've already confirmed it, leave it (it's their record now)
         if (linkedP2PTransaction != null && linkedP2PTransaction.Status == TransactionStatus.Pending)
         {
-            await _transactionRepository.DeleteByIdAsync(linkedP2PTransaction.Id);
+            await _transactionRepository.SoftDeleteAsync(linkedP2PTransaction.Id, linkedP2PTransaction.UserId);
         }
 
         return (true, "P2P linked transaction deleted");
     }
 
-    public async Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId)
+    public async Task<List<CounterpartyInfo>> GetCounterpartiesAsync(string userId, CancellationToken ct = default)
     {
         // Get all P2P transactions for this user
         var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
@@ -202,7 +205,8 @@ public class P2PTransactionService : IP2PTransactionService
     public async Task<(bool Success, string Message, TransactionResponse? Transaction)> AcceptP2PTransactionAsync(
         string transactionId,
         string userId,
-        string accountId)
+        string accountId,
+        CancellationToken ct = default)
     {
         // Get the pending transaction
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(transactionId, userId);
@@ -283,7 +287,8 @@ public class P2PTransactionService : IP2PTransactionService
     public async Task<(bool Success, string Message)> RejectP2PTransactionAsync(
         string transactionId,
         string userId,
-        string? reason)
+        string? reason,
+        CancellationToken ct = default)
     {
         // Get the pending transaction
         var transaction = await _transactionRepository.GetByIdAndUserIdAsync(transactionId, userId);

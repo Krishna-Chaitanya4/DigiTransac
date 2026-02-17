@@ -56,7 +56,7 @@ public static class ConversationEndpoints
                 return Results.Unauthorized();
 
             var conversation = await conversationService.GetConversationAsync(
-                userId, counterpartyUserId, limit ?? 50, before, ct);
+                userId, counterpartyUserId, Math.Min(limit ?? 50, 200), before, ct);
             return Results.Ok(conversation);
         })
         .WithName("GetConversation")
@@ -212,6 +212,27 @@ public static class ConversationEndpoints
             return Results.Ok(new { message = "Message deleted" });
         })
         .WithName("DeleteMessage")
+        .Produces<object>(200)
+        .Produces<ErrorResponse>(400);
+
+        // Restore (undo delete) message
+        group.MapPost("/messages/{messageId}/restore", async (
+            string messageId,
+            ClaimsPrincipal user,
+            IConversationService conversationService,
+            CancellationToken ct) =>
+        {
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var result = await conversationService.RestoreMessageAsync(userId, messageId, ct);
+            if (result.IsFailure)
+                return result.ToApiResult();
+
+            return Results.Ok(new { message = "Message restored" });
+        })
+        .WithName("RestoreMessage")
         .Produces<object>(200)
         .Produces<ErrorResponse>(400);
 

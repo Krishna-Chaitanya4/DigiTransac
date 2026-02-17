@@ -19,7 +19,8 @@ public static class TransactionBatchEndpoints
             BatchOperationRequest request,
             ClaimsPrincipal user,
             ITransactionService transactionService,
-            IValidator<BatchOperationRequest> validator) =>
+            IValidator<BatchOperationRequest> validator,
+            CancellationToken ct) =>
         {
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -32,17 +33,17 @@ public static class TransactionBatchEndpoints
             switch (request.Action.ToLowerInvariant())
             {
                 case "delete":
-                    result = await transactionService.BatchDeleteAsync(userId, request.Ids);
+                    result = await transactionService.BatchDeleteAsync(userId, request.Ids, ct);
                     break;
                 case "markconfirmed":
                 case "markcleared": // Legacy support
-                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Confirmed));
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Confirmed), ct);
                     break;
                 case "markpending":
-                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Pending));
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Pending), ct);
                     break;
                 case "markdeclined":
-                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Declined));
+                    result = await transactionService.BatchUpdateStatusAsync(userId, request.Ids, nameof(TransactionStatus.Declined), ct);
                     break;
                 default:
                     return Results.BadRequest(new ErrorResponse($"Unknown action: {request.Action}"));

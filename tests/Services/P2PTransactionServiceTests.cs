@@ -102,8 +102,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(
@@ -153,8 +153,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(
@@ -194,8 +194,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(
@@ -234,8 +234,8 @@ public class P2PTransactionServiceTests
 
         Transaction? capturedTransaction = null;
         _transactionRepositoryMock.Setup(x => x.CreateAsync(It.IsAny<Transaction>(), null))
-            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?>((t, _) => capturedTransaction = t)
-            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _) => t);
+            .Callback<Transaction, MongoDB.Driver.IClientSessionHandle?, CancellationToken>((t, _, __) => capturedTransaction = t)
+            .ReturnsAsync((Transaction t, MongoDB.Driver.IClientSessionHandle? _, CancellationToken __) => t);
 
         // Act
         var result = await _p2pService.CreateP2PTransactionAsync(
@@ -429,7 +429,7 @@ public class P2PTransactionServiceTests
 
         _transactionRepositoryMock.Setup(x => x.GetLinkedP2PTransactionAsync(transactionLinkId, SenderUserId))
             .ReturnsAsync(receiverPendingTransaction);
-        _transactionRepositoryMock.Setup(x => x.DeleteByIdAsync("receiver-tx-id", null))
+        _transactionRepositoryMock.Setup(x => x.SoftDeleteAsync("receiver-tx-id", ReceiverUserId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -437,7 +437,7 @@ public class P2PTransactionServiceTests
 
         // Assert
         result.Success.Should().BeTrue();
-        _transactionRepositoryMock.Verify(x => x.DeleteByIdAsync("receiver-tx-id", null), Times.Once);
+        _transactionRepositoryMock.Verify(x => x.SoftDeleteAsync("receiver-tx-id", ReceiverUserId, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -462,7 +462,7 @@ public class P2PTransactionServiceTests
 
         // Assert
         result.Success.Should().BeTrue();
-        _transactionRepositoryMock.Verify(x => x.DeleteByIdAsync(It.IsAny<string>(), null), Times.Never);
+        _transactionRepositoryMock.Verify(x => x.SoftDeleteAsync(It.IsAny<string>(), It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -903,7 +903,9 @@ public class P2PTransactionServiceTests
             ChatMessageId: null,
             DateLocal: null,      // Timezone-aware date field
             TimeLocal: null,      // Timezone-aware time field
-            DateTimezone: null    // Timezone field
+            DateTimezone: null,   // Timezone field
+            IsDeleted: false,
+            DeletedAt: null
         );
     }
 

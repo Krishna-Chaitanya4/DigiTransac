@@ -39,6 +39,7 @@ public static class ApplicationServiceExtensions
         builder.Services.Configure<EncryptionSettings>(builder.Configuration.GetSection("Encryption"));
         builder.Services.Configure<SecuritySettings>(builder.Configuration.GetSection("Security"));
         builder.Services.Configure<RateLimitSettings>(builder.Configuration.GetSection("RateLimit"));
+        builder.Services.Configure<WebPushSettings>(builder.Configuration.GetSection("WebPush"));
 
         var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>()!;
         builder.Services.AddSingleton(emailSettings);
@@ -176,6 +177,8 @@ public static class ApplicationServiceExtensions
     private static void AddBackgroundServices(WebApplicationBuilder builder)
     {
         builder.Services.AddHostedService<RecurringTransactionBackgroundService>();
+        builder.Services.AddHostedService<DeletedMessageCleanupService>();
+        builder.Services.AddHostedService<DeletedTransactionCleanupService>();
     }
 
     private static void AddValidatorsAndMediatR(WebApplicationBuilder builder)
