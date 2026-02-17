@@ -32,6 +32,18 @@ export const canUndoDelete = (msg: ConversationMessage): boolean => {
   return minutesElapsed <= UNDO_DELETE_WINDOW_MINUTES;
 };
 
+// Helper to check if a deleted transaction can still be restored (undo)
+const canUndoTransactionDelete = (
+  message: ConversationMessage,
+  onRestoreTransaction: ((id: string) => void) | undefined
+): boolean => {
+  if (message.type !== 'Transaction' || !message.transaction?.isDeleted) return false;
+  const tx = message.transaction;
+  if (!tx.deletedAt || !onRestoreTransaction || !message.isFromMe) return false;
+  const minutesElapsed = (Date.now() - new Date(tx.deletedAt).getTime()) / (1000 * 60);
+  return minutesElapsed <= UNDO_DELETE_WINDOW_MINUTES;
+};
+
 interface MessageBubbleProps {
   message: ConversationMessage;
   showTime: boolean;
@@ -124,8 +136,7 @@ export const MessageBubble = memo(function MessageBubble({
   // Soft-deleted transaction (transaction data still available, within undo window)
   if (message.type === 'Transaction' && message.transaction?.isDeleted) {
     const tx = message.transaction;
-    const canUndo = tx.deletedAt && onRestoreTransaction && message.isFromMe &&
-      (Date.now() - new Date(tx.deletedAt).getTime()) / (1000 * 60) <= UNDO_DELETE_WINDOW_MINUTES;
+    const canUndo = canUndoTransactionDelete(message, onRestoreTransaction);
     return (
       <div
         id={`msg-${message.id}`}

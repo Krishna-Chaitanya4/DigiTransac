@@ -8,6 +8,7 @@ import { formatDateToStartOfDay, formatDateToEndOfDay } from '../../hooks/useTra
 import { DateRangePicker } from '../../components/DatePicker';
 
 import type { PeriodPreset, WidgetId, SectionId, ViewMode } from './types';
+import type { CategoryBreakdown } from '../../services/transactionService';
 import { COLLAPSED_SECTIONS_KEY, WIDGET_ORDER_KEY, DEFAULT_WIDGET_ORDER, PERIOD_OPTIONS } from './types';
 import { getPreviousPeriodRange, getDateRange, formatDate } from './helpers';
 import { FinancialSummaryWidget } from './FinancialSummaryWidget';
@@ -386,17 +387,17 @@ export default function InsightsPage() {
     }
     
     // Filter categories that are income categories and have positive amounts
-    const incomeCats = analytics.topCategories.filter((cat: any) =>
+    const incomeCats = analytics.topCategories.filter((cat: CategoryBreakdown) =>
       systemFolders.incomeCategoryIds.includes(cat.labelId) && cat.amount > 0
     );
     
     // Recalculate percentages based on total income
-    const totalIncome = incomeCats.reduce((sum: number, cat: any) => sum + cat.amount, 0);
+    const totalIncome = incomeCats.reduce((sum: number, cat: CategoryBreakdown) => sum + cat.amount, 0);
     
-    return incomeCats.map((cat: any) => ({
+    return incomeCats.map((cat: CategoryBreakdown) => ({
       ...cat,
       percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0
-    })).sort((a: any, b: any) => b.amount - a.amount);
+    })).sort((a: CategoryBreakdown, b: CategoryBreakdown) => b.amount - a.amount);
   }, [analytics, systemFolders]);
 
   // Calculate savings rate

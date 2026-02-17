@@ -1,14 +1,15 @@
-import type { DragProps } from './types';
+import type { DragProps, SectionId } from './types';
+import type { SpendingByAccountResponse, AccountSpending } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection, WidgetWithErrorBoundary } from './InsightWidgets';
 
 interface ByAccountWidgetProps {
-  spendingByAccount: any;
+  spendingByAccount: SpendingByAccountResponse | undefined;
   byAccountLoading: boolean;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   collapsedSections: Set<string>;
-  toggleSection: (id: any) => void;
+  toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
 }
 
@@ -52,7 +53,7 @@ export function ByAccountWidget({
           </div>
         ) : spendingByAccount && spendingByAccount.accounts.length > 0 ? (
           <div className="space-y-3 pt-4">
-            {spendingByAccount.accounts.map((account: any) => (
+            {spendingByAccount.accounts.map((account: AccountSpending) => (
               <div key={account.accountId} className="flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-cyan-100 dark:bg-cyan-900/30"
@@ -87,7 +88,7 @@ export function ByAccountWidget({
                 <span className="text-gray-500 dark:text-gray-400">Total spending</span>
                 <span className="font-semibold text-gray-900 dark:text-gray-100">
                   {convertAndFormat(
-                    spendingByAccount.accounts.reduce((sum: number, acc: any) => sum + acc.totalDebits, 0),
+                    spendingByAccount.accounts.reduce((sum: number, acc: AccountSpending) => sum + acc.totalDebits, 0),
                     spendingByAccount?.currency,
                     primaryCurrency,
                     convert

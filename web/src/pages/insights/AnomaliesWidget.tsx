@@ -1,14 +1,15 @@
-import type { DragProps } from './types';
+import type { DragProps, SectionId } from './types';
+import type { SpendingAnomaliesResponse, SpendingAnomaly } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection, WidgetWithErrorBoundary } from './InsightWidgets';
 
 interface AnomaliesWidgetProps {
-  anomalies: any;
+  anomalies: SpendingAnomaliesResponse | undefined;
   anomaliesLoading: boolean;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   collapsedSections: Set<string>;
-  toggleSection: (id: any) => void;
+  toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
 }
 
@@ -48,7 +49,7 @@ export function AnomaliesWidget({
           </div>
         ) : anomalies && anomalies.anomalies.length > 0 ? (
           <div className="space-y-3 pt-4">
-            {anomalies.anomalies.map((anomaly: any, index: number) => (
+            {anomalies.anomalies.map((anomaly: SpendingAnomaly, index: number) => (
               <div
                 key={anomaly.transactionId || `anomaly-${index}`}
                 className={`p-4 rounded-lg border-l-4 ${

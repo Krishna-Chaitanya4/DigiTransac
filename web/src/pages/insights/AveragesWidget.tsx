@@ -1,15 +1,17 @@
-import type { DragProps } from './types';
+import type { DragProps, SectionId } from './types';
+import type { TransactionAnalytics } from '../../services/transactionService';
+import type { TransactionSummary } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection, ComparisonBadge, WidgetWithErrorBoundary } from './InsightWidgets';
 
 interface AveragesWidgetProps {
-  analytics: any;
-  prevAnalytics: any;
-  transactionSummary: any;
+  analytics: TransactionAnalytics | undefined;
+  prevAnalytics: TransactionAnalytics | undefined;
+  transactionSummary: TransactionSummary | undefined;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   collapsedSections: Set<string>;
-  toggleSection: (id: any) => void;
+  toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
 }
 

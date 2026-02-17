@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom';
 import type { SectionId, DragProps, MobileReorderProps } from './types';
+import type { TransactionAnalytics, CategoryBreakdown } from '../../services/transactionService';
+import type { TransactionSummary } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection, DragHandle, MobileReorderButtons, WidgetWithErrorBoundary } from './InsightWidgets';
 
 interface CategoryPairWidgetProps {
-  analytics: any;
+  analytics: TransactionAnalytics | undefined;
   systemFolders: { incomeCategoryIds: string[]; expenseCategoryIds: string[] };
-  incomeCategories: any[];
-  transactionSummary: any;
-  prevAnalytics: any;
+  incomeCategories: CategoryBreakdown[];
+  transactionSummary: TransactionSummary | undefined;
+  prevAnalytics: TransactionAnalytics | undefined;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   isLoading: boolean;
@@ -86,9 +88,9 @@ export function CategoryPairWidget({
           ) : analytics?.topCategories && analytics.topCategories.length > 0 ? (
             <div className="space-y-3 pt-4">
               {analytics.topCategories
-                .filter((cat: any) => systemFolders.expenseCategoryIds.includes(cat.labelId))
+                .filter((cat: CategoryBreakdown) => systemFolders.expenseCategoryIds.includes(cat.labelId))
                 .slice(0, 6)
-                .map((category: any) => (
+                .map((category: CategoryBreakdown) => (
                 <div key={category.labelId} className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"

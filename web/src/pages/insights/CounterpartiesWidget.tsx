@@ -1,14 +1,15 @@
-import type { DragProps } from './types';
+import type { DragProps, SectionId } from './types';
+import type { TopCounterpartiesResponse, CounterpartySpending } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection, WidgetWithErrorBoundary } from './InsightWidgets';
 
 interface CounterpartiesWidgetProps {
-  counterparties: any;
+  counterparties: TopCounterpartiesResponse | undefined;
   counterpartiesLoading: boolean;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   collapsedSections: Set<string>;
-  toggleSection: (id: any) => void;
+  toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
 }
 
@@ -52,7 +53,7 @@ export function CounterpartiesWidget({
           </div>
         ) : counterparties && counterparties.counterparties.length > 0 ? (
           <div className="space-y-3 pt-4">
-            {counterparties.counterparties.map((cp: any, index: number) => {
+            {counterparties.counterparties.map((cp: CounterpartySpending, index: number) => {
               const avgAmount = cp.transactionCount > 0 ? cp.totalAmount / cp.transactionCount : 0;
               return (
                 <div key={cp.name} className="flex items-center gap-3">
@@ -85,7 +86,7 @@ export function CounterpartiesWidget({
                 <span className="text-gray-500 dark:text-gray-400">Total from top payees</span>
                 <span className="font-semibold text-gray-900 dark:text-gray-100">
                   {convertAndFormat(
-                    counterparties.counterparties.reduce((sum: number, cp: any) => sum + cp.totalAmount, 0),
+                    counterparties.counterparties.reduce((sum: number, cp: CounterpartySpending) => sum + cp.totalAmount, 0),
                     counterparties?.currency,
                     primaryCurrency,
                     convert

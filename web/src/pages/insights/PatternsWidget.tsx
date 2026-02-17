@@ -1,15 +1,16 @@
 import { ChartErrorBoundary } from '../../components/error';
-import type { DragProps } from './types';
+import type { DragProps, SectionId } from './types';
+import type { SpendingPatternsResponse, DayOfWeekSpending, HourOfDaySpending } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection } from './InsightWidgets';
 
 interface PatternsWidgetProps {
-  spendingPatterns: any;
+  spendingPatterns: SpendingPatternsResponse | undefined;
   patternsLoading: boolean;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   collapsedSections: Set<string>;
-  toggleSection: (id: any) => void;
+  toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
 }
 
@@ -49,8 +50,8 @@ export function PatternsWidget({
             <div>
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">By Day of Week</h4>
               <div className="space-y-2">
-                {spendingPatterns.byDayOfWeek.map((day: any) => {
-                  const maxAmount = Math.max(...spendingPatterns.byDayOfWeek.map((d: any) => d.totalAmount));
+                {spendingPatterns.byDayOfWeek.map((day: DayOfWeekSpending) => {
+                  const maxAmount = Math.max(...spendingPatterns.byDayOfWeek.map((d: DayOfWeekSpending) => d.totalAmount));
                   const barWidth = maxAmount > 0 ? (day.totalAmount / maxAmount) * 100 : 0;
                   return (
                     <div key={day.dayOfWeek} className="flex items-center gap-2">
@@ -91,11 +92,11 @@ export function PatternsWidget({
                 ];
                 
                 const periodData = timePeriods.map(period => {
-                  const hourData = spendingPatterns.byHourOfDay.filter((h: any) => period.hours.includes(h.hour));
+                  const hourData = spendingPatterns.byHourOfDay.filter((h: HourOfDaySpending) => period.hours.includes(h.hour));
                   return {
                     ...period,
-                    totalAmount: hourData.reduce((sum: number, h: any) => sum + h.totalAmount, 0),
-                    transactionCount: hourData.reduce((sum: number, h: any) => sum + h.transactionCount, 0),
+                    totalAmount: hourData.reduce((sum: number, h: HourOfDaySpending) => sum + h.totalAmount, 0),
+                    transactionCount: hourData.reduce((sum: number, h: HourOfDaySpending) => sum + h.transactionCount, 0),
                   };
                 });
                 
@@ -149,14 +150,14 @@ export function PatternsWidget({
               <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                 <div className="text-sm text-orange-600 dark:text-orange-400">Peak Day</div>
                 <div className="text-lg font-bold text-orange-700 dark:text-orange-300">
-                  {spendingPatterns.byDayOfWeek.reduce((a: any, b: any) => a.totalAmount > b.totalAmount ? a : b).dayName}
+                  {spendingPatterns.byDayOfWeek.reduce((a: DayOfWeekSpending, b: DayOfWeekSpending) => a.totalAmount > b.totalAmount ? a : b).dayName}
                 </div>
               </div>
               <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                 <div className="text-sm text-orange-600 dark:text-orange-400">Peak Hour</div>
                 <div className="text-lg font-bold text-orange-700 dark:text-orange-300">
                   {(() => {
-                    const peakHour = spendingPatterns.byHourOfDay.reduce((a: any, b: any) => a.totalAmount > b.totalAmount ? a : b);
+                    const peakHour = spendingPatterns.byHourOfDay.reduce((a: HourOfDaySpending, b: HourOfDaySpending) => a.totalAmount > b.totalAmount ? a : b);
                     return `${peakHour.hour}:00 - ${peakHour.hour + 1}:00`;
                   })()}
                 </div>

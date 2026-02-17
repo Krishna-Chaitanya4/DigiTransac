@@ -1,4 +1,5 @@
 import type { ViewMode } from './types';
+import type { TransactionSummary } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { ComparisonBadge } from './InsightWidgets';
 
@@ -8,7 +9,7 @@ interface FinancialSummaryWidgetProps {
   isLoading: boolean;
   financialSummary: { income: number; expenses: number; transfers: number; netChange: number };
   prevFinancialSummary: { income: number; expenses: number; transfers: number; netChange: number };
-  transactionSummary: any;
+  transactionSummary: TransactionSummary | undefined;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   savingsRate: number;

@@ -1,16 +1,18 @@
 import { ChartErrorBoundary } from '../../components/error';
-import type { DragProps } from './types';
+import type { DragProps, SectionId } from './types';
+import type { TransactionAnalytics, SpendingTrend } from '../../services/transactionService';
+import type { TransactionSummary } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection } from './InsightWidgets';
 
 interface TrendsWidgetProps {
-  analytics: any;
-  transactionSummary: any;
+  analytics: TransactionAnalytics | undefined;
+  transactionSummary: TransactionSummary | undefined;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   isLoading: boolean;
   collapsedSections: Set<string>;
-  toggleSection: (id: any) => void;
+  toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
 }
 
@@ -56,7 +58,7 @@ export function TrendsWidget({
           <div className="h-48 flex items-end gap-2 pt-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="flex-1 flex flex-col gap-1">
-                <div className="bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ height: `${Math.random() * 100 + 50}px` }} />
+                <div className="bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ height: `${[80, 120, 60, 140, 90, 110][i - 1]}px` }} />
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
               </div>
             ))}
@@ -65,9 +67,9 @@ export function TrendsWidget({
           <div className="space-y-4 pt-4">
             {/* Simple bar chart visualization */}
             <div className="flex items-end gap-2 h-40">
-              {analytics.spendingTrend.slice(-6).map((trend: any) => {
+              {analytics.spendingTrend.slice(-6).map((trend: SpendingTrend) => {
                 const maxValue = Math.max(
-                  ...analytics.spendingTrend.slice(-6).flatMap((t: any) => [t.credits, t.debits])
+                  ...analytics.spendingTrend.slice(-6).flatMap((t: SpendingTrend) => [t.credits, t.debits])
                 );
                 const creditsHeight = maxValue > 0 ? (trend.credits / maxValue) * 100 : 0;
                 const debitsHeight = maxValue > 0 ? (trend.debits / maxValue) * 100 : 0;

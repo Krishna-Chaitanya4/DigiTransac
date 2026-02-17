@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 import { BudgetCard } from '../../components/budget';
-import type { DragProps } from './types';
+import type { DragProps, SectionId } from './types';
+import type { BudgetSummary, Budget } from '../../types/budgets';
 import { CollapsibleSection, WidgetWithErrorBoundary } from './InsightWidgets';
 
 interface BudgetsWidgetProps {
-  budgetSummary: any;
+  budgetSummary: BudgetSummary | undefined;
   collapsedSections: Set<string>;
-  toggleSection: (id: any) => void;
+  toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
 }
 
@@ -46,9 +47,9 @@ export function BudgetsWidget({
         {budgetSummary?.budgets && budgetSummary.budgets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4">
             {budgetSummary.budgets
-              .sort((a: any, b: any) => b.percentUsed - a.percentUsed) // Sort by usage, highest first
+              .sort((a: Budget, b: Budget) => b.percentUsed - a.percentUsed) // Sort by usage, highest first
               .slice(0, 3)
-              .map((budget: any) => (
+              .map((budget: Budget) => (
                 <BudgetCard key={budget.id} budget={budget} compact />
               ))}
           </div>
