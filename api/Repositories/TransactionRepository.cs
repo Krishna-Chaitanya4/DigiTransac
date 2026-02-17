@@ -169,7 +169,7 @@ public class TransactionRepository : ITransactionRepository
         {
             filterBuilder.Eq(t => t.UserId, userId),
             filterBuilder.Eq(t => t.IsRecurringTemplate, false), // Exclude templates from normal listings
-            filterBuilder.Eq(t => t.IsDeleted, false), // Exclude soft-deleted transactions
+            filterBuilder.Ne(t => t.IsDeleted, true), // Exclude soft-deleted transactions (Ne(true) matches both false and missing field)
         };
         
         // Include/exclude pending P2P transactions (AccountId is null) based on status filter
@@ -439,7 +439,7 @@ public class TransactionRepository : ITransactionRepository
             filterBuilder.Eq(t => t.AccountId, accountId),
             filterBuilder.Eq(t => t.UserId, userId),
             filterBuilder.Eq(t => t.IsRecurringTemplate, false),
-            filterBuilder.Eq(t => t.IsDeleted, false)
+            filterBuilder.Ne(t => t.IsDeleted, true)
         };
 
         if (type.HasValue)
@@ -472,7 +472,7 @@ public class TransactionRepository : ITransactionRepository
         {
             filterBuilder.Eq(t => t.UserId, userId),
             filterBuilder.Eq(t => t.IsRecurringTemplate, false),
-            filterBuilder.Eq(t => t.IsDeleted, false)
+            filterBuilder.Ne(t => t.IsDeleted, true)
         };
 
         if (startDate.HasValue)
@@ -513,7 +513,7 @@ public class TransactionRepository : ITransactionRepository
         {
             filterBuilder.Eq(t => t.UserId, userId),
             filterBuilder.Eq(t => t.IsRecurringTemplate, false),
-            filterBuilder.Eq(t => t.IsDeleted, false)
+            filterBuilder.Ne(t => t.IsDeleted, true)
         };
 
         if (startDate.HasValue)
@@ -549,7 +549,7 @@ public class TransactionRepository : ITransactionRepository
             Builders<Transaction>.Filter.Eq(t => t.AccountId, accountId),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
     }
@@ -566,7 +566,7 @@ public class TransactionRepository : ITransactionRepository
             Builders<Transaction>.Filter.In(t => t.AccountId, accountIdList),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
 
         var pipeline = new[]
@@ -601,7 +601,7 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true),
             Builders<Transaction>.Filter.ElemMatch(t => t.Splits, s => s.LabelId == labelId)
         );
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
@@ -612,7 +612,7 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false),
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true),
             Builders<Transaction>.Filter.AnyEq(t => t.TagIds, tagId)
         );
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
@@ -654,7 +654,7 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Pending),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
         
         return (int)await _transactions.CountDocumentsAsync(filter, options: null, ct);
@@ -678,7 +678,7 @@ public class TransactionRepository : ITransactionRepository
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
             Builders<Transaction>.Filter.Ne(t => t.CounterpartyUserId, null),
             Builders<Transaction>.Filter.Eq(t => t.IsRecurringTemplate, false),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
         
         return await _transactions.Find(filter)
@@ -719,7 +719,7 @@ public class TransactionRepository : ITransactionRepository
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.Id, id),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId),
-            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, false)
+            Builders<Transaction>.Filter.Ne(t => t.IsDeleted, true)
         );
 
         var update = Builders<Transaction>.Update

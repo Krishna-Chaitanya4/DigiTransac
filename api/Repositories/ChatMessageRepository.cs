@@ -237,7 +237,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, counterpartyUserId),
             Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         return (int)await _chatMessages.CountDocumentsAsync(filter, options: null, ct);
@@ -253,7 +253,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.In(m => m.SenderUserId, counterpartyIdList),
             Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         var pipeline = _chatMessages.Aggregate()
@@ -269,7 +269,7 @@ public class ChatMessageRepository : IChatMessageRepository
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
             Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         return (int)await _chatMessages.CountDocumentsAsync(filter, options: null, ct);
@@ -317,7 +317,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
             Builders<ChatMessage>.Filter.Eq(m => m.Type, ChatMessageType.Text),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         var update = Builders<ChatMessage>.Update
@@ -334,7 +334,7 @@ public class ChatMessageRepository : IChatMessageRepository
         var filter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.Id, messageId),
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, senderUserId),
-            Builders<ChatMessage>.Filter.Eq(m => m.IsDeleted, false)
+            Builders<ChatMessage>.Filter.Ne(m => m.IsDeleted, true)
         );
 
         var update = Builders<ChatMessage>.Update
