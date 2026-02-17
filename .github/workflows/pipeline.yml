@@ -18,8 +18,10 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', '.github/dependabot.yml']
   pull_request:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', '.github/dependabot.yml']
   workflow_dispatch:
     inputs:
       skip_tests:
@@ -32,6 +34,11 @@ on:
         required: false
         default: ''
         type: string
+
+# Cancel in-progress runs for PRs; let main deployments complete sequentially
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # SECURITY: OIDC for Azure authentication
 permissions:
@@ -285,24 +292,44 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
+      - name: Test with Coverage
         run: |
           dotnet test --no-build --configuration Release \
             --verbosity normal \
             --filter "Category!=Integration" \
             --logger "trx;LogFileName=test-results.trx" \
-            --collect:"XPlat Code Coverage"
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
         env:
           JWT_SECRET_KEY: test-jwt-secret-key-for-ci-testing-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-testing
           ENCRYPTION_KEK: test-kek-32-characters-exactly!
+
+      - name: Generate Coverage Report
+        if: always()
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: '**/coverage.cobertura.xml'
+          badge: true
+          format: markdown
+          output: both
+          thresholds: '40 60'
+
+      - name: Add Coverage PR Comment
+        if: github.event_name == 'pull_request' && always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: backend-coverage
+          path: code-coverage-results.md
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: backend-test-results
-          path: '**/test-results.trx'
+          path: |
+            **/test-results.trx
+            **/coverage.cobertura.xml
           retention-days: 7
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -337,9 +364,16 @@ jobs:
         run: npm run lint
         # Lint errors will fail the build - warnings are allowed
 
-      - name: Test
+      - name: Test with Coverage
         working-directory: web
-        run: npm test -- --run --reporter=verbose
+        run: npx vitest run --reporter=verbose --coverage --coverage.reporter=json-summary --coverage.reporter=text
+
+      - name: Add Frontend Coverage PR Comment
+        if: github.event_name == 'pull_request' && always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          working-directory: web
+          vite-config-path: vitest.config.ts
 
       - name: Build (Verify)
         working-directory: web
@@ -385,9 +419,10 @@ jobs:
 
       - name: Check .NET Outdated Packages
         run: |
-          echo "### .NET Outdated Packages" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 .NET Outdated Packages" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          # List outdated packages (human-readable table)
           OUTPUT=$(dotnet list package --outdated 2>&1) || true
           
           if echo "$OUTPUT" | grep -q ">"; then
@@ -395,35 +430,24 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             echo "$OUTPUT" | grep -E "^   > |Top-level" >> $GITHUB_STEP_SUMMARY || true
             echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "::notice::Consider updating outdated .NET packages"
+            echo "" >> $GITHUB_STEP_SUMMARY
           else
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Check Outdated .NET Packages (Major Versions)
-        run: |
-          echo "### 📦 .NET Package Version Check" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Get outdated packages in a parseable format
-          OUTPUT=$(dotnet list package --outdated --format json 2>/dev/null) || OUTPUT="{}"
+          # Check major version deltas in a single pass (fail on 2+ major behind)
+          JSON_OUTPUT=$(dotnet list package --outdated --format json 2>/dev/null) || JSON_OUTPUT="{}"
           
-          # Check for packages by major version difference
-          CRITICAL_OUTDATED=""  # 2+ major versions behind (FAIL)
-          WARNING_OUTDATED=""   # 1 major version behind (WARN)
+          CRITICAL_OUTDATED=""
+          WARNING_OUTDATED=""
           
-          # Parse JSON and check major version differences
-          # For each project's top-level packages
-          PACKAGES=$(echo "$OUTPUT" | jq -r '.projects[]?.frameworks[]?.topLevelPackages[]? | "\(.id)|\(.resolvedVersion)|\(.latestVersion)"' 2>/dev/null || echo "")
+          PACKAGES=$(echo "$JSON_OUTPUT" | jq -r '.projects[]?.frameworks[]?.topLevelPackages[]? | "\(.id)|\(.resolvedVersion)|\(.latestVersion)"' 2>/dev/null || echo "")
           
           while IFS='|' read -r PKG_NAME CURRENT_VER LATEST_VER; do
             if [ -z "$PKG_NAME" ]; then continue; fi
             
-            # Extract major versions (handle versions like "1.2.3" or "1.2.3-preview")
             CURRENT_MAJOR=$(echo "$CURRENT_VER" | grep -oE '^[0-9]+' || echo "0")
             LATEST_MAJOR=$(echo "$LATEST_VER" | grep -oE '^[0-9]+' || echo "0")
-            
-            # Calculate version difference
             DIFF=$((LATEST_MAJOR - CURRENT_MAJOR))
             
             if [ "$DIFF" -ge 2 ]; then
@@ -433,19 +457,15 @@ jobs:
             fi
           done <<< "$PACKAGES"
           
-          # Report warnings (1 major version behind)
           if [ -n "$WARNING_OUTDATED" ]; then
             echo "⚠️ **Packages 1 major version behind:**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             echo -e "$WARNING_OUTDATED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "::warning::Some .NET packages are 1 major version behind - consider updating"
           fi
           
-          # Report and fail on critical (2+ major versions behind)
           if [ -n "$CRITICAL_OUTDATED" ]; then
             echo "❌ **Critically outdated packages (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             echo -e "$CRITICAL_OUTDATED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "::error::Critically outdated .NET packages detected - update required"
@@ -463,6 +483,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
 
       - name: Check npm Vulnerabilities
         id: npm-vuln
@@ -511,57 +533,40 @@ jobs:
       - name: Check npm Outdated Packages
         working-directory: web
         run: |
-          echo "### npm Outdated Packages" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 npm Outdated Packages" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Check for outdated packages
+          # Single query for both table and major-version analysis
           set +e
           OUTDATED=$(npm outdated --json 2>&1)
           set -e
           
-          # Count outdated packages
           COUNT=$(echo "$OUTDATED" | jq 'length // 0')
           
+          # Show outdated packages table
           if [ "$COUNT" -gt 0 ]; then
             echo "📦 **$COUNT outdated packages:**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "| Package | Current | Wanted | Latest |" >> $GITHUB_STEP_SUMMARY
             echo "|---------|---------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-            
-            # Parse and display outdated packages
             echo "$OUTDATED" | jq -r 'to_entries[] | "| \(.key) | \(.value.current) | \(.value.wanted) | \(.value.latest) |"' >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-            
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo "::notice::$COUNT npm packages have updates available"
           else
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Check Outdated npm Packages (Major Versions)
-        working-directory: web
-        run: |
-          echo "### 📦 npm Package Version Check" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Check for outdated packages
-          set +e
-          OUTDATED=$(npm outdated --json 2>&1)
-          set -e
+          # Check major version deltas in a single pass (fail on 2+ major behind)
+          CRITICAL_OUTDATED=""
+          WARNING_OUTDATED=""
           
-          # Check for packages by major version difference
-          CRITICAL_OUTDATED=""  # 2+ major versions behind (FAIL)
-          WARNING_OUTDATED=""   # 1 major version behind (WARN)
-          
-          # Parse JSON and check major version differences
           PACKAGES=$(echo "$OUTDATED" | jq -r 'to_entries[] | "\(.key)|\(.value.current)|\(.value.latest)"' 2>/dev/null || echo "")
           
           while IFS='|' read -r PKG_NAME CURRENT_VER LATEST_VER; do
             if [ -z "$PKG_NAME" ]; then continue; fi
             
-            # Extract major versions (handle versions like "1.2.3" or "1.2.3-beta.1")
             CURRENT_MAJOR=$(echo "$CURRENT_VER" | grep -oE '^[0-9]+' || echo "0")
             LATEST_MAJOR=$(echo "$LATEST_VER" | grep -oE '^[0-9]+' || echo "0")
-            
-            # Calculate version difference
             DIFF=$((LATEST_MAJOR - CURRENT_MAJOR))
             
             if [ "$DIFF" -ge 2 ]; then
@@ -571,19 +576,15 @@ jobs:
             fi
           done <<< "$PACKAGES"
           
-          # Report warnings (1 major version behind)
           if [ -n "$WARNING_OUTDATED" ]; then
             echo "⚠️ **Packages 1 major version behind:**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             echo -e "$WARNING_OUTDATED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "::warning::Some npm packages are 1 major version behind - consider updating"
           fi
           
-          # Report and fail on critical (2+ major versions behind)
           if [ -n "$CRITICAL_OUTDATED" ]; then
             echo "❌ **Critically outdated packages (2+ major versions behind):**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             echo -e "$CRITICAL_OUTDATED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "::error::Critically outdated npm packages detected - update required"
@@ -636,48 +637,30 @@ jobs:
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # ────────────── Build Backend ──────────────
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+      # ────────────── Docker Buildx (for layer caching) ──────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build Backend
-        run: |
-          dotnet restore
-          dotnet build --configuration Release
-
+      # ────────────── Build & Push Backend Image ──────────────
       - name: Build & Push Backend Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./api
           push: true
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
           tags: |
             ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:${{ needs.setup.outputs.version }}
             ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:latest
 
-      # ────────────── Build Frontend ──────────────
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: web/package-lock.json
-
-      - name: Build Frontend
-        working-directory: web
-        run: |
-          npm ci
-          npm run build
-        env:
-          VITE_API_URL: ${{ env.BACKEND_URL }}/api
-          VITE_ENVIRONMENT: production
-
+      # ────────────── Build & Push Frontend Image ──────────────
       - name: Build & Push Frontend Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./web
           push: true
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
           build-args: |
             VITE_API_URL=${{ env.BACKEND_URL }}/api
           tags: |
@@ -734,7 +717,8 @@ jobs:
             echo "Attempt $i: Status $CODE"
             sleep 15
           done
-          echo "⚠️ Backend health check inconclusive"
+          echo "❌ Backend health check failed after 5 attempts"
+          exit 1
 
       - name: Health Check - Frontend
         run: |
@@ -749,7 +733,8 @@ jobs:
             echo "Attempt $i: Status $CODE"
             sleep 15
           done
-          echo "⚠️ Frontend health check inconclusive"
+          echo "❌ Frontend health check failed after 5 attempts"
+          exit 1
 
   # ┌──────────────────────────────────────────────────────────────────────────────┐
   # │ STAGE 6: Create Release Tag (Main branch only)                               │
@@ -821,7 +806,7 @@ jobs:
   summary:
     name: 📝 Summary
     runs-on: ubuntu-latest
-    needs: [setup, validate-backend, validate-frontend, validate-security, validate-changelog, build-and-deploy, verify, create-release-tag]
+    needs: [setup, validate-backend, validate-frontend, validate-security, build-and-deploy, verify, create-release-tag]
     if: always()
     steps:
       - name: PR Summary
@@ -831,19 +816,14 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 📝 CHANGELOG | ${{ needs.validate-changelog.result == 'success' && '✅ Updated' || needs.validate-changelog.result == 'skipped' && '⏭️ Skipped' || '❌ Not Updated' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔧 Backend Tests | ${{ needs.validate-backend.result == 'success' && '✅ Passed' || needs.validate-backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌐 Frontend Tests | ${{ needs.validate-frontend.result == 'success' && '✅ Passed' || needs.validate-frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔒 Security Scan | ${{ needs.validate-security.result == 'success' && '✅ Passed' || needs.validate-security.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Check if changelog validation passed (or was skipped for non-code PRs)
-          CHANGELOG_OK="${{ needs.validate-changelog.result == 'success' || needs.validate-changelog.result == 'skipped' }}"
-          
           if [ "${{ needs.validate-backend.result }}" = "success" ] && \
              [ "${{ needs.validate-frontend.result }}" = "success" ] && \
-             [ "${{ needs.validate-security.result }}" = "success" ] && \
-             [ "$CHANGELOG_OK" = "true" ]; then
+             [ "${{ needs.validate-security.result }}" = "success" ]; then
             echo "### ✅ Ready for merge!" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "All validations passed. This PR can be safely merged." >> $GITHUB_STEP_SUMMARY
@@ -858,7 +838,6 @@ jobs:
           echo "║              PR Validation Complete                        ║"
           echo "╚════════════════════════════════════════════════════════════╝"
           echo ""
-          echo "CHANGELOG:      ${{ needs.validate-changelog.result }}"
           echo "Backend Tests:  ${{ needs.validate-backend.result }}"
           echo "Frontend Tests: ${{ needs.validate-frontend.result }}"
           echo "Security Scan:  ${{ needs.validate-security.result }}"

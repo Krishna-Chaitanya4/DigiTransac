@@ -18,6 +18,12 @@ export default defineConfig({
     typecheck: {
       tsconfig: './tsconfig.test.json',
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'json'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/test/**', 'src/**/*.test.*', 'src/**/*.spec.*', 'src/main.tsx', 'src/vite-env.d.ts'],
+    },
   },
   server: {
     port: 5173,
