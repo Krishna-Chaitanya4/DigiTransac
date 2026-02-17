@@ -366,7 +366,14 @@ jobs:
 
       - name: Test with Coverage
         working-directory: web
-        run: npx vitest run --reporter=verbose --coverage
+        run: |
+          npx vitest run --reporter=verbose \
+            --coverage.enabled=true \
+            --coverage.provider=v8 \
+            --coverage.reporter=json-summary \
+            --coverage.reporter=json \
+            --coverage.reporter=text \
+            --coverage.reportsDirectory=./coverage
 
       - name: Add Frontend Coverage PR Comment
         if: github.event_name == 'pull_request' && always()
