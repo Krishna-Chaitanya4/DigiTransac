@@ -32,18 +32,6 @@ export const canUndoDelete = (msg: ConversationMessage): boolean => {
   return minutesElapsed <= UNDO_DELETE_WINDOW_MINUTES;
 };
 
-// Helper to get remaining undo time as a human-readable string
-const getUndoTimeRemaining = (deletedAt: string): string => {
-  const deletedTime = new Date(deletedAt).getTime();
-  const expiresAt = deletedTime + UNDO_DELETE_WINDOW_MINUTES * 60 * 1000;
-  const remainingMs = expiresAt - Date.now();
-  if (remainingMs <= 0) return 'expired';
-  const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
-  const remainingMins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-  if (remainingHours > 0) return `${remainingHours}h ${remainingMins}m left`;
-  return `${remainingMins}m left`;
-};
-
 interface MessageBubbleProps {
   message: ConversationMessage;
   showTime: boolean;
@@ -156,11 +144,6 @@ export const MessageBubble = memo(function MessageBubble({
               >
                 Undo
               </button>
-            )}
-            {canUndo && tx.deletedAt && (
-              <span className="text-[10px] text-gray-400 dark:text-gray-500 not-italic">
-                {getUndoTimeRemaining(tx.deletedAt)}
-              </span>
             )}
           </div>
           {showTime && (
