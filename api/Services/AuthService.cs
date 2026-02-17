@@ -69,6 +69,7 @@ public partial class AuthService : IAuthService
     private readonly ILabelRepository _labelRepository;
     private readonly ITagRepository _tagRepository;
     private readonly IBudgetRepository _budgetRepository;
+    private readonly IPushSubscriptionRepository _pushSubscriptionRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
@@ -89,6 +90,7 @@ public partial class AuthService : IAuthService
         ILabelRepository labelRepository,
         ITagRepository tagRepository,
         IBudgetRepository budgetRepository,
+        IPushSubscriptionRepository pushSubscriptionRepository,
         IUnitOfWork unitOfWork,
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger)
@@ -108,6 +110,7 @@ public partial class AuthService : IAuthService
         _labelRepository = labelRepository;
         _tagRepository = tagRepository;
         _budgetRepository = budgetRepository;
+        _pushSubscriptionRepository = pushSubscriptionRepository;
         _unitOfWork = unitOfWork;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;

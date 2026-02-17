@@ -20,6 +20,7 @@ public interface ITransactionRepository
     Task<bool> DeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
     Task<bool> DeleteByIdAsync(string id, IClientSessionHandle? session = null, CancellationToken ct = default);
     Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
+    Task<int> NullifyCounterpartyReferencesAsync(string deletedUserId, CancellationToken ct = default);
     Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId, CancellationToken ct = default);
     Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null, CancellationToken ct = default);
     Task<Dictionary<string, decimal>> GetSumByLabelAsync(string userId, DateTime? startDate, DateTime? endDate, CancellationToken ct = default);
@@ -48,8 +49,9 @@ public interface ITransactionRepository
     
     // Soft delete / restore
     Task<bool> SoftDeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
-    Task<bool> RestoreAsync(string id, string userId, CancellationToken ct = default);
+    Task<bool> RestoreAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
     Task<Transaction?> GetDeletedByIdAndUserIdAsync(string id, string userId, CancellationToken ct = default);
+    Task<List<string>> GetExpiredDeletedTransactionIdsAsync(TimeSpan undoWindow, CancellationToken ct = default);
     Task<int> PurgeExpiredDeletedTransactionsAsync(TimeSpan undoWindow, CancellationToken ct = default);
 }
 
@@ -130,7 +132,13 @@ public class TransactionRepository : ITransactionRepository
                 new(Builders<Transaction>.IndexKeys
                     .Ascending(t => t.UserId)
                     .Ascending("Location.City"),
-                    new CreateIndexOptions { Name = "idx_userId_location_city", Sparse = true })
+                    new CreateIndexOptions { Name = "idx_userId_location_city", Sparse = true }),
+                
+                // Soft-delete purge query (IsDeleted + DeletedAt)
+                new(Builders<Transaction>.IndexKeys
+                    .Ascending(t => t.IsDeleted)
+                    .Ascending(t => t.DeletedAt),
+                    new CreateIndexOptions { Name = "idx_isDeleted_deletedAt", Sparse = true })
             };
 
             _transactions.Indexes.CreateMany(indexModels);
@@ -401,6 +409,20 @@ public class TransactionRepository : ITransactionRepository
     {
         var result = await _transactions.DeleteManyAsync(t => t.UserId == userId, ct);
         return result.DeletedCount > 0;
+    }
+
+    public async Task<int> NullifyCounterpartyReferencesAsync(string deletedUserId, CancellationToken ct = default)
+    {
+        // Find transactions belonging to OTHER users that reference the deleted user as counterparty
+        var filter = Builders<Transaction>.Filter.Eq(t => t.CounterpartyUserId, deletedUserId);
+
+        var update = Builders<Transaction>.Update
+            .Set(t => t.CounterpartyUserId, (string?)null)
+            .Set(t => t.LinkedTransactionId, (string?)null)
+            .Set(t => t.TransactionLinkId, (Guid?)null);
+
+        var result = await _transactions.UpdateManyAsync(filter, update, options: null, ct);
+        return (int)result.ModifiedCount;
     }
 
     public async Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId, CancellationToken ct = default)
@@ -717,7 +739,7 @@ public class TransactionRepository : ITransactionRepository
         return await _transactions.Find(t => t.Id == id && t.UserId == userId && t.IsDeleted).FirstOrDefaultAsync(ct);
     }
 
-    public async Task<bool> RestoreAsync(string id, string userId, CancellationToken ct = default)
+    public async Task<bool> RestoreAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default)
     {
         var filter = Builders<Transaction>.Filter.And(
             Builders<Transaction>.Filter.Eq(t => t.Id, id),
@@ -729,8 +751,26 @@ public class TransactionRepository : ITransactionRepository
             .Set(t => t.IsDeleted, false)
             .Set(t => t.DeletedAt, (DateTime?)null);
 
-        var result = await _transactions.UpdateOneAsync(filter, update, options: null, ct);
+        UpdateResult result;
+        if (session != null)
+            result = await _transactions.UpdateOneAsync(session, filter, update, options: null, ct);
+        else
+            result = await _transactions.UpdateOneAsync(filter, update, options: null, ct);
         return result.ModifiedCount > 0;
+    }
+
+    public async Task<List<string>> GetExpiredDeletedTransactionIdsAsync(TimeSpan undoWindow, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - undoWindow;
+
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.IsDeleted, true),
+            Builders<Transaction>.Filter.Lt(t => t.DeletedAt, cutoff)
+        );
+
+        return await _transactions.Find(filter)
+            .Project(t => t.Id)
+            .ToListAsync(ct);
     }
 
     public async Task<int> PurgeExpiredDeletedTransactionsAsync(TimeSpan undoWindow, CancellationToken ct = default)

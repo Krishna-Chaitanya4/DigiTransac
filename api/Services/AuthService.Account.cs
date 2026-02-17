@@ -49,39 +49,50 @@ public partial class AuthService
             await _transactionRepository.DeleteAllByUserIdAsync(userId);
             _logger.LogInformation("Deleted transactions for user: {UserId}", userId);
 
-            // 2. Delete all accounts for the user
+            // 2. Nullify counterparty references on other users' P2P transactions
+            //    (prevents dangling LinkedTransactionId/CounterpartyUserId pointers)
+            var nullifiedCount = await _transactionRepository.NullifyCounterpartyReferencesAsync(userId);
+            if (nullifiedCount > 0)
+                _logger.LogInformation("Nullified {Count} counterparty transaction references for user: {UserId}", nullifiedCount, userId);
+
+            // 3. Delete all accounts for the user
             await _accountRepository.DeleteAllByUserIdAsync(userId);
             _logger.LogInformation("Deleted accounts for user: {UserId}", userId);
 
-            // 3. Delete all labels for the user
+            // 4. Delete all labels for the user
             await _labelRepository.DeleteAllByUserIdAsync(userId);
             _logger.LogInformation("Deleted labels for user: {UserId}", userId);
 
-            // 4. Delete all tags for the user
+            // 5. Delete all tags for the user
             await _tagRepository.DeleteAllByUserIdAsync(userId);
             _logger.LogInformation("Deleted tags for user: {UserId}", userId);
 
-            // 5. Delete all budgets for the user
+            // 6. Delete all budgets for the user
             await _budgetRepository.DeleteAllByUserIdAsync(userId);
             _logger.LogInformation("Deleted budgets for user: {UserId}", userId);
 
-            // 6. Delete all chat messages for the user (both sent and received)
-            await _chatMessageRepository.DeleteAllByUserIdAsync(userId);
-            _logger.LogInformation("Deleted chat messages for user: {UserId}", userId);
+            // 7. Anonymize chat messages for the counterparty (so their history isn't destroyed)
+            //    then delete messages where the user is the sole participant (self-chat)
+            await _chatMessageRepository.AnonymizeByUserIdAsync(userId);
+            _logger.LogInformation("Anonymized and cleaned chat messages for user: {UserId}", userId);
 
-            // 7. Delete all refresh tokens for the user
+            // 8. Delete all push notification subscriptions for the user
+            await _pushSubscriptionRepository.DeleteByUserIdAsync(userId);
+            _logger.LogInformation("Deleted push subscriptions for user: {UserId}", userId);
+
+            // 9. Delete all refresh tokens for the user
             await _refreshTokenRepository.DeleteByUserIdAsync(userId);
             _logger.LogInformation("Deleted refresh tokens for user: {UserId}", userId);
 
-            // 8. Delete all two-factor tokens for the user
+            // 10. Delete all two-factor tokens for the user
             await _twoFactorTokenRepository.DeleteAllByUserIdAsync(userId);
             _logger.LogInformation("Deleted two-factor tokens for user: {UserId}", userId);
 
-            // 9. Delete all email verifications for the user
+            // 11. Delete all email verifications for the user
             await _emailVerificationRepository.DeleteAllByEmailAsync(userEmail);
             _logger.LogInformation("Deleted email verifications for user: {UserId}", userId);
 
-            // 10. Delete the user record (last, so partial failure still leaves a valid user)
+            // 12. Delete the user record (last, so partial failure still leaves a valid user)
             var deleted = await _userRepository.DeleteAsync(userId);
             if (!deleted)
             {

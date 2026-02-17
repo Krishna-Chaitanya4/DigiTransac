@@ -52,17 +52,29 @@ public class DeletedTransactionCleanupService : BackgroundService
 
         using var scope = _scopeFactory.CreateScope();
         var transactionRepository = scope.ServiceProvider.GetRequiredService<ITransactionRepository>();
+        var chatMessageRepository = scope.ServiceProvider.GetRequiredService<IChatMessageRepository>();
 
         var undoWindow = TimeSpan.FromMinutes(ConversationConstants.UndoDeleteWindowMinutes);
-        var purgedCount = await transactionRepository.PurgeExpiredDeletedTransactionsAsync(undoWindow, ct);
 
-        if (purgedCount > 0)
-        {
-            _logger.LogInformation("Permanently purged {Count} expired deleted transactions", purgedCount);
-        }
-        else
+        // 1. Collect IDs of transactions about to be purged
+        var expiredIds = await transactionRepository.GetExpiredDeletedTransactionIdsAsync(undoWindow, ct);
+
+        if (expiredIds.Count == 0)
         {
             _logger.LogInformation("No expired deleted transactions to purge");
+            return;
         }
+
+        // 2. Nullify TransactionId on chat messages that reference these transactions
+        //    (prevents orphaned references after hard-delete)
+        var nullifiedCount = await chatMessageRepository.NullifyTransactionReferencesAsync(expiredIds, ct);
+        if (nullifiedCount > 0)
+        {
+            _logger.LogInformation("Nullified {Count} chat message transaction references before purge", nullifiedCount);
+        }
+
+        // 3. Hard-delete the expired transactions
+        var purgedCount = await transactionRepository.PurgeExpiredDeletedTransactionsAsync(undoWindow, ct);
+        _logger.LogInformation("Permanently purged {Count} expired deleted transactions", purgedCount);
     }
 }

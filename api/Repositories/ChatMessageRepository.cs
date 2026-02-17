@@ -86,6 +86,18 @@ public interface IChatMessageRepository
     /// Delete all messages where the user is sender or recipient (for account deletion)
     /// </summary>
     Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Anonymize a deleted user's chat presence: delete self-chat messages,
+    /// and null out sender/recipient IDs on P2P messages so the counterparty keeps their history.
+    /// </summary>
+    Task AnonymizeByUserIdAsync(string userId, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Nullify TransactionId on chat messages that reference any of the given transaction IDs.
+    /// Called during purge to prevent orphaned references after hard-delete.
+    /// </summary>
+    Task<int> NullifyTransactionReferencesAsync(IEnumerable<string> transactionIds, CancellationToken ct = default);
 }
 
 public class ChatMessageRepository : IChatMessageRepository
@@ -426,5 +438,47 @@ public class ChatMessageRepository : IChatMessageRepository
         
         var result = await _chatMessages.DeleteManyAsync(filter, ct);
         return result.DeletedCount > 0;
+    }
+
+    public async Task AnonymizeByUserIdAsync(string userId, CancellationToken ct = default)
+    {
+        // Step 1: Delete self-chat messages (where user is both sender AND recipient)
+        var selfChatFilter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, userId),
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId)
+        );
+        await _chatMessages.DeleteManyAsync(selfChatFilter, ct);
+
+        // Step 2: Anonymize messages SENT by the deleted user to others
+        //         (counterparty is the recipient — they keep their chat history)
+        var sentFilter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, userId),
+            Builders<ChatMessage>.Filter.Ne(m => m.RecipientUserId, userId)
+        );
+        var sentUpdate = Builders<ChatMessage>.Update
+            .Set(m => m.SenderUserId, "deleted");
+        await _chatMessages.UpdateManyAsync(sentFilter, sentUpdate, options: null, ct);
+
+        // Step 3: Anonymize messages RECEIVED by the deleted user from others
+        //         (counterparty is the sender — they keep their chat history)
+        var receivedFilter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
+            Builders<ChatMessage>.Filter.Ne(m => m.SenderUserId, userId)
+        );
+        var receivedUpdate = Builders<ChatMessage>.Update
+            .Set(m => m.RecipientUserId, "deleted");
+        await _chatMessages.UpdateManyAsync(receivedFilter, receivedUpdate, options: null, ct);
+    }
+
+    public async Task<int> NullifyTransactionReferencesAsync(IEnumerable<string> transactionIds, CancellationToken ct = default)
+    {
+        var idsList = transactionIds.ToList();
+        if (idsList.Count == 0) return 0;
+
+        var filter = Builders<ChatMessage>.Filter.In(m => m.TransactionId, idsList);
+        var update = Builders<ChatMessage>.Update.Set(m => m.TransactionId, (string?)null);
+
+        var result = await _chatMessages.UpdateManyAsync(filter, update, options: null, ct);
+        return (int)result.ModifiedCount;
     }
 }

@@ -662,6 +662,7 @@ public class TransactionCoreService : ITransactionCoreService
                     ? await _accountRepository.GetByIdAndUserIdAsync(linkedTransaction.AccountId, userId)
                     : null;
 
+                // Restore linked transfer atomically: balance + restore in same transaction
                 if (linkedAccount != null)
                 {
                     await using var unitOfWork = new Services.UnitOfWork.UnitOfWork(_mongoDbService);
@@ -669,9 +670,13 @@ public class TransactionCoreService : ITransactionCoreService
                     {
                         await _accountBalanceService.UpdateBalanceAsync(
                             linkedAccount, linkedTransaction.Type, linkedTransaction.Amount, true, session);
+                        await _transactionRepository.RestoreAsync(linkedTransaction.Id, userId, session);
                     });
                 }
-                await _transactionRepository.RestoreAsync(linkedTransaction.Id, userId);
+                else
+                {
+                    await _transactionRepository.RestoreAsync(linkedTransaction.Id, userId);
+                }
             }
         }
 
@@ -686,7 +691,7 @@ public class TransactionCoreService : ITransactionCoreService
             }
         }
 
-        // Re-apply balance and restore transaction
+        // Re-apply balance and restore transaction atomically
         if (account != null)
         {
             await using var unitOfWork = new Services.UnitOfWork.UnitOfWork(_mongoDbService);
@@ -694,9 +699,13 @@ public class TransactionCoreService : ITransactionCoreService
             {
                 await _accountBalanceService.UpdateBalanceAsync(
                     account, transaction.Type, transaction.Amount, true, session);
+                await _transactionRepository.RestoreAsync(id, userId, session);
             });
         }
-        await _transactionRepository.RestoreAsync(id, userId);
+        else
+        {
+            await _transactionRepository.RestoreAsync(id, userId);
+        }
 
         return Result.Success();
     }

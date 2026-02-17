@@ -29,6 +29,7 @@ public class AuthServiceTests
     private readonly Mock<ILabelRepository> _labelRepositoryMock;
     private readonly Mock<ITagRepository> _tagRepositoryMock;
     private readonly Mock<IBudgetRepository> _budgetRepositoryMock;
+    private readonly Mock<IPushSubscriptionRepository> _pushSubscriptionRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<AuthService>> _loggerMock;
     private readonly IOptions<JwtSettings> _jwtSettings;
@@ -52,6 +53,7 @@ public class AuthServiceTests
         _labelRepositoryMock = new Mock<ILabelRepository>();
         _tagRepositoryMock = new Mock<ITagRepository>();
         _budgetRepositoryMock = new Mock<IBudgetRepository>();
+        _pushSubscriptionRepositoryMock = new Mock<IPushSubscriptionRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<AuthService>>();
         _jwtSettings = Options.Create(new JwtSettings
@@ -102,6 +104,7 @@ public class AuthServiceTests
             _labelRepositoryMock.Object,
             _tagRepositoryMock.Object,
             _budgetRepositoryMock.Object,
+            _pushSubscriptionRepositoryMock.Object,
             _unitOfWorkMock.Object,
             _jwtSettings,
             _loggerMock.Object
@@ -410,6 +413,8 @@ public class AuthServiceTests
         // Setup all repository deletions within the transaction
         _transactionRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
             .ReturnsAsync(true);
+        _transactionRepositoryMock.Setup(x => x.NullifyCounterpartyReferencesAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
         _accountRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
             .ReturnsAsync(true);
         _labelRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
@@ -418,8 +423,10 @@ public class AuthServiceTests
             .ReturnsAsync(true);
         _budgetRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
             .ReturnsAsync(true);
-        _chatMessageRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
-            .ReturnsAsync(true);
+        _chatMessageRepositoryMock.Setup(x => x.AnonymizeByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _pushSubscriptionRepositoryMock.Setup(x => x.DeleteByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
         _refreshTokenRepositoryMock.Setup(x => x.DeleteByUserIdAsync(userId))
             .Returns(Task.CompletedTask);
         _twoFactorTokenRepositoryMock.Setup(x => x.DeleteAllByUserIdAsync(userId))
@@ -436,11 +443,13 @@ public class AuthServiceTests
         result.IsSuccess.Should().BeTrue();
         _userRepositoryMock.Verify(x => x.GetByIdAsync(userId), Times.Once);
         _transactionRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
+        _transactionRepositoryMock.Verify(x => x.NullifyCounterpartyReferencesAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
         _accountRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
         _labelRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
         _tagRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
         _budgetRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
-        _chatMessageRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
+        _chatMessageRepositoryMock.Verify(x => x.AnonymizeByUserIdAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+        _pushSubscriptionRepositoryMock.Verify(x => x.DeleteByUserIdAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
         _refreshTokenRepositoryMock.Verify(x => x.DeleteByUserIdAsync(userId), Times.Once);
         _twoFactorTokenRepositoryMock.Verify(x => x.DeleteAllByUserIdAsync(userId), Times.Once);
         _emailVerificationRepositoryMock.Verify(x => x.DeleteAllByEmailAsync(user.Email), Times.Once);
