@@ -366,14 +366,16 @@ jobs:
 
       - name: Test with Coverage
         working-directory: web
+        run: npx vitest run --reporter=verbose --coverage.enabled --coverage.provider=v8 --coverage.reporter=json-summary --coverage.reporter=json --coverage.reporter=text --coverage.reportsDirectory=coverage
+
+      - name: Verify Coverage Files
+        if: always()
+        working-directory: web
         run: |
-          npx vitest run --reporter=verbose \
-            --coverage.enabled=true \
-            --coverage.provider=v8 \
-            --coverage.reporter=json-summary \
-            --coverage.reporter=json \
-            --coverage.reporter=text \
-            --coverage.reportsDirectory=./coverage
+          echo "Checking for coverage files..."
+          ls -la coverage/ 2>/dev/null || echo "ERROR: coverage/ directory does not exist"
+          test -f coverage/coverage-summary.json || echo "ERROR: coverage-summary.json missing"
+          test -f coverage/coverage-final.json || echo "ERROR: coverage-final.json missing"
 
       - name: Add Frontend Coverage PR Comment
         if: github.event_name == 'pull_request' && always()
