@@ -19,8 +19,10 @@ export default defineConfig({
       tsconfig: './tsconfig.test.json',
     },
     coverage: {
+      enabled: !!process.env.CI,
       provider: 'v8',
       reporter: ['text', 'json-summary', 'json'],
+      reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/test/**', 'src/**/*.test.*', 'src/**/*.spec.*', 'src/main.tsx', 'src/vite-env.d.ts'],
     },

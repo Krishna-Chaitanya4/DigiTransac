@@ -366,19 +366,14 @@ jobs:
 
       - name: Test with Coverage
         working-directory: web
-        run: npm run test:coverage
+        run: npm test -- --run
 
       - name: Verify Coverage Files
-        if: always()
         working-directory: web
-        run: |
-          echo "Coverage directory contents:"
-          ls -la coverage/ 2>/dev/null || echo "ERROR: coverage/ directory does not exist"
-          echo "Working directory: $(pwd)"
-          find . -name "coverage-summary.json" 2>/dev/null || echo "coverage-summary.json not found anywhere"
+        run: ls -la coverage/coverage-summary.json coverage/coverage-final.json
 
       - name: Add Frontend Coverage PR Comment
-        if: github.event_name == 'pull_request' && always()
+        if: github.event_name == 'pull_request'
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           working-directory: web
