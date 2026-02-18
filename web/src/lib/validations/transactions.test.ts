@@ -115,7 +115,8 @@ describe('createTransactionSchema', () => {
   });
 
   it('rejects missing accountId', () => {
-    const { accountId, ...rest } = validTransaction;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { accountId: _, ...rest } = validTransaction;
     expect(createTransactionSchema.safeParse(rest).success).toBe(false);
   });
 

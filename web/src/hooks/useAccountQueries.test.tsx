@@ -161,6 +161,7 @@ describe('useCreateAccount', () => {
     const { result } = renderHook(() => useCreateAccount(), { wrapper });
 
     await act(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       result.current.mutate({ name: 'New', type: 'Checking', currency: 'USD', balance: 0 } as any);
     });
 
@@ -189,7 +190,6 @@ describe('useUpdateAccount', () => {
 
     // The optimistic update should set the name immediately in cache
     await waitFor(() => {
-      const cached = queryClient.getQueryData<Account[]>(['accounts', 'list', { includeArchived: false }]);
       // After onSettled, cache is invalidated and refetched
       // Just verify mutation completed successfully
       expect(mutationResult.current.isSuccess).toBe(true);
@@ -277,6 +277,7 @@ describe('useAdjustBalance', () => {
     const { result } = renderHook(() => useAdjustBalance(), { wrapper });
 
     await act(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       result.current.mutate({ id: 'acc-1', data: { amount: 500, notes: 'Adjustment' } as any });
     });
 
