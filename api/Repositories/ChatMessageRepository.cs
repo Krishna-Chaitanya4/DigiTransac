@@ -442,6 +442,10 @@ public class ChatMessageRepository : IChatMessageRepository
 
     public async Task AnonymizeByUserIdAsync(string userId, CancellationToken ct = default)
     {
+        // Sentinel value for anonymized/deleted users — must be a valid 24-char hex string
+        // because SenderUserId/RecipientUserId are stored as ObjectId in MongoDB.
+        const string deletedSentinel = "000000000000000000000000";
+        
         // Step 1: Delete self-chat messages (where user is both sender AND recipient)
         var selfChatFilter = Builders<ChatMessage>.Filter.And(
             Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, userId),
@@ -456,7 +460,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Ne(m => m.RecipientUserId, userId)
         );
         var sentUpdate = Builders<ChatMessage>.Update
-            .Set(m => m.SenderUserId, "deleted");
+            .Set(m => m.SenderUserId, deletedSentinel);
         await _chatMessages.UpdateManyAsync(sentFilter, sentUpdate, options: null, ct);
 
         // Step 3: Anonymize messages RECEIVED by the deleted user from others
@@ -466,7 +470,7 @@ public class ChatMessageRepository : IChatMessageRepository
             Builders<ChatMessage>.Filter.Ne(m => m.SenderUserId, userId)
         );
         var receivedUpdate = Builders<ChatMessage>.Update
-            .Set(m => m.RecipientUserId, "deleted");
+            .Set(m => m.RecipientUserId, deletedSentinel);
         await _chatMessages.UpdateManyAsync(receivedFilter, receivedUpdate, options: null, ct);
     }
 

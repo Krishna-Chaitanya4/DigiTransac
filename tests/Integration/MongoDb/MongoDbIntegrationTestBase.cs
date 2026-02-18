@@ -31,6 +31,8 @@ public abstract class MongoDbIntegrationTestBase : IAsyncLifetime
 
     public virtual async Task InitializeAsync()
     {
+        Skip.IfNot(MongoFixture.IsAvailable, "Docker is not available. MongoDB integration tests require Docker Desktop to be running.");
+        
         Factory = new MongoDbWebApplicationFactory(MongoFixture.ConnectionString);
         Client = Factory.CreateClient();
         

@@ -12,6 +12,8 @@ using Microsoft.IdentityModel.Tokens;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
+using DigiTransac.Api.Services.UnitOfWork;
+using DigiTransac.Api.Settings;
 using MongoDB.Driver;
 using Moq;
 
@@ -40,6 +42,9 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
     public Mock<IBudgetRepository> BudgetRepositoryMock { get; } = new();
     public Mock<IExchangeRateRepository> ExchangeRateRepositoryMock { get; } = new();
     public Mock<IChatMessageRepository> ChatMessageRepositoryMock { get; } = new();
+    public Mock<IPushSubscriptionRepository> PushSubscriptionRepositoryMock { get; } = new();
+    public Mock<IUnitOfWork> UnitOfWorkMock { get; } = new();
+    public Mock<IAuditService> AuditServiceMock { get; } = new();
 
     private static readonly string TestJwtKey = "ThisIsAVeryLongTestSecretKeyForIntegrationTestingThatIsAtLeast64Characters!";
     private static readonly string TestJwtIssuer = "DigiTransac.IntegrationTests";
@@ -94,7 +99,11 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
                 ["RateLimit:UserPermitLimit"] = "10000",
                 ["RateLimit:UserWindowSeconds"] = "1",
                 ["RateLimit:TransactionPermitLimit"] = "10000",
-                ["RateLimit:TransactionWindowSeconds"] = "1"
+                ["RateLimit:TransactionWindowSeconds"] = "1",
+                // Security settings for CookieService
+                ["Security:UseHttps"] = "false",
+                ["Security:UseSecureCookies"] = "false",
+                ["Security:CookieDomain"] = ""
             });
         });
 
@@ -120,7 +129,10 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
                 typeof(ITransactionRepository),
                 typeof(IBudgetRepository),
                 typeof(IExchangeRateRepository),
-                typeof(IChatMessageRepository)
+                typeof(IChatMessageRepository),
+                typeof(IPushSubscriptionRepository),
+                typeof(IUnitOfWork),
+                typeof(IAuditService)
             };
 
             var descriptorsToRemove = services
@@ -154,6 +166,17 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
             RefreshTokenRepositoryMock.Setup(x => x.RevokeAllByUserIdAsync(It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
 
+            // Setup UnitOfWork mock for transactional operations
+            UnitOfWorkMock.Setup(x => x.StartTransactionAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+            UnitOfWorkMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+            UnitOfWorkMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+            UnitOfWorkMock.Setup(x => x.ExecuteInTransactionAsync(It.IsAny<Func<IClientSessionHandle?, Task>>(), It.IsAny<CancellationToken>()))
+                .Returns((Func<IClientSessionHandle?, Task> action, CancellationToken _) => action(null));
+            UnitOfWorkMock.Setup(x => x.TransactionsSupported).Returns(false);
+
             // Setup MongoDbService mock to return mock collections (won't be called since repos are mocked)
             var mockCollection = new Mock<IMongoCollection<object>>();
             MongoDbServiceMock.Setup(x => x.GetCollection<It.IsAnyType>(It.IsAny<string>()))
@@ -177,6 +200,9 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(BudgetRepositoryMock.Object);
             services.AddSingleton(ExchangeRateRepositoryMock.Object);
             services.AddSingleton(ChatMessageRepositoryMock.Object);
+            services.AddSingleton(PushSubscriptionRepositoryMock.Object);
+            services.AddScoped<IUnitOfWork>(_ => UnitOfWorkMock.Object);
+            services.AddScoped<IAuditService>(_ => AuditServiceMock.Object);
 
             // Disable rate limiting for integration tests by reconfiguring with very permissive limits
             services.Configure<RateLimiterOptions>(options =>

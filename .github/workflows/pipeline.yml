@@ -294,7 +294,7 @@ jobs:
 
       - name: Test with Coverage
         run: |
-          dotnet test --no-build --configuration Release \
+          dotnet test tests/DigiTransac.Tests.csproj --no-build --configuration Release \
             --verbosity normal \
             --filter "Category!=Integration" \
             --logger "trx;LogFileName=test-results.trx" \
