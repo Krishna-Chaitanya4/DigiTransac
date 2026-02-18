@@ -10,6 +10,15 @@ import * as authService from '../services/authService';
 // Mock the auth service
 vi.mock('../services/authService');
 
+// Mock the currency service to prevent unmocked fetch errors
+vi.mock('../services/currencyService', () => ({
+  getSupportedCurrencies: vi.fn().mockResolvedValue([]),
+  getCurrencyPreference: vi.fn().mockResolvedValue('USD'),
+  updateCurrencyPreference: vi.fn().mockResolvedValue(undefined),
+  getCurrencySymbol: vi.fn().mockReturnValue('$'),
+  Currency: {},
+}));
+
 // Create a wrapper with auth state pre-populated
 function renderWithAuth(initialUser = { email: 'test@example.com', fullName: 'Test User', isEmailVerified: true }) {
   const validPayload = { sub: 'user-123', email: initialUser.email, exp: Math.floor(Date.now() / 1000) + 900 };

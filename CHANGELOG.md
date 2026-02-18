@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.19] - 2026-02-18
+
+### Fixed — Tests
+- **SettingsPage Test Stderr Noise** — Mocked `currencyService` in SettingsPage tests to prevent `Failed to load currency data` errors flooding CI output
+- **CI Duplicate Coverage Report** — Fixed `dotnet test` targeting all assemblies instead of specific test project, causing duplicate rows in code coverage PR comment
+
+## [1.6.18] - 2026-02-18
+
 ### Added — Testing
-- **Comprehensive Test Coverage** — Added ~513 new unit tests across API and Web, bringing total to 1,755 tests (756 API + 999 Web)
+- **Comprehensive Test Coverage** — Added ~643 new unit tests across API and Web, bringing total to 1,818 tests (819 API + 999 Web)
 - **API Validator Tests (170)** — Account, Auth, Budget, Label, Tag, Transaction validators and ValidationExtensions
-- **API Service Tests (77)** — BudgetService (22), TransactionCoreService (13), TransactionImportService (42)
+- **API Service Tests (207)** — BudgetService (22), TransactionCoreService (13), TransactionImportService (42), AuditService (30), TransferService (16), RecurringTransactionService (22), TransactionMapperService (23), TransactionBatchService (14), TransactionExportService (8), GlobalExceptionHandlerMiddleware (17)
 - **API Common Tests (29)** — CurrencyFormatter (15), ETagHelper (14)
 - **Web Validation Tests (~180)** — Zod schema tests for accounts, auth, budgets, common, transactions
 - **Web Utils & Hook Tests (54)** — formatters, labelExclusion, useAccountQueries, useLabelQueries
