@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.17] - 2026-02-18
+
+### Fixed
+- **Chat Instant Display** — New conversation messages now appear instantly for the sender; fixed by seeding React Query cache with pending conversation data before sending, so optimistic updates work from the first message
+- **CI Pipeline grep Bug** — Fixed `grep -c || echo "0"` pattern that produced `0\n0` (two zeros) instead of a single integer, causing `integer expression expected` errors in VERSION validation
+
 ## [1.6.16] - 2026-02-14
 
 ### Changed — Architecture

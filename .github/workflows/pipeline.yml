@@ -143,7 +143,7 @@ jobs:
           HEAD_SHA=${{ github.event.pull_request.head.sha }}
           
           # Check if CHANGELOG.md was modified in this PR
-          CHANGELOG_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -c "CHANGELOG.md" || echo "0")
+          CHANGELOG_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -c "CHANGELOG.md" || true)
           
           if [ "$CHANGELOG_CHANGED" -eq "0" ]; then
             echo "❌ **CHANGELOG.md was not updated in this PR**" >> $GITHUB_STEP_SUMMARY
@@ -210,7 +210,7 @@ jobs:
             fi
             
             # Check if VERSION was changed in this PR
-            VERSION_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -c "^VERSION$" || echo "0")
+            VERSION_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -c "^VERSION$" || true)
             
             if [ "$VERSION_CHANGED" -eq "0" ]; then
               echo "" >> $GITHUB_STEP_SUMMARY

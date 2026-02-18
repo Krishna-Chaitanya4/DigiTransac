@@ -314,6 +314,18 @@ export default function ChatsPage() {
   const handleSendMessage = useCallback(async () => {
     if (!messageInput.trim() || !selectedUserId || sendMessageMutation.isPending) return;
 
+    // If this is a pending (new) conversation, seed the query cache so the
+    // optimistic update in useOptimisticSendMessage can find data and add the
+    // message instantly. Then clear pendingConversation so conversationData
+    // (which will be kept up-to-date by React Query) takes over rendering.
+    if (pendingConversation) {
+      queryClient.setQueryData(
+        conversationKeys.detail(selectedUserId),
+        pendingConversation,
+      );
+      setPendingConversation(null);
+    }
+
     try {
       await sendMessageMutation.mutateAsync({
         userId: selectedUserId,
@@ -328,7 +340,7 @@ export default function ChatsPage() {
     } catch (error) {
       logger.error('Failed to send message:', error);
     }
-  }, [messageInput, selectedUserId, replyTo, sendMessageMutation, scrollToBottom]);
+  }, [messageInput, selectedUserId, replyTo, sendMessageMutation, scrollToBottom, pendingConversation, queryClient]);
 
   // Edit message
   const handleEditMessage = useCallback(async () => {
@@ -542,6 +554,15 @@ export default function ChatsPage() {
 
       setTransactionFormError(null);
 
+      // Seed cache and clear pending conversation (same as handleSendMessage)
+      if (pendingConversation && selectedUserId) {
+        queryClient.setQueryData(
+          conversationKeys.detail(selectedUserId),
+          pendingConversation,
+        );
+        setPendingConversation(null);
+      }
+
       try {
         await createTransactionMutation.mutateAsync(data as CreateTransactionRequest);
 
@@ -559,7 +580,7 @@ export default function ChatsPage() {
         setTransactionFormError(error instanceof Error ? error.message : 'Failed to create transaction');
       }
     },
-    [selectedConversation, createTransactionMutation, invalidateList, invalidateDetail, scrollToBottom]
+    [selectedConversation, createTransactionMutation, invalidateList, invalidateDetail, scrollToBottom, pendingConversation, selectedUserId, queryClient]
   );
 
   // Go back (mobile)
