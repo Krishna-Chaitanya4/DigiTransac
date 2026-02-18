@@ -22,7 +22,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
 
     #region Create Account Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task CreateAccount_WithValidData_CreatesAccountInDatabase()
     {
         // Arrange
@@ -62,7 +62,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
         dbAccount!.Name.Should().Be("Integration Test Savings");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task CreateAccount_WithDuplicateName_ReturnsBadRequest()
     {
         // Arrange
@@ -94,7 +94,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
 
     #region Get Accounts Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccounts_WithExistingAccounts_ReturnsAllAccounts()
     {
         // Arrange
@@ -117,7 +117,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
         accounts!.Count.Should().BeGreaterThanOrEqualTo(2);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccounts_WithArchivedFilter_ExcludesArchivedByDefault()
     {
         // Arrange
@@ -145,7 +145,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
 
     #region Get Single Account Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccount_WithValidId_ReturnsAccount()
     {
         // Arrange
@@ -165,7 +165,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
         account.Name.Should().Be("Get Test Account");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccount_WithInvalidId_ReturnsNotFound()
     {
         // Arrange
@@ -182,7 +182,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
 
     #region Update Account Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateAccount_WithValidData_UpdatesAccountInDatabase()
     {
         // Arrange
@@ -219,7 +219,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
 
     #region Delete Account Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task DeleteAccount_WithNoTransactions_DeletesAccount()
     {
         // Arrange
@@ -246,7 +246,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
 
     #region Account Summary Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccountSummary_WithMultipleAccounts_ReturnsCorrectTotals()
     {
         // Arrange
@@ -274,7 +274,7 @@ public class AccountIntegrationTests : MongoDbIntegrationTestBase
 
     #region Adjust Balance Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task AdjustBalance_WithValidAmount_UpdatesBalance()
     {
         // Arrange

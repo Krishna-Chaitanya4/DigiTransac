@@ -62,7 +62,10 @@ public class MongoDbWebApplicationFactory : WebApplicationFactory<Program>
                 ["MongoDb:DatabaseName"] = _databaseName,
                 ["Encryption:Key"] = TestEncryptionKey,
                 ["Encryption:Kek"] = TestEncryptionKey,
-                ["Encryption:Provider"] = "Local"
+                ["Encryption:Provider"] = "Local",
+                ["Security:UseHttps"] = "false",
+                ["Security:UseSecureCookies"] = "false",
+                ["Security:CookieDomain"] = ""
             });
         });
 

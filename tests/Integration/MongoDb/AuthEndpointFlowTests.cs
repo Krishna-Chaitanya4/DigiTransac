@@ -32,7 +32,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
 
     #region Result Pattern Error Mapping Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task SendVerification_WithExistingEmail_ReturnsBadRequestWithErrorResponse()
     {
         // Arrange — TestEmail exists in database
@@ -47,7 +47,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         body.Should().Contain("already registered");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateName_Unauthorized_Returns401()
     {
         // Arrange — no auth token
@@ -60,7 +60,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ChangePassword_Unauthorized_Returns401()
     {
         // Arrange — no auth token
@@ -77,7 +77,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
 
     #region Validation Error Tests
 
-    [Theory]
+    [SkippableTheory]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("notanemail")]
@@ -93,7 +93,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_WithEmptyEmail_ReturnsBadRequest()
     {
         // Arrange
@@ -106,7 +106,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_WithEmptyPassword_ReturnsBadRequest()
     {
         // Arrange
@@ -123,7 +123,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
 
     #region ETag / Conditional Response Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccounts_ReturnsETagHeader()
     {
         // Arrange
@@ -138,7 +138,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         response.Headers.ETag!.Tag.Should().NotBeNullOrEmpty();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccounts_WithMatchingETag_Returns304NotModified()
     {
         // Arrange
@@ -159,7 +159,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         secondResponse.StatusCode.Should().Be(HttpStatusCode.NotModified);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAccounts_WithDifferentETag_Returns200WithData()
     {
         // Arrange
@@ -179,7 +179,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
 
     #region Cookie-Based Refresh Token Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_SetsRefreshTokenCookie()
     {
         // Arrange
@@ -199,7 +199,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         refreshCookie.ToLowerInvariant().Should().Contain("samesite=strict");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_ResponseBody_DoesNotContainRefreshToken()
     {
         // Arrange
@@ -220,7 +220,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
 
     #region Protected Endpoint Authorization Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task AllProtectedEndpoints_WithoutAuth_Return401()
     {
         // These endpoints require authorization
@@ -256,7 +256,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
 
     #region Content-Type Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_ResponseHasJsonContentType()
     {
         // Arrange
@@ -270,7 +270,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task SendVerification_Error_ResponseHasJsonContentType()
     {
         // Arrange — invalid email

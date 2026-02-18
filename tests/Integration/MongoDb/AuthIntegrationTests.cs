@@ -32,7 +32,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Login Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_WithValidCredentials_ReturnsOkWithAccessToken()
     {
         // Arrange — TestUser is created by base class SetupTestUserAsync
@@ -55,7 +55,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         cookies.Should().Contain(c => c.Contains("digitransac_refresh_token"));
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_WithInvalidPassword_ReturnsUnauthorized()
     {
         // Arrange
@@ -68,7 +68,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_WithNonExistentEmail_ReturnsUnauthorized()
     {
         // Arrange
@@ -85,7 +85,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Get Current User Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetCurrentUser_WithValidToken_ReturnsUserProfile()
     {
         // Arrange
@@ -103,7 +103,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         json.GetProperty("primaryCurrency").GetString().Should().Be("INR");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetCurrentUser_WithoutToken_ReturnsUnauthorized()
     {
         // Act — no auth header
@@ -117,7 +117,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Update Name Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateName_WithValidName_UpdatesNameInDatabase()
     {
         // Arrange
@@ -138,7 +138,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         user!.FullName.Should().Be("Updated Integration Name");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateName_WithEmptyName_ReturnsBadRequest()
     {
         // Arrange
@@ -156,7 +156,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Change Password Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task ChangePassword_WithValidCurrentPassword_ChangesPassword()
     {
         // Arrange
@@ -179,7 +179,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         loginWithNew.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ChangePassword_WithWrongCurrentPassword_ReturnsBadRequest()
     {
         // Arrange
@@ -198,7 +198,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Forgot Password Flow Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task ForgotPassword_WithExistingEmail_ReturnsOk()
     {
         // Arrange — security best practice: always returns 200
@@ -221,7 +221,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         verification!.Code.Should().HaveLength(6);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ForgotPassword_WithNonExistentEmail_StillReturnsOk()
     {
         // Arrange — security: don't reveal email existence
@@ -238,7 +238,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Delete Account Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task DeleteAccount_WithCorrectPassword_DeletesUserFromDatabase()
     {
         // Arrange — create a separate user to delete so we don't break other tests
@@ -257,15 +257,13 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
         var request = new DeleteAccountRequest(deletePassword);
 
-        // Act
-        var response = await deleteClient.DeleteAsync("/api/auth/account");
-        // DELETE with body requires special handling
+        // Act — DELETE with body requires special handling via HttpRequestMessage
         var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, "/api/auth/account")
         {
             Content = JsonContent.Create(request)
         };
         deleteRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
-        response = await Factory.CreateClient().SendAsync(deleteRequest);
+        var response = await Factory.CreateClient().SendAsync(deleteRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -278,7 +276,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         deletedUser.Should().BeNull();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DeleteAccount_WithIncorrectPassword_ReturnsError()
     {
         // Arrange
@@ -313,7 +311,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Token Refresh Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_ThenAccessProtectedEndpoint_Succeeds()
     {
         // Arrange — full login + access flow
@@ -341,7 +339,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Send Verification Code Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task SendVerificationCode_WithNewEmail_ReturnsOk()
     {
         // Arrange
@@ -364,7 +362,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         verification.Should().NotBeNull();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task SendVerificationCode_WithExistingEmail_ReturnsBadRequest()
     {
         // Arrange — TestEmail is already registered
@@ -377,7 +375,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task SendVerificationCode_WithInvalidEmail_ReturnsBadRequest()
     {
         // Arrange
@@ -394,7 +392,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Full Registration Flow Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task FullRegistrationFlow_SendCode_VerifyCode_CompleteRegistration()
     {
         // Arrange
@@ -465,7 +463,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Full Password Reset Flow Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task FullPasswordResetFlow_SendCode_VerifyCode_ResetPassword()
     {
         // Arrange
@@ -518,7 +516,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
 
     #region Concurrent Access Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task MultipleLoginsForSameUser_AllSucceed()
     {
         // Arrange

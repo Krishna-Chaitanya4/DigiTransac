@@ -85,7 +85,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 
     #region Create Transaction Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task CreateTransaction_WithValidExpense_CreatesTransactionAndUpdatesBalance()
     {
         // Arrange
@@ -129,7 +129,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
         account!.CurrentBalance.Should().Be(9500); // 10000 - 500
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task CreateTransaction_WithValidIncome_IncreasesBalance()
     {
         // Arrange
@@ -171,7 +171,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 
     #region Get Transactions Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetTransactions_WithFilters_ReturnsFilteredResults()
     {
         // Arrange
@@ -203,7 +203,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
         result!.Transactions.Should().Contain(t => t.Title == "Recent Transaction");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetTransactions_WithPagination_ReturnsPagedResults()
     {
         // Arrange
@@ -236,7 +236,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 
     #region Get Single Transaction Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetTransaction_WithValidId_ReturnsTransaction()
     {
         // Arrange
@@ -266,7 +266,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 
     #region Update Transaction Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateTransaction_WithValidData_UpdatesTransactionAndBalance()
     {
         // Arrange
@@ -315,7 +315,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 
     #region Delete Transaction Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task DeleteTransaction_WithValidId_DeletesAndRevertsBalance()
     {
         // Arrange
@@ -355,7 +355,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 
     #region Transfer Transaction Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task CreateTransfer_BetweenAccounts_UpdatesBothBalances()
     {
         // Arrange
@@ -404,7 +404,7 @@ public class TransactionIntegrationTests : MongoDbIntegrationTestBase
 
     #region Batch Operations Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task BatchDelete_WithValidIds_DeletesMultipleTransactions()
     {
         // Arrange
