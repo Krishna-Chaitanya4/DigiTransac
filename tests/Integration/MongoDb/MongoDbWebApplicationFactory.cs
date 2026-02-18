@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
 using MongoDB.Driver;
+using Moq;
 
 namespace DigiTransac.Tests.Integration.MongoDb;
 
@@ -80,7 +81,8 @@ public class MongoDbWebApplicationFactory : WebApplicationFactory<Program>
                            d.ServiceType == typeof(IConfigureOptions<EncryptionSettings>) ||
                            d.ServiceType == typeof(IOptions<EncryptionSettings>) ||
                            d.ServiceType == typeof(IConfigureOptions<JwtSettings>) ||
-                           d.ServiceType == typeof(IOptions<JwtSettings>))
+                           d.ServiceType == typeof(IOptions<JwtSettings>) ||
+                           d.ServiceType == typeof(IEmailService))
                 .ToList();
 
             foreach (var descriptor in descriptorsToRemove)
@@ -129,6 +131,9 @@ public class MongoDbWebApplicationFactory : WebApplicationFactory<Program>
 
             // Register the MongoDbService with the test configuration
             services.AddSingleton<IMongoDbService, MongoDbService>();
+
+            // Replace email service with a no-op mock to prevent real emails during tests
+            services.AddSingleton(new Mock<IEmailService>().Object);
         });
 
         // Use Development environment to bypass strict validation in Program.cs
