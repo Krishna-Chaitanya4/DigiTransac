@@ -126,7 +126,7 @@ export function useDeleteAccount() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
       // Also invalidate transactions since they reference accounts
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, refetchType: 'all' });
     },
   });
 }
@@ -142,7 +142,7 @@ export function useAdjustBalance() {
       // Await invalidation to ensure fresh data is fetched before UI updates
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, refetchType: 'all' }),
         // Balance adjustment creates a transaction visible in self-chat
         queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all }),
       ]);

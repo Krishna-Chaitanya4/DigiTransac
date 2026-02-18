@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CollapsibleSection } from './CollapsibleSection';
 import { DragHandle } from './DragHandle';
 import { WidgetWithErrorBoundary } from './WidgetWithErrorBoundary';
+import { CategoryDonutChart } from '../../pages/insights/CategoryDonutChart';
 import type { SectionId, CategoryData } from './types';
 
 interface CategoryBreakdownWidgetProps {
@@ -35,6 +37,16 @@ export function CategoryBreakdownWidget({
   onDragEnd,
   onDrop,
 }: CategoryBreakdownWidgetProps) {
+  const totalExpenses = useMemo(
+    () => expenseCategories.slice(0, 6).reduce((sum, cat) => sum + cat.amount, 0),
+    [expenseCategories]
+  );
+
+  const totalIncome = useMemo(
+    () => incomeCategories.slice(0, 6).reduce((sum, cat) => sum + cat.amount, 0),
+    [incomeCategories]
+  );
+
   return (
     <WidgetWithErrorBoundary name="Categories">
       <div
@@ -74,15 +86,22 @@ export function CategoryBreakdownWidget({
           {isLoading ? (
             <CategorySkeleton />
           ) : expenseCategories.length > 0 ? (
-            <div className="space-y-3 pt-4">
-              {expenseCategories.slice(0, 6).map((category) => (
-                <CategoryRow
-                  key={category.labelId}
-                  category={category}
-                  formatCurrency={formatCurrency}
-                  primaryCurrency={primaryCurrency}
-                />
-              ))}
+            <div className="pt-4">
+              <CategoryDonutChart
+                categories={expenseCategories.slice(0, 6)}
+                totalLabel="Total"
+                totalAmount={formatCurrency(totalExpenses, primaryCurrency)}
+              />
+              <div className="space-y-3 mt-4">
+                {expenseCategories.slice(0, 6).map((category) => (
+                  <CategoryRow
+                    key={category.labelId}
+                    category={category}
+                    formatCurrency={formatCurrency}
+                    primaryCurrency={primaryCurrency}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
             <EmptyState message="No expense transactions in this period" />
@@ -113,16 +132,23 @@ export function CategoryBreakdownWidget({
           {isLoading ? (
             <CategorySkeleton />
           ) : incomeCategories.length > 0 ? (
-            <div className="space-y-3 pt-4">
-              {incomeCategories.slice(0, 6).map((category) => (
-                <CategoryRow
-                  key={category.labelId}
-                  category={category}
-                  formatCurrency={formatCurrency}
-                  primaryCurrency={primaryCurrency}
-                  isIncome
-                />
-              ))}
+            <div className="pt-4">
+              <CategoryDonutChart
+                categories={incomeCategories.slice(0, 6)}
+                totalLabel="Total"
+                totalAmount={formatCurrency(totalIncome, primaryCurrency)}
+              />
+              <div className="space-y-3 mt-4">
+                {incomeCategories.slice(0, 6).map((category) => (
+                  <CategoryRow
+                    key={category.labelId}
+                    category={category}
+                    formatCurrency={formatCurrency}
+                    primaryCurrency={primaryCurrency}
+                    isIncome
+                  />
+                ))}
+              </div>
             </div>
           ) : (
             <EmptyState message="No income transactions in this period" icon="💰" />

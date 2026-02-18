@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
 import type { SectionId, DragProps, MobileReorderProps } from './types';
 import type { TransactionAnalytics, CategoryBreakdown } from '../../services/transactionService';
 import type { TransactionSummary } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection, DragHandle, MobileReorderButtons, WidgetWithErrorBoundary } from './InsightWidgets';
+import { CategoryDonutChart, getCategoryChartColor } from './CategoryDonutChart';
 
 interface CategoryPairWidgetProps {
   analytics: TransactionAnalytics | undefined;
@@ -35,6 +36,24 @@ export function CategoryPairWidget({
   dragProps,
   mobileReorderProps,
 }: CategoryPairWidgetProps) {
+  // Memoize filtered categories for donut charts
+  const expenseCategories = useMemo(() => {
+    if (!analytics?.topCategories) return [];
+    return analytics.topCategories
+      .filter((cat: CategoryBreakdown) => systemFolders.expenseCategoryIds.includes(cat.labelId))
+      .slice(0, 6);
+  }, [analytics?.topCategories, systemFolders.expenseCategoryIds]);
+
+  const totalExpenses = useMemo(
+    () => expenseCategories.reduce((sum, cat) => sum + cat.amount, 0),
+    [expenseCategories]
+  );
+
+  const totalIncome = useMemo(
+    () => incomeCategories.slice(0, 6).reduce((sum, cat) => sum + cat.amount, 0),
+    [incomeCategories]
+  );
+
   return (
     <WidgetWithErrorBoundary name="Categories">
       <div
@@ -60,13 +79,6 @@ export function CategoryPairWidget({
             <>
               <MobileReorderButtons {...mobileReorderProps} />
               <DragHandle />
-              <Link
-                to="/transactions"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                View all →
-              </Link>
             </>
           }
           isCollapsed={collapsedSections.has('categories')}
@@ -85,16 +97,23 @@ export function CategoryPairWidget({
                 </div>
               ))}
             </div>
-          ) : analytics?.topCategories && analytics.topCategories.length > 0 ? (
-            <div className="space-y-3 pt-4">
-              {analytics.topCategories
-                .filter((cat: CategoryBreakdown) => systemFolders.expenseCategoryIds.includes(cat.labelId))
-                .slice(0, 6)
-                .map((category: CategoryBreakdown) => (
+          ) : expenseCategories.length > 0 ? (
+            <div className="pt-4">
+              {/* Donut Chart */}
+              <CategoryDonutChart
+                categories={expenseCategories}
+                totalLabel="Total"
+                totalAmount={convertAndFormat(totalExpenses, transactionSummary?.currency, primaryCurrency, convert)}
+              />
+              {/* Category List */}
+              <div className="space-y-3 mt-4">
+              {expenseCategories.map((category: CategoryBreakdown, index: number) => {
+                const chartColor = getCategoryChartColor(category.labelColor, index);
+                return (
                 <div key={category.labelId} className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
-                    style={{ backgroundColor: category.labelColor ? `${category.labelColor}20` : '#f3f4f6' }}
+                    style={{ backgroundColor: `${chartColor}20` }}
                   >
                     {category.labelIcon || '📦'}
                   </div>
@@ -112,7 +131,7 @@ export function CategoryPairWidget({
                         className="h-2 rounded-full transition-all duration-300"
                         style={{
                           width: `${category.percentage}%`,
-                          backgroundColor: category.labelColor || '#ef4444'
+                          backgroundColor: chartColor
                         }}
                       />
                     </div>
@@ -121,7 +140,9 @@ export function CategoryPairWidget({
                     {category.percentage.toFixed(0)}%
                   </span>
                 </div>
-              ))}
+                );
+              })}
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -142,15 +163,7 @@ export function CategoryPairWidget({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
             </svg>
           }
-          headerRight={
-            <Link
-              to="/transactions"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              View all →
-            </Link>
-          }
+          headerRight={null}
           isCollapsed={collapsedSections.has('incomeCategories')}
           onToggle={toggleSection}
         >
@@ -168,12 +181,22 @@ export function CategoryPairWidget({
               ))}
             </div>
           ) : incomeCategories.length > 0 ? (
-            <div className="space-y-3 pt-4">
-              {incomeCategories.slice(0, 6).map((category) => (
+            <div className="pt-4">
+              {/* Donut Chart */}
+              <CategoryDonutChart
+                categories={incomeCategories.slice(0, 6)}
+                totalLabel="Total"
+                totalAmount={convertAndFormat(totalIncome, transactionSummary?.currency, primaryCurrency, convert)}
+              />
+              {/* Category List */}
+              <div className="space-y-3 mt-4">
+              {incomeCategories.slice(0, 6).map((category, index) => {
+                const chartColor = getCategoryChartColor(category.labelColor, index);
+                return (
                 <div key={category.labelId} className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
-                    style={{ backgroundColor: category.labelColor ? `${category.labelColor}20` : '#f0fdf4' }}
+                    style={{ backgroundColor: `${chartColor}20` }}
                   >
                     {category.labelIcon || '💰'}
                   </div>
@@ -191,7 +214,7 @@ export function CategoryPairWidget({
                         className="h-2 rounded-full transition-all duration-300"
                         style={{
                           width: `${category.percentage}%`,
-                          backgroundColor: category.labelColor || '#22c55e'
+                          backgroundColor: chartColor
                         }}
                       />
                     </div>
@@ -200,7 +223,9 @@ export function CategoryPairWidget({
                     {category.percentage.toFixed(0)}%
                   </span>
                 </div>
-              ))}
+                );
+              })}
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
