@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Testing
+- **Comprehensive Test Coverage** — Added ~513 new unit tests across API and Web, bringing total to 1,755 tests (756 API + 999 Web)
+- **API Validator Tests (170)** — Account, Auth, Budget, Label, Tag, Transaction validators and ValidationExtensions
+- **API Service Tests (77)** — BudgetService (22), TransactionCoreService (13), TransactionImportService (42)
+- **API Common Tests (29)** — CurrencyFormatter (15), ETagHelper (14)
+- **Web Validation Tests (~180)** — Zod schema tests for accounts, auth, budgets, common, transactions
+- **Web Utils & Hook Tests (54)** — formatters, labelExclusion, useAccountQueries, useLabelQueries
+- **Web Component Tests (3)** — ProtectedRoute auth guard
+
+### Fixed — Integration Tests
+- **DigiTransacWebApplicationFactory** — Added missing DI mocks for IPushSubscriptionRepository, IUnitOfWork, IAuditService, and SecuritySettings config; all 24 non-MongoDB integration tests now pass
+- **MongoDb Test Skip on No Docker** — MongoDbContainerFixture now gracefully skips tests when Docker is unavailable using SkippableFact instead of hard-failing
+- **MongoDbBuilder Deprecation** — Replaced deprecated parameterless `MongoDbBuilder()` with `MongoDbBuilder("mongo:7.0")`
+
+### Fixed — Bugs
+- **ChatMessage Anonymization Crash** — `ChatMessageRepository.AnonymizeByUserIdAsync` was setting SenderUserId/RecipientUserId to `"deleted"` which is not a valid ObjectId hex string; changed to `"000000000000000000000000"` sentinel
+
 ## [1.6.17] - 2026-02-18
 
 ### Fixed
