@@ -13,7 +13,6 @@ import { getPreviousPeriodRange, getDateRange, formatDate } from './helpers';
 import { CategoryPairWidget } from './CategoryPairWidget';
 import { TrendsWidget } from './TrendsWidget';
 import { BudgetsWidget } from './BudgetsWidget';
-import { AveragesWidget } from './AveragesWidget';
 import { CounterpartiesWidget } from './CounterpartiesWidget';
 import { ByAccountWidget } from './ByAccountWidget';
 import { PatternsWidget } from './PatternsWidget';
@@ -222,12 +221,6 @@ export default function InsightsPage() {
     formatDate(periodEnd)
   );
   
-  // Get analytics for previous period (for income category comparison)
-  const { data: prevAnalytics } = useTransactionAnalytics(
-    formatDate(prevPeriodStart),
-    formatDate(prevPeriodEnd)
-  );
-  
   // Get extended analytics data
   const { data: counterparties, isLoading: counterpartiesLoading } = useTopCounterparties(
     formatDate(periodStart),
@@ -407,7 +400,6 @@ export default function InsightsPage() {
                 key="categoryPair"
                 analytics={analytics}
                 transactionSummary={transactionSummary}
-                prevAnalytics={prevAnalytics}
                 primaryCurrency={primaryCurrency}
                 convert={convert}
                 isLoading={isLoading}
@@ -443,21 +435,6 @@ export default function InsightsPage() {
                 key="budgets"
                 budgetSummary={budgetSummary}
                 isLoading={budgetsLoading}
-                collapsedSections={collapsedSections}
-                toggleSection={toggleSection}
-                dragProps={dragProps}
-              />
-            );
-            
-          case 'averages':
-            return (
-              <AveragesWidget
-                key="averages"
-                analytics={analytics}
-                prevAnalytics={prevAnalytics}
-                transactionSummary={transactionSummary}
-                primaryCurrency={primaryCurrency}
-                convert={convert}
                 collapsedSections={collapsedSections}
                 toggleSection={toggleSection}
                 dragProps={dragProps}

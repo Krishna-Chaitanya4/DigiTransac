@@ -9,7 +9,6 @@ import { CategoryDonutChart, getCategoryChartColor } from './CategoryDonutChart'
 interface CategoryPairWidgetProps {
   analytics: TransactionAnalytics | undefined;
   transactionSummary: TransactionSummary | undefined;
-  prevAnalytics: TransactionAnalytics | undefined;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   isLoading: boolean;

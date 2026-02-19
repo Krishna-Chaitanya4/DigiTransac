@@ -1,10 +1,10 @@
 import { DragEvent, ReactNode } from 'react';
 
 // Widget IDs for reordering (excludes the fixed summary card)
-export type WidgetId = 'categoryPair' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
+export type WidgetId = 'categoryPair' | 'trends' | 'budgets' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
 
 // Collapsible section IDs for persistence
-export type SectionId = 'summary' | 'categories' | 'incomeCategories' | 'trends' | 'budgets' | 'averages' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
+export type SectionId = 'summary' | 'categories' | 'incomeCategories' | 'trends' | 'budgets' | 'counterparties' | 'byAccount' | 'patterns' | 'anomalies';
 
 export interface CollapsibleSectionProps {
   id: SectionId;
