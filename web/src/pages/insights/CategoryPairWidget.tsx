@@ -8,8 +8,6 @@ import { CategoryDonutChart, getCategoryChartColor } from './CategoryDonutChart'
 
 interface CategoryPairWidgetProps {
   analytics: TransactionAnalytics | undefined;
-  systemFolders: { incomeCategoryIds: string[]; expenseCategoryIds: string[] };
-  incomeCategories: CategoryBreakdown[];
   transactionSummary: TransactionSummary | undefined;
   prevAnalytics: TransactionAnalytics | undefined;
   primaryCurrency: string;
@@ -24,8 +22,6 @@ interface CategoryPairWidgetProps {
 
 export function CategoryPairWidget({
   analytics,
-  systemFolders,
-  incomeCategories,
   transactionSummary,
   primaryCurrency,
   convert,
@@ -36,13 +32,17 @@ export function CategoryPairWidget({
   dragProps,
   mobileReorderProps,
 }: CategoryPairWidgetProps) {
-  // Memoize filtered categories for donut charts
+  // Top expense categories (Send transactions, excluding transfers)
   const expenseCategories = useMemo(() => {
     if (!analytics?.topCategories) return [];
-    return analytics.topCategories
-      .filter((cat: CategoryBreakdown) => systemFolders.expenseCategoryIds.includes(cat.labelId))
-      .slice(0, 6);
-  }, [analytics?.topCategories, systemFolders.expenseCategoryIds]);
+    return analytics.topCategories.slice(0, 6);
+  }, [analytics?.topCategories]);
+
+  // Top income categories (Receive transactions, excluding transfers)
+  const incomeCategories = useMemo(() => {
+    if (!analytics?.topIncomeCategories) return [];
+    return analytics.topIncomeCategories.slice(0, 6);
+  }, [analytics?.topIncomeCategories]);
 
   const totalExpenses = useMemo(
     () => expenseCategories.reduce((sum, cat) => sum + cat.amount, 0),
@@ -50,7 +50,7 @@ export function CategoryPairWidget({
   );
 
   const totalIncome = useMemo(
-    () => incomeCategories.slice(0, 6).reduce((sum, cat) => sum + cat.amount, 0),
+    () => incomeCategories.reduce((sum, cat) => sum + cat.amount, 0),
     [incomeCategories]
   );
 
@@ -184,13 +184,13 @@ export function CategoryPairWidget({
             <div className="pt-4">
               {/* Donut Chart */}
               <CategoryDonutChart
-                categories={incomeCategories.slice(0, 6)}
+                categories={incomeCategories}
                 totalLabel="Total"
                 totalAmount={convertAndFormat(totalIncome, transactionSummary?.currency, primaryCurrency, convert)}
               />
               {/* Category List */}
               <div className="space-y-3 mt-4">
-              {incomeCategories.slice(0, 6).map((category, index) => {
+              {incomeCategories.map((category, index) => {
                 const chartColor = getCategoryChartColor(category.labelColor, index);
                 return (
                 <div key={category.labelId} className="flex items-center gap-3">
@@ -230,7 +230,7 @@ export function CategoryPairWidget({
           ) : (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
               </svg>
               <p>No income transactions in this period</p>
             </div>

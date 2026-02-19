@@ -3,12 +3,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { PullToRefreshContainer } from '../../components/PullToRefreshContainer';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useBudgets, useTransactionSummary, useTransactionAnalytics, useLabels, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies, useInvalidateTransactions, useInvalidateBudgets, useInvalidateLabels } from '../../hooks';
+import { useBudgets, useTransactionSummary, useTransactionAnalytics, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies, useInvalidateTransactions, useInvalidateBudgets, useInvalidateLabels } from '../../hooks';
 import { formatDateToStartOfDay, formatDateToEndOfDay } from '../../hooks/useTransactionFilters';
 import { DateRangePicker } from '../../components/DatePicker';
 
-import type { PeriodPreset, WidgetId, SectionId, ViewMode } from './types';
-import type { CategoryBreakdown } from '../../services/transactionService';
+import type { PeriodPreset, WidgetId, SectionId } from './types';
 import { COLLAPSED_SECTIONS_KEY, WIDGET_ORDER_KEY, DEFAULT_WIDGET_ORDER, PERIOD_OPTIONS } from './types';
 import { getPreviousPeriodRange, getDateRange, formatDate } from './helpers';
 import { FinancialSummaryWidget } from './FinancialSummaryWidget';
@@ -26,7 +25,6 @@ export default function InsightsPage() {
   const { primaryCurrency, convert } = useCurrency();
   const isMobile = useIsMobile();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodPreset>('thisMonth');
-  const [viewMode, setViewMode] = useState<ViewMode>('categorized');
   
   // Collapsed sections state with localStorage persistence
   const [collapsedSections, setCollapsedSections] = useState<Set<SectionId>>(() => {
@@ -196,51 +194,6 @@ export default function InsightsPage() {
     }
   };
 
-  // Fetch labels to identify Income/Expense/Transfer folders
-  const { data: labels = [] } = useLabels();
-  
-  // Get system folder IDs - note: actual folder names are "Income", "Expenses", "Transfers"
-  const systemFolders = useMemo(() => {
-    // Find system folders by name - these are the root folders created by the backend
-    const incomeFolder = labels.find(l => l.name === 'Income' && l.type === 'Folder' && !l.parentId);
-    const expenseFolder = labels.find(l => l.name === 'Expenses' && l.type === 'Folder' && !l.parentId);
-    const transferFolder = labels.find(l => l.name === 'Transfers' && l.type === 'Folder' && !l.parentId);
-    
-    // Get all category IDs under a folder (recursively through sub-folders)
-    const getChildCategoryIds = (folderId: string | undefined): string[] => {
-      if (!folderId) return [];
-      
-      const result: string[] = [];
-      const collectCategories = (parentId: string) => {
-        const children = labels.filter(l => l.parentId === parentId);
-        for (const child of children) {
-          if (child.type === 'Category') {
-            result.push(child.id);
-          }
-          // Always recurse into folders to find nested categories
-          if (child.type === 'Folder') {
-            collectCategories(child.id);
-          }
-        }
-      };
-      collectCategories(folderId);
-      return result;
-    };
-    
-    const incomeCategoryIds = getChildCategoryIds(incomeFolder?.id);
-    const expenseCategoryIds = getChildCategoryIds(expenseFolder?.id);
-    const transferCategoryIds = getChildCategoryIds(transferFolder?.id);
-    
-    return {
-      incomeId: incomeFolder?.id,
-      expenseId: expenseFolder?.id,
-      transferId: transferFolder?.id,
-      incomeCategoryIds,
-      expenseCategoryIds,
-      transferCategoryIds,
-    };
-  }, [labels]);
-
   // Calculate previous period range for comparison
   const { start: prevPeriodStart, end: prevPeriodEnd } = useMemo(() => {
     return getPreviousPeriodRange(periodStart, periodEnd);
@@ -312,94 +265,30 @@ export default function InsightsPage() {
     ]);
   }, [invalidateTransactions, invalidateBudgets, invalidateLabels]);
 
-  // Calculate true income/expense from category breakdown
+  // Money In / Money Out — purely based on transaction Type, excluding transfers
   const financialSummary = useMemo(() => {
-    if (!transactionSummary?.byCategory || !systemFolders.incomeCategoryIds.length) {
-      // Fallback to totalCredits/totalDebits
-      return {
-        income: transactionSummary?.totalCredits ?? 0,
-        expenses: transactionSummary?.totalDebits ?? 0,
-        transfers: 0,
-        netChange: transactionSummary?.netChange ?? 0,
-      };
-    }
-    
-    let income = 0;
-    let expenses = 0;
-    let transfers = 0;
-    
-    // Sum by category based on folder membership
-    Object.entries(transactionSummary.byCategory).forEach(([labelId, amount]) => {
-      if (systemFolders.incomeCategoryIds.includes(labelId)) {
-        income += amount as number;
-      } else if (systemFolders.expenseCategoryIds.includes(labelId)) {
-        expenses += amount as number;
-      } else if (systemFolders.transferCategoryIds.includes(labelId)) {
-        transfers += amount as number;
-      }
-    });
-    
+    const income = transactionSummary?.totalCredits ?? 0;
+    const expenses = transactionSummary?.totalDebits ?? 0;
     return {
       income,
       expenses,
-      transfers,
+      transfers: 0,
       netChange: income - expenses,
     };
-  }, [transactionSummary, systemFolders]);
+  }, [transactionSummary]);
   
-  // Calculate previous period financial summary for comparison
+  // Previous period for comparison
   const prevFinancialSummary = useMemo(() => {
-    if (!prevTransactionSummary?.byCategory || !systemFolders.incomeCategoryIds.length) {
-      return {
-        income: prevTransactionSummary?.totalCredits ?? 0,
-        expenses: prevTransactionSummary?.totalDebits ?? 0,
-        transfers: 0,
-        netChange: prevTransactionSummary?.netChange ?? 0,
-      };
-    }
-    
-    let income = 0;
-    let expenses = 0;
-    let transfers = 0;
-    
-    Object.entries(prevTransactionSummary.byCategory).forEach(([labelId, amount]) => {
-      if (systemFolders.incomeCategoryIds.includes(labelId)) {
-        income += amount as number;
-      } else if (systemFolders.expenseCategoryIds.includes(labelId)) {
-        expenses += amount as number;
-      } else if (systemFolders.transferCategoryIds.includes(labelId)) {
-        transfers += amount as number;
-      }
-    });
-    
+    const income = prevTransactionSummary?.totalCredits ?? 0;
+    const expenses = prevTransactionSummary?.totalDebits ?? 0;
     return {
       income,
       expenses,
-      transfers,
+      transfers: 0,
       netChange: income - expenses,
     };
-  }, [prevTransactionSummary, systemFolders]);
+  }, [prevTransactionSummary]);
   
-  // Calculate income categories breakdown (mirror of expense categories)
-  const incomeCategories = useMemo(() => {
-    if (!analytics?.topCategories || !systemFolders.incomeCategoryIds.length) {
-      return [];
-    }
-    
-    // Filter categories that are income categories and have positive amounts
-    const incomeCats = analytics.topCategories.filter((cat: CategoryBreakdown) =>
-      systemFolders.incomeCategoryIds.includes(cat.labelId) && cat.amount > 0
-    );
-    
-    // Recalculate percentages based on total income
-    const totalIncome = incomeCats.reduce((sum: number, cat: CategoryBreakdown) => sum + cat.amount, 0);
-    
-    return incomeCats.map((cat: CategoryBreakdown) => ({
-      ...cat,
-      percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0
-    })).sort((a: CategoryBreakdown, b: CategoryBreakdown) => b.amount - a.amount);
-  }, [analytics, systemFolders]);
-
   // Calculate savings rate
   const savingsRate = useMemo(() => {
     if (financialSummary.income <= 0) return 0;
@@ -486,7 +375,7 @@ export default function InsightsPage() {
       {/* Welcome Card */}
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-800 dark:to-blue-900 rounded-lg p-6 mb-6 text-white">
         <h2 className="text-lg font-medium mb-2">
-          Welcome back, {user?.fullName}!
+          Welcome back, {user?.fullName?.includes('@') ? user.fullName.split('@')[0] : user?.fullName}!
         </h2>
         <p className="text-blue-100">
           Here's your financial overview for {periodLabel}.
@@ -495,8 +384,6 @@ export default function InsightsPage() {
 
       {/* Financial Summary Card */}
       <FinancialSummaryWidget
-        viewMode={viewMode}
-        setViewMode={setViewMode}
         isLoading={isLoading}
         financialSummary={financialSummary}
         prevFinancialSummary={prevFinancialSummary}
@@ -531,8 +418,6 @@ export default function InsightsPage() {
               <CategoryPairWidget
                 key="categoryPair"
                 analytics={analytics}
-                systemFolders={systemFolders}
-                incomeCategories={incomeCategories}
                 transactionSummary={transactionSummary}
                 prevAnalytics={prevAnalytics}
                 primaryCurrency={primaryCurrency}

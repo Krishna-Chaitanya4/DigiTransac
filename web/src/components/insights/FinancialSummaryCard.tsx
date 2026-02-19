@@ -55,10 +55,10 @@ export function FinancialSummaryCard({
                 ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
                 : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
-            title="Shows all money received and sent, regardless of category"
+            title="Shows all money received and sent, excluding internal transfers"
           >
             💵 Money In vs Out
-            <Tooltip text="All credits received & debits sent (including transfers)" />
+            <Tooltip text="All credits received & debits sent (excluding transfers)" />
           </button>
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
@@ -68,7 +68,7 @@ export function FinancialSummaryCard({
           <span>
             {viewMode === 'categorized'
               ? 'Excludes uncategorized & transfer transactions'
-              : 'Includes all transactions (transfers counted twice)'}
+              : 'Excludes internal transfers between your accounts'}
           </span>
         </div>
       </div>

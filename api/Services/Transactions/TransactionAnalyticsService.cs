@@ -203,12 +203,20 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             // Use included amount (sum of non-excluded splits) for totals
             var includedAmount = GetIncludedAmount(t, ctx.ExcludedLabelIds, accountDict, primaryCurrency, rates);
 
-            if (t.Type == TransactionType.Receive)
-                totalCredits += includedAmount;
-            else if (t.Type == TransactionType.Send)
-                totalDebits += includedAmount;
+            // Transfers are internal movements between user's own accounts — exclude from cashflow
+            var isTransfer = !string.IsNullOrEmpty(t.LinkedTransactionId);
+
+            if (!isTransfer)
+            {
+                if (t.Type == TransactionType.Receive)
+                    totalCredits += includedAmount;
+                else if (t.Type == TransactionType.Send)
+                    totalDebits += includedAmount;
+            }
                 
             // Accumulate category totals with currency conversion, skipping excluded splits
+            // Amounts are signed: Receive = positive, Send = negative
+            // This lets the frontend compute net values per folder (e.g., net Income, net Expenses)
             foreach (var split in t.Splits)
             {
                 if (ctx.ExcludedLabelIds.Contains(split.LabelId))
@@ -216,10 +224,13 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
                 var convertedSplitAmount = _exchangeRateService.Convert(
                     split.Amount, transactionCurrency, primaryCurrency, rates);
+                
+                // Sign the amount based on transaction type
+                var signedAmount = t.Type == TransactionType.Send ? -convertedSplitAmount : convertedSplitAmount;
                     
                 if (!categoryTotals.ContainsKey(split.LabelId))
                     categoryTotals[split.LabelId] = 0;
-                categoryTotals[split.LabelId] += convertedSplitAmount;
+                categoryTotals[split.LabelId] += signedAmount;
             }
             
             // Accumulate tag totals with currency conversion (using included amount)
@@ -267,29 +278,31 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Calculate category breakdown with currency conversion, excluding analytics-excluded splits
-        var categoryTotals = new Dictionary<string, (decimal amount, int count)>();
-        foreach (var t in transactions.Where(t => !t.IsRecurringTemplate))
+        // Calculate category breakdown by type, excluding internal transfers and analytics-excluded splits
+        var expenseTotals = new Dictionary<string, (decimal amount, int count)>();
+        var incomeTotals = new Dictionary<string, (decimal amount, int count)>();
+        foreach (var t in transactions.Where(t => !t.IsRecurringTemplate && string.IsNullOrEmpty(t.LinkedTransactionId)))
         {
+            var target = t.Type == TransactionType.Send ? expenseTotals : incomeTotals;
             var transactionCurrency = GetTransactionCurrency(t, accounts, primaryCurrency);
             foreach (var split in t.Splits)
             {
                 if (ctx.ExcludedLabelIds.Contains(split.LabelId))
                     continue;
 
-                if (!categoryTotals.ContainsKey(split.LabelId))
+                if (!target.ContainsKey(split.LabelId))
                 {
-                    categoryTotals[split.LabelId] = (0, 0);
+                    target[split.LabelId] = (0, 0);
                 }
-                var current = categoryTotals[split.LabelId];
+                var current = target[split.LabelId];
                 var convertedAmount = _exchangeRateService.Convert(
                     split.Amount, transactionCurrency, primaryCurrency, rates);
-                categoryTotals[split.LabelId] = (current.amount + convertedAmount, current.count + 1);
+                target[split.LabelId] = (current.amount + convertedAmount, current.count + 1);
             }
         }
 
-        var totalSpending = categoryTotals.Values.Sum(v => v.amount);
-        var topCategories = categoryTotals
+        var totalSpending = expenseTotals.Values.Sum(v => v.amount);
+        var topCategories = expenseTotals
             .OrderByDescending(kv => kv.Value.amount)
             .Take(10)
             .Select(kv =>
@@ -307,24 +320,54 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             })
             .ToList();
 
-        // Calculate spending trends (by month) with currency conversion, excluding analytics-excluded transactions
-        var trends = transactions
-            .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
-            .GroupBy(t => t.Date.ToString("yyyy-MM"))
-            .OrderBy(g => g.Key)
-            .Select(g => new SpendingTrend(
-                g.Key,
-                g.Where(t => t.Type == TransactionType.Receive)
-                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
-                g.Where(t => t.Type == TransactionType.Send)
-                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
-                g.Where(t => t.Type == TransactionType.Receive)
-                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)) -
-                g.Where(t => t.Type == TransactionType.Send)
-                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
-                g.Count()
-            ))
+        var totalIncome = incomeTotals.Values.Sum(v => v.amount);
+        var topIncomeCategories = incomeTotals
+            .OrderByDescending(kv => kv.Value.amount)
+            .Take(10)
+            .Select(kv =>
+            {
+                labels.TryGetValue(kv.Key, out var label);
+                return new CategoryBreakdown(
+                    kv.Key,
+                    label?.Name ?? "Unknown",
+                    label?.Icon,
+                    label?.Color,
+                    kv.Value.amount,
+                    kv.Value.count,
+                    totalIncome > 0 ? Math.Round(kv.Value.amount / totalIncome * 100, 1) : 0
+                );
+            })
             .ToList();
+
+        // Calculate spending trends (by day) with currency conversion, excluding analytics-excluded transactions
+        var dailyTrends = transactions
+            .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
+            .GroupBy(t => t.Date.ToString("yyyy-MM-dd"))
+            .ToDictionary(
+                g => g.Key,
+                g => new SpendingTrend(
+                    g.Key,
+                    g.Where(t => t.Type == TransactionType.Receive)
+                        .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
+                    g.Where(t => t.Type == TransactionType.Send)
+                        .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
+                    g.Where(t => t.Type == TransactionType.Receive)
+                        .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)) -
+                    g.Where(t => t.Type == TransactionType.Send)
+                        .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
+                    g.Count()
+                )
+            );
+
+        // Fill in missing days with zeros across the entire date range
+        var rangeStart = startDate ?? (transactions.Any() ? transactions.Min(t => t.Date).Date : DateTime.UtcNow.Date);
+        var rangeEnd = endDate ?? DateTime.UtcNow.Date;
+        var trends = new List<SpendingTrend>();
+        for (var day = rangeStart.Date; day <= rangeEnd.Date; day = day.AddDays(1))
+        {
+            var key = day.ToString("yyyy-MM-dd");
+            trends.Add(dailyTrends.TryGetValue(key, out var existing) ? existing : new SpendingTrend(key, 0, 0, 0, 0));
+        }
 
         // Calculate averages by type with currency conversion, excluding analytics-excluded transactions
         var actualTransactions = transactions
@@ -352,6 +395,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         return new TransactionAnalyticsResponse(
             topCategories,
+            topIncomeCategories,
             trends,
             averagesByType,
             Math.Round(totalSends / days, 2),
