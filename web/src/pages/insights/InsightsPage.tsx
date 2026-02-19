@@ -214,7 +214,7 @@ export default function InsightsPage() {
   
   const { data: transactionSummary, isLoading: summaryLoading } = useTransactionSummary(summaryFilter);
   const { data: prevTransactionSummary } = useTransactionSummary(prevSummaryFilter);
-  const { data: budgetSummary } = useBudgets(true);
+  const { data: budgetSummary, isLoading: budgetsLoading } = useBudgets(true);
   
   // Get analytics for selected period
   const { data: analytics, isLoading: analyticsLoading } = useTransactionAnalytics(
@@ -442,6 +442,7 @@ export default function InsightsPage() {
               <BudgetsWidget
                 key="budgets"
                 budgetSummary={budgetSummary}
+                isLoading={budgetsLoading}
                 collapsedSections={collapsedSections}
                 toggleSection={toggleSection}
                 dragProps={dragProps}
