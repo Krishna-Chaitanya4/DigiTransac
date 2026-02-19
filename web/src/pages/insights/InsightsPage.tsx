@@ -10,7 +10,6 @@ import { DateRangePicker } from '../../components/DatePicker';
 import type { PeriodPreset, WidgetId, SectionId } from './types';
 import { COLLAPSED_SECTIONS_KEY, WIDGET_ORDER_KEY, DEFAULT_WIDGET_ORDER, PERIOD_OPTIONS } from './types';
 import { getPreviousPeriodRange, getDateRange, formatDate } from './helpers';
-import { FinancialSummaryWidget } from './FinancialSummaryWidget';
 import { CategoryPairWidget } from './CategoryPairWidget';
 import { TrendsWidget } from './TrendsWidget';
 import { BudgetsWidget } from './BudgetsWidget';
@@ -382,17 +381,6 @@ export default function InsightsPage() {
         </p>
       </div>
 
-      {/* Financial Summary Card */}
-      <FinancialSummaryWidget
-        isLoading={isLoading}
-        financialSummary={financialSummary}
-        prevFinancialSummary={prevFinancialSummary}
-        transactionSummary={transactionSummary}
-        primaryCurrency={primaryCurrency}
-        convert={convert}
-        savingsRate={savingsRate}
-      />
-
       {/* Reorderable Widgets */}
       {widgetOrder.map((widgetId, widgetIndex) => {
         const dragProps = {
@@ -443,6 +431,9 @@ export default function InsightsPage() {
                 collapsedSections={collapsedSections}
                 toggleSection={toggleSection}
                 dragProps={dragProps}
+                financialSummary={financialSummary}
+                prevFinancialSummary={prevFinancialSummary}
+                savingsRate={savingsRate}
               />
             );
             

@@ -14,7 +14,7 @@ import type { DragProps, SectionId } from './types';
 import type { TransactionAnalytics } from '../../services/transactionService';
 import type { TransactionSummary } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
-import { CollapsibleSection } from './InsightWidgets';
+import { CollapsibleSection, ComparisonBadge } from './InsightWidgets';
 import { formatCurrency } from '../../services/currencyService';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -28,6 +28,9 @@ interface TrendsWidgetProps {
   collapsedSections: Set<string>;
   toggleSection: (id: SectionId) => void;
   dragProps: DragProps;
+  financialSummary: { income: number; expenses: number; transfers: number; netChange: number };
+  prevFinancialSummary: { income: number; expenses: number; transfers: number; netChange: number };
+  savingsRate: number;
 }
 
 interface ChartDataPoint {
@@ -110,6 +113,9 @@ export function TrendsWidget({
   collapsedSections,
   toggleSection,
   dragProps,
+  financialSummary,
+  prevFinancialSummary,
+  savingsRate,
 }: TrendsWidgetProps) {
   const chartData = useMemo<ChartDataPoint[]>(() => {
     if (!analytics?.spendingTrend) return [];
@@ -188,10 +194,92 @@ export function TrendsWidget({
           <div className="h-64 flex items-center justify-center">
             <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading chart...</div>
           </div>
-        ) : chartData.length > 0 ? (
-          <div className="space-y-4 pt-4">
-            {/* Recharts Area Chart */}
-            <div className="w-full h-64 sm:h-80">
+        ) : (
+          <div className="pt-4">
+            {/* Hero Stats Row */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
+              {/* Money In */}
+              <div className="text-center p-2 sm:p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                  <span className="text-[10px] sm:text-xs font-medium text-green-700 dark:text-green-300">Money In</span>
+                </div>
+                <div className="text-sm sm:text-xl font-bold text-green-600 dark:text-green-400 truncate">
+                  {convertAndFormat(financialSummary.income, transactionSummary?.currency, primaryCurrency, convert)}
+                </div>
+                {prevFinancialSummary.income > 0 && (
+                  <div className="mt-1 flex justify-center">
+                    <ComparisonBadge
+                      current={financialSummary.income}
+                      previous={prevFinancialSummary.income}
+                      invertColors={false}
+                      label="vs prev"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Money Out */}
+              <div className="text-center p-2 sm:p-4 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 rounded-xl">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  <span className="text-[10px] sm:text-xs font-medium text-red-700 dark:text-red-300">Money Out</span>
+                </div>
+                <div className="text-sm sm:text-xl font-bold text-red-600 dark:text-red-400 truncate">
+                  {convertAndFormat(financialSummary.expenses, transactionSummary?.currency, primaryCurrency, convert)}
+                </div>
+                {prevFinancialSummary.expenses > 0 && (
+                  <div className="mt-1 flex justify-center">
+                    <ComparisonBadge
+                      current={financialSummary.expenses}
+                      previous={prevFinancialSummary.expenses}
+                      invertColors={true}
+                      label="vs prev"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Net Cash Flow */}
+              <div className={`text-center p-2 sm:p-4 rounded-xl ${
+                financialSummary.netChange >= 0
+                  ? 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20'
+                  : 'bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20'
+              }`}>
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <svg className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${financialSummary.netChange >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  <span className={`text-[10px] sm:text-xs font-medium ${financialSummary.netChange >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>Net Cash Flow</span>
+                </div>
+                <div className={`text-sm sm:text-xl font-bold truncate ${financialSummary.netChange >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                  {financialSummary.netChange >= 0 ? '+' : ''}
+                  {convertAndFormat(financialSummary.netChange, transactionSummary?.currency, primaryCurrency, convert)}
+                </div>
+                <div className={`text-[9px] sm:text-[10px] mt-0.5 ${financialSummary.netChange >= 0 ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-orange-600/70 dark:text-orange-400/70'}`}>
+                  {savingsRate >= 0 ? `${savingsRate.toFixed(0)}% savings rate` : 'spending exceeds income'}
+                </div>
+                {(prevFinancialSummary.netChange !== 0 || financialSummary.netChange !== 0) && (
+                  <div className="mt-1 flex justify-center">
+                    <ComparisonBadge
+                      current={financialSummary.netChange}
+                      previous={prevFinancialSummary.netChange}
+                      invertColors={false}
+                      label="vs prev"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Area Chart */}
+            {chartData.length > 0 ? (
+              <div className="space-y-4">
+                <div className="w-full h-64 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={chartData}
@@ -266,30 +354,29 @@ export function TrendsWidget({
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
+                </div>
 
-            {/* Summary stats */}
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="text-center">
-                <div className="text-sm text-gray-500 dark:text-gray-400">Daily Average</div>
-                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {convertAndFormat(analytics!.dailyAverage, transactionSummary?.currency, primaryCurrency, convert)}
+                {/* Summary stats */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-center">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Daily Average</div>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      {convertAndFormat(analytics!.dailyAverage, transactionSummary?.currency, primaryCurrency, convert)}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Monthly Average</div>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      {convertAndFormat(analytics!.monthlyAverage, transactionSummary?.currency, primaryCurrency, convert)}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="text-center">
-                <div className="text-sm text-gray-500 dark:text-gray-400">Monthly Average</div>
-                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {convertAndFormat(analytics!.monthlyAverage, transactionSummary?.currency, primaryCurrency, convert)}
-                </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
+                No trend data for this period
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-            </svg>
-            <p>No trend data available</p>
+            )}
           </div>
         )}
       </CollapsibleSection>

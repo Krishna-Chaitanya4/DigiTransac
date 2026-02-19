@@ -340,9 +340,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .ToList();
 
         // Calculate spending trends (by day) with currency conversion, excluding analytics-excluded transactions
+        // Use DateLocal (user's local date) when available, falling back to UTC date
         var dailyTrends = transactions
             .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
-            .GroupBy(t => t.Date.ToString("yyyy-MM-dd"))
+            .GroupBy(t => t.DateLocal ?? t.Date.ToString("yyyy-MM-dd"))
             .ToDictionary(
                 g => g.Key,
                 g => new SpendingTrend(
