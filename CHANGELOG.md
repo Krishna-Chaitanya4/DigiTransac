@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.21] - 2026-02-20
+
+### Fixed — Session Persistence (PWA & Browser)
+- **Token Refresh Race Condition** — Unified all refresh paths through a single shared mutex in apiClient; prevents server token-rotation conflicts from concurrent refreshes
+- **Cross-Tab Token Desync** — Added `storage` event listener in AuthContext to sync auth state across tabs; prevents server "token theft" detection from revoking all sessions
+- **SignalR Stale Token** — `accessTokenFactory` now reads from localStorage instead of closure-captured value; reconnections use fresh token after refresh
+- **iOS PWA Cookie Blocking** — Changed `SameSite=Strict` to `SameSite=Lax` on refresh token cookie; iOS standalone PWA cold starts no longer fail to send cookies
+- **React Query Retry Storm** — Added `session.*expired` to `isClientError()` match; prevents 3x redundant refresh attempts on session expiration
+- **Query Cache Leak on Logout** — `clearAuth()` now calls `queryClient.clear()` to wipe stale data between user sessions
+- **Network Reconnection** — Added `online` event listener for eager token refresh after connectivity is restored
+- **Cold-Start Flash** — Failed refresh on app start now immediately calls `clearAuth()` instead of showing dead-token UI
+- **Service Worker Auth Bypass** — Explicit no-cache route for `/api/auth/` endpoints in service worker
+
 ## [1.6.20] - 2026-02-20
 
 ### Changed — Insights Page
