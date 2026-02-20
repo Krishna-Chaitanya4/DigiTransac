@@ -208,6 +208,7 @@ export interface AveragesByType {
 
 export interface TransactionAnalytics {
   topCategories: CategoryBreakdown[];
+  topIncomeCategories: CategoryBreakdown[];
   spendingTrend: SpendingTrend[];
   averagesByType: AveragesByType;
   dailyAverage: number;

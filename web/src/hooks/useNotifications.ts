@@ -108,33 +108,43 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       }
     });
 
+    // Shared invalidation options — refetchType: 'all' ensures inactive queries
+    // (e.g. analytics when user is on Chats page) are also refetched in background
+    const invalidateAll = { refetchType: 'all' as const };
+
     // Register event handlers
     connection.on('P2PTransactionCreated', (notification: P2PTransactionNotification) => {
       console.log('P2P Transaction Created:', notification);
       optionsRef.current.onP2PTransactionCreated?.(notification);
       
-      // Invalidate relevant queries to refresh UI
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingTransactions'] });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // Invalidate all transaction-dependent queries (including analytics/insights)
+      queryClient.invalidateQueries({ queryKey: ['transactions'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['conversations'], ...invalidateAll });
     });
 
     connection.on('P2PTransactionAccepted', (notification: P2PTransactionNotification) => {
       console.log('P2P Transaction Accepted:', notification);
       optionsRef.current.onP2PTransactionAccepted?.(notification);
       
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // Invalidate all transaction-dependent queries
+      queryClient.invalidateQueries({ queryKey: ['transactions'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['conversations'], ...invalidateAll });
     });
 
     connection.on('P2PTransactionRejected', (notification: P2PTransactionNotification) => {
       console.log('P2P Transaction Rejected:', notification);
       optionsRef.current.onP2PTransactionRejected?.(notification);
       
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingTransactions'] });
+      // Invalidate all transaction-dependent queries
+      queryClient.invalidateQueries({ queryKey: ['transactions'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
     });
 
     connection.on('ChatMessage', (notification: ChatMessageNotification) => {

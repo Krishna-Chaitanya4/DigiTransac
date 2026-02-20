@@ -1,16 +1,14 @@
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
 import type { SectionId, DragProps, MobileReorderProps } from './types';
 import type { TransactionAnalytics, CategoryBreakdown } from '../../services/transactionService';
 import type { TransactionSummary } from '../../types/transactions';
 import { convertAndFormat } from './helpers';
 import { CollapsibleSection, DragHandle, MobileReorderButtons, WidgetWithErrorBoundary } from './InsightWidgets';
+import { CategoryDonutChart, getCategoryChartColor } from './CategoryDonutChart';
 
 interface CategoryPairWidgetProps {
   analytics: TransactionAnalytics | undefined;
-  systemFolders: { incomeCategoryIds: string[]; expenseCategoryIds: string[] };
-  incomeCategories: CategoryBreakdown[];
   transactionSummary: TransactionSummary | undefined;
-  prevAnalytics: TransactionAnalytics | undefined;
   primaryCurrency: string;
   convert: (amount: number, fromCurrency: string) => number;
   isLoading: boolean;
@@ -23,8 +21,6 @@ interface CategoryPairWidgetProps {
 
 export function CategoryPairWidget({
   analytics,
-  systemFolders,
-  incomeCategories,
   transactionSummary,
   primaryCurrency,
   convert,
@@ -35,6 +31,30 @@ export function CategoryPairWidget({
   dragProps,
   mobileReorderProps,
 }: CategoryPairWidgetProps) {
+  // Top expense categories (Send transactions, excluding transfers)
+  const topCategories = analytics?.topCategories;
+  const expenseCategories = useMemo(() => {
+    if (!topCategories) return [];
+    return topCategories.slice(0, 6);
+  }, [topCategories]);
+
+  // Top income categories (Receive transactions, excluding transfers)
+  const topIncomeCategories = analytics?.topIncomeCategories;
+  const incomeCategories = useMemo(() => {
+    if (!topIncomeCategories) return [];
+    return topIncomeCategories.slice(0, 6);
+  }, [topIncomeCategories]);
+
+  const totalExpenses = useMemo(
+    () => expenseCategories.reduce((sum, cat) => sum + cat.amount, 0),
+    [expenseCategories]
+  );
+
+  const totalIncome = useMemo(
+    () => incomeCategories.reduce((sum, cat) => sum + cat.amount, 0),
+    [incomeCategories]
+  );
+
   return (
     <WidgetWithErrorBoundary name="Categories">
       <div
@@ -50,7 +70,7 @@ export function CategoryPairWidget({
         {/* Top Expense Categories - Collapsible */}
         <CollapsibleSection
           id="categories"
-          title="Top Spending Categories"
+          title="Money Out by Category"
           icon={
             <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -60,13 +80,6 @@ export function CategoryPairWidget({
             <>
               <MobileReorderButtons {...mobileReorderProps} />
               <DragHandle />
-              <Link
-                to="/transactions"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                View all →
-              </Link>
             </>
           }
           isCollapsed={collapsedSections.has('categories')}
@@ -85,16 +98,23 @@ export function CategoryPairWidget({
                 </div>
               ))}
             </div>
-          ) : analytics?.topCategories && analytics.topCategories.length > 0 ? (
-            <div className="space-y-3 pt-4">
-              {analytics.topCategories
-                .filter((cat: CategoryBreakdown) => systemFolders.expenseCategoryIds.includes(cat.labelId))
-                .slice(0, 6)
-                .map((category: CategoryBreakdown) => (
+          ) : expenseCategories.length > 0 ? (
+            <div className="pt-4">
+              {/* Donut Chart */}
+              <CategoryDonutChart
+                categories={expenseCategories}
+                totalLabel="Total"
+                totalAmount={convertAndFormat(totalExpenses, transactionSummary?.currency, primaryCurrency, convert)}
+              />
+              {/* Category List */}
+              <div className="space-y-3 mt-4">
+              {expenseCategories.map((category: CategoryBreakdown, index: number) => {
+                const chartColor = getCategoryChartColor(category.labelColor, index);
+                return (
                 <div key={category.labelId} className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
-                    style={{ backgroundColor: category.labelColor ? `${category.labelColor}20` : '#f3f4f6' }}
+                    style={{ backgroundColor: `${chartColor}20` }}
                   >
                     {category.labelIcon || '📦'}
                   </div>
@@ -112,7 +132,7 @@ export function CategoryPairWidget({
                         className="h-2 rounded-full transition-all duration-300"
                         style={{
                           width: `${category.percentage}%`,
-                          backgroundColor: category.labelColor || '#ef4444'
+                          backgroundColor: chartColor
                         }}
                       />
                     </div>
@@ -121,14 +141,16 @@ export function CategoryPairWidget({
                     {category.percentage.toFixed(0)}%
                   </span>
                 </div>
-              ))}
+                );
+              })}
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <p>No expense transactions in this period</p>
+              <p>No money out transactions in this period</p>
             </div>
           )}
         </CollapsibleSection>
@@ -136,21 +158,13 @@ export function CategoryPairWidget({
         {/* Top Income Categories */}
         <CollapsibleSection
           id="incomeCategories"
-          title="Top Income Sources"
+          title="Money In by Category"
           icon={
             <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
             </svg>
           }
-          headerRight={
-            <Link
-              to="/transactions"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              View all →
-            </Link>
-          }
+          headerRight={null}
           isCollapsed={collapsedSections.has('incomeCategories')}
           onToggle={toggleSection}
         >
@@ -168,12 +182,22 @@ export function CategoryPairWidget({
               ))}
             </div>
           ) : incomeCategories.length > 0 ? (
-            <div className="space-y-3 pt-4">
-              {incomeCategories.slice(0, 6).map((category) => (
+            <div className="pt-4">
+              {/* Donut Chart */}
+              <CategoryDonutChart
+                categories={incomeCategories}
+                totalLabel="Total"
+                totalAmount={convertAndFormat(totalIncome, transactionSummary?.currency, primaryCurrency, convert)}
+              />
+              {/* Category List */}
+              <div className="space-y-3 mt-4">
+              {incomeCategories.map((category, index) => {
+                const chartColor = getCategoryChartColor(category.labelColor, index);
+                return (
                 <div key={category.labelId} className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
-                    style={{ backgroundColor: category.labelColor ? `${category.labelColor}20` : '#f0fdf4' }}
+                    style={{ backgroundColor: `${chartColor}20` }}
                   >
                     {category.labelIcon || '💰'}
                   </div>
@@ -191,7 +215,7 @@ export function CategoryPairWidget({
                         className="h-2 rounded-full transition-all duration-300"
                         style={{
                           width: `${category.percentage}%`,
-                          backgroundColor: category.labelColor || '#22c55e'
+                          backgroundColor: chartColor
                         }}
                       />
                     </div>
@@ -200,14 +224,16 @@ export function CategoryPairWidget({
                     {category.percentage.toFixed(0)}%
                   </span>
                 </div>
-              ))}
+                );
+              })}
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
               </svg>
-              <p>No income transactions in this period</p>
+              <p>No money in transactions in this period</p>
             </div>
           )}
         </CollapsibleSection>

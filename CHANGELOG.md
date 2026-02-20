@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.20] - 2026-02-20
+
+### Changed — Insights Page
+- **Categories** — Renamed to Money Out / Money In by Category with recharts donut charts; type-based analytics instead of income/spending concept
+- **Cash Flow Trends** — Merged financial summary stats into TrendsWidget; recharts AreaChart with daily granularity, zero-fill, and timezone-safe date formatting
+- **Budget Tracking** — Health header with colored status badges, warning indicators, sorted by utilization
+- **Top Recipients** — Renamed from Counterparties; P2P badges, percentage shown
+- **Account Activity** — New widget replacing Spending by Account: per-account emoji icon, transaction count, money in/out, net change, activity share progress bar
+- **Spending Alerts** — Type-specific icons (warning triangle, trend arrow, tag, person+)
+- **Compact Mobile Layout** — Mobile reorder controls for widget drag-and-drop
+
+### Fixed — Real-time Data
+- **Stale Insights After P2P Transactions** — Backend analytics endpoints changed from `max-age=300` to `no-cache` with ETag revalidation; browser no longer serves stale cached responses
+- **SignalR P2P Handlers** — Added `refetchType: 'all'` and accounts/budgets invalidation to all P2P event handlers (Created/Accepted/Rejected)
+- **Mutation Cache Invalidation** — `useUpdateStatus`, `useBatchMarkConfirmed`, `useBatchMarkPending` now invalidate accounts and budgets queries
+- **Analytics Stale Time** — Reduced from 5 minutes to 30 seconds
+
+### Removed — Dead Code (-1,778 lines)
+- Deleted entire `components/insights/` directory (12 orphaned files from prior refactoring)
+- Removed unused `FinancialSummaryWidget`, `ByAccountWidget`, duplicate `CounterpartiesWidget`
+- Removed Transaction Averages widget (redundant with trends)
+
 ## [1.6.19] - 2026-02-18
 
 ### Fixed — Tests

@@ -151,7 +151,7 @@ export function useDeleteLabelWithReassignment() {
       deleteLabelWithReassignment(id, reassignToId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.labels.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, refetchType: 'all' });
     },
   });
 }

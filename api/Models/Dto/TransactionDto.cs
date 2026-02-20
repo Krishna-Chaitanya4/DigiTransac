@@ -446,6 +446,7 @@ public record ExportRequest(
 // Analytics DTOs
 public record TransactionAnalyticsResponse(
     List<CategoryBreakdown> TopCategories,
+    List<CategoryBreakdown> TopIncomeCategories,
     List<SpendingTrend> SpendingTrend,
     AveragesByType AveragesByType,
     decimal DailyAverage,

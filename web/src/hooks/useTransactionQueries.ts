@@ -93,7 +93,7 @@ export function useTransactionAnalytics(
   return useQuery({
     queryKey: ['transactions', 'analytics', { startDate, endDate, accountId }],
     queryFn: () => getAnalytics(startDate, endDate, accountId),
-    staleTime: 5 * 60 * 1000, // 5 minutes - analytics don't need to be real-time
+    staleTime: 30 * 1000, // 30 seconds - refetch when navigating back to insights
     enabled,
   });
 }
@@ -107,6 +107,10 @@ export function useCounterparties() {
   });
 }
 
+// Shared invalidation options — use refetchType 'all' so inactive queries
+// (e.g. Insights analytics when user is on Transactions page) are also invalidated
+const invalidateAll = { refetchType: 'all' as const };
+
 // Hook for creating a transaction
 export function useCreateTransaction() {
   const queryClient = useQueryClient();
@@ -114,9 +118,10 @@ export function useCreateTransaction() {
   return useMutation({
     mutationFn: (data: CreateTransactionRequest) => createTransaction(data),
     onSuccess: () => {
-      // Invalidate all transaction-related queries
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+      // Invalidate all transaction-related queries (including analytics/summary)
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     meta: {
       successMessage: 'Transaction created successfully',
@@ -132,8 +137,9 @@ export function useUpdateTransaction() {
     mutationFn: ({ id, data }: { id: string; data: UpdateTransactionRequest }) =>
       updateTransaction(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     meta: {
       successMessage: 'Transaction updated successfully',
@@ -184,8 +190,9 @@ export function useDeleteTransaction() {
     },
     onSettled: () => {
       // Always refetch after error or success to ensure consistency
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     // No successMessage - the toast with undo button is shown by the page
   });
@@ -198,8 +205,9 @@ export function useRestoreTransaction() {
   return useMutation({
     mutationFn: (id: string) => restoreTransaction(id),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     meta: {
       successMessage: 'Transaction restored',
@@ -248,7 +256,9 @@ export function useUpdateStatus() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     meta: {
       successMessage: 'Status updated',
@@ -292,8 +302,9 @@ export function useBatchDelete() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     meta: {
       successMessage: 'Transactions deleted',
@@ -338,7 +349,9 @@ export function useBatchMarkConfirmed() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     meta: {
       successMessage: 'Transactions marked as confirmed',
@@ -383,7 +396,9 @@ export function useBatchMarkPending() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
     },
     meta: {
       successMessage: 'Transactions marked as pending',
@@ -409,8 +424,9 @@ export function useInvalidateTransactions() {
   const queryClient = useQueryClient();
   
   return () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+    queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
   };
 }
 
@@ -427,7 +443,7 @@ export function useTopCounterparties(
   return useQuery({
     queryKey: ['transactions', 'analytics', 'counterparties', { startDate, endDate, page, pageSize }],
     queryFn: () => getTopCounterparties(startDate, endDate, pageSize, page),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds
     enabled,
   });
 }
@@ -441,7 +457,7 @@ export function useSpendingByAccount(
   return useQuery({
     queryKey: ['transactions', 'analytics', 'byAccount', { startDate, endDate }],
     queryFn: () => getSpendingByAccount(startDate, endDate),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds
     enabled,
   });
 }
@@ -455,7 +471,7 @@ export function useSpendingPatterns(
   return useQuery({
     queryKey: ['transactions', 'analytics', 'patterns', { startDate, endDate }],
     queryFn: () => getSpendingPatterns(startDate, endDate),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds
     enabled,
   });
 }
@@ -469,7 +485,7 @@ export function useSpendingAnomalies(
   return useQuery({
     queryKey: ['transactions', 'analytics', 'anomalies', { startDate, endDate }],
     queryFn: () => getSpendingAnomalies(startDate, endDate),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds
     enabled,
   });
 }

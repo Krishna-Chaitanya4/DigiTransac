@@ -22,6 +22,47 @@ export function AnomaliesWidget({
   toggleSection,
   dragProps,
 }: AnomaliesWidgetProps) {
+  const getTypeIcon = (type: SpendingAnomaly['type'], severity: SpendingAnomaly['severity']) => {
+    const colorClass = severity === 'High'
+      ? 'text-red-500 dark:text-red-400'
+      : severity === 'Medium'
+      ? 'text-yellow-500 dark:text-yellow-400'
+      : 'text-blue-500 dark:text-blue-400';
+
+    switch (type) {
+      case 'HighTransaction':
+        return (
+          <svg className={`w-5 h-5 ${colorClass} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        );
+      case 'SpendingSpike':
+        return (
+          <svg className={`w-5 h-5 ${colorClass} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        );
+      case 'UnusualCategory':
+        return (
+          <svg className={`w-5 h-5 ${colorClass} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        );
+      case 'NewPayee':
+        return (
+          <svg className={`w-5 h-5 ${colorClass} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className={`w-5 h-5 ${colorClass} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        );
+    }
+  };
+
   return (
     <WidgetWithErrorBoundary name="Spending Alerts">
       <CollapsibleSection
@@ -52,17 +93,20 @@ export function AnomaliesWidget({
             {anomalies.anomalies.map((anomaly: SpendingAnomaly, index: number) => (
               <div
                 key={anomaly.transactionId || `anomaly-${index}`}
-                className={`p-4 rounded-lg border-l-4 ${
+                className={`p-4 rounded-lg ${
                   anomaly.severity === 'High'
-                    ? 'bg-red-50 dark:bg-red-900/20 border-red-500'
+                    ? 'bg-red-50 dark:bg-red-900/20'
                     : anomaly.severity === 'Medium'
-                    ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500'
-                    : 'bg-blue-50 dark:bg-blue-900/20 border-blue-500'
+                    ? 'bg-yellow-50 dark:bg-yellow-900/20'
+                    : 'bg-blue-50 dark:bg-blue-900/20'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    {getTypeIcon(anomaly.type, anomaly.severity)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-sm font-medium ${
                         anomaly.severity === 'High'
                           ? 'text-red-700 dark:text-red-300'
@@ -87,15 +131,15 @@ export function AnomaliesWidget({
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                       {new Date(anomaly.detectedAt).toLocaleDateString()}
-                      {anomaly.payeeName && ` • Payee: ${anomaly.payeeName}`}
-                      {anomaly.categoryName && ` • Category: ${anomaly.categoryName}`}
+                      {anomaly.payeeName && ` · ${anomaly.payeeName}`}
+                      {anomaly.categoryName && ` · ${anomaly.categoryName}`}
                     </p>
                   </div>
                   {anomaly.amount !== undefined && (
-                    <div className="text-right ml-4">
-                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                          {convertAndFormat(anomaly.amount, anomalies?.currency, primaryCurrency, convert)}
-                        </div>
+                    <div className="text-right ml-2 shrink-0">
+                      <div className="text-base font-bold text-gray-900 dark:text-gray-100">
+                        {convertAndFormat(anomaly.amount, anomalies?.currency, primaryCurrency, convert)}
+                      </div>
                     </div>
                   )}
                 </div>

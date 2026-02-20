@@ -68,10 +68,14 @@ const mockAnalytics = {
     { labelId: 'lbl-food', labelName: 'Food', labelColor: '#ef4444', amount: 1500, percentage: 50, transactionCount: 20 },
     { labelId: 'lbl-transport', labelName: 'Transport', labelColor: '#3b82f6', amount: 1000, percentage: 33, transactionCount: 15 },
   ],
+  topIncomeCategories: [
+    { labelId: 'lbl-salary', labelName: 'Salary', labelColor: '#22c55e', amount: 5000, percentage: 100, transactionCount: 5 },
+  ],
   spendingTrend: [
-    { period: '2025-12', credits: 4500, debits: 2800 },
-    { period: '2026-01', credits: 5000, debits: 3200 },
-    { period: '2026-02', credits: 5000, debits: 3000 },
+    { period: '2026-01-20', credits: 4500, debits: 2800 },
+    { period: '2026-01-21', credits: 0, debits: 0 },
+    { period: '2026-01-22', credits: 5000, debits: 3200 },
+    { period: '2026-02-01', credits: 5000, debits: 3000 },
   ],
   dailyAverage: 100,
   monthlyAverage: 3000,
@@ -146,6 +150,9 @@ vi.mock('../hooks', () => ({
   useSpendingAnomalies: vi.fn(() => ({
     data: mockAnomalies,
     isLoading: false
+  })),
+  useAccounts: vi.fn(() => ({
+    data: [],
   })),
   // Invalidation hooks for pull-to-refresh
   useInvalidateTransactions: vi.fn(() => vi.fn(() => Promise.resolve())),
@@ -230,12 +237,12 @@ describe('InsightsPage', () => {
     });
   });
 
-  it('displays financial summary with income and expenses', async () => {
+  it('displays financial summary with money in and money out', async () => {
     renderWithProviders(<InsightsPage />);
     
     await waitFor(() => {
-      expect(screen.getByText('Income')).toBeDefined();
-      expect(screen.getByText('Expenses')).toBeDefined();
+      expect(screen.getAllByText('Money In').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Money Out').length).toBeGreaterThan(0);
     });
   });
 
@@ -255,22 +262,14 @@ describe('InsightsPage', () => {
     });
   });
 
-  it('can toggle between categorized and cashflow view', async () => {
-    const user = userEvent.setup();
+  it('shows net cash flow in summary', async () => {
     renderWithProviders(<InsightsPage />);
     
+    // Should show Money In, Money Out, and Net Cash Flow
     await waitFor(() => {
-      expect(screen.getByText('💰 Income vs Expenses')).toBeDefined();
-    });
-    
-    // Click on Money In vs Out
-    const cashflowButton = screen.getByText('💵 Money In vs Out');
-    await user.click(cashflowButton);
-    
-    await waitFor(() => {
-      // "Money In" and "Money Out" may appear multiple times in the UI
       expect(screen.getAllByText('Money In').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Money Out').length).toBeGreaterThan(0);
+      expect(screen.getByText('Net Cash Flow')).toBeDefined();
     });
   });
 });
