@@ -40,6 +40,7 @@ function isClientError(error: unknown): boolean {
     if (message.includes('404') || message.includes('not found')) return true;
     if (message.includes('400') || message.includes('bad request')) return true;
     if (message.includes('422') || message.includes('validation')) return true;
+    if (message.includes('session') && message.includes('expired')) return true;
     // Note: 429 (Too Many Requests) is intentionally NOT treated as a client error
     // so that rate-limited requests benefit from retry with exponential backoff
   }

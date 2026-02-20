@@ -39,7 +39,7 @@ public class CookieService : ICookieService
         {
             HttpOnly = true,                          // Not accessible via JavaScript
             Secure = _securitySettings.UseSecureCookies, // Only sent over HTTPS in production
-            SameSite = SameSiteMode.Strict,           // Prevent CSRF
+            SameSite = SameSiteMode.Lax,              // Lax for PWA standalone compatibility (Strict blocks cookies on iOS PWA cold start)
             Path = "/api/auth",                        // Only sent to auth endpoints
         };
 
@@ -70,7 +70,7 @@ public class CookieService : ICookieService
         {
             HttpOnly = true,
             Secure = _securitySettings.UseSecureCookies,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax,
             Expires = DateTime.UtcNow.AddDays(-1),    // Expire immediately
             Path = "/api/auth",
         };

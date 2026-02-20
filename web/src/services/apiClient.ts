@@ -103,8 +103,9 @@ async function doRefreshToken(): Promise<string | null> {
 /**
  * Attempt to refresh the access token exactly once.
  * Concurrent callers share a single in-flight refresh.
+ * This is the ONLY refresh entry point — AuthContext must use this too.
  */
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = doRefreshToken().finally(() => {
       refreshPromise = null;

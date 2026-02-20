@@ -3,9 +3,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider, useAuth } from './AuthContext';
 import * as authService from '../services/authService';
+import * as apiClient from '../services/apiClient';
 
 // Mock the auth service
 vi.mock('../services/authService');
+
+// Mock refreshAccessToken from apiClient (used by AuthContext for token refresh)
+vi.mock('../services/apiClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/apiClient')>();
+  return {
+    ...actual,
+    refreshAccessToken: vi.fn(),
+  };
+});
 
 // Test component to access auth context
 function TestConsumer() {
@@ -211,15 +221,8 @@ describe('AuthContext', () => {
     const newTokenPayload = { sub: 'user-123', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) + 900 };
     const newAccessToken = `header.${btoa(JSON.stringify(newTokenPayload))}.signature`;
 
-    // refreshToken no longer takes a parameter - refresh token is sent via HttpOnly cookie
-    vi.mocked(authService.refreshToken).mockResolvedValue({
-      accessToken: newAccessToken,
-      refreshToken: '', // Kept for type compatibility
-      email: 'test@example.com',
-      fullName: 'Test User',
-      isEmailVerified: true,
-      primaryCurrency: 'USD',
-    });
+    // Mock refreshAccessToken from apiClient (shared mutex refresh)
+    vi.mocked(apiClient.refreshAccessToken).mockResolvedValue(newAccessToken);
 
     let validToken: string | null = null;
 
@@ -248,8 +251,8 @@ describe('AuthContext', () => {
     await user.click(screen.getByText('Get Valid Token'));
 
     await waitFor(() => {
-      // refreshToken is now called without parameters (uses HttpOnly cookie)
-      expect(authService.refreshToken).toHaveBeenCalled();
+      // refreshAccessToken is now called via apiClient's shared mutex
+      expect(apiClient.refreshAccessToken).toHaveBeenCalled();
     });
 
     // Token should be refreshed
@@ -269,7 +272,7 @@ describe('AuthContext', () => {
     localStorage.setItem('digitransac_access_token', expiredToken);
     localStorage.setItem('digitransac_user', JSON.stringify(storedUser));
 
-    vi.mocked(authService.refreshToken).mockRejectedValue(new Error('Invalid refresh token'));
+    vi.mocked(apiClient.refreshAccessToken).mockResolvedValue(null);
 
     let validToken: string | null = 'should-be-null';
 
