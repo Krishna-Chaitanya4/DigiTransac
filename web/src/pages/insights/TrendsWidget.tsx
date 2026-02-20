@@ -117,10 +117,11 @@ export function TrendsWidget({
   prevFinancialSummary,
   savingsRate,
 }: TrendsWidgetProps) {
+  const spendingTrend = analytics?.spendingTrend;
+  const sourceCurrency = transactionSummary?.currency;
   const chartData = useMemo<ChartDataPoint[]>(() => {
-    if (!analytics?.spendingTrend) return [];
-    const sourceCurrency = transactionSummary?.currency;
-    return analytics.spendingTrend.map((trend) => {
+    if (!spendingTrend) return [];
+    return spendingTrend.map((trend) => {
       const moneyIn = sourceCurrency && sourceCurrency !== primaryCurrency
         ? convert(trend.credits, sourceCurrency) : trend.credits;
       const moneyOut = sourceCurrency && sourceCurrency !== primaryCurrency
@@ -146,7 +147,7 @@ export function TrendsWidget({
         net: Math.round((moneyIn - moneyOut) * 100) / 100,
       };
     });
-  }, [analytics?.spendingTrend, transactionSummary?.currency, primaryCurrency, convert]);
+  }, [spendingTrend, sourceCurrency, primaryCurrency, convert]);
 
   const displayCurrency = primaryCurrency;
   const totalDays = chartData.length;

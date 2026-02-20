@@ -22,10 +22,11 @@ export function BudgetsWidget({
   dragProps,
 }: BudgetsWidgetProps) {
   // Sort budgets by usage (highest first) without mutating source array
+  const budgets = budgetSummary?.budgets;
   const sortedBudgets = useMemo(() => {
-    if (!budgetSummary?.budgets) return [];
-    return [...budgetSummary.budgets].sort((a: Budget, b: Budget) => b.percentUsed - a.percentUsed);
-  }, [budgetSummary?.budgets]);
+    if (!budgets) return [];
+    return [...budgets].sort((a: Budget, b: Budget) => b.percentUsed - a.percentUsed);
+  }, [budgets]);
 
   const overallPercent = budgetSummary && budgetSummary.totalBudgetAmount > 0
     ? Math.round((budgetSummary.totalSpent / budgetSummary.totalBudgetAmount) * 100)

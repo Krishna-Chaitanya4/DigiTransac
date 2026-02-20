@@ -32,16 +32,18 @@ export function CategoryPairWidget({
   mobileReorderProps,
 }: CategoryPairWidgetProps) {
   // Top expense categories (Send transactions, excluding transfers)
+  const topCategories = analytics?.topCategories;
   const expenseCategories = useMemo(() => {
-    if (!analytics?.topCategories) return [];
-    return analytics.topCategories.slice(0, 6);
-  }, [analytics?.topCategories]);
+    if (!topCategories) return [];
+    return topCategories.slice(0, 6);
+  }, [topCategories]);
 
   // Top income categories (Receive transactions, excluding transfers)
+  const topIncomeCategories = analytics?.topIncomeCategories;
   const incomeCategories = useMemo(() => {
-    if (!analytics?.topIncomeCategories) return [];
-    return analytics.topIncomeCategories.slice(0, 6);
-  }, [analytics?.topIncomeCategories]);
+    if (!topIncomeCategories) return [];
+    return topIncomeCategories.slice(0, 6);
+  }, [topIncomeCategories]);
 
   const totalExpenses = useMemo(
     () => expenseCategories.reduce((sum, cat) => sum + cat.amount, 0),
