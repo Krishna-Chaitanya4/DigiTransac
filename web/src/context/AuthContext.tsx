@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User, AuthResponse } from '../types/auth';
 import * as authService from '../services/authService';
-import { SESSION_EXPIRED_EVENT } from '../services/apiClient';
+import { SESSION_EXPIRED_EVENT, refreshAccessToken } from '../services/apiClient';
 import { setSentryUser, clearSentryUser } from '../services/sentry';
+import { queryClient } from '../lib/queryClient';
 
 // Detect if running as installed PWA (standalone mode)
 function isPwaStandalone(): boolean {
@@ -82,15 +83,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Proactively refresh if access token is expired or about to expire
         // This prevents the first API call from failing and provides seamless PWA experience
         if (isTokenExpired(storedAccessToken)) {
-          authService.refreshToken()
-            .then((response) => {
-              handleAuthSuccess(response);
+          refreshAccessToken()
+            .then((newToken) => {
+              if (newToken) {
+                // Re-fetch user profile from the new token response
+                // The token is already stored in localStorage by refreshAccessToken
+                setAccessToken(newToken);
+              } else {
+                // Refresh failed — clear auth state so user is redirected to login
+                clearAuth();
+              }
               setIsLoading(false);
             })
             .catch(() => {
-              // Refresh failed — token cookie expired or was cleared
-              // Keep user data so ProtectedRoute can show the app briefly,
-              // the next API call will trigger session-expired flow
+              // Refresh failed — clear stale auth to avoid brief flash of app
+              clearAuth();
               setIsLoading(false);
             });
           return; // Don't set isLoading=false yet, wait for refresh
@@ -113,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      // Clear all cached query data
+      queryClient.clear();
       // Clear Sentry user
       clearSentryUser();
       // Set message to show on login page
@@ -121,6 +130,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
+
+  // Cross-tab synchronization: detect when another tab updates the access token
+  // or logs out, and sync React state accordingly
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACCESS_TOKEN_KEY) {
+        if (e.newValue) {
+          // Another tab refreshed the token — update React state
+          setAccessToken(e.newValue);
+        } else {
+          // Another tab logged out — clear auth state in this tab too
+          setAccessToken(null);
+          setUser(null);
+          queryClient.clear();
+          clearSentryUser();
+        }
+      } else if (e.key === USER_KEY) {
+        if (e.newValue) {
+          try {
+            const parsedUser = JSON.parse(e.newValue);
+            setUser(parsedUser);
+          } catch { /* ignore corrupted data */ }
+        } else {
+          setUser(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Proactive token refresh: schedule a refresh 60 seconds before the access token expires
@@ -139,9 +179,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       refreshTimer = setTimeout(async () => {
         try {
-          const response = await authService.refreshToken();
-          handleAuthSuccess(response);
-          scheduleRefresh(); // re-schedule for the new token
+          const newToken = await refreshAccessToken();
+          if (newToken) {
+            setAccessToken(newToken);
+            scheduleRefresh(); // re-schedule for the new token
+          }
         } catch {
           // Refresh failed — don't force logout yet;
           // the 401 interceptor in apiClient will handle it on the next API call
@@ -154,9 +196,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = localStorage.getItem(ACCESS_TOKEN_KEY);
         if (token && isTokenExpired(token)) {
           // Token expired while tab was hidden — refresh immediately
-          authService.refreshToken()
-            .then((response) => {
-              handleAuthSuccess(response);
+          refreshAccessToken()
+            .then((newToken) => {
+              if (newToken) {
+                setAccessToken(newToken);
+              }
               scheduleRefresh();
             })
             .catch(() => {
@@ -171,9 +215,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     scheduleRefresh();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // Also refresh when device comes back online (network reconnection)
+    function handleOnline() {
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (token && isTokenExpired(token)) {
+        refreshAccessToken()
+          .then((newToken) => {
+            if (newToken) setAccessToken(newToken);
+            scheduleRefresh();
+          })
+          .catch(() => { /* 401 interceptor handles it */ });
+      } else {
+        scheduleRefresh();
+      }
+    }
+    window.addEventListener('online', handleOnline);
+
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]); // Re-schedule whenever the access token changes
@@ -199,6 +260,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    // Clear all cached query data to prevent stale data leaking across sessions
+    queryClient.clear();
     // Note: HttpOnly cookie will be cleared by the server on logout
     // Clear Sentry user
     clearSentryUser();
@@ -222,15 +285,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Token is expired or missing, try to refresh using HttpOnly cookie
     try {
-      const response = await authService.refreshToken();
-      handleAuthSuccess(response);
-      return response.accessToken;
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        setAccessToken(newToken);
+        return newToken;
+      }
+      // Refresh failed, clear auth state
+      clearAuth();
+      return null;
     } catch {
       // Refresh failed, clear auth state
       clearAuth();
       return null;
     }
-  }, [handleAuthSuccess, clearAuth]);
+  }, [clearAuth]);
 
   const pwaDetected = isPwaStandalone();
 

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { NOTIFICATION_CONSTANTS } from '../utils/constants';
 import { API_BASE_URL } from '../services/apiClient';
+import { getStoredAccessToken } from '../services/tokenStorage';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -68,7 +69,8 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${apiUrl}/hubs/notifications`, {
-        accessTokenFactory: () => token,
+        // Always read the latest token from localStorage so reconnections use the freshest token
+        accessTokenFactory: () => getStoredAccessToken() || token,
         transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents,
       })
       .withAutomaticReconnect({

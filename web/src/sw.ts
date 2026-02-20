@@ -14,6 +14,17 @@ precacheAndRoute(self.__WB_MANIFEST);
 // Clean up old caches
 cleanupOutdatedCaches();
 
+// NEVER cache auth endpoints — these must always go to the network
+registerRoute(
+  /^https?:\/\/.*\/api\/auth\//,
+  new NetworkFirst({
+    cacheName: 'auth-no-cache',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [] }), // Cache nothing
+    ],
+  })
+);
+
 // Runtime caching for API calls
 registerRoute(
   /^https?:\/\/.*\/api\/transactions/,
