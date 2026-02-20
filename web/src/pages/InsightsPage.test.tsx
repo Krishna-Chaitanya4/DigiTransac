@@ -151,6 +151,9 @@ vi.mock('../hooks', () => ({
     data: mockAnomalies,
     isLoading: false
   })),
+  useAccounts: vi.fn(() => ({
+    data: [],
+  })),
   // Invalidation hooks for pull-to-refresh
   useInvalidateTransactions: vi.fn(() => vi.fn(() => Promise.resolve())),
   useInvalidateBudgets: vi.fn(() => vi.fn(() => Promise.resolve())),
