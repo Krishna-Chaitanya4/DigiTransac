@@ -8,7 +8,6 @@ export { WidgetWithErrorBoundary, WidgetErrorFallback } from './WidgetWithErrorB
 export type { WidgetWithErrorBoundaryProps, WidgetErrorFallbackProps } from './WidgetWithErrorBoundary';
 export { TrendWidget } from './TrendWidget';
 export { CategoryBreakdownWidget } from './CategoryBreakdownWidget';
-export { CounterpartiesWidget } from './CounterpartiesWidget';
 export { SpendingByAccountWidget } from './SpendingByAccountWidget';
 export { PatternsWidget } from './PatternsWidget';
 export { AnomaliesWidget } from './AnomaliesWidget';

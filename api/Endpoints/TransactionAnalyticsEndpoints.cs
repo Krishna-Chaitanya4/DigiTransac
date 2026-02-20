@@ -14,7 +14,7 @@ public static class TransactionAnalyticsEndpoints
     public static RouteGroupBuilder MapTransactionAnalyticsEndpoints(this RouteGroupBuilder group)
     {
         // Get analytics
-        // Cache analytics for 5 minutes to reduce load on expensive aggregate queries
+        // no-cache: always revalidate with server; ETag provides 304 when data unchanged
         group.MapGet("/analytics", async (
             DateTime? startDate,
             DateTime? endDate,
@@ -30,11 +30,11 @@ public static class TransactionAnalyticsEndpoints
 
             var analytics = await transactionService.GetAnalyticsAsync(userId, startDate, endDate, accountId, ct);
             
-            return ETagHelper.OkWithETag(httpContext, analytics, cacheMaxAgeSeconds: 300);
+            return ETagHelper.OkWithETag(httpContext, analytics, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetTransactionAnalytics")
         .WithSummary("Get transaction analytics")
-        .WithDescription("Returns comprehensive analytics including income/expense breakdown, category spending, monthly trends, and top payees. Cached for 5 minutes with ETag support.")
+        .WithDescription("Returns comprehensive analytics including income/expense breakdown, category spending, monthly trends, and top payees. Uses ETag-based caching with 304 Not Modified.")
         .Produces<TransactionAnalyticsResponse>(200);
 
         // Get top counterparties (payees) spending breakdown
@@ -54,7 +54,7 @@ public static class TransactionAnalyticsEndpoints
 
             var result = await analyticsService.GetTopCounterpartiesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10, ct);
             
-            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
+            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetTopCounterparties")
         .WithSummary("Get top counterparties")
@@ -78,7 +78,7 @@ public static class TransactionAnalyticsEndpoints
 
             var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate, page ?? 1, Math.Min(pageSize ?? 50, 200), ct);
             
-            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
+            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetSpendingByAccount")
         .WithSummary("Get spending by account")
@@ -100,7 +100,7 @@ public static class TransactionAnalyticsEndpoints
 
             var result = await analyticsService.GetSpendingPatternsAsync(userId, startDate, endDate, ct);
             
-            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
+            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetSpendingPatterns")
         .WithSummary("Get spending patterns")
@@ -124,7 +124,7 @@ public static class TransactionAnalyticsEndpoints
 
             var result = await analyticsService.GetSpendingAnomaliesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10, ct);
             
-            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
+            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetSpendingAnomalies")
         .WithSummary("Get spending anomalies")
@@ -156,7 +156,7 @@ public static class TransactionAnalyticsEndpoints
                 radiusKm ?? 1.0,
                 ct);
             
-            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
+            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetLocationInsights")
         .WithSummary("Get location-based insights")
@@ -188,7 +188,7 @@ public static class TransactionAnalyticsEndpoints
                 minTripDistanceKm ?? 50.0,
                 ct);
             
-            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 300);
+            return ETagHelper.OkWithETag(httpContext, result, cacheMaxAgeSeconds: 0);
         })
         .WithName("GetTripGroups")
         .WithSummary("Get trip groups")
