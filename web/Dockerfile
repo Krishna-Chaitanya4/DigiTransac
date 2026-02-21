@@ -21,10 +21,12 @@ RUN npm run build
 FROM nginx:alpine AS runtime
 
 # Create non-root user and set up writable directories for nginx
+# Fix PID path in main config to avoid permission denied for non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
     && mkdir -p /var/cache/nginx /var/log/nginx /tmp/nginx \
     && chown -R appuser:appgroup /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp/nginx \
-    && chmod -R 755 /var/cache/nginx /var/log/nginx /tmp/nginx
+    && chmod -R 755 /var/cache/nginx /var/log/nginx /tmp/nginx \
+    && sed -i 's|/var/run/nginx.pid|/tmp/nginx/nginx.pid|g' /etc/nginx/nginx.conf
 
 WORKDIR /usr/share/nginx/html
 
@@ -42,4 +44,4 @@ USER appuser
 
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]
+CMD ["nginx", "-g", "daemon off;"]
