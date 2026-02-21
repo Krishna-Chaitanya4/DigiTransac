@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.6.22] - 2026-02-21
+## [1.6.23] - 2026-02-21
 
 ### Fixed — Frontend Docker Deployment
 - **Port Mismatch** — Azure Container Apps ingress targetPort was 80 but nginx listens on 8080; updated to 8080
