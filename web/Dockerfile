@@ -26,7 +26,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
     && mkdir -p /var/cache/nginx /var/log/nginx /tmp/nginx \
     && chown -R appuser:appgroup /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp/nginx \
     && chmod -R 755 /var/cache/nginx /var/log/nginx /tmp/nginx \
-    && sed -i 's|/var/run/nginx.pid|/tmp/nginx/nginx.pid|g' /etc/nginx/nginx.conf
+    && sed -i 's|/run/nginx.pid|/tmp/nginx/nginx.pid|g' /etc/nginx/nginx.conf
 
 WORKDIR /usr/share/nginx/html
 
