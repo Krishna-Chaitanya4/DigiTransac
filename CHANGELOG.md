@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.24] - 2026-02-21
+
+### Fixed — Frontend Docker Deployment
+- **Port Mismatch** — Azure Container Apps ingress targetPort was 80 but nginx listens on 8080; updated to 8080
+- **Non-Root PID File** — nginx crashed with `Permission denied` writing PID to `/run/nginx.pid` as non-root user; `sed` replaces PID path to `/tmp/nginx/nginx.pid` during build (base image uses `/run/nginx.pid`, not `/var/run/nginx.pid`)
+
 ## [1.6.23] - 2026-02-21
 
 ### Fixed — Frontend Docker Deployment
