@@ -22,9 +22,9 @@ FROM nginx:alpine AS runtime
 
 # Create non-root user and set up writable directories for nginx
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
-    && mkdir -p /var/cache/nginx /var/log/nginx /var/run \
-    && chown -R appuser:appgroup /usr/share/nginx/html /var/cache/nginx /var/log/nginx /var/run \
-    && chmod -R 755 /var/cache/nginx /var/log/nginx /var/run
+    && mkdir -p /var/cache/nginx /var/log/nginx /tmp/nginx \
+    && chown -R appuser:appgroup /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp/nginx \
+    && chmod -R 755 /var/cache/nginx /var/log/nginx /tmp/nginx
 
 WORKDIR /usr/share/nginx/html
 
@@ -42,4 +42,4 @@ USER appuser
 
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]
