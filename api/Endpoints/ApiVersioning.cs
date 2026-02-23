@@ -45,12 +45,6 @@ public static class ApiVersioning
         
         // Map V1 transaction endpoints as an example
         v1.MapTransactionEndpointsV1();
-        
-        // V2 endpoints would go here when needed
-        // var v2 = app.MapGroup("/api/v{version:apiVersion}")
-        //     .WithApiVersionSet(versionSet)
-        //     .MapToApiVersion(V2);
-        // v2.MapTransactionEndpointsV2();
     }
     
     /// <summary>

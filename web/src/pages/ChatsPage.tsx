@@ -13,8 +13,8 @@ import {
   useRestoreMessage,
   useMarkAsRead,
   useInvalidateConversations,
-  conversationKeys,
 } from '../hooks';
+import { queryKeys } from '../lib/queryClient';
 import { useNotifications } from '../hooks/useNotifications';
 import {
   ConversationList,
@@ -320,7 +320,7 @@ export default function ChatsPage() {
     // (which will be kept up-to-date by React Query) takes over rendering.
     if (pendingConversation) {
       queryClient.setQueryData(
-        conversationKeys.detail(selectedUserId),
+        queryKeys.conversations.detail(selectedUserId),
         pendingConversation,
       );
       setPendingConversation(null);
@@ -387,7 +387,7 @@ export default function ChatsPage() {
     (transactionId: string, isDeleted: boolean) => {
       if (!selectedUserId) return;
       queryClient.setQueryData<ConversationDetailResponse>(
-        conversationKeys.detail(selectedUserId),
+        queryKeys.conversations.detail(selectedUserId),
         (old) => {
           if (!old) return old;
           return {
@@ -557,7 +557,7 @@ export default function ChatsPage() {
       // Seed cache and clear pending conversation (same as handleSendMessage)
       if (pendingConversation && selectedUserId) {
         queryClient.setQueryData(
-          conversationKeys.detail(selectedUserId),
+          queryKeys.conversations.detail(selectedUserId),
           pendingConversation,
         );
         setPendingConversation(null);

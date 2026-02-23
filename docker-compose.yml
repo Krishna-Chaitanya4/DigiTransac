@@ -30,7 +30,6 @@ services:
       MONGODB_CONNECTION_STRING: mongodb://mongodb:27017
       MONGODB_DATABASE_NAME: DigiTransac
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required - set it in .env file}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required - set it in .env file}
       ENCRYPTION_KEK: ${ENCRYPTION_KEK:?ENCRYPTION_KEK is required - set it in .env file}
       EMAIL_SENDER: ${EMAIL_SENDER:-}
       EMAIL_APP_PASSWORD: ${EMAIL_APP_PASSWORD:-}

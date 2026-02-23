@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
@@ -154,11 +155,8 @@ public static class AuthTokenEndpoints
             HttpContext httpContext,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             await authService.RevokeAllUserTokensAsync(userId, ct);
             

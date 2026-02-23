@@ -75,7 +75,6 @@ export {
   useUserSearch,
   useInvalidateConversations,
   useOptimisticSendMessage,
-  conversationKeys,
 } from './useConversationQueries';
 
 // Budget queries
@@ -113,8 +112,6 @@ export {
 export type { CachedLocation, CachedMessage, OfflineAction } from './useOffline';
 export { useModalState, useDeleteModalState } from './useModalState';
 export { usePullToRefresh } from './usePullToRefresh';
-export { useSwipeGesture } from './useSwipeGesture';
-export { usePinchZoom } from './usePinchZoom';
 
 // Re-export query keys for external use
 export { queryKeys } from '../lib/queryClient';

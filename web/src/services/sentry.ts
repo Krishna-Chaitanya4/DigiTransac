@@ -112,13 +112,6 @@ export function captureException(error: Error | unknown, context?: Record<string
 }
 
 /**
- * Capture a message (non-error event)
- */
-export function captureMessage(message: string, level: 'info' | 'warning' | 'error' = 'info'): void {
-  Sentry.captureMessage(message, level);
-}
-
-/**
  * Add breadcrumb for debugging
  * Breadcrumbs show the trail of events before an error
  */
@@ -135,5 +128,3 @@ export function addBreadcrumb(
   });
 }
 
-// Re-export ErrorBoundary for use in App.tsx
-export const ErrorBoundary = Sentry.ErrorBoundary;

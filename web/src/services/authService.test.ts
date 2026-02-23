@@ -42,25 +42,6 @@ describe('authService', () => {
     vi.resetAllMocks();
   });
 
-  describe('getStoredAccessToken', () => {
-    it('should return token from localStorage', () => {
-      localStorageMock.getItem.mockReturnValue('test-token');
-      
-      const result = authService.getStoredAccessToken();
-      
-      expect(result).toBe('test-token');
-      expect(localStorageMock.getItem).toHaveBeenCalledWith('digitransac_access_token');
-    });
-
-    it('should return null when no token exists', () => {
-      localStorageMock.getItem.mockReturnValue(null);
-      
-      const result = authService.getStoredAccessToken();
-      
-      expect(result).toBeNull();
-    });
-  });
-
   describe('sendVerificationCode', () => {
     it('should send verification code request', async () => {
       mockFetch.mockResolvedValue(mockOkResponse({ message: 'Code sent', verificationToken: 'token123' }));

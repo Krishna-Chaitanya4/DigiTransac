@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { NOTIFICATION_CONSTANTS } from '../utils/constants';
 import { API_BASE_URL } from '../services/apiClient';
 import { getStoredAccessToken } from '../services/tokenStorage';
+import { logger } from '../services/logger';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -93,20 +94,20 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     // Handle connection state changes
     connection.onreconnecting((err: Error | undefined) => {
       setConnectionState('Reconnecting');
-      console.log('SignalR reconnecting...', err);
+      logger.warn('SignalR reconnecting', { error: err?.message });
     });
 
     connection.onreconnected((connectionId: string | undefined) => {
       setConnectionState('Connected');
       reconnectAttemptsRef.current = 0;
-      console.log('SignalR reconnected:', connectionId);
+      logger.info('SignalR reconnected', { connectionId });
     });
 
     connection.onclose((err: Error | undefined) => {
       setConnectionState('Disconnected');
       if (err) {
         setError(err.message);
-        console.error('SignalR connection closed with error:', err);
+        logger.error('SignalR connection closed with error', { error: err.message });
       }
     });
 
@@ -116,7 +117,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
     // Register event handlers
     connection.on('P2PTransactionCreated', (notification: P2PTransactionNotification) => {
-      console.log('P2P Transaction Created:', notification);
+      logger.info('P2P Transaction Created', { transactionId: notification.transactionId, type: notification.type });
       optionsRef.current.onP2PTransactionCreated?.(notification);
       
       // Invalidate all transaction-dependent queries (including analytics/insights)
@@ -128,7 +129,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     connection.on('P2PTransactionAccepted', (notification: P2PTransactionNotification) => {
-      console.log('P2P Transaction Accepted:', notification);
+      logger.info('P2P Transaction Accepted', { transactionId: notification.transactionId });
       optionsRef.current.onP2PTransactionAccepted?.(notification);
       
       // Invalidate all transaction-dependent queries
@@ -139,7 +140,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     connection.on('P2PTransactionRejected', (notification: P2PTransactionNotification) => {
-      console.log('P2P Transaction Rejected:', notification);
+      logger.info('P2P Transaction Rejected', { transactionId: notification.transactionId });
       optionsRef.current.onP2PTransactionRejected?.(notification);
       
       // Invalidate all transaction-dependent queries
@@ -150,7 +151,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     connection.on('ChatMessage', (notification: ChatMessageNotification) => {
-      console.log('Chat Message:', notification);
+      logger.debug('Chat Message received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onChatMessage?.(notification);
       
       // Invalidate conversation detail for this sender
@@ -161,7 +162,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     connection.on('NewChatMessage', (notification: ChatMessageNotification) => {
-      console.log('New Chat Message:', notification);
+      logger.debug('New Chat Message received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onNewChatMessage?.(notification);
       
       // Invalidate conversation detail for this sender
@@ -175,7 +176,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     connection.on('Pong', (timestamp: string) => {
-      console.log('Pong received:', timestamp);
+      logger.debug('Pong received', { timestamp });
     });
 
     return connection;
@@ -192,11 +193,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       await connection.start();
       setConnectionState('Connected');
       reconnectAttemptsRef.current = 0;
-      console.log('SignalR connected');
+      logger.info('SignalR connected');
     } catch (err) {
       setConnectionState('Error');
       setError(err instanceof Error ? err.message : 'Failed to connect');
-      console.error('SignalR connection error:', err);
+      logger.error('SignalR connection error', { error: err instanceof Error ? err.message : String(err) });
     }
   }, [initializeConnection]);
 

@@ -29,7 +29,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ACCESS_TOKEN_KEY = 'digitransac_access_token';
+import { ACCESS_TOKEN_KEY } from '../services/tokenStorage';
 const USER_KEY = 'digitransac_user';
 
 // Check if token is expired (with 30s buffer for API calls)

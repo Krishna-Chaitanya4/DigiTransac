@@ -107,6 +107,4 @@ export const INSIGHTS_CONSTANTS = {
   TOP_COUNTERPARTIES_COUNT: 10,
 } as const;
 
-// NOTE: Currency symbols and formatting functions have been consolidated to
-// web/src/services/currencyService.ts to avoid duplication.
-// Import { formatCurrency, getCurrencySymbol, currencyConfig } from '../services/currencyService'
+// NOTE: Currency symbols and formatting functions are in web/src/services/currencyService.ts

@@ -55,7 +55,6 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
         // Set required environment variables BEFORE any WebApplicationFactory initialization
         // These must be set statically to ensure they're available when Program.cs runs
         var testKey = Convert.ToBase64String(new byte[32]); // 32-byte key for AES-256
-        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", testKey);
         Environment.SetEnvironmentVariable("ENCRYPTION_KEK", testKey);
         Environment.SetEnvironmentVariable("JWT_SECRET_KEY", TestJwtKey);
         Environment.SetEnvironmentVariable("MONGODB_CONNECTION_STRING", "mongodb://localhost:27017");
@@ -85,7 +84,6 @@ public class DigiTransacWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:RefreshTokenExpireDays"] = "7",
                 ["MongoDb:ConnectionString"] = "mongodb://localhost:27017",
                 ["MongoDb:DatabaseName"] = "DigiTransac_Test",
-                ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
                 ["Encryption:Kek"] = Convert.ToBase64String(new byte[32]),
                 ["Encryption:Provider"] = "Local",
                 // Disable rate limiting for integration tests by setting very high limits

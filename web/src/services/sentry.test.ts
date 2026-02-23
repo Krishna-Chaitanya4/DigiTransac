@@ -18,7 +18,6 @@ import {
   setSentryUser,
   clearSentryUser,
   captureException,
-  captureMessage,
   addBreadcrumb,
 } from './sentry';
 
@@ -116,26 +115,6 @@ describe('sentry', () => {
       captureException(errorMessage);
 
       expect(Sentry.captureException).toHaveBeenCalledWith(errorMessage);
-    });
-  });
-
-  describe('captureMessage', () => {
-    it('should call Sentry.captureMessage with default info level', () => {
-      captureMessage('Test message');
-
-      expect(Sentry.captureMessage).toHaveBeenCalledWith('Test message', 'info');
-    });
-
-    it('should call Sentry.captureMessage with warning level', () => {
-      captureMessage('Warning message', 'warning');
-
-      expect(Sentry.captureMessage).toHaveBeenCalledWith('Warning message', 'warning');
-    });
-
-    it('should call Sentry.captureMessage with error level', () => {
-      captureMessage('Error message', 'error');
-
-      expect(Sentry.captureMessage).toHaveBeenCalledWith('Error message', 'error');
     });
   });
 

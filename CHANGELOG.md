@@ -7,11 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Feature Integration)
+- **Keyboard shortcuts modal** — Integrated `KeyboardShortcutsModal` into Layout; press `?` or `Ctrl+/` to view all available shortcuts
+- **Onboarding tour** — Integrated `OnboardingTour` into Layout; auto-shows for new users with step-by-step walkthrough (desktop & mobile variants, completion tracked via localStorage)
+- **Tour target attributes** — Added `data-tour` attributes to sidebar nav and all navigation links for tour highlighting
+
+### Fixed
+- **Push subscription sync** — `pushsubscriptionchange` handler in service worker now fetches the VAPID key, re-subscribes, and syncs the new subscription to the server (previously a TODO that could silently break push notifications)
+- **Production logging** — Replaced 13 `console.log`/`console.error` calls with the structured `logger` service in `useNotifications`, `BudgetsPage`, and `CurrencyDropdown` (prevents sensitive notification data from leaking to browser console)
+
+### Changed (Duplicate Code Consolidation)
+
+#### Frontend
+- **Transaction filter params** — `getTransactionSummary` and `exportTransactions` now reuse `buildFilterQuery` instead of duplicating 20+ lines of filter param construction
+- **Analytics date range params** — Created `buildDateRangeParams` helper; all 7 analytics functions now use it instead of repeating `URLSearchParams` construction
+- **Transaction invalidation** — Extracted `invalidateTransactionRelatedQueries()` helper, replacing 9 duplicated 3-line invalidation blocks across mutation hooks
+- **Conversation query keys** — Centralized conversation query keys into `queryKeys.conversations` (with `list`, `detail`, `userSearch`); removed local duplicate in `useConversationQueries`
+- **Error message extraction** — Exported `getErrorMessage` from `queryClient.ts`; replaced 3 inline `error instanceof Error ? error.message : 'Unknown error'` patterns in push notification service
+- **Duplicate interface** — Removed duplicate `CurrencyBalances` interface from `currencyService.ts` (only `accountService.ts` version is used)
+
+#### Backend
+- **User ID extraction** — Created `ClaimsPrincipalExtensions` with `GetUserId()` and `TryGetUserId()` extension methods; replaced 85 occurrences of the 4-line userId extraction pattern across 14 endpoint files
+
+### Removed (Dead Code Cleanup)
+
+#### Frontend (~2,950 lines removed)
+- **Unused hooks** — Deleted `useLongPress`, `usePinchZoom`, `useSwipeGesture` (~200 lines)
+- **Unused validation schemas** — Deleted entire `lib/validations/` directory (1,718 lines: accounts, auth, budgets, common, transactions + 5 test files)
+- **Dead re-exports** — Removed backward-compat `getStoredAccessToken` re-exports from `apiClient.ts` and `authService.ts`
+- **Dead Sentry exports** — Removed unused `captureMessage` function and `ErrorBoundary` re-export from `sentry.ts`
+- **Dead analytics exports** — Made internal types/constants non-exported, removed unused `useAnalytics()` and `usePageTracking()` functions
+- **Dead barrel exports** — Removed `ChatHeader`, `FloatingActionButton`, `PullToRefreshIndicator` from chat barrel; `useSwipeGesture`, `usePinchZoom` from hooks barrel; `PendingP2PIndicator` alias from PendingIndicator
+- **Duplicate constant** — Replaced duplicate `ACCESS_TOKEN_KEY` in AuthContext with import from tokenStorage
+- **Unused component** — Deleted top-level `TransactionTypeSelector` (35 lines)
+
+#### Backend
+- **Orphaned `Encryption:Key` config** — Removed from all 4 appsettings files, ConfigurationExtensions env var mapping/validation, both integration test factories, docker-compose, CI pipeline, `.env.example`, and DEPLOYMENT.md (EncryptionSettings only has `Kek`)
+- **Commented-out code** — Removed V2 API versioning placeholder from ApiVersioning.cs
+
 ## [1.7.0] - 2026-02-21
 
 ### Security
 - **Eliminate code injection** — Replaced `new Function()` in CalculatorInput with a safe recursive-descent math parser (supports +, -, *, /, parentheses)
-- **Remove default secrets** — Docker Compose now uses `${VAR:?required}` fail-fast syntax for JWT_SECRET_KEY, ENCRYPTION_KEY, ENCRYPTION_KEK
+- **Remove default secrets** — Docker Compose now uses `${VAR:?required}` fail-fast syntax for JWT_SECRET_KEY, ENCRYPTION_KEK
 - **MongoDB binding** — Dev compose binds MongoDB to `127.0.0.1`; prod compose removes MongoDB/Redis port exposure entirely
 - **CSP hardening** — Removed `'unsafe-eval'` from `script-src` in nginx Content-Security-Policy
 - **Timing-safe OTP comparison** — Login OTP check uses `CryptographicOperations.FixedTimeEquals()` to prevent timing attacks

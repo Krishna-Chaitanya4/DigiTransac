@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentValidation;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -24,11 +25,8 @@ public static class AccountEndpoints
             HttpContext httpContext,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var accounts = await accountService.GetAllAsync(userId, includeArchived ?? false, ct);
             return ETagHelper.OkWithETag(httpContext, accounts);
@@ -41,11 +39,8 @@ public static class AccountEndpoints
         // Get account summary (totals, net worth)
         group.MapGet("/summary", async (ClaimsPrincipal user, IAccountService accountService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var summary = await accountService.GetSummaryAsync(userId, ct);
             return Results.Ok(summary);
@@ -63,11 +58,8 @@ public static class AccountEndpoints
             IAccountService accountService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var account = await accountService.GetByIdAsync(id, userId, ct);
             if (account == null)
@@ -94,11 +86,8 @@ public static class AccountEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await accountService.CreateAsync(userId, request, ct);
             return result.ToApiResult(account => Results.Created($"/api/accounts/{account.Id}", account));
@@ -121,11 +110,8 @@ public static class AccountEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await accountService.UpdateAsync(id, userId, request, ct);
             return result.ToApiResult();
@@ -142,11 +128,8 @@ public static class AccountEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await accountService.AdjustBalanceAsync(id, userId, request, ct);
             if (result.IsFailure)
@@ -166,11 +149,8 @@ public static class AccountEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await accountService.ReorderAsync(userId, request, ct);
             if (result.IsFailure)
@@ -187,11 +167,8 @@ public static class AccountEndpoints
         // Set default account
         group.MapPost("/{id}/set-default", async (string id, ClaimsPrincipal user, IAccountService accountService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await accountService.SetDefaultAsync(id, userId, ct);
             if (result.IsFailure)
@@ -208,11 +185,8 @@ public static class AccountEndpoints
         // Delete account
         group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, IAccountService accountService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await accountService.DeleteAsync(id, userId, ct);
             if (result.IsFailure)

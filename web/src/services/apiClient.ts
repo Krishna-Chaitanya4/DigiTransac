@@ -16,8 +16,6 @@ export interface ApiError {
   status: number;
 }
 
-// Re-export for backward compatibility
-export { getStoredAccessToken } from './tokenStorage';
 
 function getAuthHeaders(): HeadersInit {
   const token = getStoredAccessToken();

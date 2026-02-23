@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentValidation;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -18,11 +19,8 @@ public static class LabelEndpoints
         // Get all labels (flat list)
         group.MapGet("/", async (ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var labels = await labelService.GetAllAsync(userId, ct);
             return Results.Ok(labels);
@@ -34,11 +32,8 @@ public static class LabelEndpoints
         // Get labels as tree structure
         group.MapGet("/tree", async (ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var tree = await labelService.GetTreeAsync(userId, ct);
             return Results.Ok(tree);
@@ -50,11 +45,8 @@ public static class LabelEndpoints
         // Get single label
         group.MapGet("/{id}", async (string id, ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var label = await labelService.GetByIdAsync(id, userId, ct);
             if (label == null)
@@ -74,11 +66,8 @@ public static class LabelEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await labelService.CreateAsync(userId, request, ct);
             return result.ToApiResult(label => Results.Created($"/api/labels/{label.Id}", label));
@@ -93,11 +82,8 @@ public static class LabelEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await labelService.UpdateAsync(id, userId, request, ct);
             return result.ToApiResult();
@@ -109,11 +95,8 @@ public static class LabelEndpoints
         // Delete label
         group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await labelService.DeleteAsync(id, userId, ct);
             if (result.IsFailure)
@@ -128,11 +111,8 @@ public static class LabelEndpoints
         // Get transaction count for a label
         group.MapGet("/{id}/transaction-count", async (string id, ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var count = await labelService.GetTransactionCountAsync(id, userId, ct);
             return Results.Ok(new { transactionCount = count });
@@ -148,11 +128,8 @@ public static class LabelEndpoints
             ILabelService labelService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await labelService.DeleteWithReassignmentAsync(id, userId, reassignToId, ct);
             return result.ToApiResult(r => Results.Ok(new { r.Message, r.TransactionCount }));
@@ -164,11 +141,8 @@ public static class LabelEndpoints
         // Reorder labels
         group.MapPost("/reorder", async (ReorderLabelsRequest request, ClaimsPrincipal user, ILabelService labelService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await labelService.ReorderAsync(userId, request, ct);
             if (result.IsFailure)

@@ -1,9 +1,6 @@
 import { AuthResponse, VerificationResponse } from '../types/auth';
 import { API_BASE_URL, handleResponse } from './apiClient';
 
-// Re-export for backward compatibility
-export { getStoredAccessToken } from './tokenStorage';
-
 // Wrapper to handle network errors
 async function fetchWithErrorHandling(url: string, options: RequestInit): Promise<Response> {
   try {

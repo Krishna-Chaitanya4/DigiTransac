@@ -240,34 +240,38 @@ export function OnboardingTour({ onComplete, forceShow = false }: OnboardingTour
     }
 
     const padding = 16;
+    const tooltipMaxWidth = 448; // max-w-md ≈ 28rem
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Clamp so the tooltip never overflows the viewport horizontally
+    const clampLeft = (centerX: number) =>
+      Math.max(padding, Math.min(centerX - tooltipMaxWidth / 2, vw - tooltipMaxWidth - padding));
+
     switch (currentTourStep.position) {
       case 'bottom':
         return {
           position: 'fixed' as const,
-          top: highlightRect.bottom + padding,
-          left: highlightRect.left + highlightRect.width / 2,
-          transform: 'translateX(-50%)',
+          top: Math.min(highlightRect.bottom + padding, vh - 280),
+          left: clampLeft(highlightRect.left + highlightRect.width / 2),
         };
       case 'top':
         return {
           position: 'fixed' as const,
-          bottom: window.innerHeight - highlightRect.top + padding,
-          left: highlightRect.left + highlightRect.width / 2,
-          transform: 'translateX(-50%)',
+          bottom: Math.min(vh - highlightRect.top + padding, vh - padding),
+          left: clampLeft(highlightRect.left + highlightRect.width / 2),
         };
       case 'left':
         return {
           position: 'fixed' as const,
-          top: highlightRect.top + highlightRect.height / 2,
-          right: window.innerWidth - highlightRect.left + padding,
-          transform: 'translateY(-50%)',
+          top: Math.max(padding, Math.min(highlightRect.top + highlightRect.height / 2 - 140, vh - 280)),
+          right: Math.min(vw - highlightRect.left + padding, vw - padding),
         };
       case 'right':
         return {
           position: 'fixed' as const,
-          top: highlightRect.top + highlightRect.height / 2,
-          left: highlightRect.right + padding,
-          transform: 'translateY(-50%)',
+          top: Math.max(padding, Math.min(highlightRect.top + highlightRect.height / 2 - 140, vh - 280)),
+          left: Math.min(highlightRect.right + padding, vw - tooltipMaxWidth - padding),
         };
       default:
         return {};

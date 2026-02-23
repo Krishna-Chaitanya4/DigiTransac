@@ -786,6 +786,7 @@ export default function TransactionsPage() {
               setAddSheetMode('dropdown');
               setIsAddSheetOpen(prev => !prev);
             }}
+            data-tour="add-transaction"
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium ${
               isAddSheetOpen && addSheetMode === 'dropdown'
                 ? 'bg-blue-700 dark:bg-blue-800 text-white ring-2 ring-blue-300 dark:ring-blue-600'

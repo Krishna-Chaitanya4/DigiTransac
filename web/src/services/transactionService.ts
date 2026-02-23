@@ -83,33 +83,10 @@ export async function getTransaction(id: string): Promise<Transaction> {
 export async function getTransactionSummary(
   filter: TransactionFilter
 ): Promise<TransactionSummary> {
-  const params = new URLSearchParams();
-  if (filter.startDate) params.append('startDate', filter.startDate);
-  if (filter.endDate) params.append('endDate', filter.endDate);
-  if (filter.accountIds?.length) params.append('accountIds', filter.accountIds.join(','));
-  
-  // Handle types filter - translate Transfer to hasLinkedTransaction
-  if (filter.types?.length) {
-    const hasTransferFilter = filter.types.includes('Transfer');
-    const apiTypes = filter.types.filter(t => t !== 'Transfer') as TransactionType[];
-    
-    if (apiTypes.length > 0) {
-      params.append('types', apiTypes.join(','));
-    }
-    if (hasTransferFilter) {
-      params.append('hasLinkedTransaction', 'true');
-    }
-  }
-  
-  if (filter.labelIds?.length) params.append('labelIds', filter.labelIds.join(','));
-  if (filter.tagIds?.length) params.append('tagIds', filter.tagIds.join(','));
-  if (filter.counterpartyUserIds?.length) params.append('counterpartyUserIds', filter.counterpartyUserIds.join(','));
-  if (filter.minAmount !== undefined) params.append('minAmount', filter.minAmount.toString());
-  if (filter.maxAmount !== undefined) params.append('maxAmount', filter.maxAmount.toString());
-  if (filter.status) params.append('status', filter.status);
-  
-  const query = params.toString();
-  return apiClient.get<TransactionSummary>(`/transactions/summary${query ? `?${query}` : ''}`);
+  // Reuse buildFilterQuery — strip page/pageSize since summary doesn't paginate
+  const { page: _, pageSize: __, searchText: ___, isRecurring: ____, ...summaryFilter } = filter;
+  const query = buildFilterQuery(summaryFilter as TransactionFilter);
+  return apiClient.get<TransactionSummary>(`/transactions/summary${query}`);
 }
 
 // Get recurring transactions
@@ -220,13 +197,8 @@ export async function getAnalytics(
   endDate?: string,
   accountId?: string
 ): Promise<TransactionAnalytics> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  if (accountId) params.append('accountId', accountId);
-  
-  const query = params.toString();
-  return apiClient.get<TransactionAnalytics>(`/transactions/analytics${query ? `?${query}` : ''}`);
+  const query = buildDateRangeParams(startDate, endDate, { accountId });
+  return apiClient.get<TransactionAnalytics>(`/transactions/analytics${query}`);
 }
 
 // Export
@@ -234,16 +206,10 @@ export async function exportTransactions(
   filter: TransactionFilter,
   format: 'csv' | 'json' = 'json'
 ): Promise<Transaction[] | string> {
-  const params = new URLSearchParams();
-  if (filter.startDate) params.append('startDate', filter.startDate);
-  if (filter.endDate) params.append('endDate', filter.endDate);
-  if (filter.accountIds?.length) params.append('accountIds', filter.accountIds.join(','));
-  if (filter.types?.length) params.append('types', filter.types.join(','));
-  if (filter.labelIds?.length) params.append('labelIds', filter.labelIds.join(','));
-  if (filter.tagIds?.length) params.append('tagIds', filter.tagIds.join(','));
-  params.append('format', format);
-  
-  const query = params.toString();
+  // Reuse buildFilterQuery for consistent filter handling, then append format
+  const filterQuery = buildFilterQuery({ ...filter, page: undefined, pageSize: undefined });
+  const separator = filterQuery ? '&' : '?';
+  const query = `${filterQuery}${separator}format=${format}`;
   
   if (format === 'csv') {
     // For CSV, we need to get the raw text response (apiClient parses JSON)
@@ -252,14 +218,14 @@ export async function exportTransactions(
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    const response = await fetch(`${API_BASE_URL}/transactions/export?${query}`, {
+    const response = await fetch(`${API_BASE_URL}/transactions/export${query}`, {
       headers,
       credentials: 'include',
     });
     return response.text();
   }
   
-  return apiClient.get<Transaction[]>(`/transactions/export?${query}`);
+  return apiClient.get<Transaction[]>(`/transactions/export${query}`);
 }
 
 // Helper functions for inclusive date range handling
@@ -313,6 +279,24 @@ export async function getPendingCount(): Promise<number> {
 
 // ============ Extended Analytics APIs ============
 
+// Build query params for date-range-based analytics endpoints
+function buildDateRangeParams(
+  startDate?: string,
+  endDate?: string,
+  extra?: Record<string, string | number | undefined>
+): string {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      if (value !== undefined) params.append(key, value.toString());
+    }
+  }
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
 // Get top counterparties (payees) spending breakdown
 export async function getTopCounterparties(
   startDate?: string,
@@ -320,14 +304,8 @@ export async function getTopCounterparties(
   pageSize = 10,
   page = 1
 ): Promise<TopCounterpartiesResponse> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  params.append('page', page.toString());
-  params.append('pageSize', pageSize.toString());
-  
-  const query = params.toString();
-  return apiClient.get<TopCounterpartiesResponse>(`/transactions/analytics/counterparties?${query}`);
+  const query = buildDateRangeParams(startDate, endDate, { page, pageSize });
+  return apiClient.get<TopCounterpartiesResponse>(`/transactions/analytics/counterparties${query}`);
 }
 
 // Get spending breakdown by account
@@ -335,12 +313,8 @@ export async function getSpendingByAccount(
   startDate?: string,
   endDate?: string
 ): Promise<SpendingByAccountResponse> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  
-  const query = params.toString();
-  return apiClient.get<SpendingByAccountResponse>(`/transactions/analytics/by-account${query ? `?${query}` : ''}`);
+  const query = buildDateRangeParams(startDate, endDate);
+  return apiClient.get<SpendingByAccountResponse>(`/transactions/analytics/by-account${query}`);
 }
 
 // Get spending patterns (by day of week and hour of day)
@@ -348,12 +322,8 @@ export async function getSpendingPatterns(
   startDate?: string,
   endDate?: string
 ): Promise<SpendingPatternsResponse> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  
-  const query = params.toString();
-  return apiClient.get<SpendingPatternsResponse>(`/transactions/analytics/patterns${query ? `?${query}` : ''}`);
+  const query = buildDateRangeParams(startDate, endDate);
+  return apiClient.get<SpendingPatternsResponse>(`/transactions/analytics/patterns${query}`);
 }
 
 // Get spending anomalies and alerts
@@ -361,12 +331,8 @@ export async function getSpendingAnomalies(
   startDate?: string,
   endDate?: string
 ): Promise<SpendingAnomaliesResponse> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  
-  const query = params.toString();
-  return apiClient.get<SpendingAnomaliesResponse>(`/transactions/analytics/anomalies${query ? `?${query}` : ''}`);
+  const query = buildDateRangeParams(startDate, endDate);
+  return apiClient.get<SpendingAnomaliesResponse>(`/transactions/analytics/anomalies${query}`);
 }
 
 // Get location-based spending insights
@@ -377,15 +343,8 @@ export async function getLocationInsights(
   longitude?: number,
   radiusKm?: number
 ): Promise<LocationInsightsResponse> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  if (latitude !== undefined) params.append('latitude', latitude.toString());
-  if (longitude !== undefined) params.append('longitude', longitude.toString());
-  if (radiusKm !== undefined) params.append('radiusKm', radiusKm.toString());
-  
-  const query = params.toString();
-  return apiClient.get<LocationInsightsResponse>(`/transactions/analytics/locations${query ? `?${query}` : ''}`);
+  const query = buildDateRangeParams(startDate, endDate, { latitude, longitude, radiusKm });
+  return apiClient.get<LocationInsightsResponse>(`/transactions/analytics/locations${query}`);
 }
 
 // Get trip groups (travel spending analysis)
@@ -396,13 +355,6 @@ export async function getTripGroups(
   homeLongitude?: number,
   minTripDistanceKm?: number
 ): Promise<TripGroupsResponse> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
-  if (homeLatitude !== undefined) params.append('homeLatitude', homeLatitude.toString());
-  if (homeLongitude !== undefined) params.append('homeLongitude', homeLongitude.toString());
-  if (minTripDistanceKm !== undefined) params.append('minTripDistanceKm', minTripDistanceKm.toString());
-  
-  const query = params.toString();
-  return apiClient.get<TripGroupsResponse>(`/transactions/analytics/trips${query ? `?${query}` : ''}`);
+  const query = buildDateRangeParams(startDate, endDate, { homeLatitude, homeLongitude, minTripDistanceKm });
+  return apiClient.get<TripGroupsResponse>(`/transactions/analytics/trips${query}`);
 }

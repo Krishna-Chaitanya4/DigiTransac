@@ -257,22 +257,65 @@ self.addEventListener('notificationclose', (event: NotificationEvent) => {
 
 /**
  * Handle push subscription change (e.g., browser updates the subscription)
+ * Re-subscribes with the VAPID key from the server and syncs the new subscription.
  */
 self.addEventListener('pushsubscriptionchange', (event) => {
   console.log('[SW] Push subscription changed');
   
-  // Resubscribe with the new subscription
+  const apiBaseUrl = `${self.location.origin}/api`;
+  
   const resubscribe = async () => {
     try {
+      // Fetch the VAPID public key from the server
+      const vapidResponse = await fetch(`${apiBaseUrl}/push/vapid-public-key`);
+      if (!vapidResponse.ok) {
+        console.error('[SW] Failed to fetch VAPID key:', vapidResponse.status);
+        return;
+      }
+      const { publicKey } = await vapidResponse.json() as { publicKey: string | null };
+      if (!publicKey) {
+        console.error('[SW] No VAPID public key configured on server');
+        return;
+      }
+
+      // Convert base64url VAPID key to Uint8Array
+      const padding = '='.repeat((4 - (publicKey.length % 4)) % 4);
+      const base64 = (publicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = atob(base64);
+      const applicationServerKey = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; i++) {
+        applicationServerKey[i] = rawData.charCodeAt(i);
+      }
+
+      // Re-subscribe with the proper VAPID key
       const subscription = await self.registration.pushManager.subscribe({
         userVisibleOnly: true,
-        // Note: applicationServerKey should be re-fetched from the server
+        applicationServerKey,
       });
-      
-      console.log('[SW] Resubscribed to push notifications:', subscription.endpoint);
-      
-      // TODO: Send the new subscription to the server
-      // This would require fetching the VAPID key and making an API call
+
+      // Send the new subscription to the server
+      const subscriptionJson = subscription.toJSON();
+      const keys = subscriptionJson.keys as { p256dh: string; auth: string } | undefined;
+      if (!keys) {
+        console.error('[SW] Failed to get subscription keys after resubscribe');
+        return;
+      }
+
+      const syncResponse = await fetch(`${apiBaseUrl}/push/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: subscription.endpoint,
+          keys: { p256dh: keys.p256dh, auth: keys.auth },
+          deviceName: 'Auto-resubscribed',
+        }),
+      });
+
+      if (syncResponse.ok) {
+        console.log('[SW] Resubscribed and synced with server');
+      } else {
+        console.error('[SW] Failed to sync subscription with server:', syncResponse.status);
+      }
     } catch (error) {
       console.error('[SW] Failed to resubscribe to push notifications:', error);
     }

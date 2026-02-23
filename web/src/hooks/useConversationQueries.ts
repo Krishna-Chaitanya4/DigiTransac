@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../lib/queryClient';
 import {
   getConversations,
   getConversation,
@@ -16,13 +17,8 @@ import type {
   SendMessageRequest,
 } from '../types/conversations';
 
-// Query keys
-export const conversationKeys = {
-  all: ['conversations'] as const,
-  list: () => [...conversationKeys.all, 'list'] as const,
-  detail: (userId: string) => [...conversationKeys.all, 'detail', userId] as const,
-  userSearch: (email: string) => [...conversationKeys.all, 'search', email] as const,
-};
+// Use centralized query keys from queryClient.ts
+const conversationKeys = queryKeys.conversations;
 
 // Hook to fetch all conversations
 export function useConversations() {

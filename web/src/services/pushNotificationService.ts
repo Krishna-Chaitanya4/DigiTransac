@@ -1,4 +1,6 @@
 import { apiClient } from './apiClient';
+import { getErrorMessage } from '../lib/queryClient';
+import { logger } from './logger';
 
 /**
  * Check if push notifications are supported in this browser
@@ -22,7 +24,7 @@ export function getNotificationPermission(): NotificationPermission {
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (!('Notification' in window)) {
-    console.warn('Notifications not supported');
+    logger.warn('Notifications not supported in this browser');
     return 'denied';
   }
 
@@ -31,7 +33,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   }
 
   if (Notification.permission === 'denied') {
-    console.warn('Notification permission was previously denied');
+    logger.warn('Notification permission was previously denied');
     return 'denied';
   }
 
@@ -48,7 +50,7 @@ export async function getVapidPublicKey(): Promise<string | null> {
     const response = await apiClient.get<{ publicKey: string | null; message?: string }>('/push/vapid-public-key');
     return response.publicKey;
   } catch (error) {
-    console.error('Failed to fetch VAPID public key:', error);
+    logger.error('Failed to fetch VAPID public key', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }
@@ -125,8 +127,8 @@ export async function subscribeToPush(): Promise<{ success: boolean; message: st
 
     return { success: true, message: 'Successfully subscribed to push notifications' };
   } catch (error) {
-    console.error('Failed to subscribe to push notifications:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    logger.error('Failed to subscribe to push notifications', { error: error instanceof Error ? error.message : String(error) });
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -156,8 +158,8 @@ export async function unsubscribeFromPush(): Promise<{ success: boolean; message
 
     return { success: true, message: 'Successfully unsubscribed from push notifications' };
   } catch (error) {
-    console.error('Failed to unsubscribe from push notifications:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    logger.error('Failed to unsubscribe from push notifications', { error: error instanceof Error ? error.message : String(error) });
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -186,8 +188,8 @@ export async function sendTestNotification(): Promise<{ success: boolean; messag
     const response = await apiClient.post<{ message: string }>('/push/test', {});
     return { success: true, message: response.message };
   } catch (error) {
-    console.error('Failed to send test notification:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    logger.error('Failed to send test notification', { error: error instanceof Error ? error.message : String(error) });
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 

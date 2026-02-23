@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -38,11 +39,8 @@ public static class PushEndpoints
             HttpContext httpContext) =>
         {
             var ct = httpContext.RequestAborted;
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             // Validate request
             if (string.IsNullOrEmpty(request.Endpoint) ||
@@ -104,11 +102,8 @@ public static class PushEndpoints
             HttpContext httpContext) =>
         {
             var ct = httpContext.RequestAborted;
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             if (string.IsNullOrEmpty(request.Endpoint))
             {
@@ -138,11 +133,8 @@ public static class PushEndpoints
             HttpContext httpContext) =>
         {
             var ct = httpContext.RequestAborted;
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var subscriptions = await subscriptionRepository.GetByUserIdAsync(userId, ct);
             
@@ -168,11 +160,8 @@ public static class PushEndpoints
             HttpContext httpContext) =>
         {
             var ct = httpContext.RequestAborted;
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             // Verify the subscription belongs to this user by fetching all user subscriptions
             var subscriptions = await subscriptionRepository.GetByUserIdAsync(userId, ct);
@@ -197,11 +186,8 @@ public static class PushEndpoints
             HttpContext httpContext) =>
         {
             var ct = httpContext.RequestAborted;
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var payload = new PushNotificationPayload(
                 Title: "DigiTransac Test",

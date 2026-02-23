@@ -7,6 +7,8 @@ import { useScrollDirection } from '../hooks/useScrollDirection';
 import { useSwipeNavigation } from '../hooks/useSwipeNavigation';
 import { useKeyboardAwareScroll } from '../hooks/useKeyboardAwareScroll';
 import { BottomTabBar } from './mobile';
+import { KeyboardShortcutsModal, useKeyboardShortcutsModal } from './KeyboardShortcutsModal';
+import { OnboardingTour } from './OnboardingTour';
 
 const navigation = [
   {
@@ -138,6 +140,9 @@ export default function Layout() {
   // Ensure focused inputs stay visible when mobile keyboard opens
   useKeyboardAwareScroll();
 
+  // Keyboard shortcuts help modal (? or Ctrl+/)
+  const { isOpen: shortcutsOpen, close: closeShortcuts } = useKeyboardShortcutsModal();
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Mobile header — auto-hides on scroll down, reappears on scroll up */}
@@ -201,7 +206,7 @@ export default function Layout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1" role="navigation" aria-label="Main navigation">
+        <nav className="flex-1 px-3 py-4 space-y-1" role="navigation" aria-label="Main navigation" data-tour="sidebar">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -210,6 +215,7 @@ export default function Layout() {
                 to={item.href}
                 title={sidebarCollapsed ? item.name : undefined}
                 aria-current={isActive ? 'page' : undefined}
+                data-tour={item.name.toLowerCase()}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                   ${sidebarCollapsed ? 'lg:justify-center' : ''}
@@ -341,8 +347,16 @@ export default function Layout() {
 
       {/* Bottom Tab Bar — mobile only */}
       {isMobile && (
-        <BottomTabBar />
+        <div data-tour="bottom-tabs">
+          <BottomTabBar />
+        </div>
       )}
+
+      {/* Keyboard shortcuts help modal */}
+      <KeyboardShortcutsModal isOpen={shortcutsOpen} onClose={closeShortcuts} />
+
+      {/* Onboarding tour for new users */}
+      <OnboardingTour />
     </div>
   );
 }
