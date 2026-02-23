@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-02-23
+
+### Changed
+- **Location search: Nominatim → Photon** — Switched to Photon (Komoot) geocoding API for better POI/business search results with native lat/lon bias
+
+### Fixed
+- **iOS location permission re-prompting** — Cache location permission in localStorage for iOS Safari (which lacks `navigator.permissions` API); prevents repeated system permission dialogs
+- **Transaction form horizontal scroll** — Added `overflow-x-hidden` to mobile form container to prevent horizontal scrolling
+
 ## [1.8.0] - 2026-02-23
 
 ### Added

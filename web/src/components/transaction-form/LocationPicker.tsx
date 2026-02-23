@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { TransactionLocationRequest } from '../../types/transactions';
-import { getCurrentPosition, reverseGeocode, searchPlaces, checkLocationPermission, isGeolocationSupported, type PlaceSearchResult } from '../../services/locationService';
+import { getCurrentPosition, reverseGeocode, searchPlaces, checkLocationPermission, cacheLocationPermission, isGeolocationSupported, type PlaceSearchResult } from '../../services/locationService';
 import { logger } from '../../services/logger';
 
 interface LocationPickerProps {
@@ -40,6 +40,7 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading,
     try {
       const coords = await getCurrentPosition();
       if (coords) {
+        cacheLocationPermission('granted');
         const geoInfo = await reverseGeocode(coords);
         onChange({
           latitude: coords.latitude,
@@ -132,6 +133,7 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading,
     try {
       const coords = await getCurrentPosition();
       if (coords) {
+        cacheLocationPermission('granted');
         const geoInfo = await reverseGeocode(coords);
         onChange({
           latitude: coords.latitude,
@@ -145,6 +147,7 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading,
         // Permission might have been denied during the request
         const newStatus = await checkLocationPermission();
         if (newStatus === 'denied') {
+          cacheLocationPermission('denied');
           setLocationError('Location access was denied. Please enable it in your browser settings and try again.');
         } else {
           setLocationError('Could not get location. Please try again or enter manually.');

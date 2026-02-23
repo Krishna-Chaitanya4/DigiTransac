@@ -312,19 +312,30 @@ export async function detectCurrencyFromLocation(): Promise<CurrencyDetectionRes
 }
 
 /**
- * Check if location permission was already granted
+ * Check if location permission was already granted.
+ * Falls back to localStorage cache for iOS (which lacks navigator.permissions).
  */
 export async function checkLocationPermission(): Promise<'granted' | 'denied' | 'prompt'> {
-  if (!navigator.permissions) {
-    return 'prompt'; // Can't check, will need to try
+  // Try the Permissions API first (Chrome, Firefox, Edge)
+  if (navigator.permissions) {
+    try {
+      const result = await navigator.permissions.query({ name: 'geolocation' });
+      return result.state;
+    } catch {
+      // Fall through to cache check
+    }
   }
 
-  try {
-    const result = await navigator.permissions.query({ name: 'geolocation' });
-    return result.state;
-  } catch {
-    return 'prompt';
-  }
+  // iOS Safari doesn't support navigator.permissions — use localStorage cache
+  const cached = localStorage.getItem('digitransac_location_permission');
+  if (cached === 'granted') return 'granted';
+  if (cached === 'denied') return 'denied';
+  return 'prompt';
+}
+
+/** Cache the location permission result for iOS PWA */
+export function cacheLocationPermission(state: 'granted' | 'denied'): void {
+  localStorage.setItem('digitransac_location_permission', state);
 }
 
 /**
