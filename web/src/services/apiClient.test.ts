@@ -266,8 +266,8 @@ describe('apiClient', () => {
       // Act
       const result = await apiClient.delete('/items/123');
 
-      // Assert
-      expect(result).toEqual({});
+      // Assert — empty responses return undefined (safe for DELETE/204 endpoints)
+      expect(result).toBeUndefined();
     });
   });
 });

@@ -51,7 +51,7 @@ function getFriendlyErrorMessage(status: number): string {
   }
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+export async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     // 401 is handled by the retry logic in fetchWithAuth, not here
     let errorMessage = getFriendlyErrorMessage(response.status);
@@ -68,10 +68,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw new Error(errorMessage);
   }
   
-  // Handle empty responses
+  // Handle empty responses (e.g., 204 No Content from DELETE endpoints)
   const text = await response.text();
   if (!text) {
-    return {} as T;
+    return undefined as T;
   }
   
   return JSON.parse(text);

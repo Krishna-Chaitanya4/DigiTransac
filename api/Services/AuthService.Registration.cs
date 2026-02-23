@@ -9,21 +9,21 @@ public partial class AuthService
 {
     public async Task<Result> SendVerificationCodeAsync(string email, CancellationToken ct = default)
     {
-        _logger.LogInformation("Sending verification code to {Email}", email);
+        _logger.LogDebug("Verification code request for {EmailPrefix}***", email[..Math.Min(3, email.Length)]);
 
         // Validate email format
         if (!IsValidEmail(email))
         {
-            _logger.LogWarning("Invalid email format attempted: {Email}", email);
+            _logger.LogWarning("Invalid email format attempted");
             return DomainErrors.Auth.InvalidEmail;
         }
 
-        // Check if email already registered
+        // Check if email already registered — return generic success to prevent enumeration
         var existingUser = await _userRepository.GetByEmailAsync(email);
         if (existingUser != null)
         {
-            _logger.LogWarning("Registration attempted with existing email: {Email}", email);
-            return DomainErrors.Auth.EmailAlreadyRegistered;
+            _logger.LogDebug("Verification skipped for existing email");
+            return Result.Success(); // Don't reveal that the email is already registered
         }
 
         // Delete any existing verification for this email
@@ -47,7 +47,7 @@ public partial class AuthService
         // Send email
         await _emailService.SendVerificationCodeAsync(email, code);
 
-        _logger.LogInformation("Verification code sent successfully to {Email}", email);
+        _logger.LogInformation("Verification code sent successfully");
         return Result.Success();
     }
 
@@ -147,7 +147,7 @@ public partial class AuthService
         // Clean up verification record
         await _emailVerificationRepository.DeleteByEmailAsync(request.Email, VerificationPurpose.Registration);
 
-        _logger.LogInformation("User registered successfully: {Email}, UserId: {UserId}", user.Email, user.Id);
+        _logger.LogInformation("User registered successfully, UserId: {UserId}", user.Id);
 
         var accessToken = GenerateJwtToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id);

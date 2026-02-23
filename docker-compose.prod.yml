@@ -33,7 +33,7 @@ services:
       MongoDb__WaitQueueTimeoutSeconds: 30
       MongoDb__RetryWrites: "true"
       MongoDb__RetryReads: "true"
-      Redis__ConnectionString: "redis:6379"
+      Redis__ConnectionString: \"redis:6379,password=${REDIS_PASSWORD}\"
       Jwt__Key: "${JWT_SECRET_KEY}"
       Jwt__Issuer: DigiTransac
       Jwt__Audience: DigiTransac
@@ -112,8 +112,9 @@ services:
     image: mongo:7
     container_name: digitransac-mongodb
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    # Port NOT exposed externally — internal Docker network only
+    # ports:
+    #   - "27017:27017"
     volumes:
       - mongodb_prod_data:/data/db
       - mongodb_prod_config:/data/configdb
@@ -163,8 +164,9 @@ services:
     image: redis:7-alpine
     container_name: digitransac-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # Port NOT exposed externally — internal Docker network only
+    # ports:
+    #   - "6379:6379"
     volumes:
       - redis_prod_data:/data
     command: >
@@ -173,6 +175,7 @@ services:
         --loglevel warning
         --maxmemory 256mb
         --maxmemory-policy allkeys-lru
+        --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

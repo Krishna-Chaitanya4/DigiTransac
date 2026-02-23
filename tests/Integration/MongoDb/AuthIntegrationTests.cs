@@ -363,7 +363,7 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
     }
 
     [SkippableFact]
-    public async Task SendVerificationCode_WithExistingEmail_ReturnsBadRequest()
+    public async Task SendVerificationCode_WithExistingEmail_ReturnsOk_ToPreventEnumeration()
     {
         // Arrange — TestEmail is already registered
         var request = new SendVerificationRequest(TestEmail);
@@ -371,8 +371,8 @@ public class AuthIntegrationTests : MongoDbIntegrationTestBase
         // Act
         var response = await Client.PostAsJsonAsync("/api/auth/send-verification", request);
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        // Assert — returns 200 to prevent user enumeration (no email is actually sent)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [SkippableFact]

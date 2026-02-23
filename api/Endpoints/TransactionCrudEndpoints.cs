@@ -376,7 +376,8 @@ public static class TransactionCrudEndpoints
                     csv.AppendLine($"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tagNames}\",{t.Status},\"{notes}\"");
                 }
                 
-                return Results.Text(csv.ToString(), "text/csv");
+                var csvBytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+                return Results.File(csvBytes, "text/csv", "transactions.csv");
             }
 
             return Results.Ok(transactions);

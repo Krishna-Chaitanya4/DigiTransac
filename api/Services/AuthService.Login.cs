@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using DigiTransac.Api.Common;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
@@ -8,7 +9,7 @@ public partial class AuthService
 {
     public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
-        _logger.LogInformation("Login attempt for {Email}", request.Email);
+        _logger.LogDebug("Login attempt for {EmailPrefix}***", request.Email[..Math.Min(3, request.Email.Length)]);
 
         var user = await _userRepository.GetByEmailAsync(request.Email);
 
@@ -19,7 +20,7 @@ public partial class AuthService
 
         if (user == null || !passwordValid)
         {
-            _logger.LogWarning("Failed login attempt for {Email}", request.Email);
+            _logger.LogWarning("Failed login attempt");
             
             // Audit log for failed login
             await _auditService.LogLoginFailedAsync(request.Email, "Invalid credentials");
@@ -30,7 +31,7 @@ public partial class AuthService
         // Check if 2FA is enabled
         if (user.TwoFactorEnabled)
         {
-            _logger.LogInformation("2FA required for user {Email}", request.Email);
+            _logger.LogDebug("2FA required for user {UserId}", user.Id);
             
             // Generate a temporary 2FA token
             var twoFactorToken = new TwoFactorToken
@@ -49,7 +50,7 @@ public partial class AuthService
             );
         }
 
-        _logger.LogInformation("User logged in successfully: {Email}, UserId: {UserId}", user.Email, user.Id);
+        _logger.LogInformation("User logged in successfully, UserId: {UserId}", user.Id);
         
         // Audit log for successful login
         await _auditService.LogLoginSuccessAsync(user.Id, user.Email);
@@ -90,7 +91,7 @@ public partial class AuthService
         // Mark token as used
         await _twoFactorTokenRepository.MarkAsUsedAsync(twoFactorToken.Id);
 
-        _logger.LogInformation("2FA login successful for user {Email}", user.Email);
+        _logger.LogInformation("2FA login successful for user {UserId}", user.Id);
         
         // Audit log for successful 2FA login
         await _auditService.LogLoginSuccessAsync(user.Id, user.Email);
@@ -132,7 +133,7 @@ public partial class AuthService
         // Send email
         await _emailService.SendTwoFactorBackupCodeAsync(user.Email, code);
 
-        _logger.LogInformation("2FA backup code sent to {Email}", user.Email);
+        _logger.LogInformation("2FA backup code sent to user {UserId}", user.Id);
         return Result.Success();
     }
 
@@ -145,8 +146,11 @@ public partial class AuthService
             return null;
         }
 
-        // Verify the email OTP code
-        if (string.IsNullOrEmpty(twoFactorToken.EmailOtpCode) || twoFactorToken.EmailOtpCode != emailCode)
+        // Verify the email OTP code (timing-safe comparison to prevent timing attacks)
+        if (string.IsNullOrEmpty(twoFactorToken.EmailOtpCode) ||
+            !CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(twoFactorToken.EmailOtpCode),
+                System.Text.Encoding.UTF8.GetBytes(emailCode)))
         {
             _logger.LogWarning("Invalid email OTP code for user {UserId}", twoFactorToken.UserId);
             
@@ -178,7 +182,7 @@ public partial class AuthService
         // Mark token as used
         await _twoFactorTokenRepository.MarkAsUsedAsync(twoFactorToken.Id);
 
-        _logger.LogInformation("2FA email OTP login successful for user {Email}", user.Email);
+        _logger.LogInformation("2FA email OTP login successful for user {UserId}", user.Id);
         
         // Audit log for successful 2FA email OTP login
         await _auditService.LogLoginSuccessAsync(user.Id, user.Email);

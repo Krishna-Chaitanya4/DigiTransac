@@ -214,7 +214,8 @@ export default function SpendingMapPage() {
         },
         () => {
           // Location denied or unavailable - that's ok
-        }
+        },
+        { timeout: 10000, maximumAge: 300000 } // 10s timeout, cache for 5 min
       );
     }
   }, []);

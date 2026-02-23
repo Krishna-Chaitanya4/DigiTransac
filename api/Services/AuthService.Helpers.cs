@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using DigiTransac.Api.Models;
 using Microsoft.IdentityModel.Tokens;
 
@@ -62,16 +61,20 @@ public partial class AuthService
         return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
     }
 
-    private static readonly Regex EmailRegex = new(
-        @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
     private static bool IsValidEmail(string email)
     {
-        if (string.IsNullOrWhiteSpace(email))
+        if (string.IsNullOrWhiteSpace(email) || email.Length > 254)
             return false;
 
-        return EmailRegex.IsMatch(email);
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static (bool IsValid, string Message) ValidatePassword(string password)
@@ -81,6 +84,9 @@ public partial class AuthService
 
         if (password.Length < 8)
             return (false, "Password must be at least 8 characters long");
+
+        if (password.Length > 128)
+            return (false, "Password must not exceed 128 characters");
 
         if (!password.Any(char.IsUpper))
             return (false, "Password must contain at least one uppercase letter");

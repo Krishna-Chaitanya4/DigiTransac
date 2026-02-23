@@ -5,6 +5,25 @@ import * as authService from './authService';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+// Helper to create a mock success response with both json() and text()
+function mockOkResponse(data: unknown) {
+  return {
+    ok: true,
+    json: () => Promise.resolve(data),
+    text: () => Promise.resolve(JSON.stringify(data)),
+  };
+}
+
+// Helper to create a mock error response
+function mockErrorResponse(status: number, body?: { message: string }) {
+  return {
+    ok: false,
+    status,
+    json: body ? () => Promise.resolve(body) : () => Promise.reject(new Error('Parse error')),
+    text: () => Promise.resolve(body ? JSON.stringify(body) : ''),
+  };
+}
+
 // Mock localStorage
 const localStorageMock = {
   getItem: vi.fn(),
@@ -44,10 +63,7 @@ describe('authService', () => {
 
   describe('sendVerificationCode', () => {
     it('should send verification code request', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Code sent', verificationToken: 'token123' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Code sent', verificationToken: 'token123' }));
 
       const result = await authService.sendVerificationCode('test@example.com');
 
@@ -60,11 +76,7 @@ describe('authService', () => {
     });
 
     it('should throw error on failed request', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ message: 'Invalid email' }),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(400, { message: 'Invalid email' }));
 
       await expect(authService.sendVerificationCode('invalid')).rejects.toThrow('Invalid email');
     });
@@ -80,10 +92,7 @@ describe('authService', () => {
 
   describe('verifyCode', () => {
     it('should verify code successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Verified', verificationToken: 'verified-token' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Verified', verificationToken: 'verified-token' }));
 
       const result = await authService.verifyCode('test@example.com', '123456');
 
@@ -96,11 +105,7 @@ describe('authService', () => {
     });
 
     it('should throw error on invalid code', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ message: 'Invalid code' }),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(400, { message: 'Invalid code' }));
 
       await expect(authService.verifyCode('test@example.com', 'wrong')).rejects.toThrow('Invalid code');
     });
@@ -108,13 +113,10 @@ describe('authService', () => {
 
   describe('completeRegistration', () => {
     it('should complete registration successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          accessToken: 'access-token',
-          user: { email: 'test@example.com', fullName: 'Test User' },
-        }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({
+        accessToken: 'access-token',
+        user: { email: 'test@example.com', fullName: 'Test User' },
+      }));
 
       const result = await authService.completeRegistration(
         'test@example.com',
@@ -142,15 +144,12 @@ describe('authService', () => {
 
   describe('login', () => {
     it('should login successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          accessToken: 'access-token',
-          email: 'test@example.com',
-          fullName: 'Test User',
-          primaryCurrency: 'USD',
-        }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({
+        accessToken: 'access-token',
+        email: 'test@example.com',
+        fullName: 'Test User',
+        primaryCurrency: 'USD',
+      }));
 
       const result = await authService.login('test@example.com', 'password123');
 
@@ -164,13 +163,10 @@ describe('authService', () => {
     });
 
     it('should return 2FA requirement when enabled', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          requiresTwoFactor: true,
-          twoFactorToken: '2fa-token',
-        }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({
+        requiresTwoFactor: true,
+        twoFactorToken: '2fa-token',
+      }));
 
       const result = await authService.login('test@example.com', 'password123');
 
@@ -179,27 +175,20 @@ describe('authService', () => {
     });
 
     it('should throw error on invalid credentials', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: () => Promise.reject(new Error('Parse error')),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(401));
 
       await expect(authService.login('test@example.com', 'wrong')).rejects.toThrow(
-        'Invalid credentials'
+        'session has expired'
       );
     });
   });
 
   describe('verifyTwoFactorLogin', () => {
     it('should verify 2FA code successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          accessToken: 'access-token',
-          user: { email: 'test@example.com' },
-        }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({
+        accessToken: 'access-token',
+        user: { email: 'test@example.com' },
+      }));
 
       const result = await authService.verifyTwoFactorLogin('2fa-token', '123456');
 
@@ -215,15 +204,12 @@ describe('authService', () => {
 
   describe('getCurrentUser', () => {
     it('should get current user', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          email: 'test@example.com',
-          fullName: 'Test User',
-          isEmailVerified: true,
-          primaryCurrency: 'USD',
-        }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({
+        email: 'test@example.com',
+        fullName: 'Test User',
+        isEmailVerified: true,
+        primaryCurrency: 'USD',
+      }));
 
       const result = await authService.getCurrentUser('bearer-token');
 
@@ -236,10 +222,7 @@ describe('authService', () => {
 
   describe('deleteAccount', () => {
     it('should delete account successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Account deleted' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Account deleted' }));
 
       const result = await authService.deleteAccount('token', 'password123');
 
@@ -257,10 +240,7 @@ describe('authService', () => {
 
   describe('updateName', () => {
     it('should update name successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Name updated' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Name updated' }));
 
       const result = await authService.updateName('token', 'New Name');
 
@@ -278,10 +258,7 @@ describe('authService', () => {
 
   describe('sendEmailChangeCode', () => {
     it('should send email change code', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Code sent' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Code sent' }));
 
       const result = await authService.sendEmailChangeCode('token', 'new@example.com');
 
@@ -299,10 +276,7 @@ describe('authService', () => {
 
   describe('verifyEmailChange', () => {
     it('should verify email change', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Email updated' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Email updated' }));
 
       const result = await authService.verifyEmailChange('token', 'new@example.com', '123456');
 
@@ -320,10 +294,7 @@ describe('authService', () => {
 
   describe('sendPasswordResetCode', () => {
     it('should send password reset code', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Code sent', verificationToken: 'reset-token' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Code sent', verificationToken: 'reset-token' }));
 
       const result = await authService.sendPasswordResetCode('test@example.com');
 
@@ -338,10 +309,7 @@ describe('authService', () => {
 
   describe('verifyResetCode', () => {
     it('should verify reset code', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Verified', verificationToken: 'verified-token' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Verified', verificationToken: 'verified-token' }));
 
       const result = await authService.verifyResetCode('test@example.com', '123456');
 
@@ -356,10 +324,7 @@ describe('authService', () => {
 
   describe('resetPassword', () => {
     it('should reset password successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Password reset' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Password reset' }));
 
       const result = await authService.resetPassword('test@example.com', 'token', 'newpassword');
 
@@ -378,13 +343,10 @@ describe('authService', () => {
 
   describe('refreshToken', () => {
     it('should refresh token successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          accessToken: 'new-access-token',
-          user: { email: 'test@example.com' },
-        }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({
+        accessToken: 'new-access-token',
+        user: { email: 'test@example.com' },
+      }));
 
       const result = await authService.refreshToken();
 
@@ -399,10 +361,7 @@ describe('authService', () => {
 
   describe('revokeToken', () => {
     it('should revoke token successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Token revoked' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'Token revoked' }));
 
       const result = await authService.revokeToken('access-token');
 
@@ -420,10 +379,7 @@ describe('authService', () => {
 
   describe('revokeAllTokens', () => {
     it('should revoke all tokens successfully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ message: 'All tokens revoked' }),
-      });
+      mockFetch.mockResolvedValue(mockOkResponse({ message: 'All tokens revoked' }));
 
       const result = await authService.revokeAllTokens('access-token');
 
@@ -439,10 +395,7 @@ describe('authService', () => {
   describe('Two-Factor Authentication', () => {
     describe('getTwoFactorStatus', () => {
       it('should get 2FA status', async () => {
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ enabled: true }),
-        });
+        mockFetch.mockResolvedValue(mockOkResponse({ enabled: true }));
 
         const result = await authService.getTwoFactorStatus('token');
 
@@ -455,14 +408,11 @@ describe('authService', () => {
 
     describe('setupTwoFactor', () => {
       it('should setup 2FA', async () => {
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({
-            secret: 'SECRET123',
-            qrCodeUri: 'otpauth://totp/...',
-            manualEntryKey: 'ABCD EFGH',
-          }),
-        });
+        mockFetch.mockResolvedValue(mockOkResponse({
+          secret: 'SECRET123',
+          qrCodeUri: 'otpauth://totp/...',
+          manualEntryKey: 'ABCD EFGH',
+        }));
 
         const result = await authService.setupTwoFactor('token');
 
@@ -476,10 +426,7 @@ describe('authService', () => {
 
     describe('enableTwoFactor', () => {
       it('should enable 2FA with code', async () => {
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ message: '2FA enabled' }),
-        });
+        mockFetch.mockResolvedValue(mockOkResponse({ message: '2FA enabled' }));
 
         const result = await authService.enableTwoFactor('token', '123456');
 
@@ -497,10 +444,7 @@ describe('authService', () => {
 
     describe('disableTwoFactor', () => {
       it('should disable 2FA with password', async () => {
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ message: '2FA disabled' }),
-        });
+        mockFetch.mockResolvedValue(mockOkResponse({ message: '2FA disabled' }));
 
         const result = await authService.disableTwoFactor('token', 'password123');
 
@@ -518,10 +462,7 @@ describe('authService', () => {
 
     describe('sendTwoFactorEmailOtp', () => {
       it('should send email OTP', async () => {
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ message: 'Email OTP sent' }),
-        });
+        mockFetch.mockResolvedValue(mockOkResponse({ message: 'Email OTP sent' }));
 
         const result = await authService.sendTwoFactorEmailOtp('2fa-token');
 
@@ -536,13 +477,10 @@ describe('authService', () => {
 
     describe('verifyTwoFactorEmailOtp', () => {
       it('should verify email OTP', async () => {
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({
-            accessToken: 'access-token',
-            user: { email: 'test@example.com' },
-          }),
-        });
+        mockFetch.mockResolvedValue(mockOkResponse({
+          accessToken: 'access-token',
+          user: { email: 'test@example.com' },
+        }));
 
         const result = await authService.verifyTwoFactorEmailOtp('2fa-token', '123456');
 
@@ -559,11 +497,7 @@ describe('authService', () => {
 
   describe('Error Handling', () => {
     it('should handle 400 error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.reject(new Error('Parse error')),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(400));
 
       await expect(authService.login('test@example.com', 'pass')).rejects.toThrow(
         'Invalid request'
@@ -571,11 +505,7 @@ describe('authService', () => {
     });
 
     it('should handle 403 error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 403,
-        json: () => Promise.reject(new Error('Parse error')),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(403));
 
       await expect(authService.login('test@example.com', 'pass')).rejects.toThrow(
         'You do not have permission'
@@ -583,23 +513,15 @@ describe('authService', () => {
     });
 
     it('should handle 404 error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 404,
-        json: () => Promise.reject(new Error('Parse error')),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(404));
 
       await expect(authService.login('test@example.com', 'pass')).rejects.toThrow(
-        'resource was not found'
+        'item was not found'
       );
     });
 
     it('should handle 429 error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 429,
-        json: () => Promise.reject(new Error('Parse error')),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(429));
 
       await expect(authService.login('test@example.com', 'pass')).rejects.toThrow(
         'Too many requests'
@@ -607,11 +529,7 @@ describe('authService', () => {
     });
 
     it('should handle 500 error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        json: () => Promise.reject(new Error('Parse error')),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(500));
 
       await expect(authService.login('test@example.com', 'pass')).rejects.toThrow(
         'Server error'
@@ -619,23 +537,15 @@ describe('authService', () => {
     });
 
     it('should handle unknown status code', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 418,
-        json: () => Promise.reject(new Error('Parse error')),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(418));
 
       await expect(authService.login('test@example.com', 'pass')).rejects.toThrow(
-        'Request failed (418)'
+        'Something went wrong'
       );
     });
 
     it('should use API error message when available', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ message: 'Custom API error message' }),
-      });
+      mockFetch.mockResolvedValue(mockErrorResponse(400, { message: 'Custom API error message' }));
 
       await expect(authService.login('test@example.com', 'pass')).rejects.toThrow(
         'Custom API error message'

@@ -28,9 +28,16 @@ public class CookieService : ICookieService
     private readonly SecuritySettings _securitySettings;
     private const string RefreshTokenCookieName = "digitransac_refresh_token";
 
-    public CookieService(IOptions<SecuritySettings> securitySettings)
+    public CookieService(IOptions<SecuritySettings> securitySettings, IHostEnvironment environment)
     {
         _securitySettings = securitySettings.Value;
+
+        // Fail-fast: Secure cookies must be enabled in Production to prevent token theft over HTTP
+        if (environment.IsProduction() && !_securitySettings.UseSecureCookies)
+        {
+            throw new InvalidOperationException(
+                "UseSecureCookies must be true in Production. Cookies sent over HTTP can be intercepted.");
+        }
     }
 
     public void SetRefreshTokenCookie(HttpContext context, string refreshToken, int expireDays, bool rememberMe = true)

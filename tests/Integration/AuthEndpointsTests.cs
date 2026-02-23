@@ -61,7 +61,7 @@ public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory
     }
 
     [Fact]
-    public async Task SendVerificationCode_WithExistingEmail_ReturnsBadRequest()
+    public async Task SendVerificationCode_WithExistingEmail_ReturnsOk_ToPreventEnumeration()
     {
         // Arrange
         var email = "existing@example.com";
@@ -73,8 +73,8 @@ public class AuthEndpointsTests : IClassFixture<DigiTransacWebApplicationFactory
         // Act
         var response = await _client.PostAsJsonAsync("/api/auth/send-verification", request);
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        // Assert — returns 200 to prevent user enumeration (no email is actually sent)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     #endregion

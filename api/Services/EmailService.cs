@@ -53,7 +53,7 @@ public class GmailEmailService : IEmailService
                         <h2 style='color: #4F46E5;'>Welcome to DigiTransac!</h2>
                         <p>Your verification code is:</p>
                         <div style='background-color: #F3F4F6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;'>
-                            <span style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1F2937;'>{code}</span>
+                            <span style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1F2937;'>{System.Net.WebUtility.HtmlEncode(code)}</span>
                         </div>
                         <p>This code will expire in <strong>10 minutes</strong>.</p>
                         <p style='color: #6B7280; font-size: 14px;'>If you didn't request this code, please ignore this email.</p>
@@ -96,7 +96,7 @@ public class GmailEmailService : IEmailService
                         <h2 style='color: #4F46E5;'>Password Reset Request</h2>
                         <p>You requested to reset your password. Your reset code is:</p>
                         <div style='background-color: #F3F4F6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;'>
-                            <span style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1F2937;'>{code}</span>
+                            <span style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1F2937;'>{System.Net.WebUtility.HtmlEncode(code)}</span>
                         </div>
                         <p>This code will expire in <strong>10 minutes</strong>.</p>
                         <p style='color: #6B7280; font-size: 14px;'>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
@@ -139,7 +139,7 @@ public class GmailEmailService : IEmailService
                         <h2 style='color: #4F46E5;'>Two-Factor Authentication</h2>
                         <p>You requested a backup code to sign in to your account. Your code is:</p>
                         <div style='background-color: #F3F4F6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;'>
-                            <span style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1F2937;'>{code}</span>
+                            <span style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1F2937;'>{System.Net.WebUtility.HtmlEncode(code)}</span>
                         </div>
                         <p>This code will expire in <strong>10 minutes</strong>.</p>
                         <p style='color: #6B7280; font-size: 14px;'>If you didn't request this code, someone may be trying to access your account. Please secure your password immediately.</p>

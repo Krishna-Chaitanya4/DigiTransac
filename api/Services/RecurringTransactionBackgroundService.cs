@@ -26,6 +26,7 @@ public class RecurringTransactionBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Recurring Transaction Background Service started");
+        int consecutiveErrors = 0;
 
         // Run immediately on startup, then every hour
         while (!stoppingToken.IsCancellationRequested)
@@ -33,13 +34,19 @@ public class RecurringTransactionBackgroundService : BackgroundService
             try
             {
                 await ProcessRecurringTransactionsAsync(stoppingToken);
+                consecutiveErrors = 0; // Reset on success
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing recurring transactions");
+                consecutiveErrors++;
+                _logger.LogError(ex, "Error processing recurring transactions (attempt {Attempt})", consecutiveErrors);
             }
 
-            await Task.Delay(_checkInterval, stoppingToken);
+            // Exponential backoff on consecutive errors: 1h, 2h, 4h (max 4h)
+            var delay = consecutiveErrors > 0
+                ? TimeSpan.FromTicks(Math.Min(_checkInterval.Ticks * (1L << Math.Min(consecutiveErrors - 1, 2)), TimeSpan.FromHours(4).Ticks))
+                : _checkInterval;
+            await Task.Delay(delay, stoppingToken);
         }
 
         _logger.LogInformation("Recurring Transaction Background Service stopped");

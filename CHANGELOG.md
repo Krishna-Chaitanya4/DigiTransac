@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-02-21
+
+### Security
+- **Eliminate code injection** — Replaced `new Function()` in CalculatorInput with a safe recursive-descent math parser (supports +, -, *, /, parentheses)
+- **Remove default secrets** — Docker Compose now uses `${VAR:?required}` fail-fast syntax for JWT_SECRET_KEY, ENCRYPTION_KEY, ENCRYPTION_KEK
+- **MongoDB binding** — Dev compose binds MongoDB to `127.0.0.1`; prod compose removes MongoDB/Redis port exposure entirely
+- **CSP hardening** — Removed `'unsafe-eval'` from `script-src` in nginx Content-Security-Policy
+- **Timing-safe OTP comparison** — Login OTP check uses `CryptographicOperations.FixedTimeEquals()` to prevent timing attacks
+- **Email redaction in logs** — All auth logs now use truncated email prefixes or UserId instead of full email addresses
+- **Redis password enforcement** — Production Redis now requires `--requirepass` with fail-fast env var
+- **User enumeration prevention** — Registration endpoint returns generic success for existing emails (same as forgot-password)
+- **Email template XSS prevention** — All email template code interpolations wrapped with `HtmlEncode()`
+- **Secure cookie production guard** — CookieService throws at startup if `UseSecureCookies=false` in Production environment
+- **ReDoS prevention** — Transaction search text is now escaped with `Regex.Escape()` before use in MongoDB regex queries
+
+### Improved
+- **CSV export** — Uses `Results.File()` with proper `Content-Disposition: attachment` header instead of inline text
+- **Nginx hardening** — Added `keepalive_timeout 65`, `client_max_body_size 1m`, and `.well-known` path handling
+- **Max password length** — Server-side validation now enforces 128-character maximum to prevent bcrypt DoS
+- **Email validation** — Replaced regex with `System.Net.Mail.MailAddress` parser (RFC-compliant, no regex edge cases)
+- **Consolidated handleResponse** — Removed duplicate response handler from authService; both apiClient and authService now share one implementation
+- **Empty response safety** — `handleResponse` returns `undefined` instead of `{} as T` for empty bodies (safer for array/primitive return types)
+- **Background service resilience** — All 3 background services now use exponential backoff (1h → 2h → 4h cap) on consecutive errors
+- **Geolocation timeout** — SpendingMapPage `getCurrentPosition` now has 10s timeout and 5-minute cache
+- **isPwaStandalone extraction** — Moved PWA detection to shared `utils/pwa.ts` utility, memoized with `useMemo` in AuthContext
+- **JWT parsing documentation** — Added comment clarifying client-side JWT parsing is intentional (server validates signature)
+
+### Accessibility
+- **role="alert"** — Added `role="alert"` to MapErrorBoundary, PageErrorBoundary, and QueryErrorBoundary (full-page variant) for screen reader announcements
+
 ## [1.6.24] - 2026-02-21
 
 ### Fixed — Frontend Docker Deployment
