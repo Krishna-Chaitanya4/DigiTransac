@@ -68,13 +68,13 @@ describe('ConversationList', () => {
 
     it('should render new chat button', () => {
       render(<ConversationList {...defaultProps} />);
-      const newChatBtn = screen.getByTitle('New Chat');
-      expect(newChatBtn).toBeInTheDocument();
+      const newChatBtns = screen.getAllByTitle('New Chat');
+      expect(newChatBtns.length).toBeGreaterThan(0);
     });
 
     it('should call onNewChat when new chat button is clicked', () => {
       render(<ConversationList {...defaultProps} />);
-      fireEvent.click(screen.getByTitle('New Chat'));
+      fireEvent.click(screen.getAllByTitle('New Chat')[0]);
       expect(mockOnNewChat).toHaveBeenCalledTimes(1);
     });
   });
@@ -197,8 +197,9 @@ describe('ConversationList', () => {
       const clearButtons = screen.getAllByRole('button');
       const clearButton = clearButtons.find(btn => {
         const svg = btn.querySelector('svg');
+        const newChatBtns = screen.getAllByTitle('New Chat');
         // Looking for the X icon button (not the + icon for new chat)
-        return svg && btn !== screen.getByTitle('New Chat');
+        return svg && !newChatBtns.includes(btn);
       });
 
       if (clearButton) {

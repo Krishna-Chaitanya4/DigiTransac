@@ -340,26 +340,33 @@ export interface PlaceSearchResult {
 }
 
 /**
- * Search for places using OpenStreetMap Nominatim API (free, no API key needed)
- * Returns a list of matching places with coordinates
+ * Search for places using Photon geocoding API (powered by Komoot, uses OSM data)
+ * Better POI/business search relevance than Nominatim. Free, no API key needed.
+ * Optionally biases results toward a given location for better local results.
  */
-export async function searchPlaces(query: string, limit = 5): Promise<PlaceSearchResult[]> {
+export async function searchPlaces(
+  query: string,
+  limit = 10,
+  nearbyCoords?: { latitude: number; longitude: number }
+): Promise<PlaceSearchResult[]> {
   if (!query || query.trim().length < 2) {
     return [];
   }
 
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=${limit}&addressdetails=1`,
-      {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          // Nominatim requires a User-Agent header
-          'User-Agent': 'DigiTransac/1.0',
-        },
-      }
-    );
+    let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=${limit}`;
+
+    // Bias results toward user's location if available
+    if (nearbyCoords) {
+      url += `&lat=${nearbyCoords.latitude}&lon=${nearbyCoords.longitude}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
 
     if (!response.ok) {
       throw new Error(`Place search failed with status: ${response.status}`);
@@ -367,26 +374,42 @@ export async function searchPlaces(query: string, limit = 5): Promise<PlaceSearc
 
     const data = await response.json();
 
-    return data.map((place: {
-      place_id: number;
-      display_name: string;
-      lat: string;
-      lon: string;
-      address?: {
+    // Photon returns GeoJSON FeatureCollection
+    return (data.features || []).map((feature: {
+      properties: {
+        osm_id: number;
+        name?: string;
+        street?: string;
+        housenumber?: string;
         city?: string;
-        town?: string;
-        village?: string;
-        municipality?: string;
+        state?: string;
         country?: string;
+        type?: string;
       };
-    }) => ({
-      placeId: String(place.place_id),
-      displayName: place.display_name,
-      city: place.address?.city || place.address?.town || place.address?.village || place.address?.municipality,
-      country: place.address?.country,
-      latitude: parseFloat(place.lat),
-      longitude: parseFloat(place.lon),
-    }));
+      geometry: {
+        coordinates: [number, number]; // [lon, lat]
+      };
+    }) => {
+      const props = feature.properties;
+      // Build a useful display name from available fields
+      const parts: string[] = [];
+      if (props.name) parts.push(props.name);
+      if (props.street) {
+        parts.push(props.housenumber ? `${props.street} ${props.housenumber}` : props.street);
+      }
+      if (props.city) parts.push(props.city);
+      if (props.state) parts.push(props.state);
+      if (props.country) parts.push(props.country);
+      
+      return {
+        placeId: String(props.osm_id || Math.random()),
+        displayName: parts.join(', ') || 'Unknown',
+        city: props.city,
+        country: props.country,
+        latitude: feature.geometry.coordinates[1],
+        longitude: feature.geometry.coordinates[0],
+      };
+    });
   } catch (error) {
     logger.error('Place search failed:', error);
     return [];

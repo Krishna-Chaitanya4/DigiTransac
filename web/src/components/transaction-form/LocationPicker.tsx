@@ -72,7 +72,11 @@ export function LocationPicker({ location, onChange, isLoading: externalLoading,
     placeSearchTimeoutRef.current = setTimeout(async () => {
       setIsSearchingPlaces(true);
       try {
-        const results = await searchPlaces(manualPlaceName.trim());
+        // Bias results toward current/known location for better local results
+        const nearbyCoords = location
+          ? { latitude: location.latitude, longitude: location.longitude }
+          : undefined;
+        const results = await searchPlaces(manualPlaceName.trim(), 10, nearbyCoords);
         setPlaceSearchResults(results);
         setHighlightedPlaceIndex(-1);
       } catch (error) {
