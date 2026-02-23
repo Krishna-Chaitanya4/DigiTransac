@@ -84,6 +84,7 @@ export async function getTransactionSummary(
   filter: TransactionFilter
 ): Promise<TransactionSummary> {
   // Reuse buildFilterQuery — strip page/pageSize since summary doesn't paginate
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { page: _, pageSize: __, searchText: ___, isRecurring: ____, ...summaryFilter } = filter;
   const query = buildFilterQuery(summaryFilter as TransactionFilter);
   return apiClient.get<TransactionSummary>(`/transactions/summary${query}`);

@@ -233,7 +233,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]); // Re-schedule whenever the access token changes
 
   const handleAuthSuccess = useCallback((authResponse: AuthResponse) => {
