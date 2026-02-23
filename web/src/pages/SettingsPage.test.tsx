@@ -73,11 +73,11 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('should render danger zone section', async () => {
+  it('should render delete account section', async () => {
     renderWithAuth();
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Danger Zone' })).toBeInTheDocument();
+      expect(screen.getByText('Delete account')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Delete Account' })).toBeInTheDocument();
     });
   });

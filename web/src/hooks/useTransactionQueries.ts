@@ -16,8 +16,6 @@ import {
   getCounterparties,
   getTopCounterparties,
   getSpendingByAccount,
-  getSpendingPatterns,
-  getSpendingAnomalies,
   getLocationInsights,
   getTripGroups,
 } from '../services/transactionService';
@@ -31,8 +29,6 @@ import type {
   CounterpartyInfo,
   TopCounterpartiesResponse,
   SpendingByAccountResponse,
-  SpendingPatternsResponse,
-  SpendingAnomaliesResponse,
   LocationInsightsResponse,
   TripGroupsResponse,
 } from '../types/transactions';
@@ -454,34 +450,6 @@ export function useSpendingByAccount(
   });
 }
 
-// Hook for fetching spending patterns (by day of week and hour of day)
-export function useSpendingPatterns(
-  startDate?: string,
-  endDate?: string,
-  enabled = true
-) {
-  return useQuery({
-    queryKey: ['transactions', 'analytics', 'patterns', { startDate, endDate }],
-    queryFn: () => getSpendingPatterns(startDate, endDate),
-    staleTime: 30 * 1000, // 30 seconds
-    enabled,
-  });
-}
-
-// Hook for fetching spending anomalies and alerts
-export function useSpendingAnomalies(
-  startDate?: string,
-  endDate?: string,
-  enabled = true
-) {
-  return useQuery({
-    queryKey: ['transactions', 'analytics', 'anomalies', { startDate, endDate }],
-    queryFn: () => getSpendingAnomalies(startDate, endDate),
-    staleTime: 30 * 1000, // 30 seconds
-    enabled,
-  });
-}
-
 // Hook for fetching location-based spending insights
 export function useLocationInsights(
   startDate?: string,
@@ -526,8 +494,6 @@ export type {
   TransactionAnalytics,
   TopCounterpartiesResponse,
   SpendingByAccountResponse,
-  SpendingPatternsResponse,
-  SpendingAnomaliesResponse,
   LocationInsightsResponse,
   TripGroupsResponse,
 };

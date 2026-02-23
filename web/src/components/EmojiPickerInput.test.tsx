@@ -42,7 +42,7 @@ describe('EmojiPickerInput', () => {
   describe('Rendering', () => {
     it('should render with placeholder when no value', () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select an emoji" />);
-      expect(screen.getByText('Select an emoji')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Select an emoji')).toBeInTheDocument();
     });
 
     it('should render with label when provided', () => {
@@ -52,7 +52,7 @@ describe('EmojiPickerInput', () => {
 
     it('should display the selected emoji value', () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} value="🍕" />);
-      expect(screen.getByText('🍕')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('🍕')).toBeInTheDocument();
     });
 
     it('should show clear button when value is set', () => {
@@ -67,10 +67,10 @@ describe('EmojiPickerInput', () => {
   });
 
   describe('Picker Interaction', () => {
-    it('should open emoji picker when button is clicked', async () => {
+    it('should open emoji picker when chevron button is clicked', async () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
-      const button = screen.getByRole('button', { name: /select/i });
+      const button = screen.getByTitle('Pick from list');
       fireEvent.click(button);
       
       await waitFor(() => {
@@ -78,10 +78,10 @@ describe('EmojiPickerInput', () => {
       });
     });
 
-    it('should close emoji picker when clicking again', async () => {
+    it('should close emoji picker when clicking chevron again', async () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
-      const button = screen.getByRole('button', { name: /select/i });
+      const button = screen.getByTitle('Pick from list');
       
       // Open
       fireEvent.click(button);
@@ -101,7 +101,7 @@ describe('EmojiPickerInput', () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} onChange={onChange} placeholder="Select" />);
       
       // Open picker
-      const button = screen.getByRole('button', { name: /select/i });
+      const button = screen.getByTitle('Pick from list');
       fireEvent.click(button);
       
       // Click an emoji
@@ -117,7 +117,7 @@ describe('EmojiPickerInput', () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
       // Open picker
-      const button = screen.getByRole('button', { name: /select/i });
+      const button = screen.getByTitle('Pick from list');
       fireEvent.click(button);
       
       await waitFor(() => {
@@ -161,7 +161,7 @@ describe('EmojiPickerInput', () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} placeholder="Select" />);
       
       // Open picker
-      const button = screen.getByRole('button', { name: /select/i });
+      const button = screen.getByTitle('Pick from list');
       fireEvent.click(button);
       
       await waitFor(() => {
@@ -187,7 +187,7 @@ describe('EmojiPickerInput', () => {
       );
       
       // Open picker
-      const button = screen.getByRole('button', { name: /select/i });
+      const button = screen.getByTitle('Pick from list');
       fireEvent.click(button);
       
       await waitFor(() => {
@@ -210,7 +210,7 @@ describe('EmojiPickerInput', () => {
       renderWithTheme(<EmojiPickerInput {...defaultProps} onChange={onChange} placeholder="Select" />);
       
       // Open picker
-      const button = screen.getByRole('button', { name: /select/i });
+      const button = screen.getByTitle('Pick from list');
       fireEvent.click(button);
       
       // Click car emoji

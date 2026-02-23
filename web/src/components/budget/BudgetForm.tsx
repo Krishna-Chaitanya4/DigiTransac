@@ -5,6 +5,7 @@ import { EmojiPickerInput } from '../EmojiPickerInput';
 import { DatePicker } from '../DatePicker';
 import { CurrencyDropdown } from '../CurrencyDropdown';
 import { getCurrencySymbol } from '../../services/currencyService';
+import { CalculatorInput } from '../CalculatorInput';
 import type { Budget, BudgetPeriod, CreateBudgetRequest, UpdateBudgetRequest, BudgetAlertRequest } from '../../types/budgets';
 import { defaultAlerts } from '../../types/budgets';
 import type { Label } from '../../types/labels';
@@ -57,7 +58,7 @@ export const BudgetForm = memo(function BudgetForm({
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(0);
   const [currency, setCurrency] = useState(primaryCurrency);
   const [period, setPeriod] = useState<BudgetPeriod>('Monthly');
   const [startDate, setStartDate] = useState('');
@@ -118,7 +119,7 @@ export const BudgetForm = memo(function BudgetForm({
       if (editingBudget) {
         setName(editingBudget.name);
         setDescription(editingBudget.description || '');
-        setAmount(editingBudget.amount.toString());
+        setAmount(editingBudget.amount);
         setCurrency(editingBudget.currency);
         setPeriod(editingBudget.period);
         setStartDate(editingBudget.startDate ? editingBudget.startDate.split('T')[0] : '');
@@ -136,7 +137,7 @@ export const BudgetForm = memo(function BudgetForm({
         // Reset to defaults
         setName('');
         setDescription('');
-        setAmount('');
+        setAmount(0);
         setCurrency(primaryCurrency);
         setPeriod('Monthly');
         setStartDate('');
@@ -157,8 +158,7 @@ export const BudgetForm = memo(function BudgetForm({
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const amountNum = parseFloat(amount);
-    if (!name.trim() || isNaN(amountNum) || amountNum <= 0) {
+    if (!name.trim() || amount <= 0) {
       return;
     }
 
@@ -172,7 +172,7 @@ export const BudgetForm = memo(function BudgetForm({
     const data: CreateBudgetRequest | UpdateBudgetRequest = {
       name: name.trim(),
       description: description.trim() || undefined,
-      amount: amountNum,
+      amount,
       currency,
       period,
       startDate: startDate || undefined,
@@ -311,24 +311,14 @@ export const BudgetForm = memo(function BudgetForm({
                     currency={currency}
                     onChange={setCurrency}
                   />
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                      {getCurrencySymbol(currency)}
-                    </span>
-                    <input
-                      id="budget-amount"
-                      type="number"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                        bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                        focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
+                  <CalculatorInput
+                    id="budget-amount"
+                    value={amount}
+                    onChange={setAmount}
+                    currency={getCurrencySymbol(currency)}
+                    placeholder="0.00"
+                    className="flex-1"
+                  />
                 </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Select the currency for this budget. Transactions in other currencies will be converted.
@@ -689,7 +679,7 @@ export const BudgetForm = memo(function BudgetForm({
               </button>
               <button
                 type="submit"
-                disabled={isLoading || !name.trim() || !amount}
+                disabled={isLoading || !name.trim() || amount <= 0}
                 className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 
                   dark:from-blue-900 dark:to-blue-950 rounded-lg hover:from-blue-700 hover:to-blue-800 
                   dark:hover:from-blue-800 dark:hover:to-blue-900 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -19,8 +19,6 @@ export {
   // Extended analytics hooks
   useTopCounterparties,
   useSpendingByAccount,
-  useSpendingPatterns,
-  useSpendingAnomalies,
   useLocationInsights,
   useTripGroups,
 } from './useTransactionQueries';

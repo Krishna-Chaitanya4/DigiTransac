@@ -210,7 +210,7 @@ export function TrendsWidget({
                 <div className="text-sm sm:text-xl font-bold text-green-600 dark:text-green-400 truncate">
                   {convertAndFormat(financialSummary.income, transactionSummary?.currency, primaryCurrency, convert)}
                 </div>
-                {prevFinancialSummary.income > 0 && (
+                {prevFinancialSummary.income > 0 && financialSummary.income !== prevFinancialSummary.income && (
                   <div className="mt-1 flex justify-center">
                     <ComparisonBadge
                       current={financialSummary.income}
@@ -233,7 +233,7 @@ export function TrendsWidget({
                 <div className="text-sm sm:text-xl font-bold text-red-600 dark:text-red-400 truncate">
                   {convertAndFormat(financialSummary.expenses, transactionSummary?.currency, primaryCurrency, convert)}
                 </div>
-                {prevFinancialSummary.expenses > 0 && (
+                {prevFinancialSummary.expenses > 0 && financialSummary.expenses !== prevFinancialSummary.expenses && (
                   <div className="mt-1 flex justify-center">
                     <ComparisonBadge
                       current={financialSummary.expenses}
@@ -264,7 +264,7 @@ export function TrendsWidget({
                 <div className={`text-[9px] sm:text-[10px] mt-0.5 ${financialSummary.netChange >= 0 ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-orange-600/70 dark:text-orange-400/70'}`}>
                   {savingsRate >= 0 ? `${savingsRate.toFixed(0)}% savings rate` : 'spending exceeds income'}
                 </div>
-                {(prevFinancialSummary.netChange !== 0 || financialSummary.netChange !== 0) && (
+                {prevFinancialSummary.netChange !== 0 && financialSummary.netChange !== prevFinancialSummary.netChange && (
                   <div className="mt-1 flex justify-center">
                     <ComparisonBadge
                       current={financialSummary.netChange}
@@ -340,7 +340,7 @@ export function TrendsWidget({
                     stroke="#10B981"
                     strokeWidth={2}
                     fill="url(#gradientMoneyIn)"
-                    dot={totalDays <= 31}
+                    dot={false}
                     activeDot={{ r: 4, fill: '#10B981', stroke: '#fff', strokeWidth: 2 }}
                   />
                   <Area
@@ -350,27 +350,11 @@ export function TrendsWidget({
                     stroke="#F43F5E"
                     strokeWidth={2}
                     fill="url(#gradientMoneyOut)"
-                    dot={totalDays <= 31}
+                    dot={false}
                     activeDot={{ r: 4, fill: '#F43F5E', stroke: '#fff', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
-                </div>
-
-                {/* Summary stats */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="text-center">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Daily Average</div>
-                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {convertAndFormat(analytics!.dailyAverage, transactionSummary?.currency, primaryCurrency, convert)}
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Monthly Average</div>
-                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {convertAndFormat(analytics!.monthlyAverage, transactionSummary?.currency, primaryCurrency, convert)}
-                    </div>
-                  </div>
                 </div>
               </div>
             ) : (

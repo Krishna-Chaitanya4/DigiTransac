@@ -13,6 +13,7 @@ import {
   getSupportedCurrencies,
   COMMON_CURRENCIES,
 } from '../../services/currencyService';
+import { CalculatorInput } from '../CalculatorInput';
 
 // Preset colors for accounts
 const PRESET_COLORS = [
@@ -41,7 +42,7 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
   const [type, setType] = useState<AccountType>('Bank');
   const [color, setColor] = useState('');
   const [currency, setCurrency] = useState(primaryCurrency);
-  const [initialBalance, setInitialBalance] = useState('0');
+  const [initialBalance, setInitialBalance] = useState(0);
   const [institution, setInstitution] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [notes, setNotes] = useState('');
@@ -66,7 +67,7 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
       setType(editingAccount.type);
       setColor(editingAccount.color || '');
       setCurrency(editingAccount.currency);
-      setInitialBalance(editingAccount.initialBalance.toString());
+      setInitialBalance(editingAccount.initialBalance);
       setInstitution(editingAccount.institution || '');
       setAccountNumber(editingAccount.accountNumber || '');
       setNotes(editingAccount.notes || '');
@@ -78,7 +79,7 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
       setType('Bank');
       setColor('');
       setCurrency(primaryCurrency);
-      setInitialBalance('0');
+      setInitialBalance(0);
       setInstitution('');
       setAccountNumber('');
       setNotes('');
@@ -105,7 +106,7 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
         type,
         color: color || null,
         currency,
-        initialBalance: parseFloat(initialBalance) || 0,
+        initialBalance,
         institution: institution.trim() || null,
         accountNumber: accountNumber.trim() || null,
         notes: notes.trim() || null,
@@ -210,14 +211,13 @@ export function AccountModal({ isOpen, onClose, onSubmit, editingAccount, isLoad
                       search={currencySearch}
                       onSearchChange={setCurrencySearch}
                     />
-                    <input
-                      type="number"
+                    <CalculatorInput
                       id="initialBalance"
                       value={initialBalance}
-                      onChange={(e) => setInitialBalance(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={setInitialBalance}
+                      currency={getCurrencySymbol(currency)}
                       placeholder="0.00"
-                      step="0.01"
+                      className="flex-1"
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

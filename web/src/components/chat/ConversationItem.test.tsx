@@ -108,8 +108,8 @@ describe('ConversationItem', () => {
         />
       );
 
-      // Self-chat uses amber/orange gradient
-      const avatar = container.querySelector('.from-amber-500');
+      // Self-chat uses amber solid background
+      const avatar = container.querySelector('.bg-amber-500');
       expect(avatar).toBeInTheDocument();
     });
   });

@@ -8,8 +8,6 @@ interface CategoryDonutChartProps {
   emptyColor?: string;
 }
 
-const RADIAN = Math.PI / 180;
-
 // Distinct color palette — adjacent colors are maximally different
 export const CHART_COLORS = [
   '#3b82f6', // blue
@@ -48,23 +46,6 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   );
 }
 
-// Custom label renderer for pie slices
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderActiveLabel(props: any) {
-  const { cx, cy, midAngle, innerRadius, outerRadius, percentage } = props;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  if (percentage < 8) return null;
-
-  return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-[10px] font-semibold" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-      {`${percentage.toFixed(0)}%`}
-    </text>
-  );
-}
-
 export function CategoryDonutChart({
   categories,
   totalLabel,
@@ -98,7 +79,6 @@ export function CategoryDonutChart({
               stroke="none"
               animationBegin={0}
               animationDuration={800}
-              label={hasData ? renderActiveLabel : undefined}
               labelLine={false}
             >
               {chartData.map((entry, index) => (

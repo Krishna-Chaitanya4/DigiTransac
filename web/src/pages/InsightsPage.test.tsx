@@ -254,11 +254,11 @@ describe('InsightsPage', () => {
     });
   });
 
-  it('shows spending patterns section', async () => {
+  it('shows budget tracking section heading', async () => {
     renderWithProviders(<InsightsPage />);
     
     await waitFor(() => {
-      expect(screen.getByText('Spending Patterns')).toBeDefined();
+      expect(screen.getByText('Budget Tracking')).toBeDefined();
     });
   });
 

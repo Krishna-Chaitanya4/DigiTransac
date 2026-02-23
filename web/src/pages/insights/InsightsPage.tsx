@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { PullToRefreshContainer } from '../../components/PullToRefreshContainer';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useBudgets, useTransactionSummary, useTransactionAnalytics, useTopCounterparties, useSpendingByAccount, useSpendingPatterns, useSpendingAnomalies, useAccounts, useInvalidateTransactions, useInvalidateBudgets, useInvalidateLabels } from '../../hooks';
+import { useBudgets, useTransactionSummary, useTransactionAnalytics, useTopCounterparties, useSpendingByAccount, useAccounts, useInvalidateTransactions, useInvalidateBudgets, useInvalidateLabels } from '../../hooks';
 import { formatDateToStartOfDay, formatDateToEndOfDay } from '../../hooks/useTransactionFilters';
 import { DateRangePicker } from '../../components/DatePicker';
 
@@ -14,8 +14,6 @@ import { CategoryPairWidget } from './CategoryPairWidget';
 import { TrendsWidget } from './TrendsWidget';
 import { BudgetsWidget } from './BudgetsWidget';
 import { CounterpartiesWidget } from './CounterpartiesWidget';
-import { PatternsWidget } from './PatternsWidget';
-import { AnomaliesWidget } from './AnomaliesWidget';
 import { AccountActivityWidget } from './AccountActivityWidget';
 
 export default function InsightsPage() {
@@ -226,16 +224,6 @@ export default function InsightsPage() {
     formatDate(periodStart),
     formatDate(periodEnd),
     10
-  );
-  
-  const { data: spendingPatterns, isLoading: patternsLoading } = useSpendingPatterns(
-    formatDate(periodStart),
-    formatDate(periodEnd)
-  );
-  
-  const { data: anomalies, isLoading: anomaliesLoading } = useSpendingAnomalies(
-    formatDate(periodStart),
-    formatDate(periodEnd)
   );
   
   const { data: spendingByAccount, isLoading: byAccountLoading } = useSpendingByAccount(
@@ -464,34 +452,6 @@ export default function InsightsPage() {
                 spendingByAccount={spendingByAccount}
                 accounts={accountsList}
                 byAccountLoading={byAccountLoading}
-                primaryCurrency={primaryCurrency}
-                convert={convert}
-                collapsedSections={collapsedSections}
-                toggleSection={toggleSection}
-                dragProps={dragProps}
-              />
-            );
-            
-          case 'patterns':
-            return (
-              <PatternsWidget
-                key="patterns"
-                spendingPatterns={spendingPatterns}
-                patternsLoading={patternsLoading}
-                primaryCurrency={primaryCurrency}
-                convert={convert}
-                collapsedSections={collapsedSections}
-                toggleSection={toggleSection}
-                dragProps={dragProps}
-              />
-            );
-            
-          case 'anomalies':
-            return (
-              <AnomaliesWidget
-                key="anomalies"
-                anomalies={anomalies}
-                anomaliesLoading={anomaliesLoading}
                 primaryCurrency={primaryCurrency}
                 convert={convert}
                 collapsedSections={collapsedSections}

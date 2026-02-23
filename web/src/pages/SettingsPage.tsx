@@ -388,7 +388,7 @@ export default function SettingsPage() {
                           onChange={(e) => setCurrencySearch(e.target.value)}
                           onKeyDown={handleCurrencyKeyDown}
                           placeholder="Search currencies..."
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           autoFocus
                         />
                       </div>
@@ -516,17 +516,16 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Danger Zone */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-900 p-6">
-          <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-4">Danger Zone</h2>
+        {/* Delete Account */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Delete Account</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Delete account</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Permanently delete your account and all data</p>
             </div>
             <button
               onClick={() => setShowDeleteModal(true)}
-              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
             >
               Delete Account
             </button>
@@ -593,7 +592,7 @@ export default function SettingsPage() {
                     id="delete-password"
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
-                    className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    className="block w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     placeholder="Your password"
                     aria-describedby={deleteError ? 'delete-error' : undefined}
                   />

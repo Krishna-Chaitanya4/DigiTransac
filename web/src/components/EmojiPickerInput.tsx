@@ -66,6 +66,18 @@ export function EmojiPickerInput({
     onChange('');
   };
 
+  // Accept typed/pasted emoji — extract only emoji characters
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const text = e.target.value;
+    // Match emoji characters (including compound emojis with ZWJ, skin tones, flags, etc.)
+    const emojiRegex = /\p{Emoji_Presentation}|\p{Emoji}\uFE0F/gu;
+    const emojis = text.match(emojiRegex);
+    // Take only the last emoji entered (single emoji field)
+    if (emojis && emojis.length > 0) {
+      onChange(emojis[emojis.length - 1]);
+    }
+  };
+
   return (
     <div ref={containerRef} className="relative">
       {label && (
@@ -76,25 +88,31 @@ export function EmojiPickerInput({
       
       {/* Trigger area */}
       <div className="flex items-center gap-1">
-        <button
-          type="button"
-          id={id}
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
-            bg-white dark:bg-gray-800 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          <span className={value ? 'text-2xl' : 'text-gray-400 dark:text-gray-500'}>
-            {value || placeholder}
-          </span>
-          <svg 
-            className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
+        <div className="flex-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+          <input
+            type="text"
+            id={id}
+            value={value}
+            onChange={handleInputChange}
+            placeholder={placeholder}
+            className="flex-1 px-3 py-2 bg-transparent border-none outline-none text-2xl w-0 min-w-0 placeholder:text-base placeholder:text-gray-400 dark:placeholder:text-gray-500"
+          />
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="px-2 py-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+            title="Pick from list"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+            <svg 
+              className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
         {value && (
           <button
             type="button"

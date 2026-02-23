@@ -12,8 +12,6 @@ import type {
   CounterpartyInfo,
   TopCounterpartiesResponse,
   SpendingByAccountResponse,
-  SpendingPatternsResponse,
-  SpendingAnomaliesResponse,
   LocationInsightsResponse,
   TripGroupsResponse,
 } from '../types/transactions';
@@ -316,24 +314,6 @@ export async function getSpendingByAccount(
 ): Promise<SpendingByAccountResponse> {
   const query = buildDateRangeParams(startDate, endDate);
   return apiClient.get<SpendingByAccountResponse>(`/transactions/analytics/by-account${query}`);
-}
-
-// Get spending patterns (by day of week and hour of day)
-export async function getSpendingPatterns(
-  startDate?: string,
-  endDate?: string
-): Promise<SpendingPatternsResponse> {
-  const query = buildDateRangeParams(startDate, endDate);
-  return apiClient.get<SpendingPatternsResponse>(`/transactions/analytics/patterns${query}`);
-}
-
-// Get spending anomalies and alerts
-export async function getSpendingAnomalies(
-  startDate?: string,
-  endDate?: string
-): Promise<SpendingAnomaliesResponse> {
-  const query = buildDateRangeParams(startDate, endDate);
-  return apiClient.get<SpendingAnomaliesResponse>(`/transactions/analytics/anomalies${query}`);
 }
 
 // Get location-based spending insights
