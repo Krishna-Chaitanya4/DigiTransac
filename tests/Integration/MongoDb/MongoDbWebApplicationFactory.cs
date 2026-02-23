@@ -31,7 +31,6 @@ public class MongoDbWebApplicationFactory : WebApplicationFactory<Program>
     {
         // Set required environment variables BEFORE any WebApplicationFactory initialization
         // These must be set statically to ensure they're available when Program.cs runs
-        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", TestEncryptionKey);
         Environment.SetEnvironmentVariable("ENCRYPTION_KEK", TestEncryptionKey);
         Environment.SetEnvironmentVariable("JWT_SECRET_KEY", TestJwtKey);
     }
@@ -61,7 +60,6 @@ public class MongoDbWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:RefreshTokenExpireDays"] = "7",
                 ["MongoDb:ConnectionString"] = _connectionString,
                 ["MongoDb:DatabaseName"] = _databaseName,
-                ["Encryption:Key"] = TestEncryptionKey,
                 ["Encryption:Kek"] = TestEncryptionKey,
                 ["Encryption:Provider"] = "Local",
                 ["Security:UseHttps"] = "false",

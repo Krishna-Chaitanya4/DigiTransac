@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -19,11 +20,8 @@ public static class AuthProfileEndpoints
         // Get current user
         group.MapGet("/me", [Authorize] async (ClaimsPrincipal user, IAuthService authService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var currentUser = await authService.GetCurrentUserAsync(userId, ct);
             if (currentUser == null)
@@ -52,11 +50,8 @@ public static class AuthProfileEndpoints
             IAuthService authService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -85,11 +80,8 @@ public static class AuthProfileEndpoints
             IAuthService authService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -118,11 +110,8 @@ public static class AuthProfileEndpoints
             IAuthService authService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -151,11 +140,8 @@ public static class AuthProfileEndpoints
             IAuthService authService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;

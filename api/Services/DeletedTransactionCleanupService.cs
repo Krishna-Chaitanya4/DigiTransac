@@ -27,6 +27,7 @@ public class DeletedTransactionCleanupService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Deleted Transaction Cleanup Service started");
+        int consecutiveErrors = 0;
 
         // Run immediately on startup, then every hour
         while (!stoppingToken.IsCancellationRequested)
@@ -34,13 +35,18 @@ public class DeletedTransactionCleanupService : BackgroundService
             try
             {
                 await PurgeExpiredDeletedTransactionsAsync(stoppingToken);
+                consecutiveErrors = 0;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error purging expired deleted transactions");
+                consecutiveErrors++;
+                _logger.LogError(ex, "Error purging expired deleted transactions (attempt {Attempt})", consecutiveErrors);
             }
 
-            await Task.Delay(_checkInterval, stoppingToken);
+            var delay = consecutiveErrors > 0
+                ? TimeSpan.FromTicks(Math.Min(_checkInterval.Ticks * (1L << Math.Min(consecutiveErrors - 1, 2)), TimeSpan.FromHours(4).Ticks))
+                : _checkInterval;
+            await Task.Delay(delay, stoppingToken);
         }
 
         _logger.LogInformation("Deleted Transaction Cleanup Service stopped");

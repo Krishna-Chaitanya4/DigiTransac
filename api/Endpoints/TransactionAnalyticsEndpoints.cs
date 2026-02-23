@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Services.Transactions;
@@ -24,8 +25,7 @@ public static class TransactionAnalyticsEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var analytics = await transactionService.GetAnalyticsAsync(userId, startDate, endDate, accountId, ct);
@@ -48,8 +48,7 @@ public static class TransactionAnalyticsEndpoints
             ITransactionAnalyticsService analyticsService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await analyticsService.GetTopCounterpartiesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10, ct);
@@ -72,8 +71,7 @@ public static class TransactionAnalyticsEndpoints
             ITransactionAnalyticsService analyticsService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await analyticsService.GetSpendingByAccountAsync(userId, startDate, endDate, page ?? 1, Math.Min(pageSize ?? 50, 200), ct);
@@ -94,8 +92,7 @@ public static class TransactionAnalyticsEndpoints
             ITransactionAnalyticsService analyticsService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await analyticsService.GetSpendingPatternsAsync(userId, startDate, endDate, ct);
@@ -118,8 +115,7 @@ public static class TransactionAnalyticsEndpoints
             ITransactionAnalyticsService analyticsService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await analyticsService.GetSpendingAnomaliesAsync(userId, startDate, endDate, page ?? 1, pageSize ?? 10, ct);
@@ -143,8 +139,7 @@ public static class TransactionAnalyticsEndpoints
             ITransactionAnalyticsService analyticsService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await analyticsService.GetLocationInsightsAsync(
@@ -175,8 +170,7 @@ public static class TransactionAnalyticsEndpoints
             ITransactionAnalyticsService analyticsService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await analyticsService.GetTripGroupsAsync(

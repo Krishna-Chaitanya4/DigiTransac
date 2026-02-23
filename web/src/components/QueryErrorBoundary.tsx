@@ -83,7 +83,7 @@ function QueryErrorFallback({ onReset, inline }: QueryErrorFallbackProps) {
   }
 
   return (
-    <div className="min-h-[200px] flex items-center justify-center p-4">
+    <div className="min-h-[200px] flex items-center justify-center p-4" role="alert">
       <div className="text-center max-w-sm">
         <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <svg 

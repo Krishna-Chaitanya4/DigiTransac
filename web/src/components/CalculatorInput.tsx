@@ -19,30 +19,73 @@ interface CalculatorInputProps {
   onExpressionInputConsumed?: () => void;
 }
 
-// Simple math expression evaluator (supports +, -, *, /)
+// Safe recursive-descent math expression parser (supports +, -, *, /, parentheses)
+// No eval(), no new Function() — immune to code injection
 function evaluateExpression(expression: string): number | null {
-  // Remove all whitespace
   const cleaned = expression.replace(/\s/g, '');
   
-  // Check for valid characters only
-  if (!/^[\d+\-*/().]+$/.test(cleaned)) {
+  // Only allow digits, operators, decimal points, and parentheses
+  if (!/^[\d+\-*/().]+$/.test(cleaned) || !cleaned) {
     return null;
   }
   
-  // Don't allow empty or just operators
-  if (!cleaned || /^[+\-*/]+$/.test(cleaned)) {
-    return null;
-  }
-  
-  try {
-    // Use Function constructor to safely evaluate (only numbers and operators)
-    // This is safe because we've already validated the input contains only digits and operators
-    const result = new Function(`return (${cleaned})`)();
-    
-    if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
-      return Math.round(result * 100) / 100; // Round to 2 decimal places
+  let pos = 0;
+
+  function peek(): string { return cleaned[pos] ?? ''; }
+  function consume(): string { return cleaned[pos++]; }
+
+  // Grammar: expr = term (('+' | '-') term)*
+  function parseExpr(): number {
+    let left = parseTerm();
+    while (peek() === '+' || peek() === '-') {
+      const op = consume();
+      const right = parseTerm();
+      left = op === '+' ? left + right : left - right;
     }
-    return null;
+    return left;
+  }
+
+  // term = factor (('*' | '/') factor)*
+  function parseTerm(): number {
+    let left = parseFactor();
+    while (peek() === '*' || peek() === '/') {
+      const op = consume();
+      const right = parseFactor();
+      left = op === '*' ? left * right : left / right;
+    }
+    return left;
+  }
+
+  // factor = '(' expr ')' | number | unary- factor
+  function parseFactor(): number {
+    if (peek() === '(') {
+      consume(); // '('
+      const val = parseExpr();
+      if (peek() === ')') consume(); // ')'
+      return val;
+    }
+    if (peek() === '-') {
+      consume();
+      return -parseFactor();
+    }
+    return parseNumber();
+  }
+
+  function parseNumber(): number {
+    const start = pos;
+    while (pos < cleaned.length && (cleaned[pos] >= '0' && cleaned[pos] <= '9' || cleaned[pos] === '.')) {
+      pos++;
+    }
+    if (pos === start) return NaN;
+    return parseFloat(cleaned.slice(start, pos));
+  }
+
+  try {
+    const result = parseExpr();
+    // Ensure entire input was consumed (no trailing garbage)
+    if (pos !== cleaned.length) return null;
+    if (typeof result !== 'number' || !isFinite(result) || isNaN(result)) return null;
+    return Math.round(result * 100) / 100;
   } catch {
     return null;
   }

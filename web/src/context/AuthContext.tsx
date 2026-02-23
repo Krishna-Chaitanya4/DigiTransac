@@ -1,15 +1,10 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { User, AuthResponse } from '../types/auth';
 import * as authService from '../services/authService';
 import { SESSION_EXPIRED_EVENT, refreshAccessToken } from '../services/apiClient';
 import { setSentryUser, clearSentryUser } from '../services/sentry';
 import { queryClient } from '../lib/queryClient';
-
-// Detect if running as installed PWA (standalone mode)
-function isPwaStandalone(): boolean {
-  return window.matchMedia('(display-mode: standalone)').matches
-    || (navigator as unknown as { standalone?: boolean }).standalone === true; // iOS Safari
-}
+import { isPwaStandalone } from '../utils/pwa';
 
 interface AuthContextType {
   user: User | null;
@@ -34,10 +29,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ACCESS_TOKEN_KEY = 'digitransac_access_token';
+import { ACCESS_TOKEN_KEY } from '../services/tokenStorage';
 const USER_KEY = 'digitransac_user';
 
 // Check if token is expired (with 30s buffer for API calls)
+// NOTE: Client-side JWT parsing (atob) is intentional — we only read the `exp` claim
+// to schedule proactive refresh. The server always validates the full signature.
 function isTokenExpired(token: string): boolean {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
@@ -236,7 +233,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]); // Re-schedule whenever the access token changes
 
   const handleAuthSuccess = useCallback((authResponse: AuthResponse) => {
@@ -300,7 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearAuth]);
 
-  const pwaDetected = isPwaStandalone();
+  const pwaDetected = useMemo(() => isPwaStandalone(), []);
 
   const login = async (email: string, password: string, rememberMe?: boolean): Promise<{ requiresTwoFactor: boolean; twoFactorToken?: string }> => {
     // Default: PWA always remembers, browser only if explicitly requested

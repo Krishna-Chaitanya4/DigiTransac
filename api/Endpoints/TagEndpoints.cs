@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentValidation;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -18,11 +19,8 @@ public static class TagEndpoints
         // Get all tags
         group.MapGet("/", async (ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var tags = await tagService.GetAllAsync(userId, ct);
             return Results.Ok(tags);
@@ -34,11 +32,8 @@ public static class TagEndpoints
         // Get single tag
         group.MapGet("/{id}", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var tag = await tagService.GetByIdAsync(id, userId, ct);
             if (tag == null)
@@ -58,11 +53,8 @@ public static class TagEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await tagService.CreateAsync(userId, request, ct);
             return result.ToApiResult(tag => Results.Created($"/api/tags/{tag.Id}", tag));
@@ -77,11 +69,8 @@ public static class TagEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await tagService.UpdateAsync(id, userId, request, ct);
             return result.ToApiResult();
@@ -93,11 +82,8 @@ public static class TagEndpoints
         // Delete tag
         group.MapDelete("/{id}", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await tagService.DeleteAsync(id, userId, ct);
             if (result.IsFailure)
@@ -112,11 +98,8 @@ public static class TagEndpoints
         // Get transaction count for a tag
         group.MapGet("/{id}/transaction-count", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var count = await tagService.GetTransactionCountAsync(id, userId, ct);
             return Results.Ok(new { transactionCount = count });
@@ -127,11 +110,8 @@ public static class TagEndpoints
         // Delete tag with confirmation (removes from all transactions)
         group.MapDelete("/{id}/confirmed", async (string id, ClaimsPrincipal user, ITagService tagService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var result = await tagService.DeleteWithConfirmationAsync(id, userId, confirmed: true, ct: ct);
             return result.ToApiResult(r => Results.Ok(new { r.Message, r.TransactionCount }));

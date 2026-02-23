@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentValidation;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -19,8 +20,7 @@ public static class ConversationEndpoints
         // Get all conversations
         group.MapGet("/", async (ClaimsPrincipal user, IConversationService conversationService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var conversations = await conversationService.GetConversationsAsync(userId, ct);
@@ -32,8 +32,7 @@ public static class ConversationEndpoints
         // Get unread count
         group.MapGet("/unread-count", async (ClaimsPrincipal user, IConversationService conversationService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var count = await conversationService.GetUnreadCountAsync(userId, ct);
@@ -51,8 +50,7 @@ public static class ConversationEndpoints
             IConversationService conversationService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var conversation = await conversationService.GetConversationAsync(
@@ -72,8 +70,7 @@ public static class ConversationEndpoints
             IUserRepository userRepository,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await conversationService.SendMessageAsync(
@@ -117,8 +114,7 @@ public static class ConversationEndpoints
             IUserRepository userRepository,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var validationResult = await validator.ValidateAsync(request, ct);
@@ -162,8 +158,7 @@ public static class ConversationEndpoints
             IConversationService conversationService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             await conversationService.MarkAsReadAsync(userId, counterpartyUserId, ct);
@@ -180,8 +175,7 @@ public static class ConversationEndpoints
             IConversationService conversationService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await conversationService.EditMessageAsync(userId, messageId, request, ct);
@@ -201,8 +195,7 @@ public static class ConversationEndpoints
             IConversationService conversationService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await conversationService.DeleteMessageAsync(userId, messageId, ct);
@@ -222,8 +215,7 @@ public static class ConversationEndpoints
             IConversationService conversationService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await conversationService.RestoreMessageAsync(userId, messageId, ct);
@@ -243,8 +235,7 @@ public static class ConversationEndpoints
             IConversationService conversationService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await conversationService.SearchUserByEmailAsync(userId, email, ct);

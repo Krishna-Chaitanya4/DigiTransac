@@ -302,8 +302,7 @@ jobs:
             --results-directory ./TestResults
         env:
           JWT_SECRET_KEY: test-jwt-secret-key-for-ci-testing-32chars
-          ENCRYPTION_KEY: test-encryption-key-for-ci-testing
-          ENCRYPTION_KEK: test-kek-32-characters-exactly!
+          ENCRYPTION_KEK: dGVzdC1rZWstMzItY2hhcmFjdGVycy1leGFjdGx5IQ==
 
       - name: Generate Coverage Report
         if: always()

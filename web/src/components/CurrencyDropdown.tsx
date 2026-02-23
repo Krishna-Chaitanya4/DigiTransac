@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '../services/logger';
 import { 
   getCurrencySymbol, 
   Currency,
@@ -34,7 +35,7 @@ export function CurrencyDropdown({
   useEffect(() => {
     getSupportedCurrencies()
       .then(setCurrencies)
-      .catch(console.error);
+      .catch((err) => logger.error('Failed to load currencies', { error: err instanceof Error ? err.message : String(err) }));
   }, []);
 
   // Reset highlighted index when search changes or dropdown opens

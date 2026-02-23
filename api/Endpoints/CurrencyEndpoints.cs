@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FluentValidation;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -38,11 +39,8 @@ public static class CurrencyEndpoints
         // Force refresh exchange rates (authenticated)
         group.MapPost("/rates/refresh", async (ClaimsPrincipal user, IExchangeRateService exchangeRateService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             try
             {
@@ -66,11 +64,8 @@ public static class CurrencyEndpoints
         // Get user's primary currency preference
         group.MapGet("/preference", async (ClaimsPrincipal user, IUserRepository userRepository, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var dbUser = await userRepository.GetByIdAsync(userId, ct);
             if (dbUser == null)
@@ -96,11 +91,8 @@ public static class CurrencyEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var currencyCode = request.Currency.ToUpperInvariant();
 

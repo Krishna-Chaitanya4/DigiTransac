@@ -64,7 +64,6 @@ public static class ConfigurationExtensions
         var overrides = new Dictionary<string, string>
         {
             ["JWT_SECRET_KEY"] = "Jwt:Key",
-            ["ENCRYPTION_KEY"] = "Encryption:Key",
             ["ENCRYPTION_KEK"] = "Encryption:Kek",
             ["EMAIL_SENDER"] = "Email:SenderEmail",
             ["EMAIL_APP_PASSWORD"] = "Email:AppPassword",
@@ -160,7 +159,6 @@ public static class ConfigurationExtensions
 
     private static void ValidateEncryptionSettings(WebApplicationBuilder builder, List<string> errors)
     {
-        ValidateBase64Key(builder.Configuration["Encryption:Key"], "ENCRYPTION_KEY", "Encryption:Key", errors);
         ValidateBase64Key(builder.Configuration["Encryption:Kek"], "ENCRYPTION_KEK", "Encryption:Kek", errors);
     }
 

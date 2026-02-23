@@ -20,8 +20,10 @@
  *   analytics.identify('user-id', { email: 'user@example.com' });
  */
 
-// Types for analytics events
-export interface AnalyticsUser {
+import { logger } from './logger';
+
+// Types for analytics events (internal)
+interface AnalyticsUser {
   id: string;
   email: string;
   fullName?: string;
@@ -29,7 +31,7 @@ export interface AnalyticsUser {
   createdAt?: string;
 }
 
-export interface TransactionEvent {
+interface TransactionEvent {
   transactionId?: string;
   amount: number;
   currency: string;
@@ -40,7 +42,7 @@ export interface TransactionEvent {
   isP2P?: boolean;
 }
 
-export interface BudgetEvent {
+interface BudgetEvent {
   budgetId?: string;
   amount: number;
   period: string;
@@ -48,14 +50,14 @@ export interface BudgetEvent {
   alertsEnabled?: boolean;
 }
 
-export interface PageViewEvent {
+interface PageViewEvent {
   path: string;
   title?: string;
   referrer?: string;
 }
 
-// Event names as constants for type safety
-export const AnalyticsEvents = {
+// Event names as constants
+const AnalyticsEvents = {
   // Auth events
   SIGN_UP_STARTED: 'sign_up_started',
   SIGN_UP_COMPLETED: 'sign_up_completed',
@@ -139,7 +141,7 @@ class AnalyticsService {
   async init() {
     // Skip in test environment
     if (import.meta.env.MODE === 'test') {
-      console.log('[Analytics] Skipping initialization in test mode');
+      logger.debug('Analytics: skipping initialization in test mode');
       return;
     }
 
@@ -147,7 +149,7 @@ class AnalyticsService {
     const apiHost = import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com';
 
     if (!apiKey) {
-      console.warn('[Analytics] PostHog API key not configured. Analytics disabled.');
+      logger.warn('Analytics: PostHog API key not configured, analytics disabled');
       return;
     }
 
@@ -158,7 +160,7 @@ class AnalyticsService {
       // this.posthog = posthogModule.default as unknown as PostHogInstance;
       
       // Placeholder until PostHog is installed
-      console.warn('[Analytics] PostHog is not installed. Run: npm install posthog-js');
+      logger.warn('Analytics: PostHog is not installed. Run: npm install posthog-js');
       
       // Mock implementation for development
       this.posthog = this.createMockPostHog();
@@ -176,7 +178,7 @@ class AnalyticsService {
           if (import.meta.env.DEV) {
             // Disable capture in development
             // posthog.opt_out_capturing();
-            console.log('[Analytics] PostHog initialized in development mode');
+            logger.debug('Analytics: PostHog initialized in development mode');
           }
         },
         // Persistence for cross-session tracking
@@ -193,9 +195,9 @@ class AnalyticsService {
       this.queue.forEach(fn => fn());
       this.queue = [];
 
-      console.log('[Analytics] PostHog initialized successfully');
+      logger.info('Analytics: PostHog initialized successfully');
     } catch (error) {
-      console.error('[Analytics] Failed to initialize PostHog:', error);
+      logger.error('Analytics: Failed to initialize PostHog', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -362,16 +364,16 @@ class AnalyticsService {
     const noop = () => {};
     return {
       init: (_apiKey: string, _options: Record<string, unknown>) => {
-        console.log('[Analytics Mock] init called');
+        logger.debug('Analytics mock: init called');
       },
       identify: (userId: string, traits?: Record<string, unknown>) => {
-        console.log('[Analytics Mock] identify:', userId, traits);
+        logger.debug('Analytics mock: identify', { userId, traits });
       },
       reset: () => {
-        console.log('[Analytics Mock] reset');
+        logger.debug('Analytics mock: reset');
       },
       capture: (event: string, properties?: Record<string, unknown>) => {
-        console.log('[Analytics Mock] capture:', event, properties);
+        logger.debug('Analytics mock: capture', { event, properties });
       },
       isFeatureEnabled: (_flagName: string) => {
         return false;
@@ -381,13 +383,13 @@ class AnalyticsService {
       },
       people: {
         set: (properties: Record<string, unknown>) => {
-          console.log('[Analytics Mock] people.set:', properties);
+          logger.debug('Analytics mock: people.set', { properties });
         },
         set_once: (properties: Record<string, unknown>) => {
-          console.log('[Analytics Mock] people.set_once:', properties);
+          logger.debug('Analytics mock: people.set_once', { properties });
         },
         increment: (property: string, value: number) => {
-          console.log('[Analytics Mock] people.increment:', property, value);
+          logger.debug('Analytics mock: people.increment', { property, value });
         },
       },
       opt_out_capturing: noop,
@@ -397,21 +399,8 @@ class AnalyticsService {
   }
 }
 
-// Export singleton instance
-export const analytics = new AnalyticsService();
+// Singleton instance (internal)
+const analytics = new AnalyticsService();
 
 // Initialize analytics (call this in main.tsx)
 export const initAnalytics = () => analytics.init();
-
-// React hook for analytics
-export function useAnalytics() {
-  return analytics;
-}
-
-// Component for tracking page views (use with React Router)
-export function usePageTracking() {
-  // This would be used with useLocation from react-router-dom
-  // useEffect(() => {
-  //   analytics.pageView(location.pathname);
-  // }, [location.pathname]);
-}

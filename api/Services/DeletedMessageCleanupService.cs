@@ -27,6 +27,7 @@ public class DeletedMessageCleanupService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Deleted Message Cleanup Service started");
+        int consecutiveErrors = 0;
 
         // Run immediately on startup, then every hour
         while (!stoppingToken.IsCancellationRequested)
@@ -34,13 +35,18 @@ public class DeletedMessageCleanupService : BackgroundService
             try
             {
                 await PurgeExpiredDeletedMessagesAsync(stoppingToken);
+                consecutiveErrors = 0;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error purging expired deleted messages");
+                consecutiveErrors++;
+                _logger.LogError(ex, "Error purging expired deleted messages (attempt {Attempt})", consecutiveErrors);
             }
 
-            await Task.Delay(_checkInterval, stoppingToken);
+            var delay = consecutiveErrors > 0
+                ? TimeSpan.FromTicks(Math.Min(_checkInterval.Ticks * (1L << Math.Min(consecutiveErrors - 1, 2)), TimeSpan.FromHours(4).Ticks))
+                : _checkInterval;
+            await Task.Delay(delay, stoppingToken);
         }
 
         _logger.LogInformation("Deleted Message Cleanup Service stopped");

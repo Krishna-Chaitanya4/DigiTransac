@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
@@ -19,8 +20,7 @@ public static class TransactionImportEndpoints
             ITransactionImportService importService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             if (string.IsNullOrWhiteSpace(request.CsvContent) && string.IsNullOrWhiteSpace(request.Base64Content))
@@ -44,8 +44,7 @@ public static class TransactionImportEndpoints
             ITransactionImportService importService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             if (string.IsNullOrWhiteSpace(request.AccountId))
@@ -69,8 +68,7 @@ public static class TransactionImportEndpoints
             ITransactionImportService importService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             if (string.IsNullOrWhiteSpace(request.AccountId))

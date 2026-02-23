@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentValidation;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
@@ -37,8 +38,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             // Parse comma-separated values
@@ -94,8 +94,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var counterparties = await transactionService.GetCounterpartiesAsync(userId, ct);
@@ -122,8 +121,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             // Parse comma-separated values
@@ -158,8 +156,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var recurring = await transactionService.GetRecurringAsync(userId, ct);
@@ -178,8 +175,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var transaction = await transactionService.GetByIdAsync(id, userId, ct);
@@ -205,8 +201,7 @@ public static class TransactionCrudEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await transactionService.CreateAsync(userId, request, ct);
@@ -230,8 +225,7 @@ public static class TransactionCrudEndpoints
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
 
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await transactionService.UpdateAsync(id, userId, request, ct);
@@ -251,8 +245,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await transactionService.DeleteAsync(id, userId, ct);
@@ -273,8 +266,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await transactionService.RestoreAsync(id, userId, ct);
@@ -297,8 +289,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var (success, message) = await transactionService.DeleteRecurringAsync(id, userId, deleteFutureInstances ?? false, ct);
@@ -319,8 +310,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var count = await transactionService.GetPendingCountAsync(userId, ct);
@@ -344,8 +334,7 @@ public static class TransactionCrudEndpoints
             ITransactionService transactionService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var filter = new TransactionFilterRequest(
@@ -376,7 +365,8 @@ public static class TransactionCrudEndpoints
                     csv.AppendLine($"{t.Date:yyyy-MM-dd},{t.Type},{t.Amount},{t.Currency},\"{title}\",\"{payee}\",\"{t.AccountName}\",\"{categoryName}\",\"{tagNames}\",{t.Status},\"{notes}\"");
                 }
                 
-                return Results.Text(csv.ToString(), "text/csv");
+                var csvBytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+                return Results.File(csvBytes, "text/csv", "transactions.csv");
             }
 
             return Results.Ok(transactions);

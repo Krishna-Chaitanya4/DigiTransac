@@ -14,15 +14,6 @@ export interface ExchangeRates {
   source: string;
 }
 
-export interface CurrencyBalances {
-  assets: number;
-  liabilities: number;
-  netWorth: number;
-  assetsConverted: number;
-  liabilitiesConverted: number;
-  netWorthConverted: number;
-}
-
 // Common currencies for quick selection
 export const COMMON_CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'CAD', 'JPY'];
 

@@ -256,7 +256,7 @@ public class TransactionRepository : ITransactionRepository
         // Text search on title (not encrypted) OR matching labels/tags by name OR city/country
         if (!string.IsNullOrEmpty(filter.SearchText))
         {
-            var searchRegex = new BsonRegularExpression(filter.SearchText, "i");
+            var searchRegex = new BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(filter.SearchText), "i");
             var searchFilters = new List<FilterDefinition<Transaction>>
             {
                 filterBuilder.Regex(t => t.Title, searchRegex),

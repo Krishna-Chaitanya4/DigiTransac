@@ -157,12 +157,10 @@ KEYVAULT_NAME="digitransac-kv-3895"
 
 # Generate strong secrets
 JWT_SECRET=$(openssl rand -base64 48)
-ENCRYPTION_KEY=$(openssl rand -base64 32)
 ENCRYPTION_KEK=$(openssl rand -base64 32)
 
 # Update Key Vault secrets
 az keyvault secret set --vault-name $KEYVAULT_NAME --name "JwtSecretKey" --value "$JWT_SECRET"
-az keyvault secret set --vault-name $KEYVAULT_NAME --name "EncryptionKey" --value "$ENCRYPTION_KEY"
 az keyvault secret set --vault-name $KEYVAULT_NAME --name "EncryptionKek" --value "$ENCRYPTION_KEK"
 ```
 

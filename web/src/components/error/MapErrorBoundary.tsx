@@ -8,7 +8,7 @@ interface MapErrorFallbackProps {
 
 function MapErrorFallback({ onRetry }: MapErrorFallbackProps) {
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg p-8">
+    <div className="h-full flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg p-8" role="alert">
       <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
         <svg 
           className="w-8 h-8 text-red-500 dark:text-red-400"

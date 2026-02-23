@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Validators;
@@ -22,8 +23,7 @@ public static class BudgetEndpoints
             IBudgetService budgetService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var summary = await budgetService.GetSummaryAsync(userId, activeOnly ?? true, ct);
@@ -40,8 +40,7 @@ public static class BudgetEndpoints
             IBudgetService budgetService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var budget = await budgetService.GetByIdAsync(id, userId, ct);
@@ -62,8 +61,7 @@ public static class BudgetEndpoints
             IBudgetService budgetService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var breakdown = await budgetService.GetSpendingBreakdownAsync(id, userId, ct);
@@ -85,8 +83,7 @@ public static class BudgetEndpoints
             IValidator<CreateBudgetRequest> validator,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
@@ -109,8 +106,7 @@ public static class BudgetEndpoints
             IValidator<UpdateBudgetRequest> validator,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
@@ -132,8 +128,7 @@ public static class BudgetEndpoints
             IBudgetService budgetService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var result = await budgetService.DeleteAsync(id, userId, ct);
@@ -156,8 +151,7 @@ public static class BudgetEndpoints
             IBudgetService budgetService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var notifications = await budgetService.GetNotificationsAsync(userId, unreadOnly, ct);
@@ -174,8 +168,7 @@ public static class BudgetEndpoints
             IBudgetService budgetService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             var success = await budgetService.MarkNotificationAsReadAsync(notificationId, userId, ct);
@@ -195,8 +188,7 @@ public static class BudgetEndpoints
             IBudgetService budgetService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             await budgetService.MarkAllNotificationsAsReadAsync(userId, ct);

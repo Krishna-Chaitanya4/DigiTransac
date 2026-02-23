@@ -32,7 +32,7 @@ function PageErrorFallback({ error, onReset }: PageErrorFallbackProps) {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center" role="alert">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <svg 
             className="w-8 h-8 text-red-600 dark:text-red-400" 

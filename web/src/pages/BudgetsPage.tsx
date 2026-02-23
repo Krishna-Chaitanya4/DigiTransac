@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
+import { logger } from '../services/logger';
 import {
   useBudgets,
   useCreateBudget,
@@ -275,7 +276,7 @@ export default function BudgetsPage() {
     try {
       await deleteBudget.mutateAsync(budgetId);
     } catch (err) {
-      console.error('Failed to delete budget:', err);
+      logger.error('Failed to delete budget', { budgetId, error: err instanceof Error ? err.message : String(err) });
     }
   }, [deleteBudget, confirm]);
 

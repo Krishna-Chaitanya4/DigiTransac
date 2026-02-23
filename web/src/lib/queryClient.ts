@@ -12,9 +12,10 @@ interface ApiError extends Error {
 }
 
 /**
- * Extract a user-friendly error message from various error types
+ * Extract a user-friendly error message from various error types.
+ * Exported for reuse across services and components.
  */
-function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     // Handle API errors with response data
     const apiError = error as ApiError;
@@ -167,6 +168,9 @@ export const queryKeys = {
   // Conversations (chats)
   conversations: {
     all: ['conversations'] as const,
+    list: () => ['conversations', 'list'] as const,
+    detail: (userId: string) => ['conversations', 'detail', userId] as const,
+    userSearch: (email: string) => ['conversations', 'search', email] as const,
   },
 };
 

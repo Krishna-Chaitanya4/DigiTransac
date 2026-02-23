@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Services;
 using DigiTransac.Api.Settings;
@@ -20,11 +21,8 @@ public static class TwoFactorEndpoints
         // Get 2FA status
         group.MapGet("/status", [Authorize] async (ClaimsPrincipal user, ITwoFactorService twoFactorService, IAuthService authService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var currentUser = await authService.GetCurrentUserAsync(userId);
             if (currentUser == null)
@@ -41,11 +39,8 @@ public static class TwoFactorEndpoints
         // Generate 2FA setup (QR code, secret)
         group.MapPost("/setup", [Authorize] async (ClaimsPrincipal user, ITwoFactorService twoFactorService, CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             try
             {
@@ -74,11 +69,8 @@ public static class TwoFactorEndpoints
             ITwoFactorService twoFactorService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;
@@ -102,11 +94,8 @@ public static class TwoFactorEndpoints
             ITwoFactorService twoFactorService,
             CancellationToken ct) =>
         {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
+            if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
-            }
 
             var validationError = await validator.ValidateAndReturnErrorAsync(request);
             if (validationError != null) return validationError;

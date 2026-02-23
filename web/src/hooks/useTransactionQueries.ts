@@ -111,6 +111,16 @@ export function useCounterparties() {
 // (e.g. Insights analytics when user is on Transactions page) are also invalidated
 const invalidateAll = { refetchType: 'all' as const };
 
+/**
+ * Invalidate all transaction-related query caches (transactions, accounts, budgets).
+ * Extracted to avoid repeating the same 3-line block in every mutation hook.
+ */
+function invalidateTransactionRelatedQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
+  queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
+  queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+}
+
 // Hook for creating a transaction
 export function useCreateTransaction() {
   const queryClient = useQueryClient();
@@ -119,9 +129,7 @@ export function useCreateTransaction() {
     mutationFn: (data: CreateTransactionRequest) => createTransaction(data),
     onSuccess: () => {
       // Invalidate all transaction-related queries (including analytics/summary)
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     meta: {
       successMessage: 'Transaction created successfully',
@@ -137,9 +145,7 @@ export function useUpdateTransaction() {
     mutationFn: ({ id, data }: { id: string; data: UpdateTransactionRequest }) =>
       updateTransaction(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     meta: {
       successMessage: 'Transaction updated successfully',
@@ -190,9 +196,7 @@ export function useDeleteTransaction() {
     },
     onSettled: () => {
       // Always refetch after error or success to ensure consistency
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     // No successMessage - the toast with undo button is shown by the page
   });
@@ -205,9 +209,7 @@ export function useRestoreTransaction() {
   return useMutation({
     mutationFn: (id: string) => restoreTransaction(id),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     meta: {
       successMessage: 'Transaction restored',
@@ -256,9 +258,7 @@ export function useUpdateStatus() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     meta: {
       successMessage: 'Status updated',
@@ -302,9 +302,7 @@ export function useBatchDelete() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     meta: {
       successMessage: 'Transactions deleted',
@@ -349,9 +347,7 @@ export function useBatchMarkConfirmed() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     meta: {
       successMessage: 'Transactions marked as confirmed',
@@ -396,9 +392,7 @@ export function useBatchMarkPending() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+      invalidateTransactionRelatedQueries(queryClient);
     },
     meta: {
       successMessage: 'Transactions marked as pending',
@@ -424,9 +418,7 @@ export function useInvalidateTransactions() {
   const queryClient = useQueryClient();
   
   return () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
-    queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+    invalidateTransactionRelatedQueries(queryClient);
   };
 }
 

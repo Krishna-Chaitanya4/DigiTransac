@@ -148,9 +148,9 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task SendVerificationCodeAsync_WithExistingEmail_ShouldReturnFailure()
+    public async Task SendVerificationCodeAsync_WithExistingEmail_ShouldReturnSuccess_ToPreventEnumeration()
     {
-        // Arrange
+        // Arrange — email already registered
         var email = "existing@example.com";
         _userRepositoryMock.Setup(x => x.GetByEmailAsync(email))
             .ReturnsAsync(new User { Email = email, FullName = "Existing User", PasswordHash = "hash" });
@@ -158,9 +158,8 @@ public class AuthServiceTests
         // Act
         var result = await _authService.SendVerificationCodeAsync(email);
 
-        // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Email already registered");
+        // Assert — returns success to prevent user enumeration (no email is sent)
+        result.IsSuccess.Should().BeTrue();
     }
 
     #endregion

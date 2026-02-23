@@ -60,6 +60,4 @@ export function PendingIndicator({ onClick, onShowPending, showingPending = fals
   );
 }
 
-// Export with both names for backward compatibility
-export { PendingIndicator as PendingP2PIndicator };
 export default PendingIndicator;
