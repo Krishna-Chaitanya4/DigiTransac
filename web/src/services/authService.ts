@@ -1,4 +1,4 @@
-import { AuthResponse, ApiError, VerificationResponse } from '../types/auth';
+import { AuthResponse, VerificationResponse } from '../types/auth';
 import { API_BASE_URL, handleResponse } from './apiClient';
 
 // Re-export for backward compatibility
