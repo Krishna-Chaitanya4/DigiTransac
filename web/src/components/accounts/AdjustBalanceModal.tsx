@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Account, formatCurrency, accountTypeConfig } from '../../services/accountService';
 import { getCurrencySymbol } from '../../services/currencyService';
+import { CalculatorInput } from '../CalculatorInput';
 
 interface AdjustBalanceModalProps {
   isOpen: boolean;
@@ -11,24 +12,24 @@ interface AdjustBalanceModalProps {
 }
 
 export function AdjustBalanceModal({ isOpen, onClose, onSubmit, account, isLoading }: AdjustBalanceModalProps) {
-  const [newBalance, setNewBalance] = useState('');
+  const [newBalance, setNewBalance] = useState(0);
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
     if (account) {
-      setNewBalance(account.currentBalance.toString());
+      setNewBalance(account.currentBalance);
       setNotes('');
     }
   }, [account, isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(parseFloat(newBalance) || 0, notes);
+    onSubmit(newBalance, notes);
   };
 
   if (!isOpen || !account) return null;
 
-  const difference = (parseFloat(newBalance) || 0) - account.currentBalance;
+  const difference = newBalance - account.currentBalance;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -54,18 +55,13 @@ export function AdjustBalanceModal({ isOpen, onClose, onSubmit, account, isLoadi
                 <label htmlFor="newBalance" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   New Balance
                 </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">{getCurrencySymbol(account.currency)}</span>
-                  <input
-                    type="number"
+                <CalculatorInput
                     id="newBalance"
                     value={newBalance}
-                    onChange={(e) => setNewBalance(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    step="0.01"
+                    onChange={setNewBalance}
+                    currency={getCurrencySymbol(account.currency)}
                     autoFocus
                   />
-                </div>
                 {difference !== 0 && (
                   <p className={`mt-1 text-sm ${(() => {
                     const isLiability = accountTypeConfig[account.type]?.isLiability ?? false;

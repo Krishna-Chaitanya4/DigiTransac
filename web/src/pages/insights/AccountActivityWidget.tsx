@@ -39,11 +39,13 @@ export function AccountActivityWidget({
   const enrichedAccounts = useMemo(() => {
     if (!spendingByAccount?.accounts) return [];
     const accountMap = new Map(accounts?.map(a => [a.id, a]) ?? []);
-    return spendingByAccount.accounts.map(as => ({
-      ...as,
-      type: accountMap.get(as.accountId)?.type ?? 'Bank',
-      color: accountMap.get(as.accountId)?.color ?? null,
-    }));
+    return spendingByAccount.accounts
+      .map(as => ({
+        ...as,
+        type: accountMap.get(as.accountId)?.type ?? 'Bank',
+        color: accountMap.get(as.accountId)?.color ?? null,
+      }))
+      .sort((a, b) => b.transactionCount - a.transactionCount);
   }, [spendingByAccount, accounts]);
 
   const totalTransactions = enrichedAccounts.reduce((sum, a) => sum + a.transactionCount, 0);

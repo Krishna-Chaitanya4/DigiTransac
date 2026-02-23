@@ -41,10 +41,8 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         // Act
         var response = await Client.PostAsJsonAsync("/api/auth/send-verification", request);
 
-        // Assert — Result pattern should map to proper HTTP error (Conflict for duplicate resource)
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().Contain("already registered");
+        // Assert — Returns 200 OK (generic success) to prevent email enumeration
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [SkippableFact]
@@ -196,7 +194,7 @@ public class AuthEndpointFlowTests : MongoDbIntegrationTestBase
         // Verify cookie attributes (ASP.NET Core TestServer serializes attributes in lowercase)
         var refreshCookie = cookieList.First(c => c.Contains("digitransac_refresh_token"));
         refreshCookie.ToLowerInvariant().Should().Contain("httponly");
-        refreshCookie.ToLowerInvariant().Should().Contain("samesite=strict");
+        refreshCookie.ToLowerInvariant().Should().Contain("samesite=lax");
     }
 
     [SkippableFact]

@@ -495,6 +495,8 @@ public record CounterpartySpending(
     string? UserId,         // P2P counterparty user ID if applicable
     string? Email,          // P2P counterparty email if applicable
     decimal TotalAmount,
+    decimal TotalDebits,    // Total sent/spent
+    decimal TotalCredits,   // Total received
     int TransactionCount,
     decimal Percentage,     // Percentage of total spending
     string Type             // "Payee" or "P2P"

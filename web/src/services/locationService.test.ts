@@ -498,29 +498,35 @@ describe('locationService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return parsed results from Nominatim API', async () => {
-      const mockResponse = [
-        {
-          place_id: 12345,
-          display_name: 'Coffee Shop, Main Street, New York, USA',
-          lat: '40.7128',
-          lon: '-74.0060',
-          address: {
-            city: 'New York',
-            country: 'United States',
+    it('should return parsed results from Photon API', async () => {
+      const mockResponse = {
+        features: [
+          {
+            properties: {
+              osm_id: 12345,
+              name: 'Coffee Shop',
+              street: 'Main Street',
+              city: 'New York',
+              state: 'New York',
+              country: 'United States',
+            },
+            geometry: {
+              coordinates: [-74.0060, 40.7128], // [lon, lat]
+            },
           },
-        },
-        {
-          place_id: 67890,
-          display_name: 'Coffee House, London, UK',
-          lat: '51.5074',
-          lon: '-0.1278',
-          address: {
-            city: 'London',
-            country: 'United Kingdom',
+          {
+            properties: {
+              osm_id: 67890,
+              name: 'Coffee House',
+              city: 'London',
+              country: 'United Kingdom',
+            },
+            geometry: {
+              coordinates: [-0.1278, 51.5074],
+            },
           },
-        },
-      ];
+        ],
+      };
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -533,7 +539,7 @@ describe('locationService', () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
         placeId: '12345',
-        displayName: 'Coffee Shop, Main Street, New York, USA',
+        displayName: 'Coffee Shop, Main Street, New York, New York, United States',
         latitude: 40.7128,
         longitude: -74.0060,
         city: 'New York',
@@ -541,7 +547,7 @@ describe('locationService', () => {
       });
       expect(result[1]).toEqual({
         placeId: '67890',
-        displayName: 'Coffee House, London, UK',
+        displayName: 'Coffee House, London, United Kingdom',
         latitude: 51.5074,
         longitude: -0.1278,
         city: 'London',

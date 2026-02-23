@@ -600,16 +600,16 @@ export function TransactionForm({
       <LocationPicker location={location} onChange={handleLocationChange} autoCapture={false} />
 
       {/* Time & Timezone */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time</label>
           <input type="time" value={timeLocal} onChange={(e) => setTimeLocal(e.target.value)}
             className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base" />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Timezone</label>
           <select value={dateTimezone} onChange={(e) => setDateTimezone(e.target.value)}
-            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm truncate">
             {TIMEZONE_OPTIONS.map((tz) => (<option key={tz.value} value={tz.value}>{tz.label}</option>))}
             {!TIMEZONE_OPTIONS.find(tz => tz.value === dateTimezone) && (<option value={dateTimezone}>{dateTimezone}</option>)}
           </select>

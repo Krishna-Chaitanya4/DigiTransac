@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import type { ConversationSummary } from '../../types/conversations';
 import { getDisplayName, formatRelativeTime } from '../../services/conversationService';
-import { formatCurrency } from '../../services/currencyService';
 
 interface ConversationItemProps {
   conversation: ConversationSummary;
@@ -29,10 +28,6 @@ export const ConversationItem = memo(function ConversationItem({
   
   // Check for deleted message/transaction previews
   const isDeletedPreview = previewText === 'This message was deleted' || previewText === 'This transaction was deleted';
-  
-  // Check if we have transaction totals to show
-  const hasTransactions = (conversation.totalSent ?? 0) > 0 || (conversation.totalReceived ?? 0) > 0;
-  const currency = conversation.primaryCurrency ?? 'INR';
 
   return (
     <button
@@ -43,13 +38,13 @@ export const ConversationItem = memo(function ConversationItem({
     >
       {/* Avatar - special icon for self-chat */}
       {isSelfChat ? (
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white flex-shrink-0">
+        <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center text-white flex-shrink-0">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
         </div>
       ) : (
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
+        <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
           {displayName.charAt(0).toUpperCase()}
         </div>
       )}
@@ -79,28 +74,10 @@ export const ConversationItem = memo(function ConversationItem({
         }`}>
           {conversation.lastMessagePreview || 'No messages yet'}
         </p>
-
-        {/* Transaction totals - show for non-self chats with transactions */}
-        {!isSelfChat && hasTransactions && (
-          <div className="flex items-center gap-3 mt-1 text-xs">
-            {(conversation.totalSent ?? 0) > 0 && (
-              <span className="text-red-500 dark:text-red-400 flex items-center gap-1">
-                <span>↑</span>
-                <span>{formatCurrency(conversation.totalSent ?? 0, currency)}</span>
-              </span>
-            )}
-            {(conversation.totalReceived ?? 0) > 0 && (
-              <span className="text-green-500 dark:text-green-400 flex items-center gap-1">
-                <span>↓</span>
-                <span>{formatCurrency(conversation.totalReceived ?? 0, currency)}</span>
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Unread badge */}
-      {conversation.unreadCount > 0 && (
+      {/* Unread badge - hide for self-chat since all messages are from you */}
+      {!isSelfChat && conversation.unreadCount > 0 && (
         <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center flex-shrink-0">
           {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
         </span>

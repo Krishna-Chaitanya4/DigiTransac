@@ -221,7 +221,7 @@ export function CalculatorInput({
         ref={inputRef}
         id={inputId}
         type="text"
-        inputMode="decimal"
+        inputMode="text"
         value={inputValue}
         onChange={handleInputChange}
         onBlur={handleBlur}

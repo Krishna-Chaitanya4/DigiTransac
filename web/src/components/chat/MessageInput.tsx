@@ -148,7 +148,7 @@ export const MessageInput = memo(function MessageInput({
             ) : (
               <button
                 onClick={onOpenTransactionForm}
-                className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full hover:from-blue-600 hover:to-purple-700 transition-all shadow-sm"
+                className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors shadow-sm"
                 title="New transaction"
               >
                 <span className="w-5 h-5 flex items-center justify-center font-bold text-sm">₹</span>

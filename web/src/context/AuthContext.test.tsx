@@ -35,6 +35,8 @@ describe('AuthContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // Default: refresh returns null (no valid session)
+    vi.mocked(apiClient.refreshAccessToken).mockResolvedValue(null);
   });
 
   afterEach(() => {

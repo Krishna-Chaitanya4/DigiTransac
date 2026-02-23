@@ -5,18 +5,6 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { SearchableFolderDropdown } from './SearchableFolderDropdown';
 import { getDescendantIds } from './utils';
 
-// Preset colors (matching AccountModal style)
-const PRESET_COLORS = [
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#f97316', // orange
-];
-
 interface LabelModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,7 +20,6 @@ interface LabelModalProps {
 export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, labelType, isLoading, allLabels, error }: LabelModalProps) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
-  const [color, setColor] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [excludeFromAnalytics, setExcludeFromAnalytics] = useState(false);
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
@@ -48,13 +35,11 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
     if (editingLabel) {
       setName(editingLabel.name);
       setIcon(editingLabel.icon || '');
-      setColor(editingLabel.color || '');
       setSelectedParentId(editingLabel.parentId);
       setExcludeFromAnalytics(editingLabel.excludeFromAnalytics);
     } else {
       setName('');
       setIcon('');
-      setColor('');
       setSelectedParentId(parentId);
       setExcludeFromAnalytics(false);
     }
@@ -81,7 +66,7 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
       onSubmit({
         name: name.trim(),
         icon: icon || null,
-        color: color || null,
+        color: null,
         parentId: selectedParentId,
         excludeFromAnalytics,
       });
@@ -91,7 +76,7 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
         type: labelType,
         parentId: selectedParentId,
         icon: icon || null,
-        color: color || null,
+        color: null,
         excludeFromAnalytics,
       });
     }
@@ -190,44 +175,6 @@ export function LabelModal({ isOpen, onClose, onSubmit, editingLabel, parentId, 
                   onChange={setIcon}
                   placeholder="Select an emoji"
                 />
-              </div>
-
-              {/* Color - with preset colors like AccountModal */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Color
-                </label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {PRESET_COLORS.map((presetColor) => (
-                    <button
-                      key={presetColor}
-                      type="button"
-                      onClick={() => setColor(presetColor)}
-                      className={`w-8 h-8 rounded-full border-2 transition-transform ${
-                        color === presetColor ? 'border-gray-900 dark:border-gray-100 scale-110' : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: presetColor }}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    id="color"
-                    value={color || '#6b7280'}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="w-10 h-10 p-1 border border-gray-300 dark:border-gray-600 rounded cursor-pointer"
-                  />
-                  {color && (
-                    <button
-                      type="button"
-                      onClick={() => setColor('')}
-                      className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                    >
-                      Use default
-                    </button>
-                  )}
-                </div>
               </div>
 
               {/* Exclude from Analytics toggle */}

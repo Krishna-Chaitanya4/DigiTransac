@@ -30,7 +30,7 @@ export const ChatHeader = memo(function ChatHeader({
       </button>
 
       {/* Avatar */}
-      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold">
+      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
         {displayName.charAt(0).toUpperCase()}
       </div>
 

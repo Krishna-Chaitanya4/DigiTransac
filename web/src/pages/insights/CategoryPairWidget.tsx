@@ -35,14 +35,14 @@ export function CategoryPairWidget({
   const topCategories = analytics?.topCategories;
   const expenseCategories = useMemo(() => {
     if (!topCategories) return [];
-    return topCategories.slice(0, 6);
+    return topCategories;
   }, [topCategories]);
 
   // Top income categories (Receive transactions, excluding transfers)
   const topIncomeCategories = analytics?.topIncomeCategories;
   const incomeCategories = useMemo(() => {
     if (!topIncomeCategories) return [];
-    return topIncomeCategories.slice(0, 6);
+    return topIncomeCategories;
   }, [topIncomeCategories]);
 
   const totalExpenses = useMemo(
@@ -107,7 +107,7 @@ export function CategoryPairWidget({
                 totalAmount={convertAndFormat(totalExpenses, transactionSummary?.currency, primaryCurrency, convert)}
               />
               {/* Category List */}
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3 mt-4 max-h-[336px] overflow-y-auto pr-1">
               {expenseCategories.map((category: CategoryBreakdown, index: number) => {
                 const chartColor = getCategoryChartColor(category.labelColor, index);
                 return (
@@ -190,7 +190,7 @@ export function CategoryPairWidget({
                 totalAmount={convertAndFormat(totalIncome, transactionSummary?.currency, primaryCurrency, convert)}
               />
               {/* Category List */}
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3 mt-4 max-h-[336px] overflow-y-auto pr-1">
               {incomeCategories.map((category, index) => {
                 const chartColor = getCategoryChartColor(category.labelColor, index);
                 return (

@@ -75,10 +75,11 @@ export function SplitCategoriesSection({
               />
               <input
                 type="number"
+                inputMode="decimal"
                 value={split.amount || ''}
                 onChange={(e) => updateSplit(index, 'amount', parseFloat(e.target.value) || 0)}
-                className="w-24 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                className="w-24 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Amount"
                 step="0.01"
                 min="0"

@@ -90,6 +90,16 @@ async function doRefreshToken(): Promise<string | null> {
     const data = await response.json();
     if (data.accessToken) {
       localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+      // Also persist user data so session survives Safari ITP localStorage purges
+      if (data.email) {
+        const userData = {
+          email: data.email,
+          fullName: data.fullName,
+          isEmailVerified: data.isEmailVerified,
+          primaryCurrency: data.primaryCurrency,
+        };
+        localStorage.setItem('digitransac_user', JSON.stringify(userData));
+      }
       return data.accessToken as string;
     }
     return null;

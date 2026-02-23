@@ -48,8 +48,8 @@ export const RecurringSection = memo(function RecurringSection({
               <select
                 value={frequency}
                 onChange={(e) => onFrequencyChange(e.target.value as RecurrenceFrequency)}
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded 
-                  bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 text-sm"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 {Object.entries(recurrenceFrequencyConfig).map(([key, { label }]) => (
                   <option key={key} value={key}>{label}</option>
@@ -66,8 +66,8 @@ export const RecurringSection = memo(function RecurringSection({
                 onChange={(e) => onIntervalChange(parseInt(e.target.value) || 1)}
                 min="1"
                 max="99"
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded 
-                  bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 text-sm"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
           </div>

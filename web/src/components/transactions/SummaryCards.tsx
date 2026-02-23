@@ -58,7 +58,7 @@ export const SummaryCards = memo(function SummaryCards({
   transactionCount 
 }: SummaryCardsProps) {
   return (
-    <div className="grid grid-cols-3 gap-3 mb-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
       <SummaryCard
         label="Money In"
         amount={totalCredits}
@@ -73,16 +73,18 @@ export const SummaryCards = memo(function SummaryCards({
         colorClass="text-red-600 dark:text-red-400"
         currency={currency}
       />
-      <SummaryCard
-        label="Net"
-        amount={netChange}
-        icon="📊"
-        colorClass={netChange >= 0 
-          ? 'text-blue-600 dark:text-blue-400' 
-          : 'text-orange-600 dark:text-orange-400'}
-        currency={currency}
-        count={transactionCount}
-      />
+      <div className="col-span-2 sm:col-span-1">
+        <SummaryCard
+          label="Net"
+          amount={netChange}
+          icon="📊"
+          colorClass={netChange >= 0 
+            ? 'text-blue-600 dark:text-blue-400' 
+            : 'text-orange-600 dark:text-orange-400'}
+          currency={currency}
+          count={transactionCount}
+        />
+      </div>
     </div>
   );
 });
