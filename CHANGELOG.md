@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-02-23
+
+### Added
+- **Typeahead user search** — New Chat modal now searches by partial name or email with 300ms debounce (replaces exact-email-only search)
+- **Backend user search endpoint** — `GET /conversations/search-users?query=` with regex partial match on email/name
+- **Frequent Contacts sent/received breakdown** — Widget now shows ↑sent, ↓received, net amount, and activity percentage bar (matches Account Activity style)
+- **Backend CounterpartySpending fields** — Added `TotalDebits`/`TotalCredits` to DTO; service now includes both Send and Receive transactions
+- **Spending map transaction list** — All transactions with location shown below the map; sidebar locations clickable to filter
+- **iOS PWA session persistence** — Survive Safari ITP localStorage purge (silent refresh from HttpOnly cookie); `pageshow` handler for bfcache resume
+- **Settings name input keyboard shortcuts** — Enter to save, Escape to cancel
+
+### Changed
+- **Location search: Nominatim → Photon** — Switched to Photon (Komoot) geocoding API for better POI/business search results with native lat/lon bias
+- **Labels: kebab menu** — Replaced 5 inline action icons with ⋮ dropdown menu (Exclude, Add sub-folder, Add category, Edit, Delete); row highlights when menu is open
+- **Labels: removed color picker** — Charts now always use the default 10-color palette (prevents duplicate color confusion)
+- **Chat: mobile layout** — Moved + button inline with search bar (removes empty header row); removed cumulative transaction totals from conversation list
+- **Transactions: simplified date presets** — Reduced to This Month, Last Month, Custom (removed Today, This Week)
+- **Transactions: filter badge** — Default "Confirmed" status no longer counts as an active filter
+- **Transactions: mobile layout** — Export button moved inline with date presets; summary cards 2-col on mobile with Net full-width
+- **Transactions: date preset style** — Gradient → solid `bg-blue-600` for consistency
+- **Settings: removed Notifications section** — Push notifications not needed for a finance app
+- **Settings: currency dropdown** — Replaced ~100 lines of duplicate inline code with reusable `CurrencyDropdown` component (also fixes outside-click bug)
+
+### Fixed
+- **Settings dark mode bugs** — Currency search input and delete-account password input had zero dark mode classes (invisible in dark mode)
+- **Input consistency** — Normalized `rounded-lg`, `dark:bg-gray-700`, `focus:ring-2` across 7 components (RecurringSection, SplitCategoriesSection, CurrencyDropdown, SearchableCategoryDropdown, SearchableFolderDropdown, ContactPicker)
+- **CalculatorInput migration** — AccountModal, AdjustBalanceModal, BudgetForm now use `CalculatorInput` instead of raw `<input type="number">`
+- **CalculatorInput iOS keyboard** — `inputMode="decimal"` → `inputMode="text"` for full keyboard on iOS PWA
+- **TransactionForm mobile overlap** — Time/timezone fields stack on mobile (`grid-cols-1 sm:grid-cols-2`)
+- **Chat avatars** — Simplified gradients to solid colors across ConversationItem, ChatHeader, ChatHeaderEnhanced
+- **Chat ₹ button** — Gradient → solid `bg-blue-500`
+- **Self-chat unread badge** — Hidden (logically nonsensical)
+- **Emoji picker** — Now supports typed/pasted emojis alongside dropdown picker
+- **Integration tests** — Fixed SendVerification test (200 OK for email enumeration prevention), Login cookie test (SameSite=Lax for PWA)
+- **Token refresh** — `doRefreshToken` now persists user data alongside access token (full session recovery)
+- **Currency dropdown outside-click** — Settings page dropdown now closes when clicking outside
+
 ### Added (Feature Integration)
 - **Keyboard shortcuts modal** — Integrated `KeyboardShortcutsModal` into Layout; press `?` or `Ctrl+/` to view all available shortcuts
 - **Onboarding tour** — Integrated `OnboardingTour` into Layout; auto-shows for new users with step-by-step walkthrough (desktop & mobile variants, completion tracked via localStorage)
