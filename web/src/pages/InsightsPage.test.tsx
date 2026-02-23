@@ -88,8 +88,8 @@ const mockAnalytics = {
 
 const mockCounterparties = {
   counterparties: [
-    { name: 'Amazon', totalAmount: 500, transactionCount: 10 },
-    { name: 'Uber', totalAmount: 300, transactionCount: 8 },
+    { name: 'Amazon', totalAmount: 500, totalDebits: 500, totalCredits: 0, transactionCount: 10 },
+    { name: 'Uber', totalAmount: 300, totalDebits: 300, totalCredits: 0, transactionCount: 8 },
   ],
 };
 

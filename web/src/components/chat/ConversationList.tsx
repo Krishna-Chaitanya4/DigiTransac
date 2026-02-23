@@ -115,9 +115,9 @@ export const ConversationList = memo(function ConversationList({
             : 'flex w-full md:w-auto' // Full width on mobile, auto on desktop
         }`}
       >
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h1 className="hidden lg:block text-xl font-semibold text-gray-900 dark:text-gray-100">Chats</h1>
+        {/* Header - desktop only (mobile has nav bar title) */}
+        <div className="hidden lg:flex p-4 border-b border-gray-200 dark:border-gray-700 items-center justify-between">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Chats</h1>
           <button
             onClick={onNewChat}
             className="p-2 text-gray-500 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
@@ -129,20 +129,21 @@ export const ConversationList = memo(function ConversationList({
           </button>
         </div>
 
-        {/* Search conversations */}
+        {/* Search conversations + new chat button on mobile */}
         <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-          <div className="relative">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
             <input
@@ -162,6 +163,17 @@ export const ConversationList = memo(function ConversationList({
                 </svg>
               </button>
             )}
+            </div>
+            {/* New chat button - mobile only (inline with search) */}
+            <button
+              onClick={onNewChat}
+              className="lg:hidden p-2 text-gray-500 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
+              title="New Chat"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
           </div>
         </div>
 

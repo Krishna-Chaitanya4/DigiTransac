@@ -246,6 +246,8 @@ export interface CounterpartySpending {
   userId?: string;
   email?: string;
   totalAmount: number;
+  totalDebits: number;
+  totalCredits: number;
   transactionCount: number;
   percentage: number;
   type: 'Payee' | 'P2P';

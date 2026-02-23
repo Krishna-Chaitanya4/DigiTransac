@@ -28,7 +28,7 @@ export function CounterpartiesWidget({
     () => counterparties?.counterparties ? [...counterparties.counterparties].sort((a, b) => b.transactionCount - a.transactionCount) : [],
     [counterparties]
   );
-  const maxCount = sorted.length > 0 ? Math.max(...sorted.map(cp => cp.transactionCount), 1) : 1;
+  const totalTransactions = sorted.reduce((sum, cp) => sum + cp.transactionCount, 0);
 
   return (
     <WidgetWithErrorBoundary name="Frequent Contacts">
@@ -60,46 +60,61 @@ export function CounterpartiesWidget({
             ))}
           </div>
         ) : sorted.length > 0 ? (
-          <div className="space-y-2 pt-4">
+          <div className="space-y-3 pt-4">
             {sorted.map((cp: CounterpartySpending) => {
-              const avgAmount = cp.transactionCount > 0 ? cp.totalAmount / cp.transactionCount : 0;
-              const barWidth = Math.max((cp.transactionCount / maxCount) * 100, 2);
+              const activityPct = totalTransactions > 0
+                ? Math.round((cp.transactionCount / totalTransactions) * 100)
+                : 0;
+              const net = cp.totalCredits - cp.totalDebits;
               return (
-                <div key={cp.name} className="relative rounded-lg overflow-hidden">
-                  {/* Percentage bar background */}
-                  <div
-                    className="absolute inset-y-0 left-0 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg transition-all duration-300"
-                    style={{ width: `${barWidth}%` }}
-                  />
-                  <div className="relative flex items-center gap-3 px-3 py-2.5">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                <div key={cp.name} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold text-sm shrink-0">
                       {cp.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {cp.name}
-                        </span>
-                        {cp.type === 'P2P' && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 shrink-0">
-                            P2P
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {cp.name}
                           </span>
-                        )}
+                          {cp.type === 'P2P' && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 shrink-0">
+                              P2P
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-sm font-semibold shrink-0 ${
+                          net >= 0
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {net >= 0 ? '+' : ''}{convertAndFormat(Math.abs(net), counterparties?.currency, primaryCurrency, convert)}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         <span>{cp.transactionCount} txn{cp.transactionCount !== 1 ? 's' : ''}</span>
                         <span>·</span>
-                        <span>Avg {convertAndFormat(avgAmount, counterparties?.currency, primaryCurrency, convert)}</span>
-                        {cp.percentage > 0 && (
-                          <>
-                            <span>·</span>
-                            <span>{cp.percentage}%</span>
-                          </>
-                        )}
+                        <span className="text-red-500 dark:text-red-400">
+                          ↑{convertAndFormat(cp.totalDebits, counterparties?.currency, primaryCurrency, convert)}
+                        </span>
+                        <span>·</span>
+                        <span className="text-green-500 dark:text-green-400">
+                          ↓{convertAndFormat(cp.totalCredits, counterparties?.currency, primaryCurrency, convert)}
+                        </span>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 shrink-0">
-                      {convertAndFormat(cp.totalAmount, counterparties?.currency, primaryCurrency, convert)}
+                  </div>
+                  {/* Activity bar */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-indigo-500 dark:bg-indigo-400 transition-all duration-500"
+                        style={{ width: `${Math.min(activityPct, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 w-8 text-right shrink-0">
+                      {activityPct}%
                     </span>
                   </div>
                 </div>

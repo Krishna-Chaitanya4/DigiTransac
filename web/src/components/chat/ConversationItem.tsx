@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import type { ConversationSummary } from '../../types/conversations';
 import { getDisplayName, formatRelativeTime } from '../../services/conversationService';
-import { formatCurrency } from '../../services/currencyService';
 
 interface ConversationItemProps {
   conversation: ConversationSummary;
@@ -29,10 +28,6 @@ export const ConversationItem = memo(function ConversationItem({
   
   // Check for deleted message/transaction previews
   const isDeletedPreview = previewText === 'This message was deleted' || previewText === 'This transaction was deleted';
-  
-  // Check if we have transaction totals to show
-  const hasTransactions = (conversation.totalSent ?? 0) > 0 || (conversation.totalReceived ?? 0) > 0;
-  const currency = conversation.primaryCurrency ?? 'INR';
 
   return (
     <button
@@ -79,24 +74,6 @@ export const ConversationItem = memo(function ConversationItem({
         }`}>
           {conversation.lastMessagePreview || 'No messages yet'}
         </p>
-
-        {/* Transaction totals - show for non-self chats with transactions */}
-        {!isSelfChat && hasTransactions && (
-          <div className="flex items-center gap-3 mt-1 text-xs">
-            {(conversation.totalSent ?? 0) > 0 && (
-              <span className="text-red-500 dark:text-red-400 flex items-center gap-1">
-                <span>↑</span>
-                <span>{formatCurrency(conversation.totalSent ?? 0, currency)}</span>
-              </span>
-            )}
-            {(conversation.totalReceived ?? 0) > 0 && (
-              <span className="text-green-500 dark:text-green-400 flex items-center gap-1">
-                <span>↓</span>
-                <span>{formatCurrency(conversation.totalReceived ?? 0, currency)}</span>
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Unread badge - hide for self-chat since all messages are from you */}

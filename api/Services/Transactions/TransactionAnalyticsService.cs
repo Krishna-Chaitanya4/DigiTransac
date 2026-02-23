@@ -432,14 +432,15 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var (transactions, _) = await _transactionRepository.GetFilteredAsync(userId, filter);
 
-        // Filter only Send transactions (expenses), excluding analytics-excluded transactions
-        var sendTransactions = transactions
-            .Where(t => t.Type == TransactionType.Send && !t.IsRecurringTemplate
-                && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
+        // Filter transactions with counterparties, excluding analytics-excluded and recurring templates
+        var relevantTransactions = transactions
+            .Where(t => !t.IsRecurringTemplate
+                && !IsFullyExcluded(t, ctx.ExcludedLabelIds)
+                && (t.Type == TransactionType.Send || t.Type == TransactionType.Receive))
             .ToList();
 
         // Collect counterparty user IDs and fetch their info
-        var counterpartyUserIds = sendTransactions
+        var counterpartyUserIds = relevantTransactions
             .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
             .Select(t => t.CounterpartyUserId!)
             .Distinct()
@@ -457,7 +458,7 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 : (t.Title ?? "Unknown");
 
         // Group by payee/counterparty
-        var allCounterpartyGroups = sendTransactions
+        var allCounterpartyGroups = relevantTransactions
             .GroupBy(t => {
                 // Use counterparty user for P2P, otherwise decrypted payee name
                 if (!string.IsNullOrEmpty(t.CounterpartyUserId))
@@ -468,13 +469,17 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
                 return ("Payee", GetPayee(t), (string?)null);
             })
             .Select(g => {
-                var totalAmount = g.Sum(t => GetIncludedAmount(
-                    t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
+                var debits = g.Where(t => t.Type == TransactionType.Send)
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
+                var credits = g.Where(t => t.Type == TransactionType.Receive)
+                    .Sum(t => GetIncludedAmount(t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates));
                 return new {
                     Type = g.Key.Item1,
                     Name = g.Key.Item2,
                     UserId = g.Key.Item3,
-                    TotalAmount = totalAmount,
+                    TotalDebits = debits,
+                    TotalCredits = credits,
+                    TotalAmount = debits + credits,
                     TransactionCount = g.Count()
                 };
             })
@@ -496,6 +501,8 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             x.UserId,
             x.Type == "P2P" ? x.Name : null,
             x.TotalAmount,
+            x.TotalDebits,
+            x.TotalCredits,
             x.TransactionCount,
             totalSpending > 0 ? Math.Round(x.TotalAmount / totalSpending * 100, 1) : 0,
             x.Type
