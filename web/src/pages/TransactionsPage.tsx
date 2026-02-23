@@ -685,14 +685,14 @@ export default function TransactionsPage() {
     setFormError(null);
   };
 
-  // Get active filter count (excluding date range and search)
+  // Get active filter count (excluding date range, search, and default Confirmed status)
   const activeFilterCount = [
     filter.accountIds && filter.accountIds.length > 0,
     filter.types && filter.types.length > 0,
     (filter.labelIds && filter.labelIds.length > 0) || (filter.folderIds && filter.folderIds.length > 0),
     filter.tagIds && filter.tagIds.length > 0,
     filter.counterpartyUserIds && filter.counterpartyUserIds.length > 0,
-    filter.status !== undefined,
+    filter.status !== undefined && filter.status !== 'Confirmed',
     filter.minAmount !== undefined,
     filter.maxAmount !== undefined,
   ].filter(Boolean).length;
@@ -713,20 +713,7 @@ export default function TransactionsPage() {
           Transactions
         </h1>
         
-        {/* Mobile export button */}
-        <div className="flex sm:hidden items-center gap-2">
-          <button
-            onClick={() => setShowMobileExportSheet(true)}
-            className="flex items-center justify-center w-10 h-10 min-w-[44px] min-h-[44px] rounded-lg border border-gray-300 dark:border-gray-600
-              text-gray-700 dark:text-gray-300 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
-            aria-label="Export transactions"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </button>
-        </div>
+
         
         <div className="hidden sm:flex items-center gap-2">
           {/* Export dropdown */}
@@ -811,24 +798,35 @@ export default function TransactionsPage() {
       )}
 
       {/* Date Presets */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {(['today', 'thisWeek', 'thisMonth', 'lastMonth', 'custom'] as DatePreset[]).map((preset) => (
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {(['thisMonth', 'lastMonth', 'custom'] as DatePreset[]).map((preset) => (
           <button
             key={preset}
             onClick={() => handleDatePresetChange(preset)}
             className={`px-3 py-2 lg:py-1.5 min-h-[44px] lg:min-h-0 text-sm rounded-lg border transition-colors touch-manipulation ${
               datePreset === preset
-                ? 'bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-900 dark:to-blue-950 text-white border-blue-600 dark:border-blue-900'
+                ? 'bg-blue-600 dark:bg-blue-800 text-white border-blue-600 dark:border-blue-800'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-500 hover:border-blue-400 dark:hover:border-blue-400'
             }`}
           >
-            {preset === 'today' && 'Today'}
-            {preset === 'thisWeek' && 'This Week'}
             {preset === 'thisMonth' && 'This Month'}
             {preset === 'lastMonth' && 'Last Month'}
             {preset === 'custom' && 'Custom'}
           </button>
         ))}
+
+        {/* Mobile export button - inline with date presets */}
+        <button
+          onClick={() => setShowMobileExportSheet(true)}
+          className="sm:hidden flex items-center justify-center w-10 h-10 min-w-[44px] min-h-[44px] ml-auto rounded-lg border border-gray-300 dark:border-gray-600
+            text-gray-700 dark:text-gray-300 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+          aria-label="Export transactions"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </button>
       </div>
 
       {/* Custom Date Range */}
