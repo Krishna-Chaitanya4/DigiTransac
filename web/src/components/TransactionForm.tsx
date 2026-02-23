@@ -643,7 +643,7 @@ export function TransactionForm({
   // ──────────── Mobile Single-Form Layout ────────────
   if (isMobile) {
     return renderInPortal(
-      <div className="fixed inset-0 z-50 bg-white dark:bg-gray-800 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="transaction-form-title">
+      <div className="fixed inset-0 z-50 bg-white dark:bg-gray-800 flex flex-col overflow-x-hidden" role="dialog" aria-modal="true" aria-labelledby="transaction-form-title">
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-gray-200 dark:border-gray-700">
           <button type="button" onClick={onClose}
