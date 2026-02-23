@@ -86,6 +86,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Re-fetch user profile from the new token response
                 // The token is already stored in localStorage by refreshAccessToken
                 setAccessToken(newToken);
+                // Also reload user data (refreshAccessToken now persists it)
+                const refreshedUser = localStorage.getItem(USER_KEY);
+                if (refreshedUser) {
+                  try { setUser(JSON.parse(refreshedUser)); } catch { /* keep existing */ }
+                }
               } else {
                 // Refresh failed — clear auth state so user is redirected to login
                 clearAuth();
@@ -104,6 +109,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(ACCESS_TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       }
+    } else {
+      // No stored tokens — but the HttpOnly refresh cookie may still exist
+      // (Safari ITP can purge localStorage after 7 days while cookies survive)
+      // Attempt a silent refresh to recover the session
+      refreshAccessToken()
+        .then((newToken) => {
+          if (newToken) {
+            setAccessToken(newToken);
+            const refreshedUser = localStorage.getItem(USER_KEY);
+            if (refreshedUser) {
+              try {
+                const parsedUser = JSON.parse(refreshedUser);
+                setUser(parsedUser);
+                setSentryUser({ id: parsedUser.email, email: parsedUser.email, name: parsedUser.fullName });
+              } catch { /* user data missing — will redirect to login */ }
+            }
+          }
+          setIsLoading(false);
+        })
+        .catch(() => {
+          setIsLoading(false);
+        });
+      return; // Don't set isLoading=false yet, wait for refresh attempt
     }
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,10 +256,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('online', handleOnline);
 
+    // iOS PWA: handle bfcache resume (pageshow fires when visibilitychange does not)
+    function handlePageShow(e: PageTransitionEvent) {
+      if (e.persisted) {
+        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (token && isTokenExpired(token)) {
+          refreshAccessToken()
+            .then((newToken) => {
+              if (newToken) setAccessToken(newToken);
+              scheduleRefresh();
+            })
+            .catch(() => { /* 401 interceptor handles it */ });
+        } else {
+          scheduleRefresh();
+        }
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow);
+
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, [accessToken]); // Re-schedule whenever the access token changes
 
