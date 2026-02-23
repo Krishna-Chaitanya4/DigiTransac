@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { logger } from '../services/logger';
 import TwoFactorSettings from '../components/TwoFactorSettings';
-import PushNotificationSettings from '../components/PushNotificationSettings';
 import { CurrencyDropdown } from '../components/CurrencyDropdown';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
@@ -311,12 +310,6 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* Notifications Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Notifications</h2>
-          <PushNotificationSettings />
         </div>
 
         {/* Appearance Section */}
