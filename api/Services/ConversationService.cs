@@ -109,6 +109,11 @@ public interface IConversationService
     /// Search for a user by email to start a new conversation
     /// </summary>
     Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email, CancellationToken ct = default);
+
+    /// <summary>
+    /// Search for users by partial name or email
+    /// </summary>
+    Task<List<UserSearchResult>> SearchUsersAsync(string currentUserId, string query, CancellationToken ct = default);
 }
 
 public class ConversationService : IConversationService
@@ -931,5 +936,11 @@ public class ConversationService : IConversationService
         if (tx == null) return "";
         
         return CurrencyFormatter.FormatTransactionPreview(tx.Type, tx.Amount, tx.Currency);
+    }
+
+    public async Task<List<UserSearchResult>> SearchUsersAsync(string currentUserId, string query, CancellationToken ct = default)
+    {
+        var users = await _userRepository.SearchAsync(query, currentUserId, 10, ct);
+        return users.Select(u => new UserSearchResult(u.Id, u.Email, u.FullName)).ToList();
     }
 }

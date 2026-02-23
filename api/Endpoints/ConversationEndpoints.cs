@@ -243,5 +243,22 @@ public static class ConversationEndpoints
         })
         .WithName("SearchUserByEmail")
         .Produces<UserSearchResponse>(200);
+
+        // Search users by partial name or email (typeahead)
+        group.MapGet("/search-users", async (
+            string query,
+            ClaimsPrincipal user,
+            IConversationService conversationService,
+            CancellationToken ct) =>
+        {
+            if (!user.TryGetUserId(out var userId))
+                return Results.Unauthorized();
+
+            var results = await conversationService.SearchUsersAsync(userId, query, ct);
+            return Results.Ok(results);
+        })
+        .WithName("SearchUsers")
+        .WithSummary("Search users by name or email")
+        .Produces<List<UserSearchResult>>(200);
     }
 }

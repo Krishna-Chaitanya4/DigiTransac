@@ -85,6 +85,11 @@ export async function searchUserByEmail(email: string): Promise<UserSearchRespon
   return apiClient.get<UserSearchResponse>(`/conversations/search-user?email=${encodeURIComponent(email)}`);
 }
 
+// Search users by partial name or email (typeahead)
+export async function searchUsers(query: string): Promise<import('../types/conversations').UserSearchResult[]> {
+  return apiClient.get<import('../types/conversations').UserSearchResult[]>(`/conversations/search-users?query=${encodeURIComponent(query)}`);
+}
+
 // Helper: Get display name from conversation summary
 export function getDisplayName(
   counterpartyName: string | null,

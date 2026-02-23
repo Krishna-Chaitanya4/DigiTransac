@@ -10,6 +10,7 @@ public interface IUserRepository
     Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
     Task<User?> GetByIdAsync(string id, CancellationToken ct = default);
     Task<Dictionary<string, User>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default);
+    Task<List<User>> SearchAsync(string query, string excludeUserId, int limit = 10, CancellationToken ct = default);
     Task<User> CreateAsync(User user, CancellationToken ct = default);
     Task UpdateAsync(User user, CancellationToken ct = default);
     Task<bool> DeleteAsync(string id, CancellationToken ct = default);
@@ -90,5 +91,25 @@ public class UserRepository : IUserRepository
         var filter = Builders<User>.Filter.Eq("_id", new ObjectId(id));
         var result = await _users.DeleteOneAsync(filter, ct);
         return result.DeletedCount > 0;
+    }
+
+    public async Task<List<User>> SearchAsync(string query, string excludeUserId, int limit = 10, CancellationToken ct = default)
+    {
+        var trimmed = query.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(trimmed) || trimmed.Length < 2)
+            return new List<User>();
+
+        var escapedQuery = System.Text.RegularExpressions.Regex.Escape(trimmed);
+        var regex = new BsonRegularExpression(escapedQuery, "i");
+
+        var filter = Builders<User>.Filter.And(
+            Builders<User>.Filter.Ne(u => u.Id, excludeUserId),
+            Builders<User>.Filter.Or(
+                Builders<User>.Filter.Regex(u => u.Email, regex),
+                Builders<User>.Filter.Regex(u => u.FullName, regex)
+            )
+        );
+
+        return await _users.Find(filter).Limit(limit).ToListAsync(ct);
     }
 }
