@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-02-24
+
+### Fixed
+- **Real-time messaging** — Fixed SignalR hub URL (strip `/api` suffix); moved global connection to Layout; added Vite `/hubs` proxy with WebSocket support; fixed React Strict Mode race conditions in connect/disconnect
+- **Mobile header auto-hide** — Disabled scroll-based header hiding (always visible)
+
+### Changed
+- **Register page** — Updated name placeholder; added "try logging in" hint for existing accounts on verification step
+- **Nginx CSP** — Updated `connect-src` to use `photon.komoot.io` (replaces `nominatim.openstreetmap.org`)
+
 ## [1.8.1] - 2026-02-23
 
 ### Changed
