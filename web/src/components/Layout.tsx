@@ -3,9 +3,9 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { useScrollDirection } from '../hooks/useScrollDirection';
 import { useSwipeNavigation } from '../hooks/useSwipeNavigation';
 import { useKeyboardAwareScroll } from '../hooks/useKeyboardAwareScroll';
+import useNotifications from '../hooks/useNotifications';
 import { BottomTabBar } from './mobile';
 import { KeyboardShortcutsModal, useKeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { OnboardingTour } from './OnboardingTour';
@@ -107,8 +107,11 @@ export default function Layout() {
   const isDark = resolvedTheme === 'dark';
   const location = useLocation();
   const isMobile = useIsMobile();
-  const scrollDirection = useScrollDirection({ threshold: 10, topOffset: 50 });
   const mainRef = useRef<HTMLElement>(null);
+
+  // Global SignalR connection for real-time notifications (chat messages, P2P transactions)
+  // Must be at Layout level so it persists across page navigation
+  useNotifications();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -131,8 +134,8 @@ export default function Layout() {
     return pageTitles[location.pathname] || 'DigiTransac';
   }, [location.pathname]);
 
-  // Mobile header hidden state — hide on scroll down, show on scroll up or at top
-  const mobileHeaderHidden = scrollDirection === 'down';
+  // Mobile header is always visible (no auto-hide on scroll)
+  const mobileHeaderHidden = false;
 
   // Swipe between tab pages on mobile
   useSwipeNavigation(mainRef, { enabled: isMobile });

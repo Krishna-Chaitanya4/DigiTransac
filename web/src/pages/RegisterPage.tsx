@@ -341,6 +341,11 @@ export default function RegisterPage() {
                 ← Use a different email
               </button>
             </div>
+
+            <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-2">
+              Check your inbox and spam folder. If you don't receive a code, you may already have an account —{' '}
+              <Link to="/login" className="text-indigo-600 dark:text-indigo-400 hover:underline">try logging in</Link>.
+            </p>
           </form>
         )}
 
@@ -359,7 +364,7 @@ export default function RegisterPage() {
                   autoComplete="name"
                   required
                   className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-md focus:outline-hidden focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="John Doe"
+                  placeholder="Krishna"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                 />
