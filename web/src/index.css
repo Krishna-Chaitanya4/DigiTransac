@@ -19,6 +19,15 @@
   ::file-selector-button {
     border-color: var(--color-gray-200, currentcolor);
   }
+
+  /* iOS Safari: normalize time/date inputs to match other fields */
+  input[type="time"],
+  input[type="date"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    min-height: 0;
+  }
 }
 
 body {

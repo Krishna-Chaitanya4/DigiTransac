@@ -83,12 +83,12 @@ public interface IConversationService
     /// <summary>
     /// Delete a message
     /// </summary>
-    Task<Result> DeleteMessageAsync(string userId, string messageId, CancellationToken ct = default);
+    Task<Result<ChatMessage>> DeleteMessageAsync(string userId, string messageId, CancellationToken ct = default);
     
     /// <summary>
     /// Restore a deleted message (undo delete within the undo window)
     /// </summary>
-    Task<Result> RestoreMessageAsync(string userId, string messageId, CancellationToken ct = default);
+    Task<Result<ChatMessage>> RestoreMessageAsync(string userId, string messageId, CancellationToken ct = default);
     
     /// <summary>
     /// Send money to another user (creates P2P transaction + chat message)
@@ -850,7 +850,7 @@ public class ConversationService : IConversationService
         return Result.Success();
     }
 
-    public async Task<Result> DeleteMessageAsync(string userId, string messageId, CancellationToken ct = default)
+    public async Task<Result<ChatMessage>> DeleteMessageAsync(string userId, string messageId, CancellationToken ct = default)
     {
         // Check time limit for deleting
         var message = await _chatMessageRepository.GetByIdAsync(messageId, ct);
@@ -864,10 +864,10 @@ public class ConversationService : IConversationService
         if (!success)
             return Error.InternalError("Failed to delete message");
         
-        return Result.Success();
+        return Result<ChatMessage>.Success(message);
     }
 
-    public async Task<Result> RestoreMessageAsync(string userId, string messageId, CancellationToken ct = default)
+    public async Task<Result<ChatMessage>> RestoreMessageAsync(string userId, string messageId, CancellationToken ct = default)
     {
         var message = await _chatMessageRepository.GetByIdAsync(messageId, ct);
         if (message == null || message.SenderUserId != userId)
@@ -889,7 +889,7 @@ public class ConversationService : IConversationService
         if (!success)
             return Error.InternalError("Failed to restore message");
         
-        return Result.Success();
+        return Result<ChatMessage>.Success(message);
     }
 
     public async Task<UserSearchResponse> SearchUserByEmailAsync(string currentUserId, string email, CancellationToken ct = default)

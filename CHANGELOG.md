@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.4] - 2026-02-24
+
+### Fixed
+- **Message deletion preview** — Optimistic update for conversation list preview when deleting a message (updates both detail and list caches instantly)
+- **Unread badge flash** — Hide unread count badge on currently-selected conversation to prevent momentary flash when new message arrives
+- **Real-time message deletion** — Counterparty now sees message deletion in real-time via SignalR `MessageDeleted` notification (backend sends notification to recipient, frontend invalidates conversation caches)
+- **Real-time message restore (undo)** — Counterparty now sees message restore in real-time via SignalR `MessageRestored` notification with optimistic UI updates on both sides
+
 ## [1.8.3] - 2026-02-24
 
 ### Fixed

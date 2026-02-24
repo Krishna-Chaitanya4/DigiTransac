@@ -611,7 +611,7 @@ export default function SpendingMapPage() {
       )}
       
       {/* Main Content */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex gap-4 min-h-[50dvh]">
         {/* Map View */}
         {viewMode === 'map' && (
           <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">

@@ -76,8 +76,8 @@ export const ConversationItem = memo(function ConversationItem({
         </p>
       </div>
 
-      {/* Unread badge - hide for self-chat since all messages are from you */}
-      {!isSelfChat && conversation.unreadCount > 0 && (
+      {/* Unread badge - hide for self-chat and for the currently selected conversation */}
+      {!isSelfChat && !isSelected && conversation.unreadCount > 0 && (
         <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center flex-shrink-0">
           {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
         </span>

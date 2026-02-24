@@ -193,6 +193,7 @@ public static class ConversationEndpoints
             string messageId,
             ClaimsPrincipal user,
             IConversationService conversationService,
+            INotificationService notificationService,
             CancellationToken ct) =>
         {
             if (!user.TryGetUserId(out var userId))
@@ -201,6 +202,18 @@ public static class ConversationEndpoints
             var result = await conversationService.DeleteMessageAsync(userId, messageId, ct);
             if (result.IsFailure)
                 return result.ToApiResult();
+
+            // Notify the counterparty in real-time that a message was deleted
+            var deletedMessage = result.Value;
+            var recipientId = deletedMessage.RecipientUserId;
+            if (recipientId != userId)
+            {
+                var notification = new MessageDeletedNotification(
+                    MessageId: messageId,
+                    SenderId: userId
+                );
+                await notificationService.NotifyUserAsync(recipientId, "MessageDeleted", notification);
+            }
 
             return Results.Ok(new { message = "Message deleted" });
         })
@@ -213,6 +226,7 @@ public static class ConversationEndpoints
             string messageId,
             ClaimsPrincipal user,
             IConversationService conversationService,
+            INotificationService notificationService,
             CancellationToken ct) =>
         {
             if (!user.TryGetUserId(out var userId))
@@ -221,6 +235,18 @@ public static class ConversationEndpoints
             var result = await conversationService.RestoreMessageAsync(userId, messageId, ct);
             if (result.IsFailure)
                 return result.ToApiResult();
+
+            // Notify the counterparty in real-time that a message was restored
+            var restoredMessage = result.Value;
+            var recipientId = restoredMessage.RecipientUserId;
+            if (recipientId != userId)
+            {
+                var notification = new MessageRestoredNotification(
+                    MessageId: messageId,
+                    SenderId: userId
+                );
+                await notificationService.NotifyUserAsync(recipientId, "MessageRestored", notification);
+            }
 
             return Results.Ok(new { message = "Message restored" });
         })

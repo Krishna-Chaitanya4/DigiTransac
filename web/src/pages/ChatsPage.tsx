@@ -241,13 +241,20 @@ export default function ChatsPage() {
     }
   }, []);
 
-  // Mark as read when conversation loads (only once per conversation selection)
+  // Mark as read when conversation loads or when new messages arrive while viewing
   const markedAsReadRef = useRef<string | null>(null);
+  const messageCountRef = useRef<number>(0);
   useEffect(() => {
-    if (selectedUserId && conversationData && markedAsReadRef.current !== selectedUserId) {
+    if (!selectedUserId || !conversationData) return;
+    const currentMessageCount = conversationData.messages?.length || 0;
+    const isNewConversation = markedAsReadRef.current !== selectedUserId;
+    const hasNewMessages = currentMessageCount > messageCountRef.current && !isNewConversation;
+
+    if (isNewConversation || hasNewMessages) {
       markAsReadMutation.mutate(selectedUserId);
       markedAsReadRef.current = selectedUserId;
     }
+    messageCountRef.current = currentMessageCount;
   }, [selectedUserId, conversationData]);
 
   // Scroll to bottom when messages change
@@ -358,24 +365,25 @@ export default function ChatsPage() {
   const handleDeleteMessage = useCallback(
     async (messageId: string) => {
       try {
-        await deleteMessageMutation.mutateAsync(messageId);
+        await deleteMessageMutation.mutateAsync({ messageId, counterpartyUserId: selectedUserId || undefined });
       } catch (error) {
         logger.error('Failed to delete message:', error);
       }
     },
-    [deleteMessageMutation]
+    [deleteMessageMutation, selectedUserId]
   );
 
   // Restore (undo delete) message
   const handleRestoreMessage = useCallback(
     async (messageId: string) => {
+      if (!selectedUserId) return;
       try {
-        await restoreMessageMutation.mutateAsync(messageId);
+        await restoreMessageMutation.mutateAsync({ messageId, counterpartyUserId: selectedUserId });
       } catch (error) {
         logger.error('Failed to restore message:', error);
       }
     },
-    [restoreMessageMutation]
+    [restoreMessageMutation, selectedUserId]
   );
 
   // Helper to optimistically toggle isDeleted on a transaction in the conversation cache
@@ -488,12 +496,9 @@ export default function ChatsPage() {
     (direction: 'prev' | 'next') => {
       if (searchResults.length === 0) return;
 
-      let newIndex = currentSearchIndex;
-      if (direction === 'next') {
-        newIndex = (currentSearchIndex + 1) % searchResults.length;
-      } else {
-        newIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
-      }
+      const newIndex = direction === 'next'
+        ? (currentSearchIndex + 1) % searchResults.length
+        : (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
 
       setCurrentSearchIndex(newIndex);
       const element = document.getElementById(`msg-${searchResults[newIndex]}`);

@@ -31,6 +31,22 @@ public record ChatMessageNotification(
 );
 
 /// <summary>
+/// Notification payload sent via SignalR when a chat message is deleted.
+/// </summary>
+public record MessageDeletedNotification(
+    string MessageId,
+    string SenderId
+);
+
+/// <summary>
+/// Notification payload sent via SignalR when a deleted chat message is restored (undo).
+/// </summary>
+public record MessageRestoredNotification(
+    string MessageId,
+    string SenderId
+);
+
+/// <summary>
 /// Notification for pending transaction count updates.
 /// </summary>
 public record PendingCountNotification(

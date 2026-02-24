@@ -74,9 +74,70 @@ export function useDeleteMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (messageId: string) => deleteMessage(messageId),
-    onSuccess: () => {
-      // Invalidate all conversation data
+    mutationFn: ({ messageId }: { messageId: string; counterpartyUserId?: string }) =>
+      deleteMessage(messageId),
+    onMutate: async ({ messageId, counterpartyUserId }) => {
+      // Optimistically mark the message as deleted in the conversation detail
+      if (counterpartyUserId) {
+        await queryClient.cancelQueries({ queryKey: conversationKeys.detail(counterpartyUserId) });
+        await queryClient.cancelQueries({ queryKey: conversationKeys.list() });
+
+        // Update conversation detail: mark message as deleted
+        const previousDetail = queryClient.getQueryData<ConversationDetailResponse>(
+          conversationKeys.detail(counterpartyUserId)
+        );
+        if (previousDetail) {
+          queryClient.setQueryData<ConversationDetailResponse>(
+            conversationKeys.detail(counterpartyUserId),
+            {
+              ...previousDetail,
+              messages: previousDetail.messages.map((m) =>
+                m.id === messageId ? { ...m, isDeleted: true, content: null } : m
+              ),
+            }
+          );
+        }
+
+        // Update conversation list: if deleted message was the latest, update preview
+        const previousList = queryClient.getQueryData<ConversationListResponse>(
+          conversationKeys.list()
+        );
+        if (previousList) {
+          queryClient.setQueryData<ConversationListResponse>(
+            conversationKeys.list(),
+            {
+              ...previousList,
+              conversations: previousList.conversations.map((c) => {
+                if (c.counterpartyUserId !== counterpartyUserId) return c;
+                // Check if the deleted message matches the current preview
+                const deletedMsg = previousDetail?.messages.find((m) => m.id === messageId);
+                if (deletedMsg && c.lastMessagePreview === deletedMsg.content) {
+                  return { ...c, lastMessagePreview: 'This message was deleted' };
+                }
+                return c;
+              }),
+            }
+          );
+        }
+
+        return { previousDetail, previousList, counterpartyUserId };
+      }
+      return {};
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousDetail && context.counterpartyUserId) {
+        queryClient.setQueryData(
+          conversationKeys.detail(context.counterpartyUserId),
+          context.previousDetail
+        );
+      }
+      if (context?.previousList) {
+        queryClient.setQueryData(conversationKeys.list(), context.previousList);
+      }
+    },
+    onSettled: () => {
+      // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: conversationKeys.all });
     },
   });
@@ -87,9 +148,69 @@ export function useRestoreMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (messageId: string) => restoreMessage(messageId),
-    onSuccess: () => {
-      // Invalidate all conversation data
+    mutationFn: ({ messageId }: { messageId: string; counterpartyUserId: string }) =>
+      restoreMessage(messageId),
+    onMutate: async ({ messageId, counterpartyUserId }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: conversationKeys.detail(counterpartyUserId) });
+      await queryClient.cancelQueries({ queryKey: conversationKeys.list() });
+
+      // Snapshot previous values
+      const previousDetail = queryClient.getQueryData<ConversationDetailResponse>(
+        conversationKeys.detail(counterpartyUserId)
+      );
+
+      // Optimistically mark the message as not deleted in the detail cache
+      if (previousDetail) {
+        const restoredMsg = previousDetail.messages.find((m) => m.id === messageId);
+        queryClient.setQueryData<ConversationDetailResponse>(
+          conversationKeys.detail(counterpartyUserId),
+          {
+            ...previousDetail,
+            messages: previousDetail.messages.map((m) =>
+              m.id === messageId ? { ...m, isDeleted: false, deletedAt: null } : m
+            ),
+          }
+        );
+
+        // Update conversation list preview if this was the latest message
+        const previousList = queryClient.getQueryData<ConversationListResponse>(
+          conversationKeys.list()
+        );
+        if (previousList && restoredMsg) {
+          queryClient.setQueryData<ConversationListResponse>(
+            conversationKeys.list(),
+            {
+              ...previousList,
+              conversations: previousList.conversations.map((c) => {
+                if (c.counterpartyUserId !== counterpartyUserId) return c;
+                if (c.lastMessagePreview === 'This message was deleted' && restoredMsg.content) {
+                  return { ...c, lastMessagePreview: restoredMsg.content };
+                }
+                return c;
+              }),
+            }
+          );
+        }
+
+        return { previousDetail, previousList, counterpartyUserId };
+      }
+      return {};
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousDetail && context.counterpartyUserId) {
+        queryClient.setQueryData(
+          conversationKeys.detail(context.counterpartyUserId),
+          context.previousDetail
+        );
+      }
+      if (context?.previousList) {
+        queryClient.setQueryData(conversationKeys.list(), context.previousList);
+      }
+    },
+    onSettled: () => {
+      // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: conversationKeys.all });
     },
   });
