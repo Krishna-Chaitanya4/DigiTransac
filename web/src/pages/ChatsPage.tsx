@@ -15,7 +15,6 @@ import {
   useInvalidateConversations,
 } from '../hooks';
 import { queryKeys } from '../lib/queryClient';
-import { useNotifications } from '../hooks/useNotifications';
 import {
   ConversationList,
   ChatHeaderEnhanced,
@@ -67,9 +66,6 @@ export default function ChatsPage() {
   
   // URL params for deep linking (e.g., from "View in Chat" on transactions)
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // SignalR notifications for real-time updates
-  const { isConnected: isSignalRConnected } = useNotifications();
 
   // React Query hooks for data
   const { data: accounts = [] } = useAccounts();
@@ -631,7 +627,6 @@ export default function ChatsPage() {
               showSearchBar={showSearchBar}
               onToggleSearch={() => setShowSearchBar(!showSearchBar)}
               onBack={handleBack}
-              isConnected={isSignalRConnected}
             />
 
             {/* Search bar */}

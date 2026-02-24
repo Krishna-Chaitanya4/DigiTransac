@@ -61,15 +61,15 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     optionsRef.current = options;
   }, [options]);
 
-  // Use the centralized API base URL (avoids hardcoded localhost fallback)
-  const apiUrl = API_BASE_URL;
+  // Build the hub URL — strip '/api' suffix since the hub is mounted at /hubs, not /api/hubs
+  const hubBaseUrl = API_BASE_URL.replace(/\/api\/?$/, '');
 
   // Initialize connection
   const initializeConnection = useCallback((token: string) => {
     if (connectionRef.current) return connectionRef.current;
 
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${apiUrl}/hubs/notifications`, {
+      .withUrl(`${hubBaseUrl}/hubs/notifications`, {
         // Always read the latest token from localStorage so reconnections use the freshest token
         accessTokenFactory: () => getStoredAccessToken() || token,
         transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents,
@@ -86,7 +86,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
           );
         },
       })
-      .configureLogging(signalR.LogLevel.Information)
+      .configureLogging(signalR.LogLevel.Warning)
       .build();
 
     connectionRef.current = connection;
@@ -151,7 +151,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     connection.on('ChatMessage', (notification: ChatMessageNotification) => {
-      logger.debug('Chat Message received', { messageId: notification.messageId, senderId: notification.senderId });
+      logger.info('SignalR: ChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onChatMessage?.(notification);
       
       // Invalidate conversation detail for this sender
@@ -162,7 +162,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     connection.on('NewChatMessage', (notification: ChatMessageNotification) => {
-      logger.debug('New Chat Message received', { messageId: notification.messageId, senderId: notification.senderId });
+      logger.info('SignalR: NewChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onNewChatMessage?.(notification);
       
       // Invalidate conversation detail for this sender
@@ -180,12 +180,13 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     });
 
     return connection;
-  }, [apiUrl, queryClient]);
+  }, [hubBaseUrl, queryClient]);
 
   // Start connection
   const connect = useCallback(async (token: string) => {
     const connection = initializeConnection(token);
-    if (!connection || connection.state === signalR.HubConnectionState.Connected) return;
+    // Only start if truly disconnected — avoids race with Strict Mode double-invocation
+    if (!connection || connection.state !== signalR.HubConnectionState.Disconnected) return;
 
     try {
       setConnectionState('Connecting');
@@ -195,18 +196,31 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       reconnectAttemptsRef.current = 0;
       logger.info('SignalR connected');
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Ignore errors from stopping during negotiation (React Strict Mode cleanup)
+      if (msg.includes('stopped during negotiation')) {
+        logger.debug('SignalR connection stopped during negotiation (expected in dev mode)');
+        return;
+      }
       setConnectionState('Error');
-      setError(err instanceof Error ? err.message : 'Failed to connect');
-      logger.error('SignalR connection error', { error: err instanceof Error ? err.message : String(err) });
+      setError(msg);
+      logger.error('SignalR connection error', { error: msg });
     }
   }, [initializeConnection]);
 
   // Disconnect
   const disconnect = useCallback(async () => {
-    if (connectionRef.current) {
-      await connectionRef.current.stop();
+    const connection = connectionRef.current;
+    if (connection) {
+      // Clear ref immediately so the next mount creates a fresh connection
+      // instead of reusing a connection that's being stopped
       connectionRef.current = null;
       setConnectionState('Disconnected');
+      try {
+        await connection.stop();
+      } catch {
+        // Ignore errors when stopping (e.g. connection was mid-negotiation)
+      }
     }
   }, []);
 
@@ -232,17 +246,25 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   }, []);
 
   // Auto-connect when authenticated
+  // Use refs to avoid stale closures while keeping effect stable
+  const connectRef = useRef(connect);
+  const disconnectRef = useRef(disconnect);
+  connectRef.current = connect;
+  disconnectRef.current = disconnect;
+
   useEffect(() => {
     if (user && accessToken) {
-      connect(accessToken);
+      logger.info('SignalR: connecting for user', { email: user.email });
+      connectRef.current(accessToken);
     } else {
-      disconnect();
+      disconnectRef.current();
     }
 
     return () => {
-      disconnect();
+      disconnectRef.current();
     };
-  }, [user, accessToken, connect, disconnect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email, !!accessToken]); // Only reconnect when user identity changes, not on token refresh
 
   // Keep-alive ping at configured interval
   useEffect(() => {
