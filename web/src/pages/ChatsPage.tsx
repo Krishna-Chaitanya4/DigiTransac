@@ -496,12 +496,9 @@ export default function ChatsPage() {
     (direction: 'prev' | 'next') => {
       if (searchResults.length === 0) return;
 
-      let newIndex = currentSearchIndex;
-      if (direction === 'next') {
-        newIndex = (currentSearchIndex + 1) % searchResults.length;
-      } else {
-        newIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
-      }
+      const newIndex = direction === 'next'
+        ? (currentSearchIndex + 1) % searchResults.length
+        : (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
 
       setCurrentSearchIndex(newIndex);
       const element = document.getElementById(`msg-${searchResults[newIndex]}`);
