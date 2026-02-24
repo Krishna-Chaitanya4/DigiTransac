@@ -47,6 +47,9 @@ public interface ITransactionRepository
     // Get transactions by IDs (for chat message resolution)
     Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, string userId, CancellationToken ct = default);
     
+    // Get transactions by IDs without userId filter (for cross-user P2P link resolution)
+    Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default);
+    
     // Soft delete / restore
     Task<bool> SoftDeleteAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
     Task<bool> RestoreAsync(string id, string userId, IClientSessionHandle? session = null, CancellationToken ct = default);
@@ -710,6 +713,17 @@ public class TransactionRepository : ITransactionRepository
             Builders<Transaction>.Filter.In(t => t.Id, idsList),
             Builders<Transaction>.Filter.Eq(t => t.UserId, userId)
         );
+        
+        return await _transactions.Find(filter).ToListAsync(ct);
+    }
+    
+    public async Task<List<Transaction>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default)
+    {
+        var idsList = ids.ToList();
+        if (idsList.Count == 0)
+            return new List<Transaction>();
+            
+        var filter = Builders<Transaction>.Filter.In(t => t.Id, idsList);
         
         return await _transactions.Find(filter).ToListAsync(ct);
     }

@@ -424,11 +424,41 @@ public class ConversationService : IConversationService
         // Build a dictionary of transactions by ID for quick lookup
         var transactionsById = transactionsForChat.ToDictionary(t => t.Id);
         
+        // Build a lookup by TransactionLinkId for P2P resolution:
+        // Chat messages store the sender's transaction ID, but the counterparty
+        // has a different transaction ID linked via the same TransactionLinkId.
+        var transactionsByLinkId = transactionsForChat
+            .Where(t => t.TransactionLinkId.HasValue)
+            .GroupBy(t => t.TransactionLinkId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+        
         // Track which transactions are already represented by chat messages
         var transactionIdsInChat = chatMessages
             .Where(m => !string.IsNullOrEmpty(m.TransactionId))
             .Select(m => m.TransactionId!)
             .ToHashSet();
+        
+        // For P2P chats, batch-resolve transaction IDs that belong to the counterparty.
+        // Chat messages store the sender's transaction ID, but the current user's
+        // matching transaction has a different ID linked via TransactionLinkId.
+        var senderTxLookup = new Dictionary<string, Transaction>();
+        if (!isSelfChat)
+        {
+            var unresolvedIds = chatMessages
+                .Where(m => m.Type == ChatMessageType.Transaction 
+                         && !string.IsNullOrEmpty(m.TransactionId)
+                         && !transactionsById.ContainsKey(m.TransactionId!))
+                .Select(m => m.TransactionId!)
+                .Distinct()
+                .ToList();
+            
+            if (unresolvedIds.Count > 0)
+            {
+                var senderTxs = await _transactionRepository.GetByIdsAsync(unresolvedIds, ct);
+                senderTxLookup = senderTxs.Where(t => t.TransactionLinkId.HasValue)
+                    .ToDictionary(t => t.Id);
+            }
+        }
         
         // Add chat messages
         foreach (var msg in chatMessages)
@@ -438,8 +468,19 @@ public class ConversationService : IConversationService
             
             if (msg.Type == ChatMessageType.Transaction && !string.IsNullOrEmpty(msg.TransactionId))
             {
-                // Find the transaction by ID
+                // Find the transaction by ID (works for sender's own transactions)
                 transactionsById.TryGetValue(msg.TransactionId, out tx);
+                
+                // If not found, resolve via TransactionLinkId (counterparty side)
+                if (tx == null && senderTxLookup.TryGetValue(msg.TransactionId, out var senderTx)
+                    && senderTx.TransactionLinkId.HasValue
+                    && transactionsByLinkId.TryGetValue(senderTx.TransactionLinkId.Value, out var linkedTx))
+                {
+                    tx = linkedTx;
+                    // Mark as handled so backward-compat loop doesn't duplicate it
+                    transactionIdsInChat.Add(tx.Id);
+                }
+                
                 if (tx != null)
                 {
                     accounts.TryGetValue(tx.AccountId ?? "", out var account);
