@@ -46,6 +46,11 @@ export interface PendingCountNotification {
   pendingCount: number;
 }
 
+export interface PresenceCallbacks {
+  onUserOnline?: (userId: string) => void;
+  onUserOffline?: (userId: string) => void;
+}
+
 interface UseNotificationsOptions {
   onP2PTransactionCreated?: (notification: P2PTransactionNotification) => void;
   onP2PTransactionAccepted?: (notification: P2PTransactionNotification) => void;
@@ -53,6 +58,7 @@ interface UseNotificationsOptions {
   onChatMessage?: (notification: ChatMessageNotification) => void;
   onNewChatMessage?: (notification: ChatMessageNotification) => void;
   onPendingCountUpdate?: (notification: PendingCountNotification) => void;
+  presence?: PresenceCallbacks;
 }
 
 type ConnectionState = 'Disconnected' | 'Connecting' | 'Connected' | 'Reconnecting' | 'Error';
@@ -207,6 +213,17 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       logger.debug('Pong received', { timestamp });
     });
 
+    // Presence events
+    connection.on('UserOnline', (userId: string) => {
+      logger.debug('User came online', { userId });
+      optionsRef.current.presence?.onUserOnline?.(userId);
+    });
+
+    connection.on('UserOffline', (userId: string) => {
+      logger.debug('User went offline', { userId });
+      optionsRef.current.presence?.onUserOffline?.(userId);
+    });
+
     return connection;
   }, [hubBaseUrl, queryClient]);
 
@@ -273,6 +290,18 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, []);
 
+  // Query which users from a list are currently online
+  const getOnlineUsers = useCallback(async (userIds: string[]): Promise<string[]> => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        return await connectionRef.current.invoke<string[]>('GetOnlineUsers', userIds);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, []);
+
   // Auto-connect when authenticated
   // Use refs to avoid stale closures while keeping effect stable
   const connectRef = useRef(connect);
@@ -313,6 +342,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     disconnect,
     joinConversation,
     leaveConversation,
+    getOnlineUsers,
     ping,
   };
 }

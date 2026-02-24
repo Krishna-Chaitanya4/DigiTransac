@@ -6,6 +6,7 @@ import { I18nextProvider } from 'react-i18next'
 import { queryClient } from './lib/queryClient'
 import { AuthProvider } from './context/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
+import { PresenceProvider } from './context/PresenceContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ToastProvider'
@@ -38,9 +39,11 @@ createRoot(document.getElementById('root')!).render(
               <BrowserRouter>
                 <AuthProvider>
                   <CurrencyProvider>
+                    <PresenceProvider>
                     <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
                       <App />
                     </Suspense>
+                    </PresenceProvider>
                   </CurrencyProvider>
                 </AuthProvider>
               </BrowserRouter>

@@ -6,6 +6,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { useSwipeNavigation } from '../hooks/useSwipeNavigation';
 import { useKeyboardAwareScroll } from '../hooks/useKeyboardAwareScroll';
 import useNotifications from '../hooks/useNotifications';
+import { usePresence } from '../context/PresenceContext';
 import { BottomTabBar } from './mobile';
 import { KeyboardShortcutsModal, useKeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { OnboardingTour } from './OnboardingTour';
@@ -109,9 +110,22 @@ export default function Layout() {
   const isMobile = useIsMobile();
   const mainRef = useRef<HTMLElement>(null);
 
+  const { setUserOnline, setUserOffline, registerQueryFn } = usePresence();
+
   // Global SignalR connection for real-time notifications (chat messages, P2P transactions)
   // Must be at Layout level so it persists across page navigation
-  useNotifications();
+  const { getOnlineUsers } = useNotifications({
+    presence: {
+      onUserOnline: setUserOnline,
+      onUserOffline: setUserOffline,
+    },
+  });
+
+  // Register the SignalR query function so other components can query online status
+  useEffect(() => {
+    registerQueryFn(getOnlineUsers);
+  }, [registerQueryFn, getOnlineUsers]);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {

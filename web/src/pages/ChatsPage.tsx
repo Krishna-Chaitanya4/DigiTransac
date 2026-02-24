@@ -28,6 +28,7 @@ import {
 import { TransactionForm } from '../components/TransactionForm';
 import { logger } from '../services/logger';
 import { SIDEBAR_CONSTANTS } from '../utils/constants';
+import { usePresence } from '../context/PresenceContext';
 import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
 import type { ConversationMessage, ConversationDetailResponse, UserSearchResult } from '../types/conversations';
 
@@ -77,6 +78,17 @@ export default function ChatsPage() {
   // Conversation React Query hooks
   const { data: conversationsData, isLoading: isLoadingConversations } = useConversations();
   const conversations = conversationsData?.conversations ?? [];
+
+  // Query online status for all counterparties when conversations load
+  const { queryOnlineUsers } = usePresence();
+  useEffect(() => {
+    const userIds = conversations
+      .filter(c => !c.isSelfChat)
+      .map(c => c.counterpartyUserId);
+    if (userIds.length > 0) {
+      queryOnlineUsers(userIds);
+    }
+  }, [conversations, queryOnlineUsers]);
 
   // Selected conversation state
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);

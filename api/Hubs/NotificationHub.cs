@@ -14,10 +14,12 @@ namespace DigiTransac.Api.Hubs;
 [Authorize]
 public class NotificationHub : Hub
 {
+    private readonly IPresenceTracker _presenceTracker;
     private readonly ILogger<NotificationHub> _logger;
 
-    public NotificationHub(ILogger<NotificationHub> logger)
+    public NotificationHub(IPresenceTracker presenceTracker, ILogger<NotificationHub> logger)
     {
+        _presenceTracker = presenceTracker;
         _logger = logger;
     }
 
@@ -28,6 +30,15 @@ public class NotificationHub : Hub
         {
             // Add user to their own group for direct notifications
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
+            
+            // Track presence — broadcast if user just came online
+            var isFirstConnection = _presenceTracker.UserConnected(userId, Context.ConnectionId);
+            if (isFirstConnection)
+            {
+                // Broadcast to all OTHER connections that this user is online
+                await Clients.Others.SendAsync("UserOnline", userId);
+            }
+            
             _logger.LogInformation("User {UserId} connected with connection {ConnectionId}", userId, Context.ConnectionId);
         }
         
@@ -40,6 +51,14 @@ public class NotificationHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user:{userId}");
+            
+            // Track presence — broadcast if user went fully offline
+            var isLastConnection = _presenceTracker.UserDisconnected(userId, Context.ConnectionId);
+            if (isLastConnection)
+            {
+                await Clients.Others.SendAsync("UserOffline", userId);
+            }
+            
             _logger.LogInformation("User {UserId} disconnected from connection {ConnectionId}", userId, Context.ConnectionId);
         }
         
@@ -84,6 +103,15 @@ public class NotificationHub : Hub
     public async Task Ping()
     {
         await Clients.Caller.SendAsync("Pong", DateTime.UtcNow);
+    }
+
+    /// <summary>
+    /// Get the online status of a list of user IDs.
+    /// Called by the client after connecting to populate initial presence state.
+    /// </summary>
+    public HashSet<string> GetOnlineUsers(string[] userIds)
+    {
+        return _presenceTracker.GetOnlineUsers(userIds);
     }
 
     private string? GetUserId()

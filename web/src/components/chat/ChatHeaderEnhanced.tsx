@@ -1,12 +1,12 @@
 import { memo } from 'react';
 import type { ConversationDetailResponse } from '../../types/conversations';
+import { usePresence } from '../../context/PresenceContext';
 
 interface ChatHeaderEnhancedProps {
   conversation: ConversationDetailResponse;
   showSearchBar: boolean;
   onToggleSearch: () => void;
   onBack: () => void;
-  isConnected?: boolean; // SignalR connection status
 }
 
 /**
@@ -18,8 +18,8 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
   showSearchBar,
   onToggleSearch,
   onBack,
-  isConnected = true,
 }: ChatHeaderEnhancedProps) {
+  const { isOnline } = usePresence();
   const isSelfChat = conversation.isSelfChat ?? false;
   // Use counterpartyName from API (which returns "Personal" for self-chat)
   const displayName = conversation.counterpartyName || conversation.counterpartyEmail;
@@ -55,8 +55,8 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0 shadow-sm">
                 {displayName?.charAt(0).toUpperCase()}
               </div>
-              {/* Online indicator */}
-              {isConnected && (
+              {/* Online indicator - real presence tracking */}
+              {isOnline(conversation.counterpartyUserId) && (
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
               )}
             </div>

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { ConversationSummary } from '../../types/conversations';
 import { getDisplayName, formatRelativeTime } from '../../services/conversationService';
+import { usePresence } from '../../context/PresenceContext';
 
 interface ConversationItemProps {
   conversation: ConversationSummary;
@@ -13,6 +14,7 @@ export const ConversationItem = memo(function ConversationItem({
   isSelected,
   onClick,
 }: ConversationItemProps) {
+  const { isOnline } = usePresence();
   const isSelfChat = conversation.isSelfChat ?? false;
   const displayName = isSelfChat
     ? 'Personal'
@@ -44,8 +46,14 @@ export const ConversationItem = memo(function ConversationItem({
           </svg>
         </div>
       ) : (
-        <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
-          {displayName.charAt(0).toUpperCase()}
+        <div className="relative flex-shrink-0">
+          <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-lg">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+          {/* Online indicator */}
+          {isOnline(conversation.counterpartyUserId) && (
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
+          )}
         </div>
       )}
 

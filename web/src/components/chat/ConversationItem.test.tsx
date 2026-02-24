@@ -9,6 +9,13 @@ vi.mock('../../services/conversationService', () => ({
   formatRelativeTime: (_dateString: string) => '5m',
 }));
 
+// Mock the presence context
+vi.mock('../../context/PresenceContext', () => ({
+  usePresence: () => ({
+    isOnline: () => false,
+  }),
+}));
+
 // Helper to create mock conversation
 const createConversation = (overrides: Partial<ConversationSummary> = {}): ConversationSummary => ({
   counterpartyUserId: 'user-123',
