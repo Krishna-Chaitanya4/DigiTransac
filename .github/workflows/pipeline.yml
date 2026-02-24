@@ -682,6 +682,12 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.ACR_LOGIN_SERVER }}/digitransac-backend:${{ needs.setup.outputs.version }} \
             --set-env-vars "CORS_ALLOWED_ORIGINS=$CORS_ORIGINS"
+          # Enable sticky sessions and WebSocket transport for SignalR
+          az containerapp ingress sticky-sessions set \
+            --name ${{ env.BACKEND_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --affinity sticky
+          echo "✅ Sticky sessions enabled for SignalR"
 
       - name: Deploy Frontend
         run: |
