@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-02-24
+
+### Fixed
+- **Production SignalR connectivity** — Enabled sticky sessions on Azure Container Apps backend so SignalR negotiate and WebSocket connections are routed to the same replica
+
 ## [1.8.2] - 2026-02-24
 
 ### Fixed
