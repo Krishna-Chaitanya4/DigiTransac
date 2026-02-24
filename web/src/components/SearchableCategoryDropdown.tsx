@@ -87,7 +87,7 @@ export const SearchableCategoryDropdown = memo(function SearchableCategoryDropdo
           }
         }}
         disabled={disabled}
-        className={`w-full px-2 py-1.5 border rounded text-left flex items-center gap-1.5 text-sm ${
+        className={`w-full px-3 py-3 border rounded-lg text-left flex items-center gap-2 text-base ${
           disabled 
             ? 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 cursor-not-allowed text-gray-500 dark:text-gray-400' 
             : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'

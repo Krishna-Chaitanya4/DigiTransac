@@ -32,6 +32,16 @@ export interface ChatMessageNotification {
   sentAt: string;
 }
 
+export interface MessageDeletedNotification {
+  messageId: string;
+  senderId: string;
+}
+
+export interface MessageRestoredNotification {
+  messageId: string;
+  senderId: string;
+}
+
 export interface PendingCountNotification {
   pendingCount: number;
 }
@@ -168,6 +178,24 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       // Invalidate conversation detail for this sender
       queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
       // Invalidate conversations list to show new message in sidebar
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+    });
+
+    connection.on('MessageDeleted', (notification: MessageDeletedNotification) => {
+      logger.info('SignalR: MessageDeleted received', { messageId: notification.messageId, senderId: notification.senderId });
+      
+      // Invalidate conversation detail to remove the deleted message
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
+      // Invalidate conversations list to update preview if deleted message was the latest
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+    });
+
+    connection.on('MessageRestored', (notification: MessageRestoredNotification) => {
+      logger.info('SignalR: MessageRestored received', { messageId: notification.messageId, senderId: notification.senderId });
+      
+      // Invalidate conversation detail to show the restored message
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
+      // Invalidate conversations list to update preview
       queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
     });
 

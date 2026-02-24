@@ -472,14 +472,17 @@ export function TransactionForm({
           </a>
         </div>
       ) : (
-        <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
-          className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-          required>
-          <option value="">Select account...</option>
-          {accounts.filter(a => !a.isArchived).map((account) => (
-            <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>
-          ))}
-        </select>
+        <div className="relative">
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
+            className="w-full px-3 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base appearance-none"
+            required>
+            <option value="">Select account...</option>
+            {accounts.filter(a => !a.isArchived).map((account) => (
+              <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>
+            ))}
+          </select>
+          <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+        </div>
       )}
     </div>
   );
@@ -493,14 +496,17 @@ export function TransactionForm({
         </div>
       ) : (
         <>
-          <select value={transferToAccountId} onChange={(e) => setTransferToAccountId(e.target.value)}
-            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-            required>
-            <option value="">Select destination...</option>
-            {accounts.filter(a => !a.isArchived && a.id !== accountId).map((account) => (
-              <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select value={transferToAccountId} onChange={(e) => setTransferToAccountId(e.target.value)}
+              className="w-full px-3 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base appearance-none"
+              required>
+              <option value="">Select destination...</option>
+              {accounts.filter(a => !a.isArchived && a.id !== accountId).map((account) => (
+                <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>
+              ))}
+            </select>
+            <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+          </div>
           {transferToAccountId && (() => {
             const destAccount = accounts.find(a => a.id === transferToAccountId);
             const sourceAccount = accounts.find(a => a.id === accountId);
@@ -604,15 +610,18 @@ export function TransactionForm({
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time</label>
           <input type="time" value={timeLocal} onChange={(e) => setTimeLocal(e.target.value)}
-            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base" />
+            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base [&::-webkit-date-and-time-value]:text-left" />
         </div>
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Timezone</label>
-          <select value={dateTimezone} onChange={(e) => setDateTimezone(e.target.value)}
-            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm truncate">
-            {TIMEZONE_OPTIONS.map((tz) => (<option key={tz.value} value={tz.value}>{tz.label}</option>))}
-            {!TIMEZONE_OPTIONS.find(tz => tz.value === dateTimezone) && (<option value={dateTimezone}>{dateTimezone}</option>)}
-          </select>
+          <div className="relative">
+            <select value={dateTimezone} onChange={(e) => setDateTimezone(e.target.value)}
+              className="w-full px-3 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base appearance-none truncate">
+              {TIMEZONE_OPTIONS.map((tz) => (<option key={tz.value} value={tz.value}>{tz.label}</option>))}
+              {!TIMEZONE_OPTIONS.find(tz => tz.value === dateTimezone) && (<option value={dateTimezone}>{dateTimezone}</option>)}
+            </select>
+            <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+          </div>
         </div>
       </div>
 
