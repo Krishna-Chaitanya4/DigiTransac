@@ -109,12 +109,15 @@ export default function TransactionsPage() {
   const pageSize = 50;
   
   // Filter state
-  const [datePreset, setDatePreset] = useState<DatePreset>('thisMonth');
+  // When navigating via ?highlight=<id> (e.g. "View in Transactions" from chat),
+  // clear filters so the transaction is findable regardless of status or date.
+  const hasHighlight = searchParams.has('highlight');
+  const [datePreset, setDatePreset] = useState<DatePreset>(hasHighlight ? 'custom' : 'thisMonth');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchText, setSearchText] = useState('');
   const [debouncedSearchText, setDebouncedSearchText] = useState('');
-  const [filter, setFilter] = useState<TransactionFilter>({ status: 'Confirmed' }); // Default to Confirmed
+  const [filter, setFilter] = useState<TransactionFilter>(hasHighlight ? {} : { status: 'Confirmed' });
   
   // Linked transaction navigation
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null);
@@ -798,7 +801,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Date Presets */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4">
         {(['thisMonth', 'lastMonth', 'custom'] as DatePreset[]).map((preset) => (
           <button
             key={preset}
@@ -815,18 +818,40 @@ export default function TransactionsPage() {
           </button>
         ))}
 
-        {/* Mobile export button - inline with date presets */}
-        <button
-          onClick={() => setShowMobileExportSheet(true)}
-          className="sm:hidden flex items-center justify-center w-10 h-10 min-w-[44px] min-h-[44px] ml-auto rounded-lg border border-gray-300 dark:border-gray-600
-            text-gray-700 dark:text-gray-300 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
-          aria-label="Export transactions"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-        </button>
+        {/* Mobile action buttons - inline with date presets */}
+        <div className="sm:hidden flex items-center gap-2 ml-auto">
+          <PendingIndicator
+            compact
+            showingPending={filter.status === 'Pending'}
+            refreshTrigger={pendingRefreshTrigger}
+            onShowPending={() => {
+              if (filter.status === 'Pending') {
+                setDatePreset('thisMonth');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setSearchText('');
+                setFilter({ status: 'Confirmed' });
+              } else {
+                setDatePreset('custom');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setSearchText('');
+                setFilter({ status: 'Pending' });
+              }
+            }}
+          />
+          <button
+            onClick={() => setShowMobileExportSheet(true)}
+            className="flex items-center justify-center w-10 h-10 min-w-[44px] min-h-[44px] rounded-lg border border-gray-300 dark:border-gray-600
+              text-gray-700 dark:text-gray-300 active:bg-gray-100 dark:active:bg-gray-700 touch-manipulation"
+            aria-label="Export transactions"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Custom Date Range */}
@@ -1016,6 +1041,25 @@ export default function TransactionsPage() {
         }}
       />
       
+      {/* Mobile FAB - Add Transaction */}
+      {isMobile && (
+        <button
+          onClick={() => {
+            setAddSheetMode('modal');
+            setIsAddSheetOpen(true);
+          }}
+          className="fixed right-4 bottom-20 z-30 w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 
+            dark:from-blue-700 dark:to-blue-800 text-white shadow-lg shadow-blue-500/30 dark:shadow-blue-900/50
+            active:scale-95 transition-transform touch-manipulation
+            flex items-center justify-center"
+          aria-label="Add transaction"
+        >
+          <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      )}
+
       {/* Add Transaction Sheet - Dropdown for desktop, Modal for mobile FAB */}
       <AddTransactionSheet
         isOpen={isAddSheetOpen}

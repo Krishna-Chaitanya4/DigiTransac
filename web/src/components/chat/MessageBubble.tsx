@@ -210,14 +210,14 @@ export const MessageBubble = memo(function MessageBubble({
     };
     const sourceIcon = getSourceIcon();
     
-    // In self-chat, positioning is based on isSystemGenerated (left = system, right = user-created)
-    // In P2P chat, positioning is based on Send/Receive
-    const isRightAligned = isSelfChat ? isMine : isSent;
+    // Position based on who created the message, not the transaction type.
+    // This is a noter app — if I logged a "Receive ₹10", I created it, so it goes right.
+    const isRightAligned = isMine;
     
-    // Determine card background based on status
+    // Determine card background based on direction (Send = red, Receive = green)
+    // Status is communicated via the badge text, not the card color.
     const getCardBackground = () => {
       if (isDeclined) return 'bg-gradient-to-br from-gray-400 to-gray-500 text-white opacity-75';
-      if (isPending) return 'bg-gradient-to-br from-amber-400 to-orange-500 text-white';
       if (isSent) return 'bg-gradient-to-br from-rose-500 to-red-600 text-white';
       return 'bg-gradient-to-br from-emerald-500 to-green-600 text-white';
     };
@@ -257,13 +257,15 @@ export const MessageBubble = memo(function MessageBubble({
                   isDeclined
                     ? 'bg-white/90 text-gray-600'
                     : isPending
-                      ? 'bg-white/90 text-amber-600'
+                      ? isSent
+                        ? 'bg-white/90 text-red-600'
+                        : 'bg-white/90 text-green-600'
                       : isSent
                         ? 'bg-white/90 text-red-600'
                         : 'bg-white/90 text-green-600'
                 }`}
               >
-                {isDeclined ? '✗ Declined' : isPending ? '⏳ Pending' : isSent ? '↑ Sent' : '↓ Received'}
+                {isDeclined ? '✗ Declined' : isPending ? (isSent ? '⏳ Sent · Pending' : '⏳ Received · Pending') : isSent ? '↑ Sent' : '↓ Received'}
               </span>
               
               {/* Source type badge */}

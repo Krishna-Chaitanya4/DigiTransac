@@ -170,6 +170,7 @@ public static class ApplicationServiceExtensions
             options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
         });
 
+        builder.Services.AddSingleton<IPresenceTracker, InMemoryPresenceTracker>();
         builder.Services.AddSingleton<IWebPushService, WebPushService>();
         builder.Services.AddScoped<INotificationService, NotificationService>();
     }

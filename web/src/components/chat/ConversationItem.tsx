@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { ConversationSummary } from '../../types/conversations';
 import { getDisplayName, formatRelativeTime } from '../../services/conversationService';
+import { usePresence } from '../../context/PresenceContext';
 
 interface ConversationItemProps {
   conversation: ConversationSummary;
@@ -13,6 +14,7 @@ export const ConversationItem = memo(function ConversationItem({
   isSelected,
   onClick,
 }: ConversationItemProps) {
+  const { isOnline } = usePresence();
   const isSelfChat = conversation.isSelfChat ?? false;
   const displayName = isSelfChat
     ? 'Personal'
@@ -22,12 +24,15 @@ export const ConversationItem = memo(function ConversationItem({
   const isTransactionPreview = conversation.lastMessageType === 'Transaction';
   
   // Determine transaction preview color based on direction (Sent = red, Received = green)
+  // Strip "You: " prefix for detection since the backend adds it for outgoing messages
   const previewText = conversation.lastMessagePreview ?? '';
-  const isSentTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('sent');
-  const isReceivedTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('received');
+  const isFromMe = previewText.startsWith('You: ');
+  const cleanPreview = isFromMe ? previewText.slice(5) : previewText;
+  const isSentTransaction = isTransactionPreview && cleanPreview.toLowerCase().startsWith('sent');
+  const isReceivedTransaction = isTransactionPreview && cleanPreview.toLowerCase().startsWith('received');
   
   // Check for deleted message/transaction previews
-  const isDeletedPreview = previewText === 'This message was deleted' || previewText === 'This transaction was deleted';
+  const isDeletedPreview = cleanPreview === 'This message was deleted' || cleanPreview === 'This transaction was deleted';
 
   return (
     <button
@@ -44,8 +49,14 @@ export const ConversationItem = memo(function ConversationItem({
           </svg>
         </div>
       ) : (
-        <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
-          {displayName.charAt(0).toUpperCase()}
+        <div className="relative flex-shrink-0">
+          <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-lg">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+          {/* Online indicator */}
+          {isOnline(conversation.counterpartyUserId) && (
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
+          )}
         </div>
       )}
 
@@ -72,7 +83,14 @@ export const ConversationItem = memo(function ConversationItem({
                   ? 'text-blue-600 dark:text-blue-400 font-medium'
                   : 'text-gray-600 dark:text-gray-400'
         }`}>
-          {conversation.lastMessagePreview || 'No messages yet'}
+          {isFromMe ? (
+            <>
+              <span className="text-gray-500 dark:text-gray-400 font-normal">You: </span>
+              {cleanPreview}
+            </>
+          ) : (
+            previewText || 'No messages yet'
+          )}
         </p>
       </div>
 

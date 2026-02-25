@@ -718,6 +718,8 @@ export function TransactionList({
     for (const dateString of sortedDates) {
       const dateTransactions = groupedTransactions[dateString];
       totals[dateString] = dateTransactions.reduce((sum, t) => {
+        // Only Confirmed transactions count toward daily totals
+        if (t.status !== 'Confirmed') return sum;
         // Skip fully-excluded transactions from daily totals
         if (isTransactionExcluded(t, labelMap)) return sum;
         const convertedAmount = convert(t.amount, t.currency);

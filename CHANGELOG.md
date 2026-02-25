@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.5] - 2026-02-25
+
+### Fixed
+- **Chat preview showing wrong message** — Always prefer `ChatMessage.CreatedAt` over `Transaction.Date` for conversation list preview (avoids timezone divergence where frontend noon-UTC fallback is later than actual server time)
+- **Transaction preview wrong direction** — Resolve viewer's own transaction via `TransactionLinkId` so preview shows correct "Sent/Received" perspective
+- **Duplicate chat bubbles** — Counterparty transaction now reuses the same `ChatMessageId` instead of creating a separate chat message
+- **"Seen" indicator not working for transactions** — Send `NewChatMessage` SignalR notification alongside `P2PTransactionCreated` so the counterparty's mark-as-read flow triggers correctly; fix frontend race condition where `cancelQueries` in `useMarkAsRead.onSuccess` could abort the refetch before the message count bumped (optimistically append all message types now)
+- **Transaction card alignment** — Use `isMine` instead of `isSent` for positioning (noter app semantics: all user-created transactions go right)
+- **Optimistic delete preview** — Handle truncated message content (50 chars) when matching conversation list preview
+- **Web push body** — Handle `"Transaction"` message type (was only checking legacy `"money"`)
+
+### Changed
+- **Pending transaction card colors** — Use same red/green gradient as confirmed; direction communicated via badge text ("⏳ Sent · Pending" / "⏳ Received · Pending")
+- **"You: " prefix in conversation list** — Backend adds prefix when latest activity is from current user; frontend renders it in neutral gray and strips it for transaction color detection
+- **Query invalidation** — Conversations now invalidated on `P2PTransactionRejected` and all transaction mutations
+- **P2PTransactionCreated** — Optimistically updates conversation list preview on the counterparty's side
+
+### Removed
+- Unused `SystemMessageSources.P2P` constant
+- Duplicate `CreateTransactionMessageAsync` call from `SendMoneyAsync`
+
 ## [1.8.4] - 2026-02-24
 
 ### Fixed

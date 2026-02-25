@@ -16,6 +16,7 @@ import type {
   ConversationMessage,
   SendMessageRequest,
 } from '../types/conversations';
+import { logger } from '../services/logger';
 
 // Use centralized query keys from queryClient.ts
 const conversationKeys = queryKeys.conversations;
@@ -111,8 +112,13 @@ export function useDeleteMessage() {
                 if (c.counterpartyUserId !== counterpartyUserId) return c;
                 // Check if the deleted message matches the current preview
                 const deletedMsg = previousDetail?.messages.find((m) => m.id === messageId);
-                if (deletedMsg && c.lastMessagePreview === deletedMsg.content) {
-                  return { ...c, lastMessagePreview: 'This message was deleted' };
+                if (deletedMsg?.content) {
+                  const truncated = deletedMsg.content.length > 50
+                    ? deletedMsg.content.slice(0, 50) + '...'
+                    : deletedMsg.content;
+                  if (c.lastMessagePreview === deletedMsg.content || c.lastMessagePreview === truncated) {
+                    return { ...c, lastMessagePreview: 'This message was deleted' };
+                  }
                 }
                 return c;
               }),
@@ -222,7 +228,7 @@ export function useMarkAsRead() {
 
   return useMutation({
     mutationFn: (userId: string) => markAsRead(userId),
-    onSuccess: (_data, userId) => {
+    onSuccess: async (_data, userId) => {
       // Update the conversations list cache to set unread count to 0
       queryClient.setQueryData<ConversationListResponse>(
         conversationKeys.list(),
@@ -238,6 +244,29 @@ export function useMarkAsRead() {
           };
         }
       );
+      // Optimistically update message statuses in the detail cache so "Seen"
+      // indicators render immediately without waiting for a refetch.
+      const detailKey = conversationKeys.detail(userId);
+      // Await cancel so in-flight refetches don't overwrite with stale data
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      queryClient.setQueryData<ConversationDetailResponse>(
+        detailKey,
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            firstUnreadMessageId: null,
+            messages: old.messages.map((m) =>
+              !m.isFromMe && m.status !== 'Read'
+                ? { ...m, status: 'Read' as const, readAt: new Date().toISOString() }
+                : m
+            ),
+          };
+        }
+      );
+    },
+    onError: (error, userId) => {
+      logger.error('Failed to mark conversation as read', { userId, error });
     },
   });
 }

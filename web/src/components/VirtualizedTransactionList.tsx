@@ -128,6 +128,8 @@ export function VirtualizedTransactionList({
     const dailyTotals: Record<string, number> = {};
     for (const date of sortedDates) {
       dailyTotals[date] = grouped[date].reduce((sum, t) => {
+        // Only Confirmed transactions count toward daily totals
+        if (t.status !== 'Confirmed') return sum;
         // Skip fully-excluded transactions from daily totals
         if (isTransactionExcluded(t, labelMap)) return sum;
         const convertedAmount = convert(t.amount, t.currency);
@@ -224,6 +226,8 @@ export function VirtualizedTransactionList({
             const dateTransactions = groupedTransactions[dateString];
             const displayDate = formatDate(dateString);
             const dailyTotal = dateTransactions.reduce((sum, t) => {
+              // Only Confirmed transactions count toward daily totals
+              if (t.status !== 'Confirmed') return sum;
               // Skip fully-excluded transactions from daily totals
               if (isTransactionExcluded(t, labelMap)) return sum;
               const convertedAmount = convert(t.amount, t.currency);

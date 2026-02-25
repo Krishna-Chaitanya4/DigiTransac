@@ -278,9 +278,10 @@ describe('TransactionsPage', () => {
 
       renderWithProviders(<TransactionsPage />);
 
-      // The PendingIndicator shows "5 Pending" when there are pending transactions
+      // The PendingIndicator shows "5 Pending" (desktop + mobile instances)
       await waitFor(() => {
-        expect(screen.getByText(/5 Pending/i)).toBeInTheDocument();
+        const elements = screen.getAllByText(/5 Pending/i);
+        expect(elements.length).toBeGreaterThanOrEqual(1);
       });
     });
 

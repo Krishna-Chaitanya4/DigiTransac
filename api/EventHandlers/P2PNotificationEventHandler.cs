@@ -63,6 +63,23 @@ public class P2PTransactionCreatedNotificationHandler : INotificationHandler<Tra
                 notification.CounterpartyUserId, 
                 p2pNotification);
 
+            // Also send NewChatMessage so the counterparty's mark-as-read flow works
+            // for transaction messages (enables "Seen" indicator for the sender).
+            if (!string.IsNullOrEmpty(transaction.ChatMessageId))
+            {
+                var chatNotification = new ChatMessageNotification(
+                    MessageId: transaction.ChatMessageId,
+                    SenderId: notification.UserId,
+                    SenderName: sender.FullName ?? sender.Email,
+                    MessageType: "Transaction",
+                    Content: null,
+                    TransactionId: notification.TransactionId,
+                    SentAt: DateTime.UtcNow
+                );
+                await _notificationService.NotifyChatMessageAsync(
+                    notification.UserId, notification.CounterpartyUserId, chatNotification);
+            }
+
             _logger.LogInformation(
                 "Sent P2P transaction created notification to user {CounterpartyUserId} for transaction {TransactionId}",
                 notification.CounterpartyUserId, notification.TransactionId);

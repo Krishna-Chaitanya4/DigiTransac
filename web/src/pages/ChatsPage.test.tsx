@@ -120,6 +120,20 @@ vi.mock('../context/CurrencyContext', () => ({
   CurrencyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('../context/PresenceContext', () => ({
+  usePresence: vi.fn(() => ({
+    isOnline: () => false,
+    isConnected: true,
+    queryOnlineUsers: vi.fn(),
+    setUserOnline: vi.fn(),
+    setUserOffline: vi.fn(),
+    setOnlineUsers: vi.fn(),
+    setConnected: vi.fn(),
+    registerQueryFn: vi.fn(),
+    onlineUsers: new Set(),
+  })),
+}));
+
 vi.mock('../context/ThemeContext', () => ({
   useTheme: vi.fn(() => ({
     theme: 'light',

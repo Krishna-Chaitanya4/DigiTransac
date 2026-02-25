@@ -1,14 +1,12 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import type { ConversationDetailResponse } from '../../types/conversations';
-import { useCurrency } from '../../context/CurrencyContext';
-import { formatCurrency } from '../../services/currencyService';
+import { usePresence } from '../../context/PresenceContext';
 
 interface ChatHeaderEnhancedProps {
   conversation: ConversationDetailResponse;
   showSearchBar: boolean;
   onToggleSearch: () => void;
   onBack: () => void;
-  isConnected?: boolean; // SignalR connection status
 }
 
 /**
@@ -20,21 +18,11 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
   showSearchBar,
   onToggleSearch,
   onBack,
-  isConnected = true,
 }: ChatHeaderEnhancedProps) {
-  const [showBalanceDetails, setShowBalanceDetails] = useState(false);
-  const { primaryCurrency } = useCurrency();
-  
+  const { isOnline } = usePresence();
   const isSelfChat = conversation.isSelfChat ?? false;
   // Use counterpartyName from API (which returns "Personal" for self-chat)
   const displayName = conversation.counterpartyName || conversation.counterpartyEmail;
-  
-  // Calculate balance summary
-  const totalSent = conversation.totalSent || 0;
-  const totalReceived = conversation.totalReceived || 0;
-  const netBalance = totalReceived - totalSent; // Positive = they owe you
-  
-  const hasBalance = totalSent > 0 || totalReceived > 0;
 
   return (
     <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 safe-area-top">
@@ -52,10 +40,8 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
         </button>
 
         {/* Avatar and name */}
-        <button
-          onClick={() => hasBalance && setShowBalanceDetails(!showBalanceDetails)}
-          className="flex items-center gap-3 flex-1 min-w-0 text-left touch-manipulation"
-          disabled={!hasBalance}
+        <div
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
         >
           {/* Avatar */}
           {isSelfChat ? (
@@ -69,56 +55,18 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0 shadow-sm">
                 {displayName?.charAt(0).toUpperCase()}
               </div>
-              {/* Online indicator */}
-              {isConnected && (
+              {/* Online indicator - real presence tracking */}
+              {isOnline(conversation.counterpartyUserId) && (
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
               )}
             </div>
           )}
 
-          {/* Name and balance summary */}
+          {/* Name */}
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-base sm:text-lg">
               {displayName}
             </h2>
-            
-            {/* Quick balance summary - compact on mobile */}
-            {hasBalance && !isSelfChat && (
-              <div className="flex items-center gap-1.5 text-xs sm:text-sm">
-                {netBalance > 0 ? (
-                  <span className="text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                    </svg>
-                    Owes you {formatCurrency(Math.abs(netBalance), primaryCurrency)}
-                  </span>
-                ) : netBalance < 0 ? (
-                  <span className="text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-                    </svg>
-                    You owe {formatCurrency(Math.abs(netBalance), primaryCurrency)}
-                  </span>
-                ) : (
-                  <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Settled up
-                  </span>
-                )}
-                
-                {/* Expand indicator */}
-                <svg 
-                  className={`w-3 h-3 text-gray-400 transition-transform ${showBalanceDetails ? 'rotate-180' : ''}`} 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            )}
             
             {/* Self-chat subtitle */}
             {isSelfChat && (
@@ -127,7 +75,7 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
               </p>
             )}
           </div>
-        </button>
+        </div>
 
         {/* Action buttons */}
         <div className="flex items-center gap-1">
@@ -158,41 +106,6 @@ export const ChatHeaderEnhanced = memo(function ChatHeaderEnhanced({
           </button>
         </div>
       </div>
-
-      {/* Expandable balance details panel */}
-      {showBalanceDetails && hasBalance && !isSelfChat && (
-        <div className="px-4 pb-3 pt-1 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800 animate-slide-down">
-          <div className="flex justify-around text-center">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">You sent</p>
-              <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                {formatCurrency(totalSent, primaryCurrency)}
-              </p>
-            </div>
-            <div className="w-px bg-gray-200 dark:bg-gray-700" />
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">You received</p>
-              <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                {formatCurrency(totalReceived, primaryCurrency)}
-              </p>
-            </div>
-            <div className="w-px bg-gray-200 dark:bg-gray-700" />
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Net balance</p>
-              <p className={`text-sm font-bold ${
-                netBalance > 0
-                  ? 'text-green-600 dark:text-green-400'
-                  : netBalance < 0
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-gray-600 dark:text-gray-300'
-              }`}>
-                {netBalance > 0 && '+'}
-                {formatCurrency(netBalance, primaryCurrency)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 });

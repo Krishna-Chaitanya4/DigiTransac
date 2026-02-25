@@ -6,6 +6,9 @@ import { NOTIFICATION_CONSTANTS } from '../utils/constants';
 import { API_BASE_URL } from '../services/apiClient';
 import { getStoredAccessToken } from '../services/tokenStorage';
 import { logger } from '../services/logger';
+import { queryKeys } from '../lib/queryClient';
+import type { ConversationDetailResponse, ConversationListResponse, ConversationMessage } from '../types/conversations';
+import { formatCurrency } from '../services/currencyService';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -46,6 +49,11 @@ export interface PendingCountNotification {
   pendingCount: number;
 }
 
+export interface PresenceCallbacks {
+  onUserOnline?: (userId: string) => void;
+  onUserOffline?: (userId: string) => void;
+}
+
 interface UseNotificationsOptions {
   onP2PTransactionCreated?: (notification: P2PTransactionNotification) => void;
   onP2PTransactionAccepted?: (notification: P2PTransactionNotification) => void;
@@ -53,6 +61,7 @@ interface UseNotificationsOptions {
   onChatMessage?: (notification: ChatMessageNotification) => void;
   onNewChatMessage?: (notification: ChatMessageNotification) => void;
   onPendingCountUpdate?: (notification: PendingCountNotification) => void;
+  presence?: PresenceCallbacks;
 }
 
 type ConnectionState = 'Disconnected' | 'Connecting' | 'Connected' | 'Reconnecting' | 'Error';
@@ -130,6 +139,30 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       logger.info('P2P Transaction Created', { transactionId: notification.transactionId, type: notification.type });
       optionsRef.current.onP2PTransactionCreated?.(notification);
       
+      // Optimistically update conversation list preview only if this transaction is newer.
+      // Use ChatMessage.CreatedAt semantics: the server's latest chat message is the
+      // authoritative preview. We only overwrite here if the current preview isn't a
+      // more recent text message (text messages always reflect real-time activity).
+      const receiverType = notification.type === 'Send' ? 'Received' : 'Sent';
+      const preview = `${receiverType} ${formatCurrency(notification.amount, notification.currency)}`;
+      queryClient.setQueryData<ConversationListResponse>(
+        queryKeys.conversations.list(),
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            conversations: old.conversations.map((c) => {
+              if (c.counterpartyUserId !== notification.counterpartyUserId) return c;
+              // Don't overwrite a recent text message preview — text messages are always
+              // more current than a transaction notification arriving via SignalR
+              if (c.lastMessageType === 'Text') return c;
+              // This is the counterparty's view (they received the notification), so no "You: " prefix
+              return { ...c, lastMessagePreview: preview, lastMessageType: 'Transaction', lastActivityAt: notification.date || new Date().toISOString() };
+            }),
+          };
+        }
+      );
+
       // Invalidate all transaction-dependent queries (including analytics/insights)
       queryClient.invalidateQueries({ queryKey: ['transactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
@@ -158,45 +191,105 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['conversations'], ...invalidateAll });
     });
 
+    // NOTE: 'ChatMessage' is sent to the conversation group (JoinConversation),
+    // but the frontend never calls joinConversation, so this event is never received.
+    // All incoming messages arrive via 'NewChatMessage' sent to the user's group.
+    // Keeping the callback registration for forward-compatibility if groups are wired up.
     connection.on('ChatMessage', (notification: ChatMessageNotification) => {
       logger.info('SignalR: ChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onChatMessage?.(notification);
       
-      // Invalidate conversation detail for this sender
-      // This ensures real-time message updates in the active conversation
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Also invalidate the conversations list to update previews
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(notification.senderId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('NewChatMessage', (notification: ChatMessageNotification) => {
       logger.info('SignalR: NewChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onNewChatMessage?.(notification);
-      
-      // Invalidate conversation detail for this sender
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Invalidate conversations list to show new message in sidebar
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+
+      const detailKey = queryKeys.conversations.detail(notification.senderId);
+
+      // Optimistically append ALL message types for instant display.
+      // For Text messages the content is available immediately.
+      // For Transaction messages the `transaction` detail is null here but will
+      // be populated by the subsequent invalidation refetch. The key reason we
+      // append eagerly is to bump the message count so the mark-as-read effect
+      // in ChatsPage fires synchronously — without this, transaction messages
+      // rely on an async refetch and can be interrupted by cancelQueries in
+      // useMarkAsRead.onSuccess, preventing "Seen" from ever appearing.
+      queryClient.setQueryData<ConversationDetailResponse>(detailKey, (old) => {
+        if (!old) return old;
+        // Dedup — skip if message already exists
+        if (old.messages.some(m => m.id === notification.messageId)) return old;
+        const newMsg: ConversationMessage = {
+          id: notification.messageId,
+          type: (notification.messageType as ConversationMessage['type']) || 'Text',
+          senderUserId: notification.senderId,
+          isFromMe: false,
+          content: notification.content || null,
+          transaction: null, // Filled by refetch for Transaction messages
+          status: 'Delivered',
+          createdAt: notification.sentAt,
+          deliveredAt: new Date().toISOString(),
+          readAt: null,
+          isEdited: false,
+          editedAt: null,
+          isDeleted: false,
+          deletedAt: null,
+          replyToMessageId: null,
+          replyTo: null,
+        };
+        return {
+          ...old,
+          messages: [...old.messages, newMsg],
+          totalCount: old.totalCount + 1,
+        };
+      });
+
+      // Invalidate to get full server data (transaction details, reply previews, etc.)
+      queryClient.invalidateQueries({ queryKey: detailKey });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('MessageDeleted', (notification: MessageDeletedNotification) => {
       logger.info('SignalR: MessageDeleted received', { messageId: notification.messageId, senderId: notification.senderId });
       
-      // Invalidate conversation detail to remove the deleted message
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Invalidate conversations list to update preview if deleted message was the latest
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(notification.senderId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('MessageRestored', (notification: MessageRestoredNotification) => {
       logger.info('SignalR: MessageRestored received', { messageId: notification.messageId, senderId: notification.senderId });
       
-      // Invalidate conversation detail to show the restored message
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Invalidate conversations list to update preview
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(notification.senderId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
+    });
+
+    // When the counterparty reads our messages, update statuses to 'Read' instantly
+    connection.on('MessagesRead', async (notification: { readByUserId: string }) => {
+      logger.info('SignalR: MessagesRead received', { readByUserId: notification.readByUserId });
+      const detailKey = queryKeys.conversations.detail(notification.readByUserId);
+      // Cancel in-flight refetches so they don't overwrite with stale 'Delivered' statuses
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      queryClient.setQueryData<ConversationDetailResponse>(
+        detailKey,
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            messages: old.messages.map((m) =>
+              m.isFromMe && m.status !== 'Read'
+                ? { ...m, status: 'Read' as const, readAt: new Date().toISOString() }
+                : m
+            ),
+          };
+        }
+      );
+      // Also update the conversation list so the sidebar reflects read status
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('PendingCount', (notification: PendingCountNotification) => {
@@ -205,6 +298,17 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
     connection.on('Pong', (timestamp: string) => {
       logger.debug('Pong received', { timestamp });
+    });
+
+    // Presence events
+    connection.on('UserOnline', (userId: string) => {
+      logger.debug('User came online', { userId });
+      optionsRef.current.presence?.onUserOnline?.(userId);
+    });
+
+    connection.on('UserOffline', (userId: string) => {
+      logger.debug('User went offline', { userId });
+      optionsRef.current.presence?.onUserOffline?.(userId);
     });
 
     return connection;
@@ -273,6 +377,18 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, []);
 
+  // Query which users from a list are currently online
+  const getOnlineUsers = useCallback(async (userIds: string[]): Promise<string[]> => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        return await connectionRef.current.invoke<string[]>('GetOnlineUsers', userIds);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, []);
+
   // Auto-connect when authenticated
   // Use refs to avoid stale closures while keeping effect stable
   const connectRef = useRef(connect);
@@ -313,6 +429,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     disconnect,
     joinConversation,
     leaveConversation,
+    getOnlineUsers,
     ping,
   };
 }

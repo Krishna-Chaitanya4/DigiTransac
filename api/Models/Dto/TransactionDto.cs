@@ -103,6 +103,7 @@ public record TransactionFilterRequest(
 
     /// <summary>
     /// Creates a filter for analytics queries (no pagination, returns all matching).
+    /// Only includes Confirmed transactions — Pending/Declined should not affect calculations.
     /// </summary>
     public static TransactionFilterRequest ForAnalytics(
         DateTime startDate,
@@ -114,12 +115,13 @@ public record TransactionFilterRequest(
         return new TransactionFilterRequest(
             startDate, endDate,
             accountIds, types, labelIds,
-            null, null, null, null, null, null,
+            null, null, null, null, "Confirmed", null,
             1, int.MaxValue);
     }
 
     /// <summary>
     /// Creates a filter for budget spending calculations (expenses only).
+    /// Only includes Confirmed transactions — Pending/Declined should not affect calculations.
     /// </summary>
     public static TransactionFilterRequest ForBudget(
         DateTime periodStart,
@@ -132,7 +134,7 @@ public record TransactionFilterRequest(
             accountIds,
             new List<string> { "Send" },  // Budget tracks expenses (Send type)
             labelIds,
-            null, null, null, null, null, null,
+            null, null, null, null, "Confirmed", null,
             1, int.MaxValue);
     }
 

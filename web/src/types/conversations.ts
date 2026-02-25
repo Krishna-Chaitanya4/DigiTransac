@@ -84,6 +84,7 @@ export interface ConversationDetailResponse {
   totalSent: number;
   totalReceived: number;
   isSelfChat?: boolean; // True when this is user's personal transaction log
+  firstUnreadMessageId?: string | null; // ID of the oldest unread message from counterparty
 }
 
 // Request types
