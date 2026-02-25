@@ -117,6 +117,8 @@ function invalidateTransactionRelatedQueries(queryClient: ReturnType<typeof useQ
   queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all, ...invalidateAll });
   queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all, ...invalidateAll });
   queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all, ...invalidateAll });
+  // P2P transactions create chat messages, so conversations preview needs refresh
+  queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all, ...invalidateAll });
 }
 
 // Hook for creating a transaction

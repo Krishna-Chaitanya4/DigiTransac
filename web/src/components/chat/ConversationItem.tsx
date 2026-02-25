@@ -24,12 +24,15 @@ export const ConversationItem = memo(function ConversationItem({
   const isTransactionPreview = conversation.lastMessageType === 'Transaction';
   
   // Determine transaction preview color based on direction (Sent = red, Received = green)
+  // Strip "You: " prefix for detection since the backend adds it for outgoing messages
   const previewText = conversation.lastMessagePreview ?? '';
-  const isSentTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('sent');
-  const isReceivedTransaction = isTransactionPreview && previewText.toLowerCase().startsWith('received');
+  const isFromMe = previewText.startsWith('You: ');
+  const cleanPreview = isFromMe ? previewText.slice(5) : previewText;
+  const isSentTransaction = isTransactionPreview && cleanPreview.toLowerCase().startsWith('sent');
+  const isReceivedTransaction = isTransactionPreview && cleanPreview.toLowerCase().startsWith('received');
   
   // Check for deleted message/transaction previews
-  const isDeletedPreview = previewText === 'This message was deleted' || previewText === 'This transaction was deleted';
+  const isDeletedPreview = cleanPreview === 'This message was deleted' || cleanPreview === 'This transaction was deleted';
 
   return (
     <button
@@ -80,7 +83,14 @@ export const ConversationItem = memo(function ConversationItem({
                   ? 'text-blue-600 dark:text-blue-400 font-medium'
                   : 'text-gray-600 dark:text-gray-400'
         }`}>
-          {conversation.lastMessagePreview || 'No messages yet'}
+          {isFromMe ? (
+            <>
+              <span className="text-gray-500 dark:text-gray-400 font-normal">You: </span>
+              {cleanPreview}
+            </>
+          ) : (
+            previewText || 'No messages yet'
+          )}
         </p>
       </div>
 

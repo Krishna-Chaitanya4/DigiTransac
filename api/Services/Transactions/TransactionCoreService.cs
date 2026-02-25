@@ -364,23 +364,11 @@ public class TransactionCoreService : ITransactionCoreService
         transaction.ChatMessageId = chatMessage.Id;
         await _transactionRepository.UpdateAsync(transaction);
 
-        // For P2P: create a counterparty chat message so "View in Chat" works for the recipient too
+        // For P2P: link counterparty's transaction to the same chat message so "View in Chat" works.
+        // The conversation detail resolves the correct transaction per viewer via TransactionLinkId.
         if (isP2P && counterpartyUser != null && counterpartyTransaction != null)
         {
-            var counterpartyChatMessage = new ChatMessage
-            {
-                SenderUserId = userId,
-                RecipientUserId = counterpartyUser.Id,
-                Type = ChatMessageType.Transaction,
-                TransactionId = counterpartyTransaction.Id,
-                Status = MessageStatus.Sent,
-                IsSystemGenerated = true,
-                SystemSource = SystemMessageSources.P2P,
-                CreatedAt = DateTime.UtcNow.AddMilliseconds(1) // Slightly after sender's message
-            };
-
-            await _chatMessageRepository.CreateAsync(counterpartyChatMessage);
-            counterpartyTransaction.ChatMessageId = counterpartyChatMessage.Id;
+            counterpartyTransaction.ChatMessageId = chatMessage.Id;
             await _transactionRepository.UpdateAsync(counterpartyTransaction);
         }
 

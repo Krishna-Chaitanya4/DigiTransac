@@ -112,8 +112,13 @@ export function useDeleteMessage() {
                 if (c.counterpartyUserId !== counterpartyUserId) return c;
                 // Check if the deleted message matches the current preview
                 const deletedMsg = previousDetail?.messages.find((m) => m.id === messageId);
-                if (deletedMsg && c.lastMessagePreview === deletedMsg.content) {
-                  return { ...c, lastMessagePreview: 'This message was deleted' };
+                if (deletedMsg?.content) {
+                  const truncated = deletedMsg.content.length > 50
+                    ? deletedMsg.content.slice(0, 50) + '...'
+                    : deletedMsg.content;
+                  if (c.lastMessagePreview === deletedMsg.content || c.lastMessagePreview === truncated) {
+                    return { ...c, lastMessagePreview: 'This message was deleted' };
+                  }
                 }
                 return c;
               }),

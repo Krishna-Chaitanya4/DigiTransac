@@ -254,8 +254,8 @@ public class NotificationService : INotificationService
             {
                 var pushPayload = new PushNotificationPayload(
                     Title: notification.SenderName ?? "New Message",
-                    Body: notification.MessageType == "money"
-                        ? $"{notification.SenderName ?? "Someone"} sent you money!"
+                    Body: notification.MessageType is "money" or "Transaction"
+                        ? $"{notification.SenderName ?? "Someone"} sent you a transaction"
                         : notification.Content ?? "You have a new message",
                     Icon: "/icons/icon-192x192.png",
                     Badge: "/icons/icon-72x72.png",

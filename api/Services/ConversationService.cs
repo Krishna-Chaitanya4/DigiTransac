@@ -270,7 +270,16 @@ public class ConversationService : IConversationService
             string? lastMessagePreview = null;
             string? lastMessageType = null;
             
-            if (latestMessage != null && (latestTx == null || latestMessage.CreatedAt > latestTx.Date))
+            // Always prefer chat messages: every P2P transaction creates a corresponding
+            // ChatMessage, so the MongoDB aggregation's latest message (by CreatedAt) is
+            // the authoritative source of the most recent activity. We must NOT compare
+            // ChatMessage.CreatedAt (server UTC clock) with Transaction.Date (user-specified
+            // date derived from local timezone), since Transaction.Date can diverge
+            // (e.g., frontend sends noon-UTC fallback "YYYY-MM-DDT12:00:00.000Z" which is
+            // later than the actual server time for users west of UTC).
+            // The latestTx fallback only applies to legacy conversations with P2P
+            // transactions that predate the chat feature (no chat messages exist).
+            if (latestMessage != null)
             {
                 lastActivityAt = latestMessage.CreatedAt;
                 lastMessageType = latestMessage.Type.ToString();
@@ -286,9 +295,38 @@ public class ConversationService : IConversationService
                 }
                 else if (latestMessage.Type == ChatMessageType.Transaction && !string.IsNullOrEmpty(latestMessage.TransactionId))
                 {
-                    // For transaction messages, fetch the actual transaction to generate preview
-                    // Use GetByIdAsync (not GetByIdAndUserIdAsync) to include soft-deleted transactions
-                    var msgTransaction = latestTx ?? await _transactionRepository.GetByIdAsync(latestMessage.TransactionId);
+                    // Resolve the viewer's own transaction for correct Send/Receive perspective.
+                    // The chat message stores the sender's transaction ID, which may not belong
+                    // to the current viewer. We follow TransactionLinkId to find the viewer's copy.
+                    Transaction? msgTransaction = null;
+                    
+                    // First check if the viewer directly owns this transaction
+                    var viewerTx = txsWithCounterparty.FirstOrDefault(t => t.Id == latestMessage.TransactionId);
+                    if (viewerTx != null)
+                    {
+                        msgTransaction = viewerTx;
+                    }
+                    else
+                    {
+                        // Chat message references the sender's transaction; fetch it to get TransactionLinkId
+                        var senderTx = await _transactionRepository.GetByIdAsync(latestMessage.TransactionId);
+                        if (senderTx != null && senderTx.IsDeleted)
+                        {
+                            msgTransaction = senderTx; // will show "deleted" preview
+                        }
+                        else if (senderTx?.TransactionLinkId != null)
+                        {
+                            // Find the viewer's matching transaction via TransactionLinkId
+                            var linkedTx = txsWithCounterparty.FirstOrDefault(t => 
+                                t.TransactionLinkId == senderTx.TransactionLinkId);
+                            msgTransaction = linkedTx ?? senderTx; // fallback to sender's if not found
+                        }
+                        else
+                        {
+                            msgTransaction = senderTx;
+                        }
+                    }
+                    
                     if (msgTransaction != null && msgTransaction.IsDeleted)
                     {
                         lastMessagePreview = "This transaction was deleted";
@@ -319,6 +357,31 @@ public class ConversationService : IConversationService
             else
             {
                 continue; // No activity, skip
+            }
+            
+            // Prefix "You: " when the latest activity was from the current user.
+            // Skip for self-chat — all messages are yours, so the prefix is redundant.
+            if (!isSelfChat && lastMessagePreview != null)
+            {
+                bool isFromMe;
+                if (latestMessage != null)
+                {
+                    isFromMe = latestMessage.SenderUserId == userId;
+                }
+                else if (latestTx != null)
+                {
+                    // Legacy fallback (no chat messages): check if this user owns the transaction
+                    isFromMe = latestTx.UserId == userId;
+                }
+                else
+                {
+                    isFromMe = false;
+                }
+                
+                if (isFromMe)
+                {
+                    lastMessagePreview = $"You: {lastMessagePreview}";
+                }
             }
             
             // Get unread count from batch-fetched dictionary
@@ -622,8 +685,9 @@ public class ConversationService : IConversationService
                     DeletedAt: tx.DeletedAt
                 );
                 
-                // Determine sender based on transaction type
-                var isFromMe = tx.Type == TransactionType.Send;
+                // This is a noter app: any transaction in the user's own collection was
+                // created by them, regardless of Send/Receive type. Always right-align.
+                var isFromMe = true;
                 
                 // Derive IsSystemGenerated from Transaction.Source
                 var isSystemGenerated = tx.Source is TransactionSource.Recurring 
@@ -634,8 +698,8 @@ public class ConversationService : IConversationService
                 messages.Add(new ConversationMessage(
                     Id: $"tx-{tx.Id}",
                     Type: "Transaction",
-                    SenderUserId: isFromMe ? userId : counterpartyUserId,
-                    IsFromMe: isFromMe,
+                    SenderUserId: userId,
+                    IsFromMe: true,
                     Content: null,
                     Transaction: txData,
                     Status: "Read", // Legacy transactions are considered read
@@ -811,15 +875,8 @@ public class ConversationService : IConversationService
         
         var transaction = result.Value;
         
-        // Create chat message for this transaction
-        if (transaction.TransactionLinkId.HasValue)
-        {
-            await _chatMessageRepository.CreateTransactionMessageAsync(
-                userId,
-                counterpartyUserId,
-                transaction.Id
-            );
-        }
+        // Note: TransactionCoreService.CreateAsync already creates the chat message
+        // and sets ChatMessageId on both sender and counterparty transactions.
         
         // Get account for display
         var account = await _accountRepository.GetByIdAndUserIdAsync(request.AccountId, userId, ct);

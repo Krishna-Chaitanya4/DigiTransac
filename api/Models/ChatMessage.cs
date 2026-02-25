@@ -139,5 +139,4 @@ public static class SystemMessageSources
     public const string Recurring = "Recurring";
     public const string Import = "Import";
     public const string Transfer = "Transfer";
-    public const string P2P = "P2P";
 }

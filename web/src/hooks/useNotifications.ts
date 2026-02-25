@@ -7,7 +7,8 @@ import { API_BASE_URL } from '../services/apiClient';
 import { getStoredAccessToken } from '../services/tokenStorage';
 import { logger } from '../services/logger';
 import { queryKeys } from '../lib/queryClient';
-import type { ConversationDetailResponse, ConversationMessage } from '../types/conversations';
+import type { ConversationDetailResponse, ConversationListResponse, ConversationMessage } from '../types/conversations';
+import { formatCurrency } from '../services/currencyService';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -138,6 +139,30 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       logger.info('P2P Transaction Created', { transactionId: notification.transactionId, type: notification.type });
       optionsRef.current.onP2PTransactionCreated?.(notification);
       
+      // Optimistically update conversation list preview only if this transaction is newer.
+      // Use ChatMessage.CreatedAt semantics: the server's latest chat message is the
+      // authoritative preview. We only overwrite here if the current preview isn't a
+      // more recent text message (text messages always reflect real-time activity).
+      const receiverType = notification.type === 'Send' ? 'Received' : 'Sent';
+      const preview = `${receiverType} ${formatCurrency(notification.amount, notification.currency)}`;
+      queryClient.setQueryData<ConversationListResponse>(
+        queryKeys.conversations.list(),
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            conversations: old.conversations.map((c) => {
+              if (c.counterpartyUserId !== notification.counterpartyUserId) return c;
+              // Don't overwrite a recent text message preview — text messages are always
+              // more current than a transaction notification arriving via SignalR
+              if (c.lastMessageType === 'Text') return c;
+              // This is the counterparty's view (they received the notification), so no "You: " prefix
+              return { ...c, lastMessagePreview: preview, lastMessageType: 'Transaction', lastActivityAt: notification.date || new Date().toISOString() };
+            }),
+          };
+        }
+      );
+
       // Invalidate all transaction-dependent queries (including analytics/insights)
       queryClient.invalidateQueries({ queryKey: ['transactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
@@ -166,6 +191,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: ['conversations'], ...invalidateAll });
     });
 
     // NOTE: 'ChatMessage' is sent to the conversation group (JoinConversation),
@@ -186,37 +212,42 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
       const detailKey = queryKeys.conversations.detail(notification.senderId);
 
-      // Optimistically append text messages for instant display
-      if (notification.messageType === 'Text' && notification.content) {
-        queryClient.setQueryData<ConversationDetailResponse>(detailKey, (old) => {
-          if (!old) return old;
-          // Dedup — skip if message already exists
-          if (old.messages.some(m => m.id === notification.messageId)) return old;
-          const newMsg: ConversationMessage = {
-            id: notification.messageId,
-            type: 'Text',
-            senderUserId: notification.senderId,
-            isFromMe: false,
-            content: notification.content || null,
-            transaction: null,
-            status: 'Delivered',
-            createdAt: notification.sentAt,
-            deliveredAt: new Date().toISOString(),
-            readAt: null,
-            isEdited: false,
-            editedAt: null,
-            isDeleted: false,
-            deletedAt: null,
-            replyToMessageId: null,
-            replyTo: null,
-          };
-          return {
-            ...old,
-            messages: [...old.messages, newMsg],
-            totalCount: old.totalCount + 1,
-          };
-        });
-      }
+      // Optimistically append ALL message types for instant display.
+      // For Text messages the content is available immediately.
+      // For Transaction messages the `transaction` detail is null here but will
+      // be populated by the subsequent invalidation refetch. The key reason we
+      // append eagerly is to bump the message count so the mark-as-read effect
+      // in ChatsPage fires synchronously — without this, transaction messages
+      // rely on an async refetch and can be interrupted by cancelQueries in
+      // useMarkAsRead.onSuccess, preventing "Seen" from ever appearing.
+      queryClient.setQueryData<ConversationDetailResponse>(detailKey, (old) => {
+        if (!old) return old;
+        // Dedup — skip if message already exists
+        if (old.messages.some(m => m.id === notification.messageId)) return old;
+        const newMsg: ConversationMessage = {
+          id: notification.messageId,
+          type: (notification.messageType as ConversationMessage['type']) || 'Text',
+          senderUserId: notification.senderId,
+          isFromMe: false,
+          content: notification.content || null,
+          transaction: null, // Filled by refetch for Transaction messages
+          status: 'Delivered',
+          createdAt: notification.sentAt,
+          deliveredAt: new Date().toISOString(),
+          readAt: null,
+          isEdited: false,
+          editedAt: null,
+          isDeleted: false,
+          deletedAt: null,
+          replyToMessageId: null,
+          replyTo: null,
+        };
+        return {
+          ...old,
+          messages: [...old.messages, newMsg],
+          totalCount: old.totalCount + 1,
+        };
+      });
 
       // Invalidate to get full server data (transaction details, reply previews, etc.)
       queryClient.invalidateQueries({ queryKey: detailKey });
