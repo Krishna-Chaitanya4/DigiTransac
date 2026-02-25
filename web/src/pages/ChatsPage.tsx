@@ -27,6 +27,7 @@ import {
 } from '../components/chat';
 import { TransactionForm } from '../components/TransactionForm';
 import { logger } from '../services/logger';
+import { useToast } from '../components/ToastProvider';
 import { SIDEBAR_CONSTANTS } from '../utils/constants';
 import { usePresence } from '../context/PresenceContext';
 import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
@@ -64,6 +65,7 @@ export default function ChatsPage() {
   // Auth context
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { info: showInfo } = useToast();
   
   // URL params for deep linking (e.g., from "View in Chat" on transactions)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -164,7 +166,7 @@ export default function ChatsPage() {
     data: conversationData,
     isLoading: isLoadingMessages,
     dataUpdatedAt,
-  } = useConversation(selectedUserId);
+  } = useConversation(selectedUserId, pendingScrollMessageId ? 200 : undefined);
 
   // Use pending conversation for new chats, or the fetched data
   const selectedConversation = pendingConversation || conversationData || null;
@@ -226,6 +228,9 @@ export default function ChatsPage() {
   // stays visible until user leaves the conversation
   const [activeUnreadDividerId, setActiveUnreadDividerId] = useState<string | null>(null);
   const hasScrolledToUnreadRef = useRef(false);
+  // Whether we scrolled to a specific message via deep link (View in Chat).
+  // Prevents the auto-scroll-to-bottom effect from overriding the position.
+  const deepLinkScrolledRef = useRef(false);
   // Timestamp of when we navigated to this conversation. Only data fetched
   // AFTER this timestamp is considered fresh (skips stale React Query cache).
   const navigationTimestampRef = useRef(0);
@@ -256,6 +261,7 @@ export default function ChatsPage() {
 
     navigationTimestampRef.current = Date.now();
     unreadCapturedRef.current = false;
+    deepLinkScrolledRef.current = false;
     setActiveUnreadDividerId(null);
     hasScrolledToUnreadRef.current = false;
     markedAsReadRef.current = null;
@@ -284,8 +290,8 @@ export default function ChatsPage() {
   // Use the API flag if available, fallback to email comparison for backward compatibility
   const isSelfChat = selectedConversation?.isSelfChat ?? (user?.email === selectedConversation?.counterpartyEmail);
 
-  // Scroll to a message and highlight it temporarily
-  const scrollToMessage = useCallback((messageId: string) => {
+  // Scroll to a message and highlight it temporarily. Returns true if element was found.
+  const scrollToMessage = useCallback((messageId: string): boolean => {
     const element = document.getElementById(`msg-${messageId}`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -297,7 +303,9 @@ export default function ChatsPage() {
           element.classList.remove('rounded-2xl', 'transition-colors', 'duration-500');
         }, 500);
       }, 1000);
+      return true;
     }
+    return false;
   }, []);
 
   // Capture firstUnreadMessageId only from FRESH data fetched after navigation.
@@ -356,6 +364,8 @@ export default function ChatsPage() {
   useEffect(() => {
     // Don't auto-scroll if we're about to scroll to a specific message
     if (pendingScrollMessageId) return;
+    // Don't auto-scroll if we just completed a deep-link scroll (View in Chat)
+    if (deepLinkScrolledRef.current) return;
     
     if (selectedConversation?.messages && selectedConversation.messages.length > 0) {
       const timeoutId = setTimeout(() => {
@@ -376,12 +386,17 @@ export default function ChatsPage() {
     if (pendingScrollMessageId && selectedConversation?.messages && selectedConversation.messages.length > 0) {
       // Small delay to ensure DOM is rendered
       const timeoutId = setTimeout(() => {
-        scrollToMessage(pendingScrollMessageId);
+        const found = scrollToMessage(pendingScrollMessageId);
+        if (!found) {
+          showInfo('Could not find this message in the conversation');
+        }
+        // Mark that we completed a deep-link scroll so auto-scroll-to-bottom is suppressed
+        deepLinkScrolledRef.current = true;
         setPendingScrollMessageId(null);
-      }, 100);
+      }, 150);
       return () => clearTimeout(timeoutId);
     }
-  }, [pendingScrollMessageId, selectedConversation?.messages, scrollToMessage]);
+  }, [pendingScrollMessageId, selectedConversation?.messages, scrollToMessage, showInfo]);
 
   // Handle scroll detection
   const handleScroll = useCallback(() => {

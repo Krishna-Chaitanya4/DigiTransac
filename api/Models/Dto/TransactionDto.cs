@@ -38,11 +38,7 @@ public record CreateTransactionRequest(
     string? CounterpartyEmail,    // If provided, creates P2P transaction
     decimal? CounterpartyAmount,  // Optional: if different currency
     // Source (optional, defaults to Manual)
-    string? Source = null,        // "Manual", "Chat", "Recurring", "Import", "Transfer"
-    // Timezone-aware date/time fields (for global travel support & advanced options)
-    string? DateLocal = null,     // "YYYY-MM-DD" - the human-intended calendar date
-    string? TimeLocal = null,     // "HH:mm" - the local time (e.g., "14:30")
-    string? DateTimezone = null   // IANA timezone e.g., "Asia/Kolkata"
+    string? Source = null         // "Manual", "Chat", "Recurring", "Import", "Transfer"
 );
 
 public record UpdateTransactionRequest(
@@ -57,11 +53,7 @@ public record UpdateTransactionRequest(
     TransactionLocationRequest? Location,
     string? Status,  // "Pending", "Confirmed", "Declined"
     string? TransferToAccountId,
-    string? AccountId,  // Allow changing the account
-    // Timezone-aware date/time fields (for global travel support & advanced options)
-    string? DateLocal = null,     // "YYYY-MM-DD" - the human-intended calendar date
-    string? TimeLocal = null,     // "HH:mm" - the local time (e.g., "14:30")
-    string? DateTimezone = null   // IANA timezone e.g., "Asia/Kolkata"
+    string? AccountId  // Allow changing the account
 );
 
 public record TransactionFilterRequest(
@@ -371,10 +363,6 @@ public record TransactionResponse(
     DateTime? LastSyncedAt,  // Set when transaction was updated via P2P sync (shows "Edited" badge)
     // Chat integration
     string? ChatMessageId,  // Reference to chat message for "View in Chat" action
-    // Timezone-aware date/time fields (for global travel support & analytics)
-    string? DateLocal,      // "YYYY-MM-DD" - the human-intended calendar date (always display this if available)
-    string? TimeLocal,      // "HH:mm" - the local time (e.g., "14:30")
-    string? DateTimezone,    // IANA timezone e.g., "Asia/Kolkata" (original timezone at creation)
     // Soft-delete support (24-hour undo window)
     bool IsDeleted,
     DateTime? DeletedAt
@@ -735,7 +723,6 @@ public record TripCategoryBreakdown(
 /// </summary>
 public record TripDaySpending(
     DateTime Date,
-    string DateLocal,           // YYYY-MM-DD format
     decimal Amount,
     int TransactionCount
 );

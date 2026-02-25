@@ -202,7 +202,7 @@ const TransactionRow = memo(function TransactionRow({
             ? 'border-gray-200 dark:border-gray-700'
             : 'border-l-4 border-l-yellow-400 border-gray-200 dark:border-gray-700 dark:border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/10'
           } ${selectionMode && isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}
-          ${isHighlighted ? 'ring-2 ring-blue-500 ring-inset animate-pulse' : ''}
+          ${isHighlighted ? 'ring-2 ring-blue-500 ring-inset bg-blue-50 dark:bg-blue-900/20' : ''}
           ${isTransactionExcluded(transaction, labelMap) ? 'opacity-60' : ''} overflow-hidden transition-all`}
       >
         {/* Main Row */}

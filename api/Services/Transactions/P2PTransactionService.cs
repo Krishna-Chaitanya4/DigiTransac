@@ -76,10 +76,6 @@ public class P2PTransactionService : IP2PTransactionService
             Amount = counterpartyAmount,
             Currency = account.Currency, // Initially same as user's currency
             Date = request.Date,
-            // Timezone-aware date fields (for global travel support)
-            // Note: We use the sender's date/timezone initially - counterparty can adjust when accepting
-            DateLocal = request.DateLocal,
-            DateTimezone = request.DateTimezone,
             Title = request.Title,
             EncryptedNotes = null, // Counterparty can add their own notes
             Splits = new List<TransactionSplit>(), // They'll fill in their own categories
@@ -120,8 +116,6 @@ public class P2PTransactionService : IP2PTransactionService
         if (request.Date.HasValue)
         {
             linkedP2PTransaction.Date = transaction.Date;
-            linkedP2PTransaction.DateLocal = transaction.DateLocal;
-            linkedP2PTransaction.DateTimezone = transaction.DateTimezone;
         }
 
         if (request.Title != null)

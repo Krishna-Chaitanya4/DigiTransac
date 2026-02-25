@@ -81,10 +81,6 @@ export interface Transaction {
   lastSyncedAt?: string;
   // Chat integration
   chatMessageId?: string; // Reference to chat message for "View in Chat" action
-  // Timezone-aware date/time fields (for global travel support & analytics)
-  dateLocal?: string;     // "YYYY-MM-DD" - the human-intended calendar date (always display this if available)
-  timeLocal?: string;     // "HH:mm" - the local time (e.g., "14:30")
-  dateTimezone?: string;  // IANA timezone e.g., "Asia/Kolkata" (original timezone at creation)
   // Soft-delete support (24-hour undo window)
   isDeleted: boolean;
   deletedAt?: string | null;
@@ -159,10 +155,6 @@ export interface CreateTransactionRequest {
   // P2P fields (optional for Send/Receive types)
   counterpartyEmail?: string;
   counterpartyAmount?: number;
-  // Timezone-aware date/time fields (for global travel support & advanced options)
-  dateLocal?: string;     // "YYYY-MM-DD" - the human-intended calendar date
-  timeLocal?: string;     // "HH:mm" - the local time (e.g., "14:30")
-  dateTimezone?: string;  // IANA timezone e.g., "Asia/Kolkata"
 }
 
 export interface UpdateTransactionRequest {
@@ -178,10 +170,6 @@ export interface UpdateTransactionRequest {
   status?: TransactionStatus;
   transferToAccountId?: string;
   accountId?: string;
-  // Timezone-aware date/time fields (for global travel support & advanced options)
-  dateLocal?: string;     // "YYYY-MM-DD" - the human-intended calendar date
-  timeLocal?: string;     // "HH:mm" - the local time (e.g., "14:30")
-  dateTimezone?: string;  // IANA timezone e.g., "Asia/Kolkata"
 }
 
 export interface TransactionFilter {

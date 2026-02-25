@@ -868,8 +868,6 @@ public class TransactionImportService : ITransactionImportService
             Amount = row.Amount,
             Currency = currency,
             Date = date,
-            DateLocal = row.Date,
-            DateTimezone = timezone,
             Title = row.Title,
             EncryptedPayee = encryptedPayee,
             EncryptedNotes = encryptedNotes,

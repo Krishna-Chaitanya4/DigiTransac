@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ToastProvider } from '../components/ToastProvider';
 import ChatsPage from './ChatsPage';
 
 // Mock scrollIntoView
@@ -154,9 +155,11 @@ const renderWithProviders = (ui: React.ReactElement) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        {ui}
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          {ui}
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>
   );
 };

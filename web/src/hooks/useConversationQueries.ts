@@ -31,10 +31,10 @@ export function useConversations() {
 }
 
 // Hook to fetch a single conversation
-export function useConversation(userId: string | null) {
+export function useConversation(userId: string | null, limit?: number) {
   return useQuery({
     queryKey: conversationKeys.detail(userId || ''),
-    queryFn: () => getConversation(userId!),
+    queryFn: () => getConversation(userId!, limit),
     enabled: !!userId,
     staleTime: 10 * 1000, // 10 seconds
   });

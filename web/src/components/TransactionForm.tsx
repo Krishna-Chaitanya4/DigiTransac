@@ -32,8 +32,8 @@ import type { Tag } from '../types/labels';
 import { getCurrencySymbol } from '../services/currencyService';
 
 // Date utility functions for timezone-aware date handling
-// When dateLocal is available, we use that for display (the human-intended date).
-// The `date` field is still sent as noon UTC for backward compatibility with queries.
+// The form uses date + time + timezone as INPUT controls to compute real UTC.
+// Only the UTC `date` field is sent to the API and stored.
 
 /**
  * Get the user's current IANA timezone identifier (e.g., "Asia/Kolkata", "America/New_York")
@@ -96,7 +96,7 @@ const getCurrentTime = (): string => {
 };
 
 /**
- * Common timezone options for dropdown (sorted by offset)
+ * Common timezone options for the override dropdown (sorted by offset)
  */
 const TIMEZONE_OPTIONS = [
   { value: 'Pacific/Honolulu', label: '(GMT-10:00) Hawaii' },
@@ -126,16 +126,9 @@ const TIMEZONE_OPTIONS = [
 
 /**
  * Extract YYYY-MM-DD from a date for the form's date picker.
- * Prefers dateLocal (the date the user originally selected) when editing.
- * Falls back to converting UTC date to the viewer's local calendar date.
+ * Converts the UTC date to the viewer's local calendar date.
  */
-const toDateString = (dateInput: string | Date, dateLocal?: string): string => {
-  // If we have the local date string from the original transaction, use it
-  if (dateLocal) {
-    return dateLocal;
-  }
-  
-  // Convert to a Date object then format as YYYY-MM-DD in the viewer's timezone
+const toDateString = (dateInput: string | Date): string => {
   const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
@@ -217,7 +210,7 @@ export function TransactionForm({
   // Calculator expression input state
   const [expressionInput, setExpressionInput] = useState<string | undefined>(undefined);
   
-  // Advanced options state (time & timezone)
+  // Advanced options state (time & timezone are inputs for computing UTC)
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [timeLocal, setTimeLocal] = useState(getCurrentTime());
   const [dateTimezone, setDateTimezone] = useState(getUserTimezone());
@@ -247,7 +240,7 @@ export function TransactionForm({
         setType(uiType);
         setAccountId(editingTransaction.accountId);
         setAmount(editingTransaction.amount);
-        setDate(toDateString(editingTransaction.date, editingTransaction.dateLocal));
+        setDate(toDateString(editingTransaction.date));
         setTitle(editingTransaction.title || '');
         setPayee(editingTransaction.payee || '');
         setNotes(editingTransaction.notes || '');
@@ -285,9 +278,10 @@ export function TransactionForm({
         setRecurrenceInterval(1);
         setRecurrenceEndDate('');
         
-        // Set time/timezone from existing transaction
-        setTimeLocal(editingTransaction.timeLocal || getCurrentTime());
-        setDateTimezone(editingTransaction.dateTimezone || getUserTimezone());
+        // Derive time from the stored UTC date in the viewer's local timezone
+        const d = new Date(editingTransaction.date);
+        setTimeLocal(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+        setDateTimezone(getUserTimezone());
         // Always start collapsed - user can expand if needed
         setShowAdvancedOptions(false);
       } else {
@@ -297,7 +291,7 @@ export function TransactionForm({
         setType(defaultType || 'Send');
         setAccountId(defaultAccountId || accounts[0]?.id || '');
         setAmount(0);
-        setDate(toDateString(new Date(), undefined));
+        setDate(toDateString(new Date()));
         setTitle('');
         setPayee('');
         setNotes('');
@@ -413,18 +407,13 @@ export function TransactionForm({
     const apiType: TransactionType = type === 'Transfer' ? 'Send' : type;
     const isTransfer = type === 'Transfer';
     
-    // Get the user's current timezone for storage
-    const timezone = getUserTimezone();
-    
-    // Use user-selected timezone or auto-detected one
-    const effectiveTimezone = showAdvancedOptions ? dateTimezone : timezone;
-    const effectiveTimeLocal = timeLocal;
+    // Derive UTC from the form's date + time + selected timezone
     
     if (editingTransaction) {
       const updateData: UpdateTransactionRequest = {
         type: apiType,
         amount,
-        date: localToUtc(date, effectiveTimeLocal, effectiveTimezone),
+        date: localToUtc(date, timeLocal, dateTimezone),
         title: title.trim() || undefined,
         payee: payee.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -433,10 +422,6 @@ export function TransactionForm({
         location: includeLocation && location ? location : undefined,
         transferToAccountId: isTransfer ? transferToAccountId : undefined,
         accountId,
-        // Timezone-aware date/time fields
-        dateLocal: date,           // The YYYY-MM-DD date the user selected
-        timeLocal: effectiveTimeLocal, // The HH:mm time
-        dateTimezone: effectiveTimezone, // User's timezone
       };
       onSubmit(updateData);
     } else {
@@ -444,7 +429,7 @@ export function TransactionForm({
         accountId,
         type: apiType,
         amount,
-        date: localToUtc(date, effectiveTimeLocal, effectiveTimezone),
+        date: localToUtc(date, timeLocal, dateTimezone),
         title: title.trim() || undefined,
         payee: payee.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -459,10 +444,6 @@ export function TransactionForm({
         } : undefined,
         // P2P fields (for Send/Receive with counterparty email)
         counterpartyEmail: isP2P ? effectiveCounterpartyEmail : undefined,
-        // Timezone-aware date/time fields
-        dateLocal: date,           // The YYYY-MM-DD date the user selected
-        timeLocal: effectiveTimeLocal, // The HH:mm time
-        dateTimezone: effectiveTimezone, // User's timezone
       };
       onSubmit(createData);
     }

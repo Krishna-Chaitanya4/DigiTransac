@@ -321,30 +321,59 @@ export default function TransactionsPage() {
     };
   }, []);
 
+  // Capture the highlight param from URL on mount (before it gets cleared)
+  const pendingHighlightRef = useRef<string | null>(searchParams.get('highlight'));
+  // Counter to force the scroll effect to re-run when a new highlight is requested.
+  // Refs alone don't trigger re-renders, so this ensures subsequent navigations work.
+  const [highlightTrigger, setHighlightTrigger] = useState(0);
+
   useEffect(() => {
     const highlightId = searchParams.get('highlight');
-    if (highlightId && transactions.length > 0) {
-      // Set the highlighted transaction
-      setHighlightedTransactionId(highlightId);
-      
-      // Clear the URL param
+    if (highlightId) {
+      pendingHighlightRef.current = highlightId;
+      setHighlightTrigger(c => c + 1);
+      // Clear the URL param immediately so it doesn't retrigger
       searchParams.delete('highlight');
       setSearchParams(searchParams, { replace: true });
-      
-      // Scroll to the transaction after a short delay
-      const scrollTimer = setTimeout(() => {
-        const element = document.querySelector(`[data-transaction-id="${highlightId}"]`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
-      timeoutRefs.current.push(scrollTimer);
-      
-      // Clear highlight after animation
-      const clearTimer = setTimeout(() => setHighlightedTransactionId(null), 3000);
-      timeoutRefs.current.push(clearTimer);
     }
-  }, [searchParams, setSearchParams, transactions.length]);
+  }, [searchParams, setSearchParams]);
+
+  // Scroll to the highlighted transaction once it appears in the loaded data.
+  // If the transaction isn't in the current page, progressively load more
+  // pages until it's found or all data has been loaded.
+  useEffect(() => {
+    const highlightId = pendingHighlightRef.current;
+    if (!highlightId || transactions.length === 0) return;
+
+    // Check if the target transaction exists in the loaded data
+    const exists = transactions.some(t => t.id === highlightId);
+    if (!exists) {
+      // Transaction not yet loaded — fetch more if available (cap at 20 pages = 1000 txns)
+      if (hasMore && currentPage < 20) {
+        setCurrentPage(prev => prev + 1);
+      } else {
+        // All pages loaded or cap reached — transaction not found, give up
+        pendingHighlightRef.current = null;
+      }
+      return;
+    }
+
+    setHighlightedTransactionId(highlightId);
+    pendingHighlightRef.current = null;
+
+    // Scroll after DOM renders the element
+    const scrollTimer = setTimeout(() => {
+      const element = document.querySelector(`[data-transaction-id="${highlightId}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 200);
+    timeoutRefs.current.push(scrollTimer);
+
+    // Clear highlight after 3 seconds
+    const clearTimer = setTimeout(() => setHighlightedTransactionId(null), 3000);
+    timeoutRefs.current.push(clearTimer);
+  }, [transactions, hasMore, currentPage, highlightTrigger]);
 
   // Handle date preset change
   const handleDatePresetChange = (preset: DatePreset) => {
@@ -453,26 +482,16 @@ export default function TransactionsPage() {
     }
   };
 
-  // Handle view linked transaction
+  // Handle view linked transaction — reuse the pending-highlight mechanism
+  // so the scroll effect handles waiting for data to load.
   const handleViewLinkedTransaction = useCallback((linkedTransactionId: string, _linkedAccountId: string) => {
     // Clear account filter to show all accounts (linked transaction might be in different account)
     setFilter(prev => ({ ...prev, accountIds: undefined }));
     
-    // Set the transaction to highlight
-    setHighlightedTransactionId(linkedTransactionId);
-    
-    // Clear highlight after animation
-    setTimeout(() => setHighlightedTransactionId(null), 3000);
-    
-    // Invalidate to reload transactions with new filter, then scroll to the linked one
+    // Use pending-highlight ref so the scroll effect picks it up after refetch
+    pendingHighlightRef.current = linkedTransactionId;
+    setHighlightTrigger(c => c + 1);
     invalidateTransactions();
-    // Small delay to let the DOM update after query refresh
-    setTimeout(() => {
-      const element = document.querySelector(`[data-transaction-id="${linkedTransactionId}"]`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 300);
   }, [invalidateTransactions]);
 
   // Handle Accept P2P - opens form with transaction data for account/category assignment
