@@ -720,7 +720,7 @@ export default function SpendingMapPage() {
                               {formatCurrency(transaction.amount, transaction.currency)}
                             </div>
                             <div className="text-sm text-gray-600 mt-1">
-                              {new Date(transaction.dateLocal || transaction.date).toLocaleDateString()}
+                              {new Date(transaction.date).toLocaleDateString()}
                             </div>
                             {transaction.location.placeName && (
                               <div className="text-sm text-gray-500 mt-1">

@@ -606,24 +606,17 @@ function getTypeIcon(type: TransactionUIType): string {
 }
 
 // Get the calendar date key for grouping transactions.
-// Prefers dateLocal (the human-intended date) when available,
-// falls back to extracting from UTC date string (stored at noon UTC).
+// WhatsApp-style: derive the local calendar date from the UTC timestamp
+// using the viewer's device timezone.
 function getDateKey(transaction: Transaction): string {
-  // If dateLocal is available, use it directly - this is the user's intended calendar date
-  if (transaction.dateLocal) {
-    return transaction.dateLocal;  // Already in YYYY-MM-DD format
-  }
-  // Fallback: extract from UTC date (works because dates are stored at noon UTC)
-  return transaction.date.split('T')[0];
+  const d = new Date(transaction.date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Format date for display using a transaction (uses dateLocal when available)
+// Format date for display using a transaction (WhatsApp-style: UTC → viewer's local TZ)
 function formatDateFromTransaction(transaction: Transaction): string {
   const dateKey = getDateKey(transaction);
-  const [year, month, day] = dateKey.split('-').map(Number);
-  
-  // Create date at noon local time for display purposes
-  const date = new Date(year, month - 1, day, 12, 0, 0);
+  const d = new Date(transaction.date);
   
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -639,19 +632,18 @@ function formatDateFromTransaction(transaction: Transaction): string {
     return 'Yesterday';
   }
   
-  return date.toLocaleDateString('en-US', {
+  return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: year !== today.getFullYear() ? 'numeric' : undefined
+    year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
   });
 }
 
-// Group transactions by date (uses dateLocal when available for correct timezone handling)
+// Group transactions by date (WhatsApp-style: UTC → viewer's local calendar date)
 function groupByDate(transactions: Transaction[]): Record<string, Transaction[]> {
   const groups: Record<string, Transaction[]> = {};
   
   for (const transaction of transactions) {
-    // Use the date key (YYYY-MM-DD) for grouping - prefers dateLocal when available
     const dateKey = getDateKey(transaction);
     if (!groups[dateKey]) {
       groups[dateKey] = [];

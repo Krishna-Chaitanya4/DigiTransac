@@ -113,7 +113,8 @@ export function VirtualizedTransactionList({
     const grouped: Record<string, Transaction[]> = {};
     
     for (const t of transactions) {
-      const dateKey = t.date.split('T')[0];
+      const d = new Date(t.date);
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
       }

@@ -36,11 +36,6 @@ import { getCurrencySymbol } from '../services/currencyService';
 // The `date` field is still sent as noon UTC for backward compatibility with queries.
 
 /**
- * Convert a date string (YYYY-MM-DD) to noon UTC for backward compatibility
- */
-const toNoonUTC = (dateStr: string): string => `${dateStr}T12:00:00.000Z`;
-
-/**
  * Get the user's current IANA timezone identifier (e.g., "Asia/Kolkata", "America/New_York")
  */
 const getUserTimezone = (): string => {
@@ -49,6 +44,47 @@ const getUserTimezone = (): string => {
   } catch {
     return 'UTC';
   }
+};
+
+/**
+ * Convert a local date + time + timezone to a UTC ISO string.
+ * WhatsApp-style: we store only the true UTC instant; display uses the viewer's device timezone.
+ *
+ * @param dateStr  YYYY-MM-DD (the calendar date the user picked)
+ * @param time     HH:mm      (the local time the user picked)
+ * @param timezone IANA timezone (e.g. "Asia/Kolkata")
+ * @returns        ISO 8601 UTC string, e.g. "2025-06-20T06:30:00.000Z"
+ */
+const localToUtc = (dateStr: string, time: string, timezone: string): string => {
+  // Build a formatter that interprets a wall-clock reading in the given timezone.
+  // We format it as parts, then calculate the offset from UTC.
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes] = time.split(':').map(Number);
+
+  // Create a Date in the system timezone, then adjust for the target timezone.
+  // Strategy: use Intl.DateTimeFormat to find the UTC offset of `timezone` at this instant,
+  // then build the correct UTC Date.
+  const guess = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+  // Get the target timezone's offset at this approximate time
+  const formatInTz = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const partsInTz = formatInTz.formatToParts(guess);
+  const get = (type: string) => Number(partsInTz.find(p => p.type === type)?.value ?? 0);
+  const wallInTz = new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+
+  // Offset (in ms) = what the wall clock in TZ shows minus actual UTC
+  const offsetMs = wallInTz.getTime() - guess.getTime() + guess.getTimezoneOffset() * 60_000;
+
+  // The desired wall-clock reading in the target TZ is year/month/day hours:minutes
+  const desiredWall = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  const utc = new Date(desiredWall.getTime() - offsetMs + desiredWall.getTimezoneOffset() * 60_000);
+
+  return utc.toISOString();
 };
 
 /**
@@ -89,28 +125,18 @@ const TIMEZONE_OPTIONS = [
 ];
 
 /**
- * Extract YYYY-MM-DD from a date, preferring dateLocal if available.
- * For transactions with dateLocal, we use that directly (it's the user's intended date).
- * For legacy transactions without dateLocal, we extract from the UTC date.
+ * Extract YYYY-MM-DD from a date for the form's date picker.
+ * Prefers dateLocal (the date the user originally selected) when editing.
+ * Falls back to converting UTC date to the viewer's local calendar date.
  */
 const toDateString = (dateInput: string | Date, dateLocal?: string): string => {
-  // If we have the local date string, use it directly
+  // If we have the local date string from the original transaction, use it
   if (dateLocal) {
     return dateLocal;
   }
   
-  if (typeof dateInput === 'string') {
-    // Check if it's just a date (YYYY-MM-DD) or has time component
-    if (dateInput.length === 10) {
-      return dateInput;
-    }
-    // Has time component - for legacy data, extract date from UTC
-    // This maintains backward compatibility
-    return dateInput.split('T')[0];
-  }
-  
-  // For Date objects, format as local date (user's perspective)
-  const d = dateInput;
+  // Convert to a Date object then format as YYYY-MM-DD in the viewer's timezone
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
@@ -398,7 +424,7 @@ export function TransactionForm({
       const updateData: UpdateTransactionRequest = {
         type: apiType,
         amount,
-        date: toNoonUTC(date),
+        date: localToUtc(date, effectiveTimeLocal, effectiveTimezone),
         title: title.trim() || undefined,
         payee: payee.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -418,7 +444,7 @@ export function TransactionForm({
         accountId,
         type: apiType,
         amount,
-        date: toNoonUTC(date),
+        date: localToUtc(date, effectiveTimeLocal, effectiveTimezone),
         title: title.trim() || undefined,
         payee: payee.trim() || undefined,
         notes: notes.trim() || undefined,
