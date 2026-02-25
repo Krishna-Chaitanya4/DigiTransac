@@ -850,11 +850,16 @@ public class ConversationService : IConversationService
             return DomainErrors.Transaction.SelfP2PNotAllowed;
         
         // Create transaction through TransactionService
+        // Pass DateLocal/TimeLocal/DateTimezone explicitly to prevent
+        // NormalizeDateTimeFields from double-converting the UTC date.
+        // Without these, it treats the UTC date as server-local-time and
+        // converts to UTC again, shifting the date backward.
+        var now = DateTime.UtcNow;
         var createRequest = new CreateTransactionRequest(
             AccountId: request.AccountId,
             Type: request.Type,  // Use the requested type (Send or Receive)
             Amount: request.Amount,
-            Date: DateTime.UtcNow,
+            Date: now,
             Title: request.Title,
             Payee: null,
             Notes: request.Notes,
@@ -865,7 +870,10 @@ public class ConversationService : IConversationService
             RecurringRule: null,
             CounterpartyEmail: counterparty.Email, // Use email for the existing P2P flow
             CounterpartyAmount: null,
-            Source: nameof(TransactionSource.Chat)  // Mark as created via chat
+            Source: nameof(TransactionSource.Chat),  // Mark as created via chat
+            DateLocal: now.ToString("yyyy-MM-dd"),
+            TimeLocal: now.ToString("HH:mm"),
+            DateTimezone: "UTC"
         );
         
         var result = await _transactionService.CreateAsync(userId, createRequest);

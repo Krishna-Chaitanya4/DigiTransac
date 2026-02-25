@@ -171,8 +171,8 @@ export default function TransactionsPage() {
       labelIds: expandedLabelIds,
       folderIds: undefined,
       searchText: debouncedSearchText || undefined,
-      page: currentPage,
-      pageSize,
+      page: 1,
+      pageSize: currentPage * pageSize, // Grow window instead of paginating to avoid data replacement
     };
   }, [filter, getDateRange, getExpandedLabelIds, debouncedSearchText, currentPage, pageSize]);
 

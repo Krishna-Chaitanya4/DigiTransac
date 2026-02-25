@@ -28,11 +28,18 @@ export interface P2PTransactionNotification {
 export interface ChatMessageNotification {
   messageId: string;
   senderId: string;
+  recipientId: string;
   senderName?: string;
   messageType: string;
   content?: string;
   transactionId?: string;
   sentAt: string;
+  // Optional transaction data for instant optimistic display
+  transactionType?: string;   // "Send" or "Receive" (from sender's perspective)
+  amount?: number;
+  currency?: string;
+  title?: string;
+  transactionStatus?: string; // "Pending", "Confirmed", "Declined"
 }
 
 export interface MessageDeletedNotification {
@@ -58,7 +65,6 @@ interface UseNotificationsOptions {
   onP2PTransactionCreated?: (notification: P2PTransactionNotification) => void;
   onP2PTransactionAccepted?: (notification: P2PTransactionNotification) => void;
   onP2PTransactionRejected?: (notification: P2PTransactionNotification) => void;
-  onChatMessage?: (notification: ChatMessageNotification) => void;
   onNewChatMessage?: (notification: ChatMessageNotification) => void;
   onPendingCountUpdate?: (notification: PendingCountNotification) => void;
   presence?: PresenceCallbacks;
@@ -163,12 +169,21 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         }
       );
 
+      // Optimistically bump the pending count so the PendingIndicator badge
+      // updates instantly without waiting for the refetch round-trip.
+      queryClient.setQueryData<number>(
+        queryKeys.transactions.pendingCount,
+        (old) => (old ?? 0) + 1
+      );
+
       // Invalidate all transaction-dependent queries (including analytics/insights)
       queryClient.invalidateQueries({ queryKey: ['transactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: ['conversations'], ...invalidateAll });
+      // Only invalidate conversation list (not detail caches) to avoid racing
+      // with the NewChatMessage optimistic append that updates detail caches.
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('P2PTransactionAccepted', (notification: P2PTransactionNotification) => {
@@ -179,7 +194,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['transactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: ['conversations'], ...invalidateAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('P2PTransactionRejected', (notification: P2PTransactionNotification) => {
@@ -191,46 +206,107 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['pendingTransactions'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['accounts'], ...invalidateAll });
       queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
-      queryClient.invalidateQueries({ queryKey: ['conversations'], ...invalidateAll });
-    });
-
-    // NOTE: 'ChatMessage' is sent to the conversation group (JoinConversation),
-    // but the frontend never calls joinConversation, so this event is never received.
-    // All incoming messages arrive via 'NewChatMessage' sent to the user's group.
-    // Keeping the callback registration for forward-compatibility if groups are wired up.
-    connection.on('ChatMessage', (notification: ChatMessageNotification) => {
-      logger.info('SignalR: ChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
-      optionsRef.current.onChatMessage?.(notification);
-      
-      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(notification.senderId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
-    connection.on('NewChatMessage', (notification: ChatMessageNotification) => {
+    connection.on('NewChatMessage', async (notification: ChatMessageNotification) => {
       logger.info('SignalR: NewChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onNewChatMessage?.(notification);
 
-      const detailKey = queryKeys.conversations.detail(notification.senderId);
+      // Determine if this is my own message echoed back to me.
+      // We can't use user.id (not in the auth type), so we check which
+      // conversation detail cache exists. If we have a cache keyed by
+      // recipientId, the recipient is our counterparty → we're the sender.
+      const cachedByRecipient = queryClient.getQueryData<ConversationDetailResponse>(
+        queryKeys.conversations.detail(notification.recipientId)
+      );
+      const isMyMessage = !!cachedByRecipient;
+      // The detail key is always keyed by the COUNTERPARTY's user ID
+      const counterpartyId = isMyMessage ? notification.recipientId : notification.senderId;
+      const detailKey = queryKeys.conversations.detail(counterpartyId);
+
+      // Cancel any in-flight refetches (e.g. from useCreateTransaction.onSuccess
+      // invalidating conversations) so they don't overwrite our optimistic append
+      // with stale data that doesn't include the new message yet.
+      await queryClient.cancelQueries({ queryKey: detailKey });
 
       // Optimistically append ALL message types for instant display.
       // For Text messages the content is available immediately.
-      // For Transaction messages the `transaction` detail is null here but will
-      // be populated by the subsequent invalidation refetch. The key reason we
-      // append eagerly is to bump the message count so the mark-as-read effect
-      // in ChatsPage fires synchronously — without this, transaction messages
-      // rely on an async refetch and can be interrupted by cancelQueries in
-      // useMarkAsRead.onSuccess, preventing "Seen" from ever appearing.
+      // For Transaction messages the transaction data is now included in the
+      // notification payload for instant rendering without waiting for refetch.
       queryClient.setQueryData<ConversationDetailResponse>(detailKey, (old) => {
         if (!old) return old;
-        // Dedup — skip if message already exists
+        // Dedup — skip if message already exists (by server ID)
         if (old.messages.some(m => m.id === notification.messageId)) return old;
+
+        // If this is our own message echoed back, the optimistic temp message
+        // (from useOptimisticSendMessage with id "temp-...") is already in the
+        // list. Replace it with the real server message instead of appending a
+        // duplicate. Match by content + isFromMe for text, or by transactionId
+        // for transaction messages.
+        let messages = old.messages;
+        if (isMyMessage) {
+          const tempIndex = messages.findIndex(m => {
+            if (!m.id.startsWith('temp-')) return false;
+            if (notification.messageType === 'Transaction') {
+              // Transaction temp messages won't exist (transactions use a different
+              // mutation path), but guard anyway
+              return false;
+            }
+            // Text message: match by content
+            return m.isFromMe && m.content === notification.content;
+          });
+          if (tempIndex !== -1) {
+            // Replace the temp message in-place with the real server message
+            messages = [...messages];
+            messages[tempIndex] = {
+              ...messages[tempIndex],
+              id: notification.messageId,
+              senderUserId: notification.senderId,
+              status: 'Delivered',
+              deliveredAt: new Date().toISOString(),
+            };
+            return { ...old, messages };
+          }
+        }
+
+        // Build optimistic transaction data if available in the notification.
+        // The sender sees their own type; the receiver sees the inverse.
+        let txData: import('../types/conversations').TransactionMessageData | null = null;
+        if (notification.messageType === 'Transaction' && notification.transactionId && notification.amount != null && notification.currency) {
+          const senderType = notification.transactionType as 'Send' | 'Receive' | undefined;
+          // Sender's perspective is what the backend sent; receiver sees the inverse
+          const viewerType = isMyMessage
+            ? (senderType || 'Send')
+            : (senderType === 'Send' ? 'Receive' : 'Send');
+          txData = {
+            transactionId: notification.transactionId,
+            transactionLinkId: '', // Filled by refetch
+            transactionType: viewerType,
+            amount: notification.amount,
+            currency: notification.currency,
+            date: notification.sentAt,
+            title: notification.title || null,
+            notes: null,
+            // Sender's transaction is always Confirmed; the notification may
+            // carry "Pending" (correct for receiver) from P2PNotificationEventHandler.
+            status: isMyMessage
+              ? 'Confirmed'
+              : ((notification.transactionStatus as 'Pending' | 'Confirmed' | 'Declined') || 'Pending'),
+            accountName: null,
+            primaryCategory: null,
+            isDeleted: false,
+            deletedAt: null,
+          };
+        }
+
         const newMsg: ConversationMessage = {
           id: notification.messageId,
           type: (notification.messageType as ConversationMessage['type']) || 'Text',
           senderUserId: notification.senderId,
-          isFromMe: false,
+          isFromMe: isMyMessage,
           content: notification.content || null,
-          transaction: null, // Filled by refetch for Transaction messages
+          transaction: txData, // Populated from notification for instant display
           status: 'Delivered',
           createdAt: notification.sentAt,
           deliveredAt: new Date().toISOString(),
@@ -249,9 +325,41 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         };
       });
 
-      // Invalidate to get full server data (transaction details, reply previews, etc.)
-      queryClient.invalidateQueries({ queryKey: detailKey });
-      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
+      // Optimistically update conversation list sidebar preview for instant feedback
+      const previewContent = notification.messageType === 'Transaction'
+        ? (isMyMessage
+            ? `Sent ${notification.currency ? formatCurrency(notification.amount!, notification.currency) : ''}`
+            : `Received ${notification.currency ? formatCurrency(notification.amount!, notification.currency) : ''}`)
+        : notification.content || '';
+      const previewText = isMyMessage ? `You: ${previewContent}` : previewContent;
+      queryClient.setQueryData<ConversationListResponse>(
+        queryKeys.conversations.list(),
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            conversations: old.conversations.map((c) => {
+              if (c.counterpartyUserId !== counterpartyId) return c;
+              return {
+                ...c,
+                lastMessagePreview: previewText,
+                lastMessageType: notification.messageType || 'Text',
+                lastActivityAt: notification.sentAt,
+                unreadCount: isMyMessage ? c.unreadCount : c.unreadCount + 1,
+              };
+            }),
+          };
+        }
+      );
+
+      // Invalidate after a short delay to get full server data (category, notes,
+      // account name, etc.). The delay ensures the server has committed the chat
+      // message before we refetch, preventing a stale response that would
+      // overwrite our optimistic bubble.
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: detailKey });
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
+      }, 500);
     });
 
     connection.on('MessageDeleted', (notification: MessageDeletedNotification) => {

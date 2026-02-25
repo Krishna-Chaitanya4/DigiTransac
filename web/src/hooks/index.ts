@@ -65,7 +65,6 @@ export {
 export {
   useConversations,
   useConversation,
-  useSendMessage,
   useEditMessage,
   useDeleteMessage,
   useRestoreMessage,

@@ -40,22 +40,6 @@ export function useConversation(userId: string | null) {
   });
 }
 
-// Hook to send a message
-export function useSendMessage() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ userId, request }: { userId: string; request: SendMessageRequest }) =>
-      sendMessage(userId, request),
-    onSuccess: (_data, variables) => {
-      // Invalidate the conversation to refetch messages
-      queryClient.invalidateQueries({ queryKey: conversationKeys.detail(variables.userId) });
-      // Invalidate the list to update previews
-      queryClient.invalidateQueries({ queryKey: conversationKeys.list() });
-    },
-  });
-}
-
 // Hook to edit a message
 export function useEditMessage() {
   const queryClient = useQueryClient();

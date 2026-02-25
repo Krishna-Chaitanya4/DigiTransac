@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryClient';
 import {
   getTransactions,
@@ -41,6 +41,7 @@ export function useTransactions(filter: TransactionFilter, enabled = true) {
     queryKey: queryKeys.transactions.list(filter),
     queryFn: () => getTransactions(filter),
     staleTime: 2 * 60 * 1000, // 2 minutes
+    placeholderData: keepPreviousData, // Show previous data while loading more
     enabled,
   });
 }
