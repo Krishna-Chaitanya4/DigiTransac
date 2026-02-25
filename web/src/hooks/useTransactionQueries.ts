@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryClient';
 import {
@@ -103,9 +104,10 @@ export function useCounterparties() {
   });
 }
 
-// Shared invalidation options — use refetchType 'all' so inactive queries
-// (e.g. Insights analytics when user is on Transactions page) are also invalidated
-const invalidateAll = { refetchType: 'all' as const };
+// Shared invalidation options — only refetch active queries to avoid cascade.
+// Inactive queries (e.g. different filter combos, Insights analytics when not visible)
+// will be marked stale and refetch on their next mount.
+const invalidateAll = { refetchType: 'active' as const };
 
 /**
  * Invalidate all transaction-related query caches (transactions, accounts, budgets).
@@ -413,9 +415,9 @@ export function usePrefetchTransactions() {
 export function useInvalidateTransactions() {
   const queryClient = useQueryClient();
   
-  return () => {
+  return useCallback(() => {
     invalidateTransactionRelatedQueries(queryClient);
-  };
+  }, [queryClient]);
 }
 
 // ============ Extended Analytics Hooks ============

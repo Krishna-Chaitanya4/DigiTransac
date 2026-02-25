@@ -337,10 +337,12 @@ public class TransactionCoreService : ITransactionCoreService
         });
 
         // Handle P2P - create pending transaction for counterparty (outside main transaction)
+        Transaction? counterpartyTransaction = null;
         if (isP2P && counterpartyUser != null)
         {
-            await _p2pService.CreateP2PTransactionAsync(
+            var p2pResult = await _p2pService.CreateP2PTransactionAsync(
                 userId, request, account, counterpartyUser, transactionLinkId!.Value, dek);
+            counterpartyTransaction = p2pResult.Transaction;
         }
 
         // Create chat message (outside main transaction - separate operation)
@@ -361,6 +363,26 @@ public class TransactionCoreService : ITransactionCoreService
         await _chatMessageRepository.CreateAsync(chatMessage);
         transaction.ChatMessageId = chatMessage.Id;
         await _transactionRepository.UpdateAsync(transaction);
+
+        // For P2P: create a counterparty chat message so "View in Chat" works for the recipient too
+        if (isP2P && counterpartyUser != null && counterpartyTransaction != null)
+        {
+            var counterpartyChatMessage = new ChatMessage
+            {
+                SenderUserId = userId,
+                RecipientUserId = counterpartyUser.Id,
+                Type = ChatMessageType.Transaction,
+                TransactionId = counterpartyTransaction.Id,
+                Status = MessageStatus.Sent,
+                IsSystemGenerated = true,
+                SystemSource = SystemMessageSources.P2P,
+                CreatedAt = DateTime.UtcNow.AddMilliseconds(1) // Slightly after sender's message
+            };
+
+            await _chatMessageRepository.CreateAsync(counterpartyChatMessage);
+            counterpartyTransaction.ChatMessageId = counterpartyChatMessage.Id;
+            await _transactionRepository.UpdateAsync(counterpartyTransaction);
+        }
 
         // Map response
         var accounts2 = await _accountRepository.GetByUserIdAsync(userId, true);

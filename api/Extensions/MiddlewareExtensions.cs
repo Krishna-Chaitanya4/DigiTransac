@@ -1,6 +1,7 @@
 using DigiTransac.Api.Endpoints;
 using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Middleware;
+using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -178,5 +179,6 @@ public static class MiddlewareExtensions
 
         // SignalR hub
         app.MapHub<NotificationHub>("/hubs/notifications");
+
     }
 }

@@ -175,11 +175,12 @@ public class TransactionRepository : ITransactionRepository
             filterBuilder.Ne(t => t.IsDeleted, true), // Exclude soft-deleted transactions (Ne(true) matches both false and missing field)
         };
         
-        // Include/exclude pending P2P transactions (AccountId is null) based on status filter
-        // When filtering for Pending status, include P2P pending transactions
-        // Otherwise, exclude them from normal listings
-        var isPendingFilter = string.Equals(filter.Status, "Pending", StringComparison.OrdinalIgnoreCase);
-        if (!isPendingFilter)
+        // Include/exclude transactions with null AccountId based on status filter
+        // P2P transactions start with AccountId = null. Allow them through when filtering
+        // for Pending or Declined status; otherwise exclude from normal listings.
+        var allowNullAccountId = string.Equals(filter.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(filter.Status, "Declined", StringComparison.OrdinalIgnoreCase);
+        if (!allowNullAccountId)
         {
             filters.Add(filterBuilder.Ne(t => t.AccountId, null));
         }
