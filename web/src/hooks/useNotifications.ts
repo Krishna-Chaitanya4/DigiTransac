@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../services/apiClient';
 import { getStoredAccessToken } from '../services/tokenStorage';
 import { logger } from '../services/logger';
 import { queryKeys } from '../lib/queryClient';
-import type { ConversationDetailResponse } from '../types/conversations';
+import type { ConversationDetailResponse, ConversationMessage } from '../types/conversations';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -168,50 +168,83 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['budgets'], ...invalidateAll });
     });
 
+    // NOTE: 'ChatMessage' is sent to the conversation group (JoinConversation),
+    // but the frontend never calls joinConversation, so this event is never received.
+    // All incoming messages arrive via 'NewChatMessage' sent to the user's group.
+    // Keeping the callback registration for forward-compatibility if groups are wired up.
     connection.on('ChatMessage', (notification: ChatMessageNotification) => {
       logger.info('SignalR: ChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onChatMessage?.(notification);
       
-      // Invalidate conversation detail for this sender
-      // This ensures real-time message updates in the active conversation
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Also invalidate the conversations list to update previews
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(notification.senderId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('NewChatMessage', (notification: ChatMessageNotification) => {
       logger.info('SignalR: NewChatMessage received', { messageId: notification.messageId, senderId: notification.senderId });
       optionsRef.current.onNewChatMessage?.(notification);
-      
-      // Invalidate conversation detail for this sender
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Invalidate conversations list to show new message in sidebar
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+
+      const detailKey = queryKeys.conversations.detail(notification.senderId);
+
+      // Optimistically append text messages for instant display
+      if (notification.messageType === 'Text' && notification.content) {
+        queryClient.setQueryData<ConversationDetailResponse>(detailKey, (old) => {
+          if (!old) return old;
+          // Dedup — skip if message already exists
+          if (old.messages.some(m => m.id === notification.messageId)) return old;
+          const newMsg: ConversationMessage = {
+            id: notification.messageId,
+            type: 'Text',
+            senderUserId: notification.senderId,
+            isFromMe: false,
+            content: notification.content || null,
+            transaction: null,
+            status: 'Delivered',
+            createdAt: notification.sentAt,
+            deliveredAt: new Date().toISOString(),
+            readAt: null,
+            isEdited: false,
+            editedAt: null,
+            isDeleted: false,
+            deletedAt: null,
+            replyToMessageId: null,
+            replyTo: null,
+          };
+          return {
+            ...old,
+            messages: [...old.messages, newMsg],
+            totalCount: old.totalCount + 1,
+          };
+        });
+      }
+
+      // Invalidate to get full server data (transaction details, reply previews, etc.)
+      queryClient.invalidateQueries({ queryKey: detailKey });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('MessageDeleted', (notification: MessageDeletedNotification) => {
       logger.info('SignalR: MessageDeleted received', { messageId: notification.messageId, senderId: notification.senderId });
       
-      // Invalidate conversation detail to remove the deleted message
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Invalidate conversations list to update preview if deleted message was the latest
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(notification.senderId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('MessageRestored', (notification: MessageRestoredNotification) => {
       logger.info('SignalR: MessageRestored received', { messageId: notification.messageId, senderId: notification.senderId });
       
-      // Invalidate conversation detail to show the restored message
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
-      // Invalidate conversations list to update preview
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(notification.senderId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     // When the counterparty reads our messages, update statuses to 'Read' instantly
-    connection.on('MessagesRead', (notification: { readByUserId: string }) => {
+    connection.on('MessagesRead', async (notification: { readByUserId: string }) => {
       logger.info('SignalR: MessagesRead received', { readByUserId: notification.readByUserId });
+      const detailKey = queryKeys.conversations.detail(notification.readByUserId);
+      // Cancel in-flight refetches so they don't overwrite with stale 'Delivered' statuses
+      await queryClient.cancelQueries({ queryKey: detailKey });
       queryClient.setQueryData<ConversationDetailResponse>(
-        queryKeys.conversations.detail(notification.readByUserId),
+        detailKey,
         (old) => {
           if (!old) return old;
           return {
@@ -224,6 +257,8 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
           };
         }
       );
+      // Also update the conversation list so the sidebar reflects read status
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     });
 
     connection.on('PendingCount', (notification: PendingCountNotification) => {

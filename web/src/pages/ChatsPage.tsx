@@ -234,9 +234,26 @@ export default function ChatsPage() {
   // Mark-as-read tracking
   const markedAsReadRef = useRef<string | null>(null);
   const messageCountRef = useRef<number>(0);
+  // Track last viewed message per conversation so we can skip the unread divider
+  // for messages the user already saw (handles mark-as-read race on navigate back).
+  const lastViewedMsgIdRef = useRef<Map<string, string>>(new Map());
+  const previousSelectedUserIdRef = useRef<string | null>(null);
+  // Keep a ref to latest messages so we can read it during navigation without deps
+  const latestMessagesRef = useRef<ConversationMessage[] | null>(null);
+  useEffect(() => {
+    latestMessagesRef.current = conversationData?.messages ?? null;
+  }, [conversationData?.messages]);
 
   // Reset ALL tracking refs when switching conversations — invalidate to force a fresh fetch
   useEffect(() => {
+    // Save last viewed message for the conversation we're leaving
+    const prevUserId = previousSelectedUserIdRef.current;
+    const msgs = latestMessagesRef.current;
+    if (prevUserId && msgs?.length) {
+      lastViewedMsgIdRef.current.set(prevUserId, msgs[msgs.length - 1].id);
+    }
+    previousSelectedUserIdRef.current = selectedUserId;
+
     navigationTimestampRef.current = Date.now();
     unreadCapturedRef.current = false;
     setActiveUnreadDividerId(null);
@@ -293,6 +310,18 @@ export default function ChatsPage() {
     unreadCapturedRef.current = true;
     const apiUnreadId = conversationData.firstUnreadMessageId;
     if (apiUnreadId) {
+      // Skip divider if these messages were already viewed in a previous visit.
+      // This handles the race where mark-as-read was in-flight when we left.
+      const lastViewedId = lastViewedMsgIdRef.current.get(selectedUserId);
+      if (lastViewedId && conversationData.messages) {
+        const messages = conversationData.messages;
+        const unreadIdx = messages.findIndex(m => m.id === apiUnreadId);
+        const viewedIdx = messages.findIndex(m => m.id === lastViewedId);
+        if (viewedIdx >= 0 && unreadIdx >= 0 && viewedIdx >= unreadIdx) {
+          // User already viewed past the unread boundary — skip divider
+          return;
+        }
+      }
       setActiveUnreadDividerId(apiUnreadId);
       hasScrolledToUnreadRef.current = false;
     }
@@ -306,11 +335,17 @@ export default function ChatsPage() {
     if (!selectedUserId || !conversationData) return;
     // Skip stale cached data — wait for fresh fetch
     if (dataUpdatedAt < navigationTimestampRef.current) return;
-    const currentMessageCount = conversationData.messages?.length || 0;
+
+    const messages = conversationData.messages ?? [];
+    const currentMessageCount = messages.length;
     const isNewConversation = markedAsReadRef.current !== selectedUserId;
     const hasNewMessages = currentMessageCount > messageCountRef.current && !isNewConversation;
 
-    if (isNewConversation || hasNewMessages) {
+    // Only mark-as-read if there are actual INCOMING messages to mark.
+    // Skips unnecessary API calls when the count increased because WE sent a message.
+    const hasUnreadIncoming = messages.some(m => !m.isFromMe && m.status !== 'Read');
+
+    if ((isNewConversation || hasNewMessages) && hasUnreadIncoming) {
       markAsReadMutation.mutate(selectedUserId);
       markedAsReadRef.current = selectedUserId;
     }

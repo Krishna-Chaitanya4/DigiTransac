@@ -16,6 +16,7 @@ import type {
   ConversationMessage,
   SendMessageRequest,
 } from '../types/conversations';
+import { logger } from '../services/logger';
 
 // Use centralized query keys from queryClient.ts
 const conversationKeys = queryKeys.conversations;
@@ -222,7 +223,7 @@ export function useMarkAsRead() {
 
   return useMutation({
     mutationFn: (userId: string) => markAsRead(userId),
-    onSuccess: (_data, userId) => {
+    onSuccess: async (_data, userId) => {
       // Update the conversations list cache to set unread count to 0
       queryClient.setQueryData<ConversationListResponse>(
         conversationKeys.list(),
@@ -240,8 +241,11 @@ export function useMarkAsRead() {
       );
       // Optimistically update message statuses in the detail cache so "Seen"
       // indicators render immediately without waiting for a refetch.
+      const detailKey = conversationKeys.detail(userId);
+      // Await cancel so in-flight refetches don't overwrite with stale data
+      await queryClient.cancelQueries({ queryKey: detailKey });
       queryClient.setQueryData<ConversationDetailResponse>(
-        conversationKeys.detail(userId),
+        detailKey,
         (old) => {
           if (!old) return old;
           return {
@@ -255,6 +259,9 @@ export function useMarkAsRead() {
           };
         }
       );
+    },
+    onError: (error, userId) => {
+      logger.error('Failed to mark conversation as read', { userId, error });
     },
   });
 }
