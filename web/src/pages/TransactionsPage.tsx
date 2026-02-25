@@ -109,12 +109,15 @@ export default function TransactionsPage() {
   const pageSize = 50;
   
   // Filter state
-  const [datePreset, setDatePreset] = useState<DatePreset>('thisMonth');
+  // When navigating via ?highlight=<id> (e.g. "View in Transactions" from chat),
+  // clear filters so the transaction is findable regardless of status or date.
+  const hasHighlight = searchParams.has('highlight');
+  const [datePreset, setDatePreset] = useState<DatePreset>(hasHighlight ? 'custom' : 'thisMonth');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchText, setSearchText] = useState('');
   const [debouncedSearchText, setDebouncedSearchText] = useState('');
-  const [filter, setFilter] = useState<TransactionFilter>({ status: 'Confirmed' }); // Default to Confirmed
+  const [filter, setFilter] = useState<TransactionFilter>(hasHighlight ? {} : { status: 'Confirmed' });
   
   // Linked transaction navigation
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null);

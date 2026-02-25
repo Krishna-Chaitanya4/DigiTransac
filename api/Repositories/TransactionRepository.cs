@@ -22,9 +22,7 @@ public interface ITransactionRepository
     Task<bool> DeleteAllByUserIdAsync(string userId, CancellationToken ct = default);
     Task<int> NullifyCounterpartyReferencesAsync(string deletedUserId, CancellationToken ct = default);
     Task<bool> DeleteAllByAccountIdAsync(string accountId, string userId, CancellationToken ct = default);
-    Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null, CancellationToken ct = default);
-    Task<Dictionary<string, decimal>> GetSumByLabelAsync(string userId, DateTime? startDate, DateTime? endDate, CancellationToken ct = default);
-    Task<Dictionary<string, decimal>> GetSumByTagAsync(string userId, DateTime? startDate, DateTime? endDate, CancellationToken ct = default);
+
     
     // Count methods for validation before deletion
     Task<int> GetCountByAccountIdAsync(string accountId, string userId, CancellationToken ct = default);
@@ -175,12 +173,11 @@ public class TransactionRepository : ITransactionRepository
             filterBuilder.Ne(t => t.IsDeleted, true), // Exclude soft-deleted transactions (Ne(true) matches both false and missing field)
         };
         
-        // Include/exclude transactions with null AccountId based on status filter
-        // P2P transactions start with AccountId = null. Allow them through when filtering
-        // for Pending or Declined status; otherwise exclude from normal listings.
-        var allowNullAccountId = string.Equals(filter.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
-                                 string.Equals(filter.Status, "Declined", StringComparison.OrdinalIgnoreCase);
-        if (!allowNullAccountId)
+        // P2P transactions start with AccountId = null (assigned on accept).
+        // Only exclude them when explicitly filtering for Confirmed status,
+        // since confirmed transactions must always have an account.
+        // For Pending, Declined, or All (no status filter) we want to see them.
+        if (string.Equals(filter.Status, "Confirmed", StringComparison.OrdinalIgnoreCase))
         {
             filters.Add(filterBuilder.Ne(t => t.AccountId, null));
         }
@@ -435,117 +432,7 @@ public class TransactionRepository : ITransactionRepository
         return result.DeletedCount > 0;
     }
 
-    public async Task<decimal> GetSumByAccountIdAsync(string accountId, string userId, TransactionType? type = null, CancellationToken ct = default)
-    {
-        var filterBuilder = Builders<Transaction>.Filter;
-        var filters = new List<FilterDefinition<Transaction>>
-        {
-            filterBuilder.Eq(t => t.AccountId, accountId),
-            filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
-            filterBuilder.Ne(t => t.IsDeleted, true)
-        };
 
-        if (type.HasValue)
-        {
-            filters.Add(filterBuilder.Eq(t => t.Type, type.Value));
-        }
-
-        var combinedFilter = filterBuilder.And(filters);
-
-        var pipeline = _transactions.Aggregate()
-            .Match(combinedFilter)
-            .Group(new BsonDocument
-            {
-                { "_id", BsonNull.Value },
-                { "total", new BsonDocument("$sum", "$amount") }
-            });
-
-        var result = await pipeline.FirstOrDefaultAsync(ct);
-        return result?["total"].ToDecimal() ?? 0m;
-    }
-
-    public async Task<Dictionary<string, decimal>> GetSumByLabelAsync(
-        string userId, 
-        DateTime? startDate, 
-        DateTime? endDate,
-        CancellationToken ct = default)
-    {
-        var filterBuilder = Builders<Transaction>.Filter;
-        var filters = new List<FilterDefinition<Transaction>>
-        {
-            filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
-            filterBuilder.Ne(t => t.IsDeleted, true)
-        };
-
-        if (startDate.HasValue)
-        {
-            filters.Add(filterBuilder.Gte(t => t.Date, startDate.Value));
-        }
-
-        if (endDate.HasValue)
-        {
-            filters.Add(filterBuilder.Lte(t => t.Date, endDate.Value));
-        }
-
-        var pipeline = _transactions.Aggregate()
-            .Match(filterBuilder.And(filters))
-            .Unwind(t => t.Splits)
-            .Group(new BsonDocument
-            {
-                { "_id", "$splits.labelId" },
-                { "total", new BsonDocument("$sum", "$splits.amount") }
-            });
-
-        var results = await pipeline.ToListAsync(ct);
-        return results
-            .Where(r => !r["_id"].IsBsonNull)
-            .ToDictionary(
-                r => r["_id"].IsString ? r["_id"].AsString : r["_id"].AsObjectId.ToString(),
-                r => r["total"].ToDecimal());
-    }
-
-    public async Task<Dictionary<string, decimal>> GetSumByTagAsync(
-        string userId, 
-        DateTime? startDate, 
-        DateTime? endDate,
-        CancellationToken ct = default)
-    {
-        var filterBuilder = Builders<Transaction>.Filter;
-        var filters = new List<FilterDefinition<Transaction>>
-        {
-            filterBuilder.Eq(t => t.UserId, userId),
-            filterBuilder.Eq(t => t.IsRecurringTemplate, false),
-            filterBuilder.Ne(t => t.IsDeleted, true)
-        };
-
-        if (startDate.HasValue)
-        {
-            filters.Add(filterBuilder.Gte(t => t.Date, startDate.Value));
-        }
-
-        if (endDate.HasValue)
-        {
-            filters.Add(filterBuilder.Lte(t => t.Date, endDate.Value));
-        }
-
-        var pipeline = _transactions.Aggregate()
-            .Match(filterBuilder.And(filters))
-            .Unwind(t => t.TagIds)
-            .Group(new BsonDocument
-            {
-                { "_id", "$tagIds" },
-                { "total", new BsonDocument("$sum", "$amount") }
-            });
-
-        var results = await pipeline.ToListAsync(ct);
-        return results
-            .Where(r => !r["_id"].IsBsonNull)
-            .ToDictionary(
-                r => r["_id"].IsString ? r["_id"].AsString : r["_id"].AsObjectId.ToString(),
-                r => r["total"].ToDecimal());
-    }
 
     public async Task<int> GetCountByAccountIdAsync(string accountId, string userId, CancellationToken ct = default)
     {
