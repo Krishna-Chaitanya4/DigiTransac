@@ -243,9 +243,13 @@ public class NotificationService : INotificationService
         // Send to conversation group and also directly to the recipient via SignalR (real-time in-app)
         await NotifyConversationAsync(userId1, userId2, "ChatMessage", notification);
         
-        // Also send direct notification to recipient user via SignalR
+        // Send direct notification to BOTH sender and recipient via SignalR.
+        // The sender needs this for instant chat bubble display (otherwise they
+        // rely on slow query invalidation/refetch). Dedup on the frontend
+        // prevents duplicate messages from appearing.
         var recipientId = notification.SenderId == userId1 ? userId2 : userId1;
         await NotifyUserAsync(recipientId, "NewChatMessage", notification);
+        await NotifyUserAsync(notification.SenderId, "NewChatMessage", notification);
         
         // Send web push notification to recipient (for when app is closed/background)
         if (_webPushService != null)

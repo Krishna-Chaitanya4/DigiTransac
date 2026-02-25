@@ -120,13 +120,18 @@ export function CalculatorInput({
       setIsExpression(true);
       const result = evaluateExpression(expressionInput);
       setEvaluatedValue(result);
+      // Immediately propagate the evaluated value so the parent form
+      // knows a valid amount exists (e.g. submit button is enabled)
+      if (result !== null && result > 0) {
+        onChange(result);
+      }
       inputRef.current?.focus();
       // Notify parent that we consumed the expression
       if (onExpressionInputConsumed) {
         onExpressionInputConsumed();
       }
     }
-  }, [expressionInput, onExpressionInputConsumed]);
+  }, [expressionInput, onExpressionInputConsumed, onChange]);
 
   // Update input when external value changes
   useEffect(() => {

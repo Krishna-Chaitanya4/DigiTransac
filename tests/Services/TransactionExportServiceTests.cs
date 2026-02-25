@@ -254,5 +254,5 @@ public class TransactionExportServiceTests
             new List<string>(),
             new List<TagInfo>(),
             null, null, null, null, null, null, false, "Confirmed",
-            DateTime.UtcNow, DateTime.UtcNow, null, null, null, null, null, null, null, null, null, false, null);
+            DateTime.UtcNow, DateTime.UtcNow, null, null, null, null, null, null, false, null);
 }

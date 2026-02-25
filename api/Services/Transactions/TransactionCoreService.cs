@@ -282,11 +282,6 @@ public class TransactionCoreService : ITransactionCoreService
             source = requestedSource;
         }
 
-        // Derive Date (UTC) from DateLocal + TimeLocal + DateTimezone
-        // This ensures Date is always consistent with local fields - no independent edits allowed
-        var (derivedDate, dateLocal, timeLocal, dateTimezone) = DateTimeHelper.NormalizeDateTimeFields(
-            request.Date, request.DateLocal, request.TimeLocal, request.DateTimezone);
-
         var transaction = new Transaction
         {
             UserId = userId,
@@ -294,11 +289,7 @@ public class TransactionCoreService : ITransactionCoreService
             Type = type,
             Amount = request.Amount,
             Currency = account.Currency,
-            Date = derivedDate,
-            // Timezone-aware date/time fields (source of truth for Date)
-            DateLocal = dateLocal,
-            TimeLocal = timeLocal,
-            DateTimezone = dateTimezone,
+            Date = request.Date,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -459,28 +450,10 @@ public class TransactionCoreService : ITransactionCoreService
             transaction.Amount = request.Amount.Value;
         }
 
-        // Update date/time fields and re-derive Date (UTC)
-        // DateLocal + TimeLocal + DateTimezone are the source of truth - Date is always derived
-        bool dateFieldsChanged = !string.IsNullOrEmpty(request.DateLocal) ||
-                                  !string.IsNullOrEmpty(request.TimeLocal) ||
-                                  !string.IsNullOrEmpty(request.DateTimezone) ||
-                                  request.Date.HasValue;
-
-        if (dateFieldsChanged)
+        // Update date/time fields
+        if (request.Date.HasValue)
         {
-            // Get current or updated values
-            var newDateLocal = request.DateLocal ?? transaction.DateLocal ?? transaction.Date.ToString("yyyy-MM-dd");
-            var newTimeLocal = request.TimeLocal ?? transaction.TimeLocal ?? "12:00";
-            var newDateTimezone = request.DateTimezone ?? transaction.DateTimezone ?? TimeZoneInfo.Local.Id;
-            var fallbackDate = request.Date ?? transaction.Date;
-
-            // Derive Date (UTC) from local fields
-            var derivedDate = DateTimeHelper.DeriveUtcDate(newDateLocal, newTimeLocal, newDateTimezone, fallbackDate);
-
-            transaction.Date = derivedDate;
-            transaction.DateLocal = newDateLocal;
-            transaction.TimeLocal = newTimeLocal;
-            transaction.DateTimezone = newDateTimezone;
+            transaction.Date = request.Date.Value;
         }
 
         if (request.Title != null)

@@ -901,9 +901,6 @@ public class P2PTransactionServiceTests
             Role: null,
             LastSyncedAt: null,
             ChatMessageId: null,
-            DateLocal: null,      // Timezone-aware date field
-            TimeLocal: null,      // Timezone-aware time field
-            DateTimezone: null,   // Timezone field
             IsDeleted: false,
             DeletedAt: null
         );

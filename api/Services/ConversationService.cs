@@ -850,11 +850,12 @@ public class ConversationService : IConversationService
             return DomainErrors.Transaction.SelfP2PNotAllowed;
         
         // Create transaction through TransactionService
+        var now = DateTime.UtcNow;
         var createRequest = new CreateTransactionRequest(
             AccountId: request.AccountId,
             Type: request.Type,  // Use the requested type (Send or Receive)
             Amount: request.Amount,
-            Date: DateTime.UtcNow,
+            Date: now,
             Title: request.Title,
             Payee: null,
             Notes: request.Notes,

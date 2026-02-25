@@ -70,11 +70,17 @@ public class P2PTransactionCreatedNotificationHandler : INotificationHandler<Tra
                 var chatNotification = new ChatMessageNotification(
                     MessageId: transaction.ChatMessageId,
                     SenderId: notification.UserId,
+                    RecipientId: notification.CounterpartyUserId,
                     SenderName: sender.FullName ?? sender.Email,
                     MessageType: "Transaction",
                     Content: null,
                     TransactionId: notification.TransactionId,
-                    SentAt: DateTime.UtcNow
+                    SentAt: DateTime.UtcNow,
+                    TransactionType: notification.Type.ToString(),
+                    Amount: notification.Amount,
+                    Currency: notification.Currency,
+                    Title: transaction.Title,
+                    TransactionStatus: "Pending"
                 );
                 await _notificationService.NotifyChatMessageAsync(
                     notification.UserId, notification.CounterpartyUserId, chatNotification);

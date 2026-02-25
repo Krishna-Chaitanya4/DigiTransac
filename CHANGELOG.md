@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.6] - 2026-02-26
+
+### Added
+- **Load older messages on scroll up** — Chat now supports infinite scroll upward with cursor-based pagination (`before` parameter); merges older messages into query cache with scroll position preservation; shows spinner while loading and "Beginning of conversation" indicator when all history is loaded
+
+### Fixed
+- **View in Transactions scroll not working** — Target transaction beyond page 1 (position 51+) was never found; now progressively loads more pages until found (up to 1000 transactions)
+- **View in Transactions repeat navigation** — Second "View in Transactions" click highlighted but didn't scroll; added `highlightTrigger` state to re-fire scroll effect on repeat navigations
+- **View in Transactions linked transaction** — Refactored `handleViewLinkedTransaction` to use `pendingHighlightRef` mechanism instead of fragile `setTimeout`
+- **View in Chat scroll override** — After deep-link scroll to target message, auto-scroll-to-bottom effect would override position after ~2 seconds; added `deepLinkScrolledRef` guard
+- **View in Chat target not found** — When target message is beyond the default 50-message limit, now fetches 200 messages for deep-link navigation; shows toast when message is not found
+- **Chat scroll-to-bottom after loading older messages** — Prevented auto-scroll-to-bottom effect from firing when older messages are prepended to the chat
+
+### Changed
+- **WhatsApp-style date handling** — Removed `DateLocal`, `TimeLocal`, `DateTimezone` from backend models, DTOs, and all services; frontend now sends real UTC and displays in viewer's local timezone
+- **Chat notification DTO** — Added `RecipientId` and transaction details (`TransactionType`, `Amount`, `Currency`, `Title`, `TransactionStatus`) to `ChatMessageNotification` for instant optimistic display
+- **SignalR chat notifications** — Now notifies both sender and recipient for instant chat bubble display (dedup on frontend)
+
 ## [1.8.5] - 2026-02-25
 
 ### Fixed

@@ -89,6 +89,7 @@ public static class ConversationEndpoints
                 var notification = new ChatMessageNotification(
                     MessageId: chatMessage.Id,
                     SenderId: userId,
+                    RecipientId: counterpartyUserId,
                     SenderName: sender?.FullName ?? sender?.Email,
                     MessageType: chatMessage.Type,
                     Content: chatMessage.Content,
@@ -134,14 +135,21 @@ public static class ConversationEndpoints
             if (chatMessage != null)
             {
                 var sender = await userRepository.GetByIdAsync(userId);
+                var tx = chatMessage.Transaction;
                 var notification = new ChatMessageNotification(
                     MessageId: chatMessage.Id,
                     SenderId: userId,
+                    RecipientId: counterpartyUserId,
                     SenderName: sender?.FullName ?? sender?.Email,
                     MessageType: chatMessage.Type,
                     Content: null, // Transaction messages don't have text content
-                    TransactionId: chatMessage.Transaction?.TransactionId,
-                    SentAt: chatMessage.CreatedAt
+                    TransactionId: tx?.TransactionId,
+                    SentAt: chatMessage.CreatedAt,
+                    TransactionType: tx?.TransactionType,
+                    Amount: tx != null ? tx.Amount : null,
+                    Currency: tx?.Currency,
+                    Title: tx?.Title,
+                    TransactionStatus: tx?.Status
                 );
                 await notificationService.NotifyChatMessageAsync(userId, counterpartyUserId, notification);
             }

@@ -340,10 +340,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
             .ToList();
 
         // Calculate spending trends (by day) with currency conversion, excluding analytics-excluded transactions
-        // Use DateLocal (user's local date) when available, falling back to UTC date
+        // Group by UTC date string
         var dailyTrends = transactions
             .Where(t => !t.IsRecurringTemplate && !IsFullyExcluded(t, ctx.ExcludedLabelIds))
-            .GroupBy(t => t.DateLocal ?? t.Date.ToString("yyyy-MM-dd"))
+            .GroupBy(t => t.Date.ToString("yyyy-MM-dd"))
             .ToDictionary(
                 g => g.Key,
                 g => new SpendingTrend(
@@ -617,27 +617,17 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
         var dayNames = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
-        // Helper to get the hour from TimeLocal (format "HH:mm") or fall back to Date.Hour
+        // Helper to get the hour from the UTC Date
         int GetTransactionHour(Transaction t) {
-            if (!string.IsNullOrEmpty(t.TimeLocal) && t.TimeLocal.Length >= 2)
-            {
-                if (int.TryParse(t.TimeLocal.Substring(0, 2), out var hour) && hour >= 0 && hour < 24)
-                    return hour;
-            }
-            // Fallback to Date.Hour for legacy transactions without TimeLocal
             return t.Date.Hour;
         }
 
-        // Helper to get day of week from DateLocal or fall back to Date
+        // Helper to get day of week from UTC Date
         int GetTransactionDayOfWeek(Transaction t) {
-            if (!string.IsNullOrEmpty(t.DateLocal) && DateTime.TryParse(t.DateLocal, out var localDate))
-            {
-                return (int)localDate.DayOfWeek;
-            }
             return (int)t.Date.DayOfWeek;
         }
 
-        // Group by day of week (using DateLocal for accuracy)
+        // Group by day of week
         var byDayOfWeek = sendTransactions
             .GroupBy(t => GetTransactionDayOfWeek(t))
             .Select(g => {
@@ -1264,11 +1254,10 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
 
             // Calculate daily breakdown
             var dailyBreakdown = regionTransactions
-                .GroupBy(t => t.DateLocal ?? t.Date.ToString("yyyy-MM-dd"))
+                .GroupBy(t => t.Date.ToString("yyyy-MM-dd"))
                 .OrderBy(g => g.Key)
                 .Select(g => new TripDaySpending(
                     DateTime.TryParse(g.Key, out var d) ? d : g.First().Date,
-                    g.Key,
                     g.Sum(t => GetIncludedAmount(
                         t, ctx.ExcludedLabelIds, accounts, primaryCurrency, rates)),
                     g.Count()

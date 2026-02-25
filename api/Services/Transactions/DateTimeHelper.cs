@@ -117,52 +117,6 @@ public static class DateTimeHelper
     }
 
     /// <summary>
-    /// Normalizes date/time fields for a transaction request.
-    /// Ensures DateLocal, TimeLocal, DateTimezone are set and Date is derived from them.
-    /// </summary>
-    /// <param name="requestDate">The Date from the request</param>
-    /// <param name="requestDateLocal">The DateLocal from the request (YYYY-MM-DD)</param>
-    /// <param name="requestTimeLocal">The TimeLocal from the request (HH:mm)</param>
-    /// <param name="requestDateTimezone">The DateTimezone from the request (IANA)</param>
-    /// <returns>Normalized (Date, DateLocal, TimeLocal, DateTimezone) tuple</returns>
-    public static (DateTime Date, string DateLocal, string TimeLocal, string DateTimezone) NormalizeDateTimeFields(
-        DateTime requestDate,
-        string? requestDateLocal,
-        string? requestTimeLocal,
-        string? requestDateTimezone)
-    {
-        // Validate and normalize DateLocal - use request date if not provided or invalid
-        string dateLocal;
-        if (IsValidDateLocal(requestDateLocal))
-        {
-            dateLocal = requestDateLocal!;
-        }
-        else
-        {
-            dateLocal = requestDate.ToString("yyyy-MM-dd");
-        }
-        
-        // Validate and normalize TimeLocal - use current time if not provided or invalid
-        string timeLocal;
-        if (IsValidTimeLocal(requestTimeLocal))
-        {
-            timeLocal = requestTimeLocal!;
-        }
-        else
-        {
-            timeLocal = DateTime.UtcNow.ToString("HH:mm");
-        }
-        
-        // Normalize DateTimezone - use local timezone if not provided
-        var dateTimezone = requestDateTimezone ?? TimeZoneInfo.Local.Id;
-        
-        // Derive Date (UTC) from the local fields
-        var derivedDate = DeriveUtcDate(dateLocal, timeLocal, dateTimezone, requestDate);
-        
-        return (derivedDate, dateLocal, timeLocal, dateTimezone);
-    }
-    
-    /// <summary>
     /// Validates date/time inputs and returns validation errors if any.
     /// </summary>
     /// <param name="dateLocal">DateLocal to validate</param>

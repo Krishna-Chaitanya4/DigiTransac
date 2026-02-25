@@ -31,28 +31,12 @@ export function useConversations() {
 }
 
 // Hook to fetch a single conversation
-export function useConversation(userId: string | null) {
+export function useConversation(userId: string | null, limit?: number) {
   return useQuery({
     queryKey: conversationKeys.detail(userId || ''),
-    queryFn: () => getConversation(userId!),
+    queryFn: () => getConversation(userId!, limit),
     enabled: !!userId,
     staleTime: 10 * 1000, // 10 seconds
-  });
-}
-
-// Hook to send a message
-export function useSendMessage() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ userId, request }: { userId: string; request: SendMessageRequest }) =>
-      sendMessage(userId, request),
-    onSuccess: (_data, variables) => {
-      // Invalidate the conversation to refetch messages
-      queryClient.invalidateQueries({ queryKey: conversationKeys.detail(variables.userId) });
-      // Invalidate the list to update previews
-      queryClient.invalidateQueries({ queryKey: conversationKeys.list() });
-    },
   });
 }
 

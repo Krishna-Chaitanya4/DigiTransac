@@ -84,10 +84,8 @@ public class TransferService : ITransferService
             ? new List<TransactionSplit> { new() { LabelId = accountTransferLabel.Id, Amount = convertedAmount, Notes = null } }
             : request.Splits.Select(s => new TransactionSplit { LabelId = s.LabelId, Amount = convertedAmount, Notes = s.Notes }).ToList();
 
-        // Derive Date (UTC) from DateLocal + TimeLocal + DateTimezone
-        // This ensures Date is always consistent with local fields - no independent edits allowed
-        var (derivedDate, dateLocal, timeLocal, dateTimezone) = DateTimeHelper.NormalizeDateTimeFields(
-            request.Date, request.DateLocal, request.TimeLocal, request.DateTimezone);
+        // Use the request's Date (already UTC from frontend)
+        var derivedDate = request.Date;
 
         // Create source transaction (Send)
         var sourceTransaction = new Transaction
@@ -98,10 +96,6 @@ public class TransferService : ITransferService
             Amount = request.Amount,
             Currency = sourceAccount.Currency,
             Date = derivedDate,
-            // Timezone-aware date fields (source of truth for Date)
-            DateLocal = dateLocal,
-            TimeLocal = timeLocal,
-            DateTimezone = dateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -136,10 +130,6 @@ public class TransferService : ITransferService
             Amount = convertedAmount,
             Currency = destinationAccount.Currency,
             Date = derivedDate,
-            // Timezone-aware date fields (source of truth for Date)
-            DateLocal = dateLocal,
-            TimeLocal = timeLocal,
-            DateTimezone = dateTimezone,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -263,8 +253,6 @@ public class TransferService : ITransferService
         if (request.Date.HasValue && linkedTransaction.Date != transaction.Date)
         {
             linkedTransaction.Date = transaction.Date;
-            linkedTransaction.DateLocal = transaction.DateLocal;
-            linkedTransaction.DateTimezone = transaction.DateTimezone;
             linkedNeedsUpdate = true;
         }
         if (request.Title != null && linkedTransaction.Title != transaction.Title)

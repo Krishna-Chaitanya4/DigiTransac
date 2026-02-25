@@ -81,11 +81,6 @@ public class RecurringTransactionService : IRecurringTransactionService
             Notes = s.Notes
         }).ToList();
 
-        // Derive Date (UTC) from DateLocal + TimeLocal + DateTimezone
-        // This ensures Date is always consistent with local fields - no independent edits allowed
-        var (derivedDate, dateLocal, timeLocal, dateTimezone) = DateTimeHelper.NormalizeDateTimeFields(
-            request.Date, request.DateLocal, request.TimeLocal, request.DateTimezone);
-
         // Create template
         var template = new Transaction
         {
@@ -94,11 +89,7 @@ public class RecurringTransactionService : IRecurringTransactionService
             Type = type,
             Amount = request.Amount,
             Currency = account.Currency,
-            Date = derivedDate,
-            // Timezone-aware date fields (source of truth for Date)
-            DateLocal = dateLocal,
-            TimeLocal = timeLocal,
-            DateTimezone = dateTimezone,
+            Date = request.Date,
             Title = request.Title,
             EncryptedPayee = _mapperService.EncryptIfNotEmpty(request.Payee, dek),
             EncryptedNotes = _mapperService.EncryptIfNotEmpty(request.Notes, dek),
@@ -140,11 +131,7 @@ public class RecurringTransactionService : IRecurringTransactionService
             Type = type,
             Amount = request.Amount,
             Currency = account.Currency,
-            Date = derivedDate,
-            // Timezone-aware date fields (source of truth for Date)
-            DateLocal = dateLocal,
-            TimeLocal = timeLocal,
-            DateTimezone = dateTimezone,
+            Date = request.Date,
             Title = request.Title,
             EncryptedPayee = template.EncryptedPayee,
             EncryptedNotes = template.EncryptedNotes,
@@ -247,14 +234,8 @@ public class RecurringTransactionService : IRecurringTransactionService
                 var account = await _accountRepository.GetByIdAsync(template.AccountId!);
                 if (account == null) continue;
 
-                // For recurring instances, derive Date from NextOccurrence + template's timezone
+                // Use NextOccurrence directly as the UTC date
                 var nextOccurrence = template.RecurringRule!.NextOccurrence;
-                var recurringDateLocal = nextOccurrence.ToString("yyyy-MM-dd");
-                var recurringTimeLocal = template.TimeLocal ?? "12:00";
-                var recurringTimezone = template.DateTimezone ?? TimeZoneInfo.Local.Id;
-                var recurringDerivedDate = DateTimeHelper.DeriveUtcDate(
-                    recurringDateLocal, recurringTimeLocal, recurringTimezone, nextOccurrence);
-
                 var newTransaction = new Transaction
                 {
                     UserId = template.UserId,
@@ -262,11 +243,7 @@ public class RecurringTransactionService : IRecurringTransactionService
                     Type = template.Type,
                     Amount = template.Amount,
                     Currency = template.Currency,
-                    Date = recurringDerivedDate,
-                    // Timezone-aware date fields (source of truth for Date)
-                    DateLocal = recurringDateLocal,
-                    TimeLocal = recurringTimeLocal,
-                    DateTimezone = recurringTimezone,
+                    Date = nextOccurrence,
                     Title = template.Title,
                     EncryptedPayee = template.EncryptedPayee,
                     EncryptedNotes = template.EncryptedNotes,
@@ -335,11 +312,7 @@ public class RecurringTransactionService : IRecurringTransactionService
                             Type = TransactionType.Receive,
                             Amount = convertedAmount,
                             Currency = transferToAccount.Currency,
-                            Date = recurringDerivedDate,
-                            // Timezone-aware date fields (source of truth for Date)
-                            DateLocal = recurringDateLocal,
-                            TimeLocal = recurringTimeLocal,
-                            DateTimezone = recurringTimezone,
+                            Date = nextOccurrence,
                             Title = template.Title,
                             EncryptedPayee = template.EncryptedPayee,
                             EncryptedNotes = template.EncryptedNotes,

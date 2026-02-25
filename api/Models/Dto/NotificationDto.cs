@@ -23,11 +23,18 @@ public record P2PTransactionNotification(
 public record ChatMessageNotification(
     string MessageId,
     string SenderId,
+    string RecipientId,
     string? SenderName,
     string MessageType,
     string? Content,
     string? TransactionId,
-    DateTime SentAt
+    DateTime SentAt,
+    // Optional transaction data for instant optimistic display on both sender and receiver
+    string? TransactionType = null,   // "Send" or "Receive" (from sender's perspective)
+    decimal? Amount = null,
+    string? Currency = null,
+    string? Title = null,
+    string? TransactionStatus = null  // "Pending", "Confirmed", "Declined"
 );
 
 /// <summary>

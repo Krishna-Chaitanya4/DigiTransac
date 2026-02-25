@@ -339,12 +339,7 @@ public class AccountService : IAccountService
             transactionType = difference > 0 ? TransactionType.Receive : TransactionType.Send;
         }
 
-        // Derive proper timezone-aware date fields so the transaction appears on the correct local calendar day
         var now = DateTime.UtcNow;
-        var localTimezone = TimeZoneInfo.Local.Id;
-        var localNow = TimeZoneInfo.ConvertTimeFromUtc(now, TimeZoneInfo.Local);
-        var dateLocal = localNow.ToString("yyyy-MM-dd");
-        var timeLocal = localNow.ToString("HH:mm");
 
         var transaction = new Transaction
         {
@@ -354,9 +349,6 @@ public class AccountService : IAccountService
             Amount = Math.Abs(difference),
             Currency = account.Currency,
             Date = now,
-            DateLocal = dateLocal,
-            TimeLocal = timeLocal,
-            DateTimezone = localTimezone,
             Title = "Balance Adjustment",
             EncryptedNotes = dek != null ? _mapperService.EncryptIfNotEmpty(adjustmentNotes, dek) : adjustmentNotes,
             Status = TransactionStatus.Confirmed,

@@ -26,7 +26,9 @@ import {
   NetworkStatusBanner,
 } from '../components/chat';
 import { TransactionForm } from '../components/TransactionForm';
+import { getConversation } from '../services/conversationService';
 import { logger } from '../services/logger';
+import { useToast } from '../components/ToastProvider';
 import { SIDEBAR_CONSTANTS } from '../utils/constants';
 import { usePresence } from '../context/PresenceContext';
 import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
@@ -64,6 +66,7 @@ export default function ChatsPage() {
   // Auth context
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { info: showInfo } = useToast();
   
   // URL params for deep linking (e.g., from "View in Chat" on transactions)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -164,7 +167,7 @@ export default function ChatsPage() {
     data: conversationData,
     isLoading: isLoadingMessages,
     dataUpdatedAt,
-  } = useConversation(selectedUserId);
+  } = useConversation(selectedUserId, pendingScrollMessageId ? 200 : undefined);
 
   // Use pending conversation for new chats, or the fetched data
   const selectedConversation = pendingConversation || conversationData || null;
@@ -218,6 +221,8 @@ export default function ChatsPage() {
 
   // Scroll state
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const loadingOlderRef = useRef(false); // prevent double-triggering
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
@@ -226,6 +231,9 @@ export default function ChatsPage() {
   // stays visible until user leaves the conversation
   const [activeUnreadDividerId, setActiveUnreadDividerId] = useState<string | null>(null);
   const hasScrolledToUnreadRef = useRef(false);
+  // Whether we scrolled to a specific message via deep link (View in Chat).
+  // Prevents the auto-scroll-to-bottom effect from overriding the position.
+  const deepLinkScrolledRef = useRef(false);
   // Timestamp of when we navigated to this conversation. Only data fetched
   // AFTER this timestamp is considered fresh (skips stale React Query cache).
   const navigationTimestampRef = useRef(0);
@@ -256,10 +264,13 @@ export default function ChatsPage() {
 
     navigationTimestampRef.current = Date.now();
     unreadCapturedRef.current = false;
+    deepLinkScrolledRef.current = false;
     setActiveUnreadDividerId(null);
     hasScrolledToUnreadRef.current = false;
     markedAsReadRef.current = null;
     messageCountRef.current = 0;
+    setIsLoadingOlder(false);
+    loadingOlderRef.current = false;
     if (selectedUserId) {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(selectedUserId) });
     }
@@ -284,8 +295,8 @@ export default function ChatsPage() {
   // Use the API flag if available, fallback to email comparison for backward compatibility
   const isSelfChat = selectedConversation?.isSelfChat ?? (user?.email === selectedConversation?.counterpartyEmail);
 
-  // Scroll to a message and highlight it temporarily
-  const scrollToMessage = useCallback((messageId: string) => {
+  // Scroll to a message and highlight it temporarily. Returns true if element was found.
+  const scrollToMessage = useCallback((messageId: string): boolean => {
     const element = document.getElementById(`msg-${messageId}`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -297,7 +308,9 @@ export default function ChatsPage() {
           element.classList.remove('rounded-2xl', 'transition-colors', 'duration-500');
         }, 500);
       }, 1000);
+      return true;
     }
+    return false;
   }, []);
 
   // Capture firstUnreadMessageId only from FRESH data fetched after navigation.
@@ -356,6 +369,10 @@ export default function ChatsPage() {
   useEffect(() => {
     // Don't auto-scroll if we're about to scroll to a specific message
     if (pendingScrollMessageId) return;
+    // Don't auto-scroll if we just completed a deep-link scroll (View in Chat)
+    if (deepLinkScrolledRef.current) return;
+    // Don't auto-scroll if we just loaded older messages (scroll-up pagination)
+    if (loadingOlderRef.current || isLoadingOlder) return;
     
     if (selectedConversation?.messages && selectedConversation.messages.length > 0) {
       const timeoutId = setTimeout(() => {
@@ -376,22 +393,97 @@ export default function ChatsPage() {
     if (pendingScrollMessageId && selectedConversation?.messages && selectedConversation.messages.length > 0) {
       // Small delay to ensure DOM is rendered
       const timeoutId = setTimeout(() => {
-        scrollToMessage(pendingScrollMessageId);
+        const found = scrollToMessage(pendingScrollMessageId);
+        if (!found) {
+          showInfo('Could not find this message in the conversation');
+        }
+        // Mark that we completed a deep-link scroll so auto-scroll-to-bottom is suppressed
+        deepLinkScrolledRef.current = true;
         setPendingScrollMessageId(null);
-      }, 100);
+      }, 150);
       return () => clearTimeout(timeoutId);
     }
-  }, [pendingScrollMessageId, selectedConversation?.messages, scrollToMessage]);
+  }, [pendingScrollMessageId, selectedConversation?.messages, scrollToMessage, showInfo]);
 
-  // Handle scroll detection
+  // Handle scroll detection + load older messages on scroll up
+  const loadOlderMessages = useCallback(async () => {
+    if (!selectedUserId || !selectedConversation?.hasMore || loadingOlderRef.current) return;
+    const messages = selectedConversation.messages;
+    if (!messages.length) return;
+
+    loadingOlderRef.current = true;
+    setIsLoadingOlder(true);
+
+    try {
+      // Use the oldest message's timestamp as the cursor
+      const oldestMsg = messages[0];
+      const before = oldestMsg.createdAt;
+      const olderData = await getConversation(selectedUserId, 50, before);
+
+      if (olderData.messages.length > 0) {
+        // Preserve scroll position: measure before DOM update
+        const container = messagesContainerRef.current;
+        const prevScrollHeight = container?.scrollHeight ?? 0;
+
+        // Merge older messages into the query cache
+        queryClient.setQueryData(
+          queryKeys.conversations.detail(selectedUserId),
+          (old: ConversationDetailResponse | undefined) => {
+            if (!old) return old;
+            // Deduplicate by ID — older messages go first
+            const existingIds = new Set(old.messages.map((m) => m.id));
+            const newMsgs = olderData.messages.filter((m) => !existingIds.has(m.id));
+            return {
+              ...old,
+              messages: [...newMsgs, ...old.messages],
+              hasMore: olderData.hasMore,
+            };
+          }
+        );
+
+        // Restore scroll position after React re-renders with the new messages
+        requestAnimationFrame(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop += newScrollHeight - prevScrollHeight;
+          }
+        });
+      } else {
+        // API returned empty — mark no more
+        queryClient.setQueryData(
+          queryKeys.conversations.detail(selectedUserId),
+          (old: ConversationDetailResponse | undefined) => {
+            if (!old) return old;
+            return { ...old, hasMore: false };
+          }
+        );
+      }
+    } catch (err) {
+      logger.error('Failed to load older messages:', err);
+    } finally {
+      setIsLoadingOlder(false);
+      // Delay clearing the ref so the scroll-to-bottom effect (which depends on
+      // messages) sees loadingOlderRef.current === true through all re-renders
+      // triggered by the cache update + isLoadingOlder state change.
+      setTimeout(() => {
+        loadingOlderRef.current = false;
+      }, 200);
+    }
+  }, [selectedUserId, selectedConversation?.hasMore, selectedConversation?.messages, queryClient]);
+
   const handleScroll = useCallback(() => {
     if (messagesContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
       const hasEnoughContent = scrollHeight > clientHeight + 50;
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
       setShowScrollButton(hasEnoughContent && !isNearBottom);
+
+      // Load older messages when scrolled near the top
+      if (scrollTop < 100 && !loadingOlderRef.current) {
+        loadOlderMessages();
+      }
     }
-  }, []);
+  }, [loadOlderMessages]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -780,6 +872,19 @@ export default function ChatsPage() {
                   </div>
                 ) : (
                   <>
+                    {/* Loading older messages indicator */}
+                    {isLoadingOlder && (
+                      <div className="flex items-center justify-center py-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500" />
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Loading older messages…</span>
+                      </div>
+                    )}
+                    {/* Show a subtle indicator when all history is loaded */}
+                    {!selectedConversation.hasMore && selectedConversation.messages.length >= 50 && !isLoadingOlder && (
+                      <div className="flex items-center justify-center py-3">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">Beginning of conversation</span>
+                      </div>
+                    )}
                     {selectedConversation.messages.map((msg, index) => {
                       const prevMsg = index > 0 ? selectedConversation.messages[index - 1] : null;
                       const nextMsg =
