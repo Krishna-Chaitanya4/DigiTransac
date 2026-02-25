@@ -6,6 +6,8 @@ import { NOTIFICATION_CONSTANTS } from '../utils/constants';
 import { API_BASE_URL } from '../services/apiClient';
 import { getStoredAccessToken } from '../services/tokenStorage';
 import { logger } from '../services/logger';
+import { queryKeys } from '../lib/queryClient';
+import type { ConversationDetailResponse } from '../types/conversations';
 
 // Notification types from the backend
 export interface P2PTransactionNotification {
@@ -203,6 +205,25 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['conversations', 'detail', notification.senderId] });
       // Invalidate conversations list to update preview
       queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+    });
+
+    // When the counterparty reads our messages, update statuses to 'Read' instantly
+    connection.on('MessagesRead', (notification: { readByUserId: string }) => {
+      logger.info('SignalR: MessagesRead received', { readByUserId: notification.readByUserId });
+      queryClient.setQueryData<ConversationDetailResponse>(
+        queryKeys.conversations.detail(notification.readByUserId),
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            messages: old.messages.map((m) =>
+              m.isFromMe && m.status !== 'Read'
+                ? { ...m, status: 'Read' as const, readAt: new Date().toISOString() }
+                : m
+            ),
+          };
+        }
+      );
     });
 
     connection.on('PendingCount', (notification: PendingCountNotification) => {

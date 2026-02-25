@@ -123,10 +123,12 @@ vi.mock('../context/CurrencyContext', () => ({
 vi.mock('../context/PresenceContext', () => ({
   usePresence: vi.fn(() => ({
     isOnline: () => false,
+    isConnected: true,
     queryOnlineUsers: vi.fn(),
     setUserOnline: vi.fn(),
     setUserOffline: vi.fn(),
     setOnlineUsers: vi.fn(),
+    setConnected: vi.fn(),
     registerQueryFn: vi.fn(),
     onlineUsers: new Set(),
   })),

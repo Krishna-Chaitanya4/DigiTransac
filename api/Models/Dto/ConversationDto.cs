@@ -97,7 +97,8 @@ public record ConversationDetailResponse(
     bool HasMore,
     decimal TotalSent,
     decimal TotalReceived,
-    bool IsSelfChat = false  // True when this is user's personal transaction log
+    bool IsSelfChat = false,  // True when this is user's personal transaction log
+    string? FirstUnreadMessageId = null  // ID of the oldest unread message from counterparty
 );
 
 // Request DTOs

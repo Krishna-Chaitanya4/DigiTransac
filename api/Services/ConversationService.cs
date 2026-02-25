@@ -380,6 +380,15 @@ public class ConversationService : IConversationService
         
         var isSelfChat = userId == counterpartyUserId;
         
+        // Get the first unread message ID BEFORE any mark-as-read could fire.
+        // For self-chat, there are no "unread" messages (you sent them to yourself).
+        string? firstUnreadMessageId = null;
+        if (!isSelfChat)
+        {
+            firstUnreadMessageId = await _chatMessageRepository.GetFirstUnreadMessageIdAsync(
+                userId, counterpartyUserId, ct);
+        }
+        
         // Get chat messages
         var chatMessages = await _chatMessageRepository.GetConversationMessagesAsync(
             userId, counterpartyUserId, limit, before, ct);
@@ -671,7 +680,8 @@ public class ConversationService : IConversationService
             HasMore: hasMore,
             TotalSent: totalSent,
             TotalReceived: totalReceived,
-            IsSelfChat: isSelfChat
+            IsSelfChat: isSelfChat,
+            FirstUnreadMessageId: firstUnreadMessageId
         );
     }
 

@@ -238,6 +238,23 @@ export function useMarkAsRead() {
           };
         }
       );
+      // Optimistically update message statuses in the detail cache so "Seen"
+      // indicators render immediately without waiting for a refetch.
+      queryClient.setQueryData<ConversationDetailResponse>(
+        conversationKeys.detail(userId),
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            firstUnreadMessageId: null,
+            messages: old.messages.map((m) =>
+              !m.isFromMe && m.status !== 'Read'
+                ? { ...m, status: 'Read' as const, readAt: new Date().toISOString() }
+                : m
+            ),
+          };
+        }
+      );
     },
   });
 }

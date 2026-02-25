@@ -42,6 +42,11 @@ public interface IChatMessageRepository
     Task<ChatMessage> CreateAsync(ChatMessage message, CancellationToken ct = default);
     
     /// <summary>
+    /// Get the ID of the first unread message from a counterparty (oldest unread)
+    /// </summary>
+    Task<string?> GetFirstUnreadMessageIdAsync(string userId, string counterpartyUserId, CancellationToken ct = default);
+    
+    /// <summary>
     /// Mark all messages from counterparty as read
     /// </summary>
     Task MarkConversationAsReadAsync(string userId, string counterpartyUserId, CancellationToken ct = default);
@@ -281,6 +286,23 @@ public class ChatMessageRepository : IChatMessageRepository
         message.Status = MessageStatus.Sent;
         await _chatMessages.InsertOneAsync(message, options: null, ct);
         return message;
+    }
+
+    public async Task<string?> GetFirstUnreadMessageIdAsync(string userId, string counterpartyUserId, CancellationToken ct = default)
+    {
+        var filter = Builders<ChatMessage>.Filter.And(
+            Builders<ChatMessage>.Filter.Eq(m => m.RecipientUserId, userId),
+            Builders<ChatMessage>.Filter.Eq(m => m.SenderUserId, counterpartyUserId),
+            Builders<ChatMessage>.Filter.Ne(m => m.Status, MessageStatus.Read)
+        );
+
+        var firstUnread = await _chatMessages.Find(filter)
+            .SortBy(m => m.CreatedAt)
+            .Limit(1)
+            .Project(m => m.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return firstUnread;
     }
 
     public async Task MarkConversationAsReadAsync(string userId, string counterpartyUserId, CancellationToken ct = default)

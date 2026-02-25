@@ -6,6 +6,7 @@ using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
+using Microsoft.AspNetCore.SignalR;
 
 namespace DigiTransac.Api.Endpoints;
 
@@ -156,12 +157,18 @@ public static class ConversationEndpoints
             string counterpartyUserId,
             ClaimsPrincipal user,
             IConversationService conversationService,
+            IHubContext<NotificationHub> hubContext,
             CancellationToken ct) =>
         {
             if (!user.TryGetUserId(out var userId))
                 return Results.Unauthorized();
 
             await conversationService.MarkAsReadAsync(userId, counterpartyUserId, ct);
+            
+            // Notify the counterparty (message sender) that their messages were read
+            await hubContext.Clients.Group($"user:{counterpartyUserId}")
+                .SendAsync("MessagesRead", new { readByUserId = userId }, ct);
+            
             return Results.Ok(new { message = "Conversation marked as read" });
         })
         .WithName("MarkConversationAsRead")

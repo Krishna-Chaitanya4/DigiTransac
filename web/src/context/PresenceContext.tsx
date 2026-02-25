@@ -5,6 +5,8 @@ type QueryFn = (userIds: string[]) => Promise<string[]>;
 interface PresenceContextValue {
   /** Set of user IDs currently online */
   onlineUsers: Set<string>;
+  /** Whether the SignalR connection is active */
+  isConnected: boolean;
   /** Check if a specific user is online */
   isOnline: (userId: string) => boolean;
   /** Add a user to the online set (called from SignalR event) */
@@ -17,12 +19,15 @@ interface PresenceContextValue {
   registerQueryFn: (fn: QueryFn) => void;
   /** Query which users are online via SignalR and update state */
   queryOnlineUsers: (userIds: string[]) => Promise<void>;
+  /** Set the SignalR connection state (called by Layout) */
+  setConnected: (connected: boolean) => void;
 }
 
 const PresenceContext = createContext<PresenceContextValue | null>(null);
 
 export function PresenceProvider({ children }: { children: ReactNode }) {
   const [onlineUsers, setOnlineUsersState] = useState<Set<string>>(new Set());
+  const [isConnected, setConnected] = useState(false);
   const queryFnRef = useRef<QueryFn | null>(null);
 
   const setUserOnline = useCallback((userId: string) => {
@@ -69,13 +74,15 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     onlineUsers,
+    isConnected,
     isOnline,
     setUserOnline,
     setUserOffline,
     setOnlineUsers,
     registerQueryFn,
     queryOnlineUsers,
-  }), [onlineUsers, isOnline, setUserOnline, setUserOffline, setOnlineUsers, registerQueryFn, queryOnlineUsers]);
+    setConnected,
+  }), [onlineUsers, isConnected, isOnline, setUserOnline, setUserOffline, setOnlineUsers, registerQueryFn, queryOnlineUsers]);
 
   return (
     <PresenceContext.Provider value={value}>

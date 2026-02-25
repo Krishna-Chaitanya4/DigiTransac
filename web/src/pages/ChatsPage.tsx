@@ -80,15 +80,17 @@ export default function ChatsPage() {
   const conversations = conversationsData?.conversations ?? [];
 
   // Query online status for all counterparties when conversations load
-  const { queryOnlineUsers } = usePresence();
+  // AND when SignalR connection becomes active (handles race condition on page load)
+  const { queryOnlineUsers, isConnected: presenceConnected } = usePresence();
   useEffect(() => {
+    if (!presenceConnected) return;
     const userIds = conversations
       .filter(c => !c.isSelfChat)
       .map(c => c.counterpartyUserId);
     if (userIds.length > 0) {
       queryOnlineUsers(userIds);
     }
-  }, [conversations, queryOnlineUsers]);
+  }, [conversations, queryOnlineUsers, presenceConnected]);
 
   // Selected conversation state
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -161,6 +163,7 @@ export default function ChatsPage() {
   const {
     data: conversationData,
     isLoading: isLoadingMessages,
+    dataUpdatedAt,
   } = useConversation(selectedUserId);
 
   // Use pending conversation for new chats, or the fetched data
@@ -217,6 +220,33 @@ export default function ChatsPage() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const unreadDividerRef = useRef<HTMLDivElement>(null);
+
+  // Track the unread divider message ID — set once when conversation opens,
+  // stays visible until user leaves the conversation
+  const [activeUnreadDividerId, setActiveUnreadDividerId] = useState<string | null>(null);
+  const hasScrolledToUnreadRef = useRef(false);
+  // Timestamp of when we navigated to this conversation. Only data fetched
+  // AFTER this timestamp is considered fresh (skips stale React Query cache).
+  const navigationTimestampRef = useRef(0);
+  // Whether we've already captured the unread divider for this navigation.
+  const unreadCapturedRef = useRef(false);
+  // Mark-as-read tracking
+  const markedAsReadRef = useRef<string | null>(null);
+  const messageCountRef = useRef<number>(0);
+
+  // Reset ALL tracking refs when switching conversations — invalidate to force a fresh fetch
+  useEffect(() => {
+    navigationTimestampRef.current = Date.now();
+    unreadCapturedRef.current = false;
+    setActiveUnreadDividerId(null);
+    hasScrolledToUnreadRef.current = false;
+    markedAsReadRef.current = null;
+    messageCountRef.current = 0;
+    if (selectedUserId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(selectedUserId) });
+    }
+  }, [selectedUserId]);
 
   // Sidebar resize state - persist in localStorage
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -253,11 +283,29 @@ export default function ChatsPage() {
     }
   }, []);
 
-  // Mark as read when conversation loads or when new messages arrive while viewing
-  const markedAsReadRef = useRef<string | null>(null);
-  const messageCountRef = useRef<number>(0);
+  // Capture firstUnreadMessageId only from FRESH data fetched after navigation.
+  // dataUpdatedAt changes when React Query gets a fresh response from the API.
+  // We compare it to navigationTimestampRef to skip stale cached data.
+  useEffect(() => {
+    if (!conversationData || !selectedUserId || unreadCapturedRef.current) return;
+    // Skip stale cached data — only process data fetched AFTER we navigated here
+    if (dataUpdatedAt < navigationTimestampRef.current) return;
+    unreadCapturedRef.current = true;
+    const apiUnreadId = conversationData.firstUnreadMessageId;
+    if (apiUnreadId) {
+      setActiveUnreadDividerId(apiUnreadId);
+      hasScrolledToUnreadRef.current = false;
+    }
+  }, [conversationData, dataUpdatedAt]);
+
+  // Mark as read when fresh conversation data arrives or when new messages come in.
+  // Uses the same dataUpdatedAt timestamp gate as the capture effect above.
+  // Both effects depend on dataUpdatedAt so they fire in the same render cycle
+  // (capture first by declaration order, then mark-as-read).
   useEffect(() => {
     if (!selectedUserId || !conversationData) return;
+    // Skip stale cached data — wait for fresh fetch
+    if (dataUpdatedAt < navigationTimestampRef.current) return;
     const currentMessageCount = conversationData.messages?.length || 0;
     const isNewConversation = markedAsReadRef.current !== selectedUserId;
     const hasNewMessages = currentMessageCount > messageCountRef.current && !isNewConversation;
@@ -267,20 +315,26 @@ export default function ChatsPage() {
       markedAsReadRef.current = selectedUserId;
     }
     messageCountRef.current = currentMessageCount;
-  }, [selectedUserId, conversationData]);
+  }, [selectedUserId, conversationData, dataUpdatedAt]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom (or unread divider) when messages change
   useEffect(() => {
     // Don't auto-scroll if we're about to scroll to a specific message
     if (pendingScrollMessageId) return;
     
     if (selectedConversation?.messages && selectedConversation.messages.length > 0) {
       const timeoutId = setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+        // If there's an unread divider and we haven't scrolled to it yet, scroll there
+        if (activeUnreadDividerId && !hasScrolledToUnreadRef.current && unreadDividerRef.current) {
+          unreadDividerRef.current.scrollIntoView({ behavior: 'instant', block: 'center' });
+          hasScrolledToUnreadRef.current = true;
+        } else if (!activeUnreadDividerId || hasScrolledToUnreadRef.current) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+        }
       }, 50);
       return () => clearTimeout(timeoutId);
     }
-  }, [selectedConversation?.messages, pendingScrollMessageId]);
+  }, [selectedConversation?.messages, pendingScrollMessageId, activeUnreadDividerId]);
 
   // Scroll to specific message from deep link (View in Chat)
   useEffect(() => {
@@ -316,14 +370,18 @@ export default function ChatsPage() {
     setCurrentSearchIndex(0);
   }, []);
 
-  // Select conversation handler
+  // Select conversation handler — clear unread divider for the conversation we're leaving
   const handleSelectConversation = useCallback((userId: string) => {
+    if (selectedUserId && selectedUserId !== userId) {
+      setActiveUnreadDividerId(null);
+      hasScrolledToUnreadRef.current = false;
+    }
     setSelectedUserId(userId);
     setPendingConversation(null);
     setReplyTo(null);
     setEditingMessage(null);
     closeSearchBar();
-  }, [closeSearchBar]);
+  }, [closeSearchBar, selectedUserId]);
 
   // Send message
   const handleSendMessage = useCallback(async () => {
@@ -596,11 +654,15 @@ export default function ChatsPage() {
     [selectedConversation, createTransactionMutation, invalidateList, invalidateDetail, scrollToBottom, pendingConversation, selectedUserId, queryClient]
   );
 
-  // Go back (mobile)
+  // Go back (mobile) — clear unread divider for the conversation we're leaving
   const handleBack = useCallback(() => {
+    if (selectedUserId) {
+      setActiveUnreadDividerId(null);
+      hasScrolledToUnreadRef.current = false;
+    }
     setSelectedUserId(null);
     setPendingConversation(null);
-  }, []);
+  }, [selectedUserId]);
 
   // Loading state
   if (isLoadingConversations) {
@@ -707,6 +769,18 @@ export default function ChatsPage() {
                               </div>
                             </div>
                           )}
+
+                          {/* "New messages" divider — shown at the first unread message */}
+                          {activeUnreadDividerId === msg.id && (
+                            <div ref={unreadDividerRef} className="flex items-center gap-3 my-4">
+                              <div className="flex-1 h-px bg-blue-400 dark:bg-blue-500" />
+                              <span className="text-xs font-semibold text-blue-500 dark:text-blue-400 whitespace-nowrap">
+                                New messages
+                              </span>
+                              <div className="flex-1 h-px bg-blue-400 dark:bg-blue-500" />
+                            </div>
+                          )}
+
                           <MessageBubble
                             message={msg}
                             showTime={showTime}

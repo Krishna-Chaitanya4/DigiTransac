@@ -110,11 +110,11 @@ export default function Layout() {
   const isMobile = useIsMobile();
   const mainRef = useRef<HTMLElement>(null);
 
-  const { setUserOnline, setUserOffline, registerQueryFn } = usePresence();
+  const { setUserOnline, setUserOffline, registerQueryFn, setConnected } = usePresence();
 
   // Global SignalR connection for real-time notifications (chat messages, P2P transactions)
   // Must be at Layout level so it persists across page navigation
-  const { getOnlineUsers } = useNotifications({
+  const { getOnlineUsers, isConnected: signalRConnected } = useNotifications({
     presence: {
       onUserOnline: setUserOnline,
       onUserOffline: setUserOffline,
@@ -125,6 +125,11 @@ export default function Layout() {
   useEffect(() => {
     registerQueryFn(getOnlineUsers);
   }, [registerQueryFn, getOnlineUsers]);
+
+  // Sync SignalR connection state into PresenceContext
+  useEffect(() => {
+    setConnected(signalRConnected);
+  }, [signalRConnected, setConnected]);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
