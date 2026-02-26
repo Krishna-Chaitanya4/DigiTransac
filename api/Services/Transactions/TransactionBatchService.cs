@@ -43,6 +43,13 @@ public class TransactionBatchService : ITransactionBatchService
 
         foreach (var id in ids)
         {
+            // Skip if already processed as a linked transaction of a previous item
+            if (processedIds.Contains(id))
+            {
+                successCount++;
+                continue;
+            }
+
             if (!transactionMap.TryGetValue(id, out var transaction))
             {
                 failedIds.Add(id);

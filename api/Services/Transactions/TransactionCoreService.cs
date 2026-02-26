@@ -94,19 +94,19 @@ public class TransactionCoreService : ITransactionCoreService
         var labelsDict = labels.ToDictionary(l => l.Id);
         var tagsDict = tags.ToDictionary(t => t.Id);
 
-        // Get all counterparties for search
-        var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
-        var allCounterpartyIds = p2pTransactions
-            .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
-            .Select(t => t.CounterpartyUserId!)
-            .Distinct()
-            .ToList();
-        var allCounterpartyUsers = await _userRepository.GetByIdsAsync(allCounterpartyIds);
-
-        // Enrich filter with search matches
+        // Only fetch counterparties when needed for search enrichment
+        Dictionary<string, Models.User> allCounterpartyUsers = new();
         var enrichedFilter = filter;
         if (!string.IsNullOrEmpty(filter.SearchText))
         {
+            var p2pTransactions = await _transactionRepository.GetP2PTransactionsAsync(userId);
+            var allCounterpartyIds = p2pTransactions
+                .Where(t => !string.IsNullOrEmpty(t.CounterpartyUserId))
+                .Select(t => t.CounterpartyUserId!)
+                .Distinct()
+                .ToList();
+            allCounterpartyUsers = await _userRepository.GetByIdsAsync(allCounterpartyIds);
+
             var searchLower = filter.SearchText.ToLowerInvariant();
 
             var matchingLabelIds = labels

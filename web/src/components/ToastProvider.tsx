@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -35,20 +35,40 @@ const DEFAULT_DURATION = 5000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Clear all timers on unmount
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
+  /** Schedule auto-removal for a toast, clearing any existing timer for that ID. */
+  const scheduleRemoval = useCallback((id: string, duration: number) => {
+    if (duration <= 0) return;
+    const timer = setTimeout(() => {
+      timersRef.current.delete(id);
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, duration);
+    timersRef.current.set(id, timer);
+  }, []);
 
   const addToast = useCallback((type: ToastType, message: string, duration = DEFAULT_DURATION) => {
     const id = crypto.randomUUID();
     setToasts(prev => [...prev, { id, type, message, duration }]);
-    
-    // Auto-remove after duration
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-      }, duration);
-    }
-  }, []);
+    scheduleRemoval(id, duration);
+  }, [scheduleRemoval]);
 
   const removeToast = useCallback((id: string) => {
+    // Clear the auto-removal timer if the toast is dismissed early
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
@@ -57,11 +77,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const id = crypto.randomUUID();
     const duration = action ? 8000 : DEFAULT_DURATION; // Longer duration when there's an action
     setToasts(prev => [...prev, { id, type: 'info' as ToastType, message, duration, action }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, duration);
+    scheduleRemoval(id, duration);
     return id;
-  }, []);
+  }, [scheduleRemoval]);
 
   const success = useCallback((message: string, duration?: number) => addToast('success', message, duration), [addToast]);
   const error = useCallback((message: string, duration?: number) => addToast('error', message, duration), [addToast]);

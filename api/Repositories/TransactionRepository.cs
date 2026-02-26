@@ -59,15 +59,22 @@ public interface ITransactionRepository
 public class TransactionRepository : ITransactionRepository
 {
     private readonly IMongoCollection<Transaction> _transactions;
+    private static bool _indexesCreated;
+    private static readonly object _indexLock = new();
 
     public TransactionRepository(IMongoDbService mongoDbService)
     {
         _transactions = mongoDbService.GetCollection<Transaction>("transactions");
 
-        // Create indexes for efficient queries
-        // Wrapped in try-catch to handle cases where indexes already exist with different names
-        try
+        // Create indexes once per application lifecycle (idempotent but avoids per-request round-trip)
+        if (!_indexesCreated)
         {
+            lock (_indexLock)
+            {
+                if (!_indexesCreated)
+                {
+                    try
+                    {
             var indexModels = new List<CreateIndexModel<Transaction>>
             {
                 // User + Date for listing transactions
@@ -141,6 +148,10 @@ public class TransactionRepository : ITransactionRepository
         catch (MongoCommandException)
         {
             // Indexes may already exist with different names - this is OK
+        }
+        _indexesCreated = true;
+                }
+            }
         }
     }
 

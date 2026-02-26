@@ -136,7 +136,7 @@ public sealed class RedisCacheService : ICacheService
         // Use local key tracking for pattern matching since IDistributedCache doesn't support SCAN
         var regex = new System.Text.RegularExpressions.Regex(
             "^" + System.Text.RegularExpressions.Regex.Escape(pattern).Replace("\\*", ".*") + "$",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+            System.Text.RegularExpressions.RegexOptions.None);
 
         var keysToRemove = _allKeys.Keys.Where(k => regex.IsMatch(k)).ToList();
 

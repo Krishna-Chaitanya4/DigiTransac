@@ -42,7 +42,7 @@ public class Result<T> : Result
         get
         {
             if (IsFailure)
-                throw new InvalidOperationException("Cannot access value of a failed result.");
+                throw new InvalidOperationException($"Cannot access value of a failed result. Error: {Error.Code} - {Error.Message}");
             return _value;
         }
     }

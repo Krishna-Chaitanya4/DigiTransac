@@ -91,7 +91,7 @@ export default function TransactionsPage() {
   
   // Conversations for contact picker in AddTransactionSheet
   const { data: conversationsData } = useConversations();
-  const conversations = conversationsData?.conversations ?? [];
+  const conversations = useMemo(() => conversationsData?.conversations ?? [], [conversationsData]);
   
   // UI state
   const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false);
@@ -196,7 +196,6 @@ export default function TransactionsPage() {
   // Optimistic status changes with undo
   const {
     transactions,
-    optimisticTransactions,
     setOptimisticTransactions,
     pendingRefreshTrigger,
     handleUpdateStatus,
@@ -349,7 +348,7 @@ export default function TransactionsPage() {
   }, [isLoading]);
 
   // Handle date preset change
-  const handleDatePresetChange = (preset: DatePreset) => {
+  const handleDatePresetChange = useCallback((preset: DatePreset) => {
     setDatePreset(preset);
     if (preset !== 'custom') {
       setCustomStartDate('');
@@ -361,10 +360,10 @@ export default function TransactionsPage() {
       setCustomStartDate(formatDateForInput(startOfMonth));
       setCustomEndDate(formatDateForInput(now));
     }
-  };
+  }, []);
 
   // Handle transaction form submit
-  const handleFormSubmit = async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
+  const handleFormSubmit = useCallback(async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
     setFormError(null);
     try {
       if (editingTransaction) {
@@ -380,13 +379,13 @@ export default function TransactionsPage() {
       setFormError(message);
       // Don't close the form on error so user can fix and retry
     }
-  };
+  }, [editingTransaction, updateTransactionMutation, createTransactionMutation]);
 
   // Handle edit
-  const handleEdit = (transaction: Transaction) => {
+  const handleEdit = useCallback((transaction: Transaction) => {
     setEditingTransaction(transaction);
     setIsFormOpen(true);
-  };
+  }, []);
 
   // Handle delete — instant soft-delete with undo toast
   const handleDelete = useCallback((id: string) => {
@@ -441,7 +440,7 @@ export default function TransactionsPage() {
   }, [navigate]);
 
   // Batch operations
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = useCallback(async () => {
     const confirmed = await confirm({
       title: 'Delete transactions?',
       message: `This will permanently delete ${selectionCount} transaction${selectionCount > 1 ? 's' : ''}. This action cannot be undone.`,
@@ -462,9 +461,9 @@ export default function TransactionsPage() {
     } finally {
       setIsBatchProcessing(false);
     }
-  };
+  }, [confirm, selectionCount, selectedIds, batchDeleteMutation, clearSelection]);
 
-  const handleBatchMarkConfirmed = async () => {
+  const handleBatchMarkConfirmed = useCallback(async () => {
     setIsBatchProcessing(true);
     try {
       await batchMarkConfirmedMutation.mutateAsync(Array.from(selectedIds));
@@ -481,9 +480,9 @@ export default function TransactionsPage() {
     } finally {
       setIsBatchProcessing(false);
     }
-  };
+  }, [selectedIds, batchMarkConfirmedMutation, transactions, clearSelection, setOptimisticTransactions]);
 
-  const handleBatchMarkPending = async () => {
+  const handleBatchMarkPending = useCallback(async () => {
     setIsBatchProcessing(true);
     try {
       await batchMarkPendingMutation.mutateAsync(Array.from(selectedIds));
@@ -500,10 +499,10 @@ export default function TransactionsPage() {
     } finally {
       setIsBatchProcessing(false);
     }
-  };
+  }, [selectedIds, batchMarkPendingMutation, transactions, clearSelection, setOptimisticTransactions]);
 
   // Export — uses Web Share API on mobile (for sharing files), fallback to direct download
-  const handleExport = async (format: 'csv' | 'json') => {
+  const handleExport = useCallback(async (format: 'csv' | 'json') => {
     try {
       const dateRange = getDateRange();
       const expandedLabelIds = getExpandedLabelIds();
@@ -544,17 +543,36 @@ export default function TransactionsPage() {
       logger.error('Failed to export:', err);
       setLocalError('Failed to export transactions. Please try again.');
     }
-  };
+  }, [getDateRange, getExpandedLabelIds, filter, searchText, isMobile]);
   
   // Mobile export bottom sheet state
   const [showMobileExportSheet, setShowMobileExportSheet] = useState(false);
 
   // Close form
-  const handleCloseForm = () => {
+  const handleCloseForm = useCallback(() => {
     setIsFormOpen(false);
     setEditingTransaction(null);
     setFormError(null);
-  };
+  }, []);
+
+  // Toggle pending filter — shared between desktop and mobile PendingIndicator
+  const handleTogglePending = useCallback(() => {
+    if (filter.status === 'Pending') {
+      // Go back to default view: Confirmed, This Month
+      setDatePreset('thisMonth');
+      setCustomStartDate('');
+      setCustomEndDate('');
+      setSearchText('');
+      setFilter({ status: 'Confirmed' });
+    } else {
+      // Show ALL pending transactions: clear filters, set all time
+      setDatePreset('custom');
+      setCustomStartDate('');
+      setCustomEndDate('');
+      setSearchText('');
+      setFilter({ status: 'Pending' });
+    }
+  }, [filter.status]);
 
   // Get active filter count (excluding date range, search, and default Confirmed status)
   const activeFilterCount = [
@@ -616,23 +634,7 @@ export default function TransactionsPage() {
           <PendingIndicator 
             showingPending={filter.status === 'Pending'}
             refreshTrigger={pendingRefreshTrigger}
-            onShowPending={() => {
-              if (filter.status === 'Pending') {
-                // Go back to default view: Confirmed, This Month
-                setDatePreset('thisMonth');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Confirmed' });
-              } else {
-                // Show ALL pending transactions: clear filters, set all time
-                setDatePreset('custom');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Pending' });
-              }
-            }}
+            onShowPending={handleTogglePending}
           />
           
           <button
@@ -689,21 +691,7 @@ export default function TransactionsPage() {
             compact
             showingPending={filter.status === 'Pending'}
             refreshTrigger={pendingRefreshTrigger}
-            onShowPending={() => {
-              if (filter.status === 'Pending') {
-                setDatePreset('thisMonth');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Confirmed' });
-              } else {
-                setDatePreset('custom');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Pending' });
-              }
-            }}
+            onShowPending={handleTogglePending}
           />
           <button
             onClick={() => setShowMobileExportSheet(true)}

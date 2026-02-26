@@ -21,15 +21,22 @@ public interface IAccountRepository
 public class AccountRepository : IAccountRepository
 {
     private readonly IMongoCollection<Account> _accounts;
+    private static bool _indexesCreated;
+    private static readonly object _indexLock = new();
 
     public AccountRepository(IMongoDbService mongoDbService)
     {
         _accounts = mongoDbService.GetCollection<Account>("accounts");
 
-        // Create compound indexes for efficient queries
-        // Wrapped in try-catch to handle cases where indexes already exist with different names
-        try
+        // Create indexes once per application lifecycle
+        if (!_indexesCreated)
         {
+            lock (_indexLock)
+            {
+                if (!_indexesCreated)
+                {
+                    try
+                    {
             var indexModels = new List<CreateIndexModel<Account>>
             {
                 // UserId + IsArchived + Order for GetByUserIdAsync (most common query)
@@ -51,6 +58,10 @@ public class AccountRepository : IAccountRepository
         catch (MongoCommandException)
         {
             // Indexes may already exist with different names - this is OK
+        }
+        _indexesCreated = true;
+                }
+            }
         }
     }
 
