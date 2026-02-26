@@ -193,7 +193,8 @@ public class TransactionBatchServiceTests
 
         await _sut.BatchDeleteAsync(UserId, ids);
 
-        _transactionRepoMock.Verify(x => x.DeleteByIdAsync("p2p-linked"), Times.Once);
+        // Should soft-delete (not hard-delete) so undo/restore works
+        _transactionRepoMock.Verify(x => x.SoftDeleteAsync("p2p-linked", "other-user", null), Times.Once);
     }
 
     [Fact]
