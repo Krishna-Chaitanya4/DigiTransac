@@ -8,7 +8,7 @@ import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog';
 import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
 import { PendingIndicator } from '../components/PendingIndicator';
-import { ToastContainer, useToast } from '../components/Toast';
+import { useToast } from '../components/ToastProvider';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -32,6 +32,7 @@ import {
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
+  useRestoreTransaction,
   useUpdateStatus,
   useBatchDelete,
   useBatchMarkConfirmed,
@@ -76,13 +77,14 @@ export default function TransactionsPage() {
   const createTransactionMutation = useCreateTransaction();
   const updateTransactionMutation = useUpdateTransaction();
   const deleteTransactionMutation = useDeleteTransaction();
+  const restoreTransactionMutation = useRestoreTransaction();
   const updateStatusMutation = useUpdateStatus();
   const batchDeleteMutation = useBatchDelete();
   const batchMarkConfirmedMutation = useBatchMarkConfirmed();
   const batchMarkPendingMutation = useBatchMarkPending();
   
   // Toast notifications
-  const { showInfo, toasts, dismissToast } = useToast();
+  const { showInfo, dismissToast } = useToast();
   
   // Confirm dialog for batch operations
   const { confirm, dialogProps: confirmDialogProps } = useConfirmDialog();
@@ -386,10 +388,17 @@ export default function TransactionsPage() {
     setIsFormOpen(true);
   };
 
-  // Handle delete — instant soft-delete (optimistic removal from React Query cache)
-  const handleDelete = (id: string) => {
+  // Handle delete — instant soft-delete with undo toast
+  const handleDelete = useCallback((id: string) => {
     deleteTransactionMutation.mutate(id);
-  };
+    const toastId = showInfo('Transaction deleted', {
+      label: 'Undo',
+      onClick: () => {
+        dismissToast(toastId);
+        restoreTransactionMutation.mutate(id);
+      },
+    });
+  }, [deleteTransactionMutation, restoreTransactionMutation, showInfo, dismissToast]);
 
   // Handle view linked transaction — reuse the pending-highlight mechanism
   // so the scroll effect handles waiting for data to load.
@@ -925,9 +934,6 @@ export default function TransactionsPage() {
         anchorRef={addSheetMode === 'dropdown' ? addButtonRef : undefined}
         mode={addSheetMode}
       />
-      
-      {/* Toast notifications */}
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {/* Confirm dialog for batch operations */}
       <ConfirmDialog {...confirmDialogProps} />

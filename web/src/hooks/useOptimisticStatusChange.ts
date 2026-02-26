@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { logger } from '../services/logger';
 import type { Transaction } from '../types/transactions';
-import type { ToastAction } from '../components/Toast';
+import type { ToastAction } from '../components/ToastProvider';
 
 interface UseOptimisticStatusChangeOptions {
   /** Raw server transactions from React Query (before optimistic overlay). */
