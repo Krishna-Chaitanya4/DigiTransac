@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.7] - 2026-02-27
+
+### Fixed
+- **Toast notification overlap** — Consolidated dual toast systems (`Toast.tsx` local + `ToastProvider.tsx` global) into single `ToastProvider` with action button support; fixed `setTimeout` leak by tracking timer IDs in Map ref with cleanup on dismiss/unmount
+- **View in Transactions scroll regression** — Fixed repeat "View in Transactions" navigation not scrolling due to React StrictMode double-mount and `searchParams.delete()` mutation
+- **P2P conversation preview showing "deleted"** — When sender deletes their transaction, counterparty's confirmed copy now shows correctly instead of "This transaction was deleted" (resolve viewer's linked transaction via `TransactionLinkId` first)
+- **P2P undo-delete blocked for counterparty** — `canUndoTransactionDelete` in `MessageBubble` was checking `isFromMe` (chat message sender) instead of transaction ownership; counterparty who received, confirmed, and deleted a P2P transaction can now undo from chat
+- **Batch delete double balance reversal** — Added `processedIds` check to prevent both sides of a transfer from having balances reversed independently during batch delete
+- **Analytics crash on empty collection** — Added `.Any()` guard before `Min()` call in `TransactionAnalyticsService` to prevent crash when no Send transactions exist in period
+
+### Changed
+- **P2P edit propagation** — Only shared fields (amount, date, type, currency, title) propagate to pending counterparty; personal fields (category, notes, labels, tags, location, payee) are never propagated
+- **P2P delete behavior** — Confirmed/Declined counterparty transactions are never affected by sender's delete; only Pending transactions are soft-deleted (consistent between single and batch delete)
+- **Batch delete P2P consistency** — Changed from hard-delete to soft-delete for pending counterparty P2P transactions, making undo/restore work consistently with single delete
+
+### Improved
+- **TransactionsPage performance** — Wrapped 7 event handlers in `useCallback`, extracted duplicated `handleTogglePending` callback, memoized empty conversations fallback array
+- **MongoDB index creation** — Added static guard to 3 repositories (`TransactionRepository`, `AccountRepository`, `LabelRepository`) to prevent redundant `CreateMany` on every HTTP request
+- **P2P query optimization** — Moved `GetP2PTransactionsAsync` and counterparty user fetch inside search text check in `TransactionCoreService` (saves 2 DB queries per non-search request)
+- **Result pattern error context** — Enhanced `Result<T>.Value` exception message to include error code and message for easier debugging
+- **Cache service regex** — Changed `RegexOptions.Compiled` to `RegexOptions.None` for throwaway patterns in `MemoryCacheService` and `RedisCacheService`
+- **Dead code cleanup** — Removed unreachable `IsDeleted` check in legacy transaction fallback (source query already filters deleted)
+
 ## [1.8.6] - 2026-02-26
 
 ### Added
