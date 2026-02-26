@@ -81,7 +81,7 @@ export default function ChatsPage() {
 
   // Conversation React Query hooks
   const { data: conversationsData, isLoading: isLoadingConversations } = useConversations();
-  const conversations = conversationsData?.conversations ?? [];
+  const conversations = useMemo(() => conversationsData?.conversations ?? [], [conversationsData?.conversations]);
 
   // Query online status for all counterparties when conversations load
   // AND when SignalR connection becomes active (handles race condition on page load)
@@ -314,7 +314,7 @@ export default function ChatsPage() {
       logger.error('Failed to send message:', err);
       showError('Failed to send message. Please try again.');
     }
-  }, [messageInput, selectedUserId, replyTo, sendMessageMutation, scrollToBottom, pendingConversation, queryClient]);
+  }, [messageInput, selectedUserId, replyTo, sendMessageMutation, scrollToBottom, pendingConversation, queryClient, showError]);
 
   // Edit message
   const handleEditMessage = useCallback(async () => {
@@ -331,7 +331,7 @@ export default function ChatsPage() {
       logger.error('Failed to edit message:', err);
       showError('Failed to edit message. Please try again.');
     }
-  }, [editingMessage, editInput, editMessageMutation]);
+  }, [editingMessage, editInput, editMessageMutation, showError]);
 
   // Delete message
   const handleDeleteMessage = useCallback(
@@ -343,7 +343,7 @@ export default function ChatsPage() {
         showError('Failed to delete message. Please try again.');
       }
     },
-    [deleteMessageMutation, selectedUserId]
+    [deleteMessageMutation, selectedUserId, showError]
   );
 
   // Restore (undo delete) message
@@ -357,7 +357,7 @@ export default function ChatsPage() {
         showError('Failed to restore message. Please try again.');
       }
     },
-    [restoreMessageMutation, selectedUserId]
+    [restoreMessageMutation, selectedUserId, showError]
   );
 
   // Helper to optimistically toggle isDeleted on a transaction in the conversation cache
