@@ -1,12 +1,18 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 export interface Toast {
   id: string;
   type: ToastType;
   message: string;
   duration?: number;
+  action?: ToastAction;
 }
 
 interface ToastContextType {
@@ -17,6 +23,10 @@ interface ToastContextType {
   error: (message: string, duration?: number) => void;
   info: (message: string, duration?: number) => void;
   warning: (message: string, duration?: number) => void;
+  /** Show an info toast with an optional action button. Returns the toast ID. */
+  showInfo: (message: string, action?: ToastAction) => string;
+  /** Dismiss a toast by ID. */
+  dismissToast: (id: string) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -25,26 +35,55 @@ const DEFAULT_DURATION = 5000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Clear all timers on unmount
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
+  /** Schedule auto-removal for a toast, clearing any existing timer for that ID. */
+  const scheduleRemoval = useCallback((id: string, duration: number) => {
+    if (duration <= 0) return;
+    const timer = setTimeout(() => {
+      timersRef.current.delete(id);
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, duration);
+    timersRef.current.set(id, timer);
+  }, []);
 
   const addToast = useCallback((type: ToastType, message: string, duration = DEFAULT_DURATION) => {
     const id = crypto.randomUUID();
     setToasts(prev => [...prev, { id, type, message, duration }]);
-    
-    // Auto-remove after duration
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-      }, duration);
-    }
-  }, []);
+    scheduleRemoval(id, duration);
+  }, [scheduleRemoval]);
 
   const removeToast = useCallback((id: string) => {
+    // Clear the auto-removal timer if the toast is dismissed early
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  /** Show an info toast with an optional action button (e.g. Undo). Returns the toast ID. */
+  const showInfo = useCallback((message: string, action?: ToastAction) => {
+    const id = crypto.randomUUID();
+    const duration = action ? 8000 : DEFAULT_DURATION; // Longer duration when there's an action
+    setToasts(prev => [...prev, { id, type: 'info' as ToastType, message, duration, action }]);
+    scheduleRemoval(id, duration);
+    return id;
+  }, [scheduleRemoval]);
+
   const success = useCallback((message: string, duration?: number) => addToast('success', message, duration), [addToast]);
   const error = useCallback((message: string, duration?: number) => addToast('error', message, duration), [addToast]);
-  const info = useCallback((message: string, duration?: number) => addToast('info', message, duration), [addToast]);
+  const infoSimple = useCallback((message: string, duration?: number) => addToast('info', message, duration), [addToast]);
   const warning = useCallback((message: string, duration?: number) => addToast('warning', message, duration), [addToast]);
 
   // Listen for global toast events (for use outside React components)
@@ -59,7 +98,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [addToast]);
 
   return (
-    <ToastContext.Provider value={{ toasts, addToast, removeToast, success, error, info, warning }}>
+    <ToastContext.Provider value={{ toasts, addToast, removeToast, success, error, info: infoSimple, warning, showInfo, dismissToast: removeToast }}>
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </ToastContext.Provider>
@@ -161,6 +200,17 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
         {icons[toast.type]}
       </span>
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
+      {toast.action && (
+        <button
+          onClick={() => {
+            toast.action?.onClick();
+            onRemove(toast.id);
+          }}
+          className="flex-shrink-0 px-3 py-1 text-xs font-semibold rounded-md bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         onClick={() => onRemove(toast.id)}
         className="flex-shrink-0 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"

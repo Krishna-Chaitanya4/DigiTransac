@@ -43,6 +43,13 @@ public class TransactionBatchService : ITransactionBatchService
 
         foreach (var id in ids)
         {
+            // Skip if already processed as a linked transaction of a previous item
+            if (processedIds.Contains(id))
+            {
+                successCount++;
+                continue;
+            }
+
             if (!transactionMap.TryGetValue(id, out var transaction))
             {
                 failedIds.Add(id);
@@ -97,7 +104,8 @@ public class TransactionBatchService : ITransactionBatchService
                 }
             }
 
-            // Delete P2P linked transaction if still pending
+            // Soft-delete P2P linked transaction if still pending
+            // Confirmed/Declined transactions belong to the counterparty and are not touched
             if (transaction.TransactionLinkId.HasValue &&
                 !string.IsNullOrEmpty(transaction.CounterpartyUserId))
             {
@@ -105,7 +113,7 @@ public class TransactionBatchService : ITransactionBatchService
                     transaction.TransactionLinkId.Value, userId);
                 if (linkedP2P != null && linkedP2P.Status == TransactionStatus.Pending)
                 {
-                    await _transactionRepository.DeleteByIdAsync(linkedP2P.Id);
+                    await _transactionRepository.SoftDeleteAsync(linkedP2P.Id, linkedP2P.UserId);
                 }
             }
 

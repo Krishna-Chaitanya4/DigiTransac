@@ -130,7 +130,7 @@ public class MemoryCacheService : ICacheService
     {
         var regex = new Regex(
             "^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$",
-            RegexOptions.Compiled);
+            RegexOptions.None);
 
         var keysToRemove = _allKeys.Keys.Where(k => regex.IsMatch(k)).ToList();
         

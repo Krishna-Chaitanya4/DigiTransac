@@ -1,4 +1,5 @@
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -18,6 +19,7 @@ public class ConversationServiceTests
     private readonly Mock<ITransactionService> _transactionServiceMock;
     private readonly Mock<IExchangeRateService> _exchangeRateServiceMock;
     private readonly Mock<ILabelRepository> _labelRepositoryMock;
+    private readonly Mock<INotificationService> _notificationServiceMock;
     private readonly Mock<ILogger<ConversationService>> _loggerMock;
     private readonly ConversationService _conversationService;
     
@@ -33,6 +35,7 @@ public class ConversationServiceTests
         _transactionServiceMock = new Mock<ITransactionService>();
         _exchangeRateServiceMock = new Mock<IExchangeRateService>();
         _labelRepositoryMock = new Mock<ILabelRepository>();
+        _notificationServiceMock = new Mock<INotificationService>();
         _loggerMock = new Mock<ILogger<ConversationService>>();
 
         SetupDefaultMocks();
@@ -45,6 +48,7 @@ public class ConversationServiceTests
             _transactionServiceMock.Object,
             _exchangeRateServiceMock.Object,
             _labelRepositoryMock.Object,
+            _notificationServiceMock.Object,
             _loggerMock.Object);
     }
 

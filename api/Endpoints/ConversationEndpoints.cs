@@ -4,7 +4,6 @@ using DigiTransac.Api.Common;
 using DigiTransac.Api.Extensions;
 using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models.Dto;
-using DigiTransac.Api.Repositories;
 using DigiTransac.Api.Services;
 using Microsoft.AspNetCore.SignalR;
 
@@ -61,14 +60,12 @@ public static class ConversationEndpoints
         .WithName("GetConversation")
         .Produces<ConversationDetailResponse>(200);
 
-        // Send text message
+        // Send text message (notification dispatched by service)
         group.MapPost("/{counterpartyUserId}/messages", async (
             string counterpartyUserId,
             SendMessageRequest request,
             ClaimsPrincipal user,
             IConversationService conversationService,
-            INotificationService notificationService,
-            IUserRepository userRepository,
             CancellationToken ct) =>
         {
             if (!user.TryGetUserId(out var userId))
@@ -80,40 +77,19 @@ public static class ConversationEndpoints
             if (result.IsFailure)
                 return result.ToApiResult();
 
-            var chatMessage = result.Value;
-
-            // Send real-time notification to recipient
-            if (userId != counterpartyUserId)
-            {
-                var sender = await userRepository.GetByIdAsync(userId);
-                var notification = new ChatMessageNotification(
-                    MessageId: chatMessage.Id,
-                    SenderId: userId,
-                    RecipientId: counterpartyUserId,
-                    SenderName: sender?.FullName ?? sender?.Email,
-                    MessageType: chatMessage.Type,
-                    Content: chatMessage.Content,
-                    TransactionId: null,
-                    SentAt: chatMessage.CreatedAt
-                );
-                await notificationService.NotifyChatMessageAsync(userId, counterpartyUserId, notification);
-            }
-
-            return Results.Ok(chatMessage);
+            return Results.Ok(result.Value);
         })
         .WithName("SendMessage")
         .Produces<ConversationMessage>(200)
         .Produces<ErrorResponse>(400);
 
-        // Send money
+        // Send money (notification dispatched by service)
         group.MapPost("/{counterpartyUserId}/send-money", async (
             string counterpartyUserId,
             SendMoneyRequest request,
             ClaimsPrincipal user,
             IConversationService conversationService,
             IValidator<SendMoneyRequest> validator,
-            INotificationService notificationService,
-            IUserRepository userRepository,
             CancellationToken ct) =>
         {
             if (!user.TryGetUserId(out var userId))
@@ -129,32 +105,7 @@ public static class ConversationEndpoints
             if (result.IsFailure)
                 return result.ToApiResult();
 
-            var chatMessage = result.Value;
-
-            // Send real-time notification to recipient
-            if (chatMessage != null)
-            {
-                var sender = await userRepository.GetByIdAsync(userId);
-                var tx = chatMessage.Transaction;
-                var notification = new ChatMessageNotification(
-                    MessageId: chatMessage.Id,
-                    SenderId: userId,
-                    RecipientId: counterpartyUserId,
-                    SenderName: sender?.FullName ?? sender?.Email,
-                    MessageType: chatMessage.Type,
-                    Content: null, // Transaction messages don't have text content
-                    TransactionId: tx?.TransactionId,
-                    SentAt: chatMessage.CreatedAt,
-                    TransactionType: tx?.TransactionType,
-                    Amount: tx != null ? tx.Amount : null,
-                    Currency: tx?.Currency,
-                    Title: tx?.Title,
-                    TransactionStatus: tx?.Status
-                );
-                await notificationService.NotifyChatMessageAsync(userId, counterpartyUserId, notification);
-            }
-
-            return Results.Ok(chatMessage);
+            return Results.Ok(result.Value);
         })
         .WithName("SendMoney")
         .Produces<ConversationMessage>(200)
@@ -203,12 +154,11 @@ public static class ConversationEndpoints
         .Produces<object>(200)
         .Produces<ErrorResponse>(400);
 
-        // Delete message
+        // Delete message (notification dispatched by service)
         group.MapDelete("/messages/{messageId}", async (
             string messageId,
             ClaimsPrincipal user,
             IConversationService conversationService,
-            INotificationService notificationService,
             CancellationToken ct) =>
         {
             if (!user.TryGetUserId(out var userId))
@@ -218,30 +168,17 @@ public static class ConversationEndpoints
             if (result.IsFailure)
                 return result.ToApiResult();
 
-            // Notify the counterparty in real-time that a message was deleted
-            var deletedMessage = result.Value;
-            var recipientId = deletedMessage.RecipientUserId;
-            if (recipientId != userId)
-            {
-                var notification = new MessageDeletedNotification(
-                    MessageId: messageId,
-                    SenderId: userId
-                );
-                await notificationService.NotifyUserAsync(recipientId, "MessageDeleted", notification);
-            }
-
             return Results.Ok(new { message = "Message deleted" });
         })
         .WithName("DeleteMessage")
         .Produces<object>(200)
         .Produces<ErrorResponse>(400);
 
-        // Restore (undo delete) message
+        // Restore (undo delete) message (notification dispatched by service)
         group.MapPost("/messages/{messageId}/restore", async (
             string messageId,
             ClaimsPrincipal user,
             IConversationService conversationService,
-            INotificationService notificationService,
             CancellationToken ct) =>
         {
             if (!user.TryGetUserId(out var userId))
@@ -250,18 +187,6 @@ public static class ConversationEndpoints
             var result = await conversationService.RestoreMessageAsync(userId, messageId, ct);
             if (result.IsFailure)
                 return result.ToApiResult();
-
-            // Notify the counterparty in real-time that a message was restored
-            var restoredMessage = result.Value;
-            var recipientId = restoredMessage.RecipientUserId;
-            if (recipientId != userId)
-            {
-                var notification = new MessageRestoredNotification(
-                    MessageId: messageId,
-                    SenderId: userId
-                );
-                await notificationService.NotifyUserAsync(recipientId, "MessageRestored", notification);
-            }
 
             return Results.Ok(new { message = "Message restored" });
         })

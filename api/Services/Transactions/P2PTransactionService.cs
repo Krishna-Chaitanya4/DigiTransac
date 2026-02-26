@@ -108,6 +108,8 @@ public class P2PTransactionService : IP2PTransactionService
             return;
 
         // Sync shared fields to the counterparty's pending transaction
+        // Personal fields (category, notes, labels, tags, location, payee) are NOT propagated
+        // Title IS synced because it describes the purpose (e.g. "Dinner split") which both parties need
         if (request.Amount.HasValue)
         {
             linkedP2PTransaction.Amount = transaction.Amount;

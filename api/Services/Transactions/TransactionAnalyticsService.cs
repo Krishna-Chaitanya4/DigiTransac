@@ -388,7 +388,9 @@ public class TransactionAnalyticsService : ITransactionAnalyticsService
         );
 
         // Calculate daily and monthly averages with currency conversion
-        var dateRange = (endDate ?? DateTime.UtcNow) - (startDate ?? actualTransactions.Min(t => t.Date));
+        var avgEnd = endDate ?? DateTime.UtcNow;
+        var avgStart = startDate ?? (actualTransactions.Any() ? actualTransactions.Min(t => t.Date) : avgEnd);
+        var dateRange = avgEnd - avgStart;
         var days = Math.Max(1, dateRange.Days);
         var months = Math.Max(1, days / 30.0);
         var totalSends = sends.Sum(t => GetIncludedAmount(

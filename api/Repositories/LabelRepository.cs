@@ -23,15 +23,22 @@ public interface ILabelRepository
 public class LabelRepository : ILabelRepository
 {
     private readonly IMongoCollection<Label> _labels;
+    private static bool _indexesCreated;
+    private static readonly object _indexLock = new();
 
     public LabelRepository(IMongoDbService mongoDbService)
     {
         _labels = mongoDbService.GetCollection<Label>("labels");
 
-        // Create compound indexes for efficient queries
-        // Wrapped in try-catch to handle cases where indexes already exist with different names
-        try
+        // Create indexes once per application lifecycle
+        if (!_indexesCreated)
         {
+            lock (_indexLock)
+            {
+                if (!_indexesCreated)
+                {
+                    try
+                    {
             var indexModels = new List<CreateIndexModel<Label>>
             {
                 // UserId + Order for GetByUserIdAsync (most common query)
@@ -59,6 +66,10 @@ public class LabelRepository : ILabelRepository
         catch (MongoCommandException)
         {
             // Indexes may already exist with different names - this is OK
+        }
+        _indexesCreated = true;
+                }
+            }
         }
     }
 

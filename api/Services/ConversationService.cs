@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using DigiTransac.Api.Common;
+using DigiTransac.Api.Hubs;
 using DigiTransac.Api.Models;
 using DigiTransac.Api.Models.Dto;
 using DigiTransac.Api.Repositories;
@@ -125,6 +126,7 @@ public class ConversationService : IConversationService
     private readonly ITransactionService _transactionService;
     private readonly IExchangeRateService _exchangeRateService;
     private readonly ILabelRepository _labelRepository;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<ConversationService> _logger;
 
     public ConversationService(
@@ -135,6 +137,7 @@ public class ConversationService : IConversationService
         ITransactionService transactionService,
         IExchangeRateService exchangeRateService,
         ILabelRepository labelRepository,
+        INotificationService notificationService,
         ILogger<ConversationService> logger)
     {
         _chatMessageRepository = chatMessageRepository;
@@ -144,6 +147,7 @@ public class ConversationService : IConversationService
         _transactionService = transactionService;
         _exchangeRateService = exchangeRateService;
         _labelRepository = labelRepository;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -223,6 +227,22 @@ public class ConversationService : IConversationService
         
         // Batch fetch unread counts for all counterparties (fixes N+1)
         var unreadCounts = await _chatMessageRepository.GetUnreadCountsAsync(userId, counterpartyIds, ct);
+        
+        // Pre-fetch sender transactions for conversation previews (fixes N+1).
+        // When the latest message is a Transaction that the viewer doesn't own,
+        // we need the sender's transaction to resolve TransactionLinkId.
+        var p2pTxIds = new HashSet<string>(p2pTransactions.Select(t => t.Id));
+        var unresolvedPreviewTxIds = latestMessages
+            .Where(m => m.Type == ChatMessageType.Transaction
+                     && !string.IsNullOrEmpty(m.TransactionId)
+                     && !p2pTxIds.Contains(m.TransactionId!))
+            .Select(m => m.TransactionId!)
+            .Distinct()
+            .ToList();
+        var senderPreviewTxs = unresolvedPreviewTxIds.Count > 0
+            ? (await _transactionRepository.GetByIdsAsync(unresolvedPreviewTxIds, ct))
+                .ToDictionary(t => t.Id)
+            : new Dictionary<string, Transaction>();
         
         // Build conversation summaries
         var conversations = new List<ConversationSummary>();
@@ -308,20 +328,18 @@ public class ConversationService : IConversationService
                     }
                     else
                     {
-                        // Chat message references the sender's transaction; fetch it to get TransactionLinkId
-                        var senderTx = await _transactionRepository.GetByIdAsync(latestMessage.TransactionId);
-                        if (senderTx != null && senderTx.IsDeleted)
+                        // Chat message references the sender's transaction; use batch-fetched lookup
+                        senderPreviewTxs.TryGetValue(latestMessage.TransactionId!, out var senderTx);
+                        if (senderTx?.TransactionLinkId != null)
                         {
-                            msgTransaction = senderTx; // will show "deleted" preview
-                        }
-                        else if (senderTx?.TransactionLinkId != null)
-                        {
-                            // Find the viewer's matching transaction via TransactionLinkId
+                            // Always try to find the viewer's own linked transaction first.
+                            // Even if the sender deleted theirs, the viewer may have confirmed
+                            // their copy — show the viewer's own transaction, not "deleted".
                             var linkedTx = txsWithCounterparty.FirstOrDefault(t => 
                                 t.TransactionLinkId == senderTx.TransactionLinkId);
-                            msgTransaction = linkedTx ?? senderTx; // fallback to sender's if not found
+                            msgTransaction = linkedTx ?? senderTx; // fallback to sender's if viewer has none
                         }
-                        else
+                        else if (senderTx != null)
                         {
                             msgTransaction = senderTx;
                         }
@@ -345,14 +363,9 @@ public class ConversationService : IConversationService
             {
                 lastActivityAt = latestTx.Date;
                 lastMessageType = "Transaction";
-                if (latestTx.IsDeleted)
-                {
-                    lastMessagePreview = "This transaction was deleted";
-                }
-                else
-                {
-                    lastMessagePreview = GetTransactionPreview(latestTx, userId);
-                }
+                // latestTx comes from GetP2PTransactionsAsync which filters IsDeleted,
+                // so latestTx.IsDeleted is always false here
+                lastMessagePreview = GetTransactionPreview(latestTx, userId);
             }
             else
             {
@@ -426,8 +439,31 @@ public class ConversationService : IConversationService
         DateTime? before = null,
         CancellationToken ct = default)
     {
-        // Get counterparty details
-        var counterparty = await _userRepository.GetByIdAsync(counterpartyUserId);
+        var isSelfChat = userId == counterpartyUserId;
+        
+        // Fire all independent DB/service calls in parallel for lower latency
+        var counterpartyTask = _userRepository.GetByIdAsync(counterpartyUserId);
+        var currentUserTask = isSelfChat
+            ? counterpartyTask  // Same user — reuse the single query
+            : _userRepository.GetByIdAsync(userId);
+        var ratesTask = _exchangeRateService.GetRatesAsync();
+        var firstUnreadTask = isSelfChat
+            ? Task.FromResult<string?>(null)
+            : _chatMessageRepository.GetFirstUnreadMessageIdAsync(userId, counterpartyUserId, ct);
+        var chatMessagesTask = _chatMessageRepository.GetConversationMessagesAsync(
+            userId, counterpartyUserId, limit, before, ct);
+        var accountsTask = _accountRepository.GetByUserIdAsync(userId, includeArchived: true, ct);
+        var labelsTask = _labelRepository.GetByUserIdAsync(userId, ct);
+        // For P2P chats, transactions are independent of chat messages
+        var p2pTransactionsTask = isSelfChat
+            ? Task.FromResult(new List<Transaction>())
+            : _transactionRepository.GetP2PTransactionsWithCounterpartyAsync(userId, counterpartyUserId);
+        
+        await Task.WhenAll(
+            counterpartyTask, currentUserTask, ratesTask, firstUnreadTask,
+            chatMessagesTask, accountsTask, labelsTask, p2pTransactionsTask);
+        
+        var counterparty = counterpartyTask.Result;
         if (counterparty == null)
         {
             return new ConversationDetailResponse(
@@ -435,26 +471,13 @@ public class ConversationService : IConversationService
                 new List<ConversationMessage>(), 0, false, 0, 0, false);
         }
         
-        // Get user's primary currency and exchange rates for conversion
-        var currentUser = await _userRepository.GetByIdAsync(userId);
+        var currentUser = currentUserTask.Result;
         var primaryCurrency = currentUser?.PrimaryCurrency ?? "USD";
-        var ratesResponse = await _exchangeRateService.GetRatesAsync();
+        var ratesResponse = ratesTask.Result;
         var rates = ratesResponse.Rates;
         
-        var isSelfChat = userId == counterpartyUserId;
-        
-        // Get the first unread message ID BEFORE any mark-as-read could fire.
-        // For self-chat, there are no "unread" messages (you sent them to yourself).
-        string? firstUnreadMessageId = null;
-        if (!isSelfChat)
-        {
-            firstUnreadMessageId = await _chatMessageRepository.GetFirstUnreadMessageIdAsync(
-                userId, counterpartyUserId, ct);
-        }
-        
-        // Get chat messages
-        var chatMessages = await _chatMessageRepository.GetConversationMessagesAsync(
-            userId, counterpartyUserId, limit, before, ct);
+        var firstUnreadMessageId = firstUnreadTask.Result;
+        var chatMessages = chatMessagesTask.Result;
         
         // Get transactions for this conversation
         List<Transaction> transactionsForChat;
@@ -471,9 +494,7 @@ public class ConversationService : IConversationService
         }
         else
         {
-            // For P2P chat, get transactions with this counterparty
-            transactionsForChat = await _transactionRepository.GetP2PTransactionsWithCounterpartyAsync(
-                userId, counterpartyUserId);
+            transactionsForChat = p2pTransactionsTask.Result;
         }
         
         // Filter transactions by before date if specified
@@ -482,13 +503,11 @@ public class ConversationService : IConversationService
             transactionsForChat = transactionsForChat.Where(t => t.Date < before.Value).ToList();
         }
         
-        // Get user's accounts for display names
-        var accounts = (await _accountRepository.GetByUserIdAsync(userId, includeArchived: true, ct))
-            .ToDictionary(a => a.Id);
+        // Get user's accounts for display names (already fetched in parallel)
+        var accounts = accountsTask.Result.ToDictionary(a => a.Id);
         
-        // Get user's labels for category display in transaction cards
-        var labels = (await _labelRepository.GetByUserIdAsync(userId, ct))
-            .ToDictionary(l => l.Id);
+        // Get user's labels for category display in transaction cards (already fetched in parallel)
+        var labels = labelsTask.Result.ToDictionary(l => l.Id);
         
         // Build unified message list
         var messages = new List<ConversationMessage>();
@@ -685,10 +704,6 @@ public class ConversationService : IConversationService
                     DeletedAt: tx.DeletedAt
                 );
                 
-                // This is a noter app: any transaction in the user's own collection was
-                // created by them, regardless of Send/Receive type. Always right-align.
-                var isFromMe = true;
-                
                 // Derive IsSystemGenerated from Transaction.Source
                 var isSystemGenerated = tx.Source is TransactionSource.Recurring 
                                                   or TransactionSource.Import 
@@ -719,10 +734,9 @@ public class ConversationService : IConversationService
         }
         
         // Sort by date ascending (oldest first, newest at bottom) and limit
-        messages = messages
-            .OrderBy(m => m.CreatedAt)
-            .TakeLast(limit)
-            .ToList();
+        var sortedMessages = messages.OrderBy(m => m.CreatedAt).ToList();
+        var mergedCountBeforeTrim = sortedMessages.Count;
+        messages = sortedMessages.TakeLast(limit).ToList();
         
         // Calculate totals with currency conversion to user's primary currency
         decimal totalSent = transactionsForChat
@@ -733,7 +747,9 @@ public class ConversationService : IConversationService
             .Sum(t => _exchangeRateService.Convert(t.Amount, t.Currency, primaryCurrency, rates));
         
         var totalCount = messages.Count;
-        var hasMore = chatMessages.Count == limit || transactionsForChat.Count > limit;
+        // hasMore is true if the chat DB returned a full page (standard cursor pattern)
+        // OR if the merged message list was trimmed by TakeLast (legacy transactions overflow).
+        var hasMore = chatMessages.Count >= limit || mergedCountBeforeTrim > limit;
         
         return new ConversationDetailResponse(
             CounterpartyUserId: counterpartyUserId,
@@ -827,6 +843,23 @@ public class ConversationService : IConversationService
             SystemSource: null
         );
         
+        // Dispatch notification (fire-and-forget, don't block the response)
+        if (userId != counterpartyUserId)
+        {
+            var sender = await _userRepository.GetByIdAsync(userId);
+            var notification = new ChatMessageNotification(
+                MessageId: chatMessage.Id,
+                SenderId: userId,
+                RecipientId: counterpartyUserId,
+                SenderName: sender?.FullName ?? sender?.Email,
+                MessageType: chatMessage.Type.ToString(),
+                Content: chatMessage.Content,
+                TransactionId: null,
+                SentAt: chatMessage.CreatedAt
+            );
+            _ = _notificationService.NotifyChatMessageAsync(userId, counterpartyUserId, notification);
+        }
+        
         return response;
     }
 
@@ -919,6 +952,33 @@ public class ConversationService : IConversationService
             SystemSource: null
         );
         
+        // Dispatch notification (the P2PNotificationEventHandler handles the P2P notification;
+        // here we send the chat message notification for instant bubble display)
+        if (!string.IsNullOrEmpty(transaction.ChatMessageId))
+        {
+            var sender = await _userRepository.GetByIdAsync(userId);
+            var chatMsg = await _chatMessageRepository.GetByIdAsync(transaction.ChatMessageId, ct);
+            if (chatMsg != null)
+            {
+                var notification = new ChatMessageNotification(
+                    MessageId: chatMsg.Id,
+                    SenderId: userId,
+                    RecipientId: counterpartyUserId,
+                    SenderName: sender?.FullName ?? sender?.Email,
+                    MessageType: chatMsg.Type.ToString(),
+                    Content: null,
+                    TransactionId: transaction.Id,
+                    SentAt: chatMsg.CreatedAt,
+                    TransactionType: request.Type,
+                    Amount: transaction.Amount,
+                    Currency: transaction.Currency,
+                    Title: transaction.Title,
+                    TransactionStatus: transaction.Status
+                );
+                _ = _notificationService.NotifyChatMessageAsync(userId, counterpartyUserId, notification);
+            }
+        }
+        
         return response;
     }
 
@@ -973,6 +1033,14 @@ public class ConversationService : IConversationService
         if (!success)
             return Error.InternalError("Failed to delete message");
         
+        // Notify counterparty of deletion
+        var recipientId = message.RecipientUserId;
+        if (recipientId != userId)
+        {
+            _ = _notificationService.NotifyUserAsync(recipientId, "MessageDeleted",
+                new MessageDeletedNotification(MessageId: messageId, SenderId: userId));
+        }
+        
         return Result<ChatMessage>.Success(message);
     }
 
@@ -997,6 +1065,14 @@ public class ConversationService : IConversationService
         var success = await _chatMessageRepository.RestoreMessageAsync(messageId, userId, ct);
         if (!success)
             return Error.InternalError("Failed to restore message");
+        
+        // Notify counterparty of restoration
+        var recipientId = message.RecipientUserId;
+        if (recipientId != userId)
+        {
+            _ = _notificationService.NotifyUserAsync(recipientId, "MessageRestored",
+                new MessageRestoredNotification(MessageId: messageId, SenderId: userId));
+        }
         
         return Result<ChatMessage>.Success(message);
     }

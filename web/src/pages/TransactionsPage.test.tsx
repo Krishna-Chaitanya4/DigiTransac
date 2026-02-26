@@ -10,6 +10,7 @@ import * as tagService from '../services/tagService';
 import { CurrencyProvider } from '../context/CurrencyContext';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { ToastProvider } from '../components/ToastProvider';
 import { BrowserRouter } from 'react-router-dom';
 import { Transaction, TransactionSummary } from '../types/transactions';
 
@@ -90,7 +91,9 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => {
         <ThemeProvider>
           <AuthProvider>
             <CurrencyProvider>
-              {children}
+              <ToastProvider>
+                {children}
+              </ToastProvider>
             </CurrencyProvider>
           </AuthProvider>
         </ThemeProvider>

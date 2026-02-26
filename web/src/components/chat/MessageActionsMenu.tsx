@@ -95,7 +95,7 @@ export const MessageActionsMenu = memo(function MessageActionsMenu({
 
   const handleViewTransaction = () => {
     if (message.transaction) {
-      navigate(`/transactions?highlight=${message.transaction.transactionId}`);
+      navigate('/transactions', { state: { highlightTransactionId: message.transaction.transactionId } });
     }
     onClose();
   };

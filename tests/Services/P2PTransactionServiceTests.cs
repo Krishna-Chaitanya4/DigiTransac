@@ -272,7 +272,7 @@ public class P2PTransactionServiceTests
             Type: null,
             Amount: 600m, // Changed amount
             Date: DateTime.UtcNow.AddDays(1), // Changed date
-            Title: "Updated title", // Changed title
+            Title: "Updated title", // Changed title (shared context - should sync)
             Payee: null,
             Notes: null,
             Splits: null,
@@ -291,9 +291,9 @@ public class P2PTransactionServiceTests
         // Act
         await _p2pService.SyncP2PTransactionAsync(senderTransaction, updateRequest);
 
-        // Assert
+        // Assert - objective shared fields + title sync; personal fields (category, notes, etc.) do not
         receiverPendingTransaction.Amount.Should().Be(600m);
-        receiverPendingTransaction.Title.Should().Be("Updated title");
+        receiverPendingTransaction.Title.Should().Be("Updated title"); // Title syncs (shared purpose)
         receiverPendingTransaction.LastSyncedAt.Should().NotBeNull();
         _transactionRepositoryMock.Verify(x => x.UpdateAsync(receiverPendingTransaction, null), Times.Once);
     }

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
@@ -8,7 +8,7 @@ import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog';
 import { DatePicker } from '../components/DatePicker';
 import { FilterPanel, SummaryCards, BulkActionsBar } from '../components/transactions';
 import { PendingIndicator } from '../components/PendingIndicator';
-import { ToastContainer, useToast } from '../components/Toast';
+import { useToast } from '../components/ToastProvider';
 import { PullToRefreshContainer } from '../components/PullToRefreshContainer';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -32,6 +32,7 @@ import {
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
+  useRestoreTransaction,
   useUpdateStatus,
   useBatchDelete,
   useBatchMarkConfirmed,
@@ -41,6 +42,10 @@ import {
 import { useConversations } from '../hooks';
 import { exportTransactions } from '../services/transactionService';
 import { logger } from '../services/logger';
+import { downloadBlob } from '../utils/downloadBlob';
+import { DownloadIcon } from '../components/icons';
+import { useOptimisticStatusChange } from '../hooks/useOptimisticStatusChange';
+import { useTransactionHighlight } from '../hooks/useTransactionHighlight';
 import type {
   Transaction,
   TransactionFilter,
@@ -52,12 +57,12 @@ export default function TransactionsPage() {
   // Currency context - backend returns summary already converted to primary currency
   const { primaryCurrency } = useCurrency();
   
-  // URL search params for highlight
-  const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Navigation for View in Chat
+  // Navigation
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Read highlight ID from navigation state (set by "View in Transactions" in chat)
+  const highlightId = (location.state as { highlightTransactionId?: string } | null)?.highlightTransactionId ?? null;
   const isMobile = useIsMobile();
   
   // React Query hooks for data fetching
@@ -72,23 +77,21 @@ export default function TransactionsPage() {
   const createTransactionMutation = useCreateTransaction();
   const updateTransactionMutation = useUpdateTransaction();
   const deleteTransactionMutation = useDeleteTransaction();
+  const restoreTransactionMutation = useRestoreTransaction();
   const updateStatusMutation = useUpdateStatus();
   const batchDeleteMutation = useBatchDelete();
   const batchMarkConfirmedMutation = useBatchMarkConfirmed();
   const batchMarkPendingMutation = useBatchMarkPending();
   
-  // Local transaction state for optimistic updates
-  const [optimisticTransactions, setOptimisticTransactions] = useState<Transaction[] | null>(null);
-  
   // Toast notifications
-  const { showInfo, toasts, dismissToast } = useToast();
+  const { showInfo, dismissToast } = useToast();
   
   // Confirm dialog for batch operations
   const { confirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   
   // Conversations for contact picker in AddTransactionSheet
   const { data: conversationsData } = useConversations();
-  const conversations = conversationsData?.conversations ?? [];
+  const conversations = useMemo(() => conversationsData?.conversations ?? [], [conversationsData]);
   
   // UI state
   const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false);
@@ -98,7 +101,6 @@ export default function TransactionsPage() {
     !!(location.state as { openAddSheet?: boolean } | null)?.openAddSheet
   );
   const [addSheetMode, setAddSheetMode] = useState<'dropdown' | 'modal'>('dropdown');
-  const [pendingRefreshTrigger, setPendingRefreshTrigger] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
@@ -109,18 +111,15 @@ export default function TransactionsPage() {
   const pageSize = 50;
   
   // Filter state
-  // When navigating via ?highlight=<id> (e.g. "View in Transactions" from chat),
+  // When navigating with a highlight target (e.g. "View in Transactions" from chat),
   // clear filters so the transaction is findable regardless of status or date.
-  const hasHighlight = searchParams.has('highlight');
+  const hasHighlight = !!highlightId;
   const [datePreset, setDatePreset] = useState<DatePreset>(hasHighlight ? 'custom' : 'thisMonth');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchText, setSearchText] = useState('');
   const [debouncedSearchText, setDebouncedSearchText] = useState('');
   const [filter, setFilter] = useState<TransactionFilter>(hasHighlight ? {} : { status: 'Confirmed' });
-  
-  // Linked transaction navigation
-  const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null);
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -187,20 +186,57 @@ export default function TransactionsPage() {
   // React Query for summary (without pagination)
   const summaryFilter = useMemo(() => {
     // Omit pagination fields for summary query
-    const { page, pageSize, ...rest } = fullFilter;
-    // Use void to suppress unused variable warnings
-    void page;
-    void pageSize;
+    const { page: _page, pageSize: _pageSize, ...rest } = fullFilter;
+    void _page; void _pageSize; // Suppress unused-variable warnings
     return rest;
   }, [fullFilter]);
   
   const { data: summary } = useTransactionSummary(summaryFilter);
 
-  // Derived state
-  const transactions = useMemo(() => {
-    return optimisticTransactions ?? transactionResponse?.transactions ?? [];
-  }, [optimisticTransactions, transactionResponse?.transactions]);
+  // Optimistic status changes with undo
+  const {
+    transactions,
+    setOptimisticTransactions,
+    pendingRefreshTrigger,
+    handleUpdateStatus,
+    handleDecline,
+  } = useOptimisticStatusChange({
+    baseTransactions: transactionResponse?.transactions ?? [],
+    filterStatus: filter.status,
+    updateStatusMutation,
+    showInfo,
+    dismissToast,
+  });
   const hasMore = transactionResponse ? transactionResponse.page < transactionResponse.totalPages : false;
+
+  // Transaction highlight (from navigation state or "View linked transaction")
+  const { highlightedTransactionId, triggerHighlight } = useTransactionHighlight({
+    transactions,
+    hasMore,
+    currentPage,
+    setCurrentPage,
+    isFetching: isFetchingTransactions,
+    initialHighlightId: highlightId,
+    navigationKey: location.key,
+  });
+
+  // Handle highlight navigation — clear filters and location state.
+  // Uses location (changes on every navigation) to detect new navigations.
+  // This handles both fresh mounts AND the edge case where the component
+  // is reconciled without remounting (useState wouldn't re-initialize filters).
+  useEffect(() => {
+    const state = location.state as { highlightTransactionId?: string } | null;
+    if (state?.highlightTransactionId) {
+      setDatePreset('custom');
+      setCustomStartDate('');
+      setCustomEndDate('');
+      setFilter({});
+      setCurrentPage(1);
+      // Clear location state to prevent re-trigger on browser back/forward
+      window.history.replaceState({}, '');
+    }
+  }, [location]);
+
   const isLoading = isLoadingAccounts || isLoadingLabels || isLoadingTags || isLoadingTransactions;
   const isLoadingMore = isFetchingTransactions && currentPage > 1;
   const queryError = accountsError || labelsError || tagsError || transactionsError 
@@ -311,72 +347,8 @@ export default function TransactionsPage() {
     };
   }, [isLoading]);
 
-  // Handle highlight from URL param (e.g., /transactions?highlight=abc123)
-  // Track timeouts for cleanup on unmount
-  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => {
-    return () => {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      timeoutRefs.current.forEach(clearTimeout);
-    };
-  }, []);
-
-  // Capture the highlight param from URL on mount (before it gets cleared)
-  const pendingHighlightRef = useRef<string | null>(searchParams.get('highlight'));
-  // Counter to force the scroll effect to re-run when a new highlight is requested.
-  // Refs alone don't trigger re-renders, so this ensures subsequent navigations work.
-  const [highlightTrigger, setHighlightTrigger] = useState(0);
-
-  useEffect(() => {
-    const highlightId = searchParams.get('highlight');
-    if (highlightId) {
-      pendingHighlightRef.current = highlightId;
-      setHighlightTrigger(c => c + 1);
-      // Clear the URL param immediately so it doesn't retrigger
-      searchParams.delete('highlight');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
-
-  // Scroll to the highlighted transaction once it appears in the loaded data.
-  // If the transaction isn't in the current page, progressively load more
-  // pages until it's found or all data has been loaded.
-  useEffect(() => {
-    const highlightId = pendingHighlightRef.current;
-    if (!highlightId || transactions.length === 0) return;
-
-    // Check if the target transaction exists in the loaded data
-    const exists = transactions.some(t => t.id === highlightId);
-    if (!exists) {
-      // Transaction not yet loaded — fetch more if available (cap at 20 pages = 1000 txns)
-      if (hasMore && currentPage < 20) {
-        setCurrentPage(prev => prev + 1);
-      } else {
-        // All pages loaded or cap reached — transaction not found, give up
-        pendingHighlightRef.current = null;
-      }
-      return;
-    }
-
-    setHighlightedTransactionId(highlightId);
-    pendingHighlightRef.current = null;
-
-    // Scroll after DOM renders the element
-    const scrollTimer = setTimeout(() => {
-      const element = document.querySelector(`[data-transaction-id="${highlightId}"]`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 200);
-    timeoutRefs.current.push(scrollTimer);
-
-    // Clear highlight after 3 seconds
-    const clearTimer = setTimeout(() => setHighlightedTransactionId(null), 3000);
-    timeoutRefs.current.push(clearTimer);
-  }, [transactions, hasMore, currentPage, highlightTrigger]);
-
   // Handle date preset change
-  const handleDatePresetChange = (preset: DatePreset) => {
+  const handleDatePresetChange = useCallback((preset: DatePreset) => {
     setDatePreset(preset);
     if (preset !== 'custom') {
       setCustomStartDate('');
@@ -388,10 +360,10 @@ export default function TransactionsPage() {
       setCustomStartDate(formatDateForInput(startOfMonth));
       setCustomEndDate(formatDateForInput(now));
     }
-  };
+  }, []);
 
   // Handle transaction form submit
-  const handleFormSubmit = async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
+  const handleFormSubmit = useCallback(async (data: CreateTransactionRequest | UpdateTransactionRequest) => {
     setFormError(null);
     try {
       if (editingTransaction) {
@@ -407,80 +379,25 @@ export default function TransactionsPage() {
       setFormError(message);
       // Don't close the form on error so user can fix and retry
     }
-  };
+  }, [editingTransaction, updateTransactionMutation, createTransactionMutation]);
 
   // Handle edit
-  const handleEdit = (transaction: Transaction) => {
+  const handleEdit = useCallback((transaction: Transaction) => {
     setEditingTransaction(transaction);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  // Handle delete — instant soft-delete (optimistic removal from React Query cache)
-  const handleDelete = (id: string) => {
+  // Handle delete — instant soft-delete with undo toast
+  const handleDelete = useCallback((id: string) => {
     deleteTransactionMutation.mutate(id);
-  };
-
-  // Handle update status with undo toast
-  const handleUpdateStatus = async (id: string, status: 'Pending' | 'Confirmed') => {
-    // Find the transaction for undo
-    const transactionToUpdate = transactions.find(t => t.id === id);
-    if (!transactionToUpdate) return;
-    
-    const previousStatus = transactionToUpdate.status;
-    const currentStatusFilter = filter.status;
-    const shouldRemove = currentStatusFilter && currentStatusFilter !== status;
-    const originalIndex = transactions.findIndex(t => t.id === id);
-    
-    // Optimistic update
-    setOptimisticTransactions(prev => {
-      const list = prev ?? transactions;
-      if (shouldRemove) {
-        return list.filter(t => t.id !== id);
-      } else {
-        return list.map(t => t.id === id ? { ...t, status } : t);
-      }
-    });
-    
-    // Show undo toast
-    const statusLabel = status === 'Confirmed' ? 'confirmed' : 'marked pending';
-    const toastId = showInfo(`Transaction ${statusLabel}`, {
+    const toastId = showInfo('Transaction deleted', {
       label: 'Undo',
-      onClick: async () => {
+      onClick: () => {
         dismissToast(toastId);
-        try {
-          await updateStatusMutation.mutateAsync({ id, status: previousStatus });
-          // Restore to previous state via optimistic update
-          setOptimisticTransactions(prev => {
-            const list = prev ?? transactions;
-            if (shouldRemove) {
-              const newList = [...list];
-              newList.splice(originalIndex, 0, { ...transactionToUpdate, status: previousStatus });
-              return newList;
-            } else {
-              return list.map(t => t.id === id ? { ...t, status: previousStatus } : t);
-            }
-          });
-          setPendingRefreshTrigger(prev => prev + 1);
-          // Clear optimistic state after undo
-          setTimeout(() => setOptimisticTransactions(null), 100);
-        } catch (err) {
-          logger.error('Failed to undo status change:', err);
-        }
+        restoreTransactionMutation.mutate(id);
       },
     });
-    
-    try {
-      await updateStatusMutation.mutateAsync({ id, status });
-      setPendingRefreshTrigger(prev => prev + 1);
-      // Clear optimistic state - query cache is updated
-      setOptimisticTransactions(null);
-    } catch (err) {
-      logger.error('Failed to update transaction:', err);
-      // Restore on error
-      setOptimisticTransactions(null);
-      dismissToast(toastId);
-    }
-  };
+  }, [deleteTransactionMutation, restoreTransactionMutation, showInfo, dismissToast]);
 
   // Handle view linked transaction — reuse the pending-highlight mechanism
   // so the scroll effect handles waiting for data to load.
@@ -488,11 +405,10 @@ export default function TransactionsPage() {
     // Clear account filter to show all accounts (linked transaction might be in different account)
     setFilter(prev => ({ ...prev, accountIds: undefined }));
     
-    // Use pending-highlight ref so the scroll effect picks it up after refetch
-    pendingHighlightRef.current = linkedTransactionId;
-    setHighlightTrigger(c => c + 1);
+    // Trigger highlight — the scroll effect handles waiting for data to load
+    triggerHighlight(linkedTransactionId);
     invalidateTransactions();
-  }, [invalidateTransactions]);
+  }, [triggerHighlight, invalidateTransactions]);
 
   // Handle Accept P2P - opens form with transaction data for account/category assignment
   const handleAcceptP2P = useCallback((transaction: Transaction) => {
@@ -500,67 +416,6 @@ export default function TransactionsPage() {
     setEditingTransaction(transaction);
     setIsFormOpen(true);
   }, []);
-
-  // Handle Decline - sets status to Declined with undo toast
-  const handleDecline = useCallback(async (id: string) => {
-    // Find the transaction for undo
-    const transactionToDecline = transactions.find(t => t.id === id);
-    if (!transactionToDecline) return;
-    
-    const previousStatus = transactionToDecline.status;
-    const currentStatusFilter = filter.status;
-    const shouldRemove = currentStatusFilter && currentStatusFilter !== 'Declined';
-    const originalIndex = transactions.findIndex(t => t.id === id);
-    
-    // Optimistic update
-    setOptimisticTransactions(prev => {
-      const list = prev ?? transactions;
-      if (shouldRemove) {
-        return list.filter(t => t.id !== id);
-      } else {
-        return list.map(t => t.id === id ? { ...t, status: 'Declined' as const } : t);
-      }
-    });
-    
-    // Show undo toast
-    const toastId = showInfo('Transaction declined', {
-      label: 'Undo',
-      onClick: async () => {
-        dismissToast(toastId);
-        try {
-          await updateStatusMutation.mutateAsync({ id, status: previousStatus });
-          // Restore to previous state via optimistic update
-          setOptimisticTransactions(prev => {
-            const list = prev ?? transactions;
-            if (shouldRemove) {
-              const newList = [...list];
-              newList.splice(originalIndex, 0, { ...transactionToDecline, status: previousStatus });
-              return newList;
-            } else {
-              return list.map(t => t.id === id ? { ...t, status: previousStatus } : t);
-            }
-          });
-          setPendingRefreshTrigger(prev => prev + 1);
-          // Clear optimistic state after undo
-          setTimeout(() => setOptimisticTransactions(null), 100);
-        } catch (err) {
-          logger.error('Failed to undo decline:', err);
-        }
-      },
-    });
-    
-    try {
-      await updateStatusMutation.mutateAsync({ id, status: 'Declined' });
-      setPendingRefreshTrigger(prev => prev + 1);
-      // Clear optimistic state - query cache is updated
-      setOptimisticTransactions(null);
-    } catch (err) {
-      logger.error('Failed to decline transaction:', err);
-      // Restore on error
-      setOptimisticTransactions(null);
-      dismissToast(toastId);
-    }
-  }, [filter.status, transactions, updateStatusMutation, showInfo, dismissToast]);
 
   // Navigate to chat view for a transaction
   const handleViewInChat = useCallback((transaction: Transaction) => {
@@ -585,7 +440,7 @@ export default function TransactionsPage() {
   }, [navigate]);
 
   // Batch operations
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = useCallback(async () => {
     const confirmed = await confirm({
       title: 'Delete transactions?',
       message: `This will permanently delete ${selectionCount} transaction${selectionCount > 1 ? 's' : ''}. This action cannot be undone.`,
@@ -606,9 +461,9 @@ export default function TransactionsPage() {
     } finally {
       setIsBatchProcessing(false);
     }
-  };
+  }, [confirm, selectionCount, selectedIds, batchDeleteMutation, clearSelection]);
 
-  const handleBatchMarkConfirmed = async () => {
+  const handleBatchMarkConfirmed = useCallback(async () => {
     setIsBatchProcessing(true);
     try {
       await batchMarkConfirmedMutation.mutateAsync(Array.from(selectedIds));
@@ -625,9 +480,9 @@ export default function TransactionsPage() {
     } finally {
       setIsBatchProcessing(false);
     }
-  };
+  }, [selectedIds, batchMarkConfirmedMutation, transactions, clearSelection, setOptimisticTransactions]);
 
-  const handleBatchMarkPending = async () => {
+  const handleBatchMarkPending = useCallback(async () => {
     setIsBatchProcessing(true);
     try {
       await batchMarkPendingMutation.mutateAsync(Array.from(selectedIds));
@@ -644,10 +499,10 @@ export default function TransactionsPage() {
     } finally {
       setIsBatchProcessing(false);
     }
-  };
+  }, [selectedIds, batchMarkPendingMutation, transactions, clearSelection, setOptimisticTransactions]);
 
   // Export — uses Web Share API on mobile (for sharing files), fallback to direct download
-  const handleExport = async (format: 'csv' | 'json') => {
+  const handleExport = useCallback(async (format: 'csv' | 'json') => {
     try {
       const dateRange = getDateRange();
       const expandedLabelIds = getExpandedLabelIds();
@@ -683,29 +538,41 @@ export default function TransactionsPage() {
       }
       
       // Fallback: direct download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, fileName);
     } catch (err) {
       logger.error('Failed to export:', err);
       setLocalError('Failed to export transactions. Please try again.');
     }
-  };
+  }, [getDateRange, getExpandedLabelIds, filter, searchText, isMobile]);
   
   // Mobile export bottom sheet state
   const [showMobileExportSheet, setShowMobileExportSheet] = useState(false);
 
   // Close form
-  const handleCloseForm = () => {
+  const handleCloseForm = useCallback(() => {
     setIsFormOpen(false);
     setEditingTransaction(null);
     setFormError(null);
-  };
+  }, []);
+
+  // Toggle pending filter — shared between desktop and mobile PendingIndicator
+  const handleTogglePending = useCallback(() => {
+    if (filter.status === 'Pending') {
+      // Go back to default view: Confirmed, This Month
+      setDatePreset('thisMonth');
+      setCustomStartDate('');
+      setCustomEndDate('');
+      setSearchText('');
+      setFilter({ status: 'Confirmed' });
+    } else {
+      // Show ALL pending transactions: clear filters, set all time
+      setDatePreset('custom');
+      setCustomStartDate('');
+      setCustomEndDate('');
+      setSearchText('');
+      setFilter({ status: 'Pending' });
+    }
+  }, [filter.status]);
 
   // Get active filter count (excluding date range, search, and default Confirmed status)
   const activeFilterCount = [
@@ -744,10 +611,7 @@ export default function TransactionsPage() {
               className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 
                 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
+              <DownloadIcon className="w-4 h-4" />
               Export
             </button>
             <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 
@@ -770,23 +634,7 @@ export default function TransactionsPage() {
           <PendingIndicator 
             showingPending={filter.status === 'Pending'}
             refreshTrigger={pendingRefreshTrigger}
-            onShowPending={() => {
-              if (filter.status === 'Pending') {
-                // Go back to default view: Confirmed, This Month
-                setDatePreset('thisMonth');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Confirmed' });
-              } else {
-                // Show ALL pending transactions: clear filters, set all time
-                setDatePreset('custom');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Pending' });
-              }
-            }}
+            onShowPending={handleTogglePending}
           />
           
           <button
@@ -843,21 +691,7 @@ export default function TransactionsPage() {
             compact
             showingPending={filter.status === 'Pending'}
             refreshTrigger={pendingRefreshTrigger}
-            onShowPending={() => {
-              if (filter.status === 'Pending') {
-                setDatePreset('thisMonth');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Confirmed' });
-              } else {
-                setDatePreset('custom');
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setSearchText('');
-                setFilter({ status: 'Pending' });
-              }
-            }}
+            onShowPending={handleTogglePending}
           />
           <button
             onClick={() => setShowMobileExportSheet(true)}
@@ -1088,9 +922,6 @@ export default function TransactionsPage() {
         anchorRef={addSheetMode === 'dropdown' ? addButtonRef : undefined}
         mode={addSheetMode}
       />
-      
-      {/* Toast notifications */}
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {/* Confirm dialog for batch operations */}
       <ConfirmDialog {...confirmDialogProps} />
