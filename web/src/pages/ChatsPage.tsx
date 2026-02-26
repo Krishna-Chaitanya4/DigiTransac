@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -26,13 +26,14 @@ import {
   NetworkStatusBanner,
 } from '../components/chat';
 import { TransactionForm } from '../components/TransactionForm';
-import { getConversation } from '../services/conversationService';
 import { logger } from '../services/logger';
 import { useToast } from '../components/ToastProvider';
 import { SIDEBAR_CONSTANTS } from '../utils/constants';
 import { usePresence } from '../context/PresenceContext';
+import { useChatScroll } from '../hooks/useChatScroll';
 import type { CreateTransactionRequest, UpdateTransactionRequest } from '../types/transactions';
 import type { ConversationMessage, ConversationDetailResponse, UserSearchResult } from '../types/conversations';
+import { ChevronDownIcon, ChatBubbleIcon } from '../components/icons';
 
 // Format date for date separator
 const formatDateSeparator = (dateString: string): string => {
@@ -66,7 +67,7 @@ export default function ChatsPage() {
   // Auth context
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { info: showInfo } = useToast();
+  const { info: showInfo, error: showError } = useToast();
   
   // URL params for deep linking (e.g., from "View in Chat" on transactions)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -219,62 +220,29 @@ export default function ChatsPage() {
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
 
-  // Scroll state
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-  const loadingOlderRef = useRef(false); // prevent double-triggering
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const unreadDividerRef = useRef<HTMLDivElement>(null);
-
-  // Track the unread divider message ID — set once when conversation opens,
-  // stays visible until user leaves the conversation
-  const [activeUnreadDividerId, setActiveUnreadDividerId] = useState<string | null>(null);
-  const hasScrolledToUnreadRef = useRef(false);
-  // Whether we scrolled to a specific message via deep link (View in Chat).
-  // Prevents the auto-scroll-to-bottom effect from overriding the position.
-  const deepLinkScrolledRef = useRef(false);
-  // Timestamp of when we navigated to this conversation. Only data fetched
-  // AFTER this timestamp is considered fresh (skips stale React Query cache).
-  const navigationTimestampRef = useRef(0);
-  // Whether we've already captured the unread divider for this navigation.
-  const unreadCapturedRef = useRef(false);
-  // Mark-as-read tracking
-  const markedAsReadRef = useRef<string | null>(null);
-  const messageCountRef = useRef<number>(0);
-  // Track last viewed message per conversation so we can skip the unread divider
-  // for messages the user already saw (handles mark-as-read race on navigate back).
-  const lastViewedMsgIdRef = useRef<Map<string, string>>(new Map());
-  const previousSelectedUserIdRef = useRef<string | null>(null);
-  // Keep a ref to latest messages so we can read it during navigation without deps
-  const latestMessagesRef = useRef<ConversationMessage[] | null>(null);
-  useEffect(() => {
-    latestMessagesRef.current = conversationData?.messages ?? null;
-  }, [conversationData?.messages]);
-
-  // Reset ALL tracking refs when switching conversations — invalidate to force a fresh fetch
-  useEffect(() => {
-    // Save last viewed message for the conversation we're leaving
-    const prevUserId = previousSelectedUserIdRef.current;
-    const msgs = latestMessagesRef.current;
-    if (prevUserId && msgs?.length) {
-      lastViewedMsgIdRef.current.set(prevUserId, msgs[msgs.length - 1].id);
-    }
-    previousSelectedUserIdRef.current = selectedUserId;
-
-    navigationTimestampRef.current = Date.now();
-    unreadCapturedRef.current = false;
-    deepLinkScrolledRef.current = false;
-    setActiveUnreadDividerId(null);
-    hasScrolledToUnreadRef.current = false;
-    markedAsReadRef.current = null;
-    messageCountRef.current = 0;
-    setIsLoadingOlder(false);
-    loadingOlderRef.current = false;
-    if (selectedUserId) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(selectedUserId) });
-    }
-  }, [selectedUserId]);
+  // Chat scroll management, unread tracking, load-older, mark-as-read
+  const {
+    messagesEndRef,
+    messagesContainerRef,
+    unreadDividerRef,
+    showScrollButton,
+    isLoadingOlder,
+    activeUnreadDividerId,
+    scrollToBottom,
+    scrollToMessage,
+    handleScroll,
+    resetUnreadTracking,
+  } = useChatScroll({
+    selectedUserId,
+    conversationData: conversationData ?? null,
+    dataUpdatedAt,
+    selectedConversation,
+    pendingScrollMessageId,
+    setPendingScrollMessageId,
+    queryClient,
+    markAsReadMutation,
+    showInfo,
+  });
 
   // Sidebar resize state - persist in localStorage
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -292,202 +260,8 @@ export default function ChatsPage() {
   const [showNewChatModal, setShowNewChatModal] = useState(false);
 
   // Is self-chat (for Transfer option and special message positioning)
-  // Use the API flag if available, fallback to email comparison for backward compatibility
-  const isSelfChat = selectedConversation?.isSelfChat ?? (user?.email === selectedConversation?.counterpartyEmail);
-
-  // Scroll to a message and highlight it temporarily. Returns true if element was found.
-  const scrollToMessage = useCallback((messageId: string): boolean => {
-    const element = document.getElementById(`msg-${messageId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('rounded-2xl', 'transition-colors', 'duration-500');
-      element.classList.add('bg-gray-200', 'dark:bg-gray-700');
-      setTimeout(() => {
-        element.classList.remove('bg-gray-200', 'dark:bg-gray-700');
-        setTimeout(() => {
-          element.classList.remove('rounded-2xl', 'transition-colors', 'duration-500');
-        }, 500);
-      }, 1000);
-      return true;
-    }
-    return false;
-  }, []);
-
-  // Capture firstUnreadMessageId only from FRESH data fetched after navigation.
-  // dataUpdatedAt changes when React Query gets a fresh response from the API.
-  // We compare it to navigationTimestampRef to skip stale cached data.
-  useEffect(() => {
-    if (!conversationData || !selectedUserId || unreadCapturedRef.current) return;
-    // Skip stale cached data — only process data fetched AFTER we navigated here
-    if (dataUpdatedAt < navigationTimestampRef.current) return;
-    unreadCapturedRef.current = true;
-    const apiUnreadId = conversationData.firstUnreadMessageId;
-    if (apiUnreadId) {
-      // Skip divider if these messages were already viewed in a previous visit.
-      // This handles the race where mark-as-read was in-flight when we left.
-      const lastViewedId = lastViewedMsgIdRef.current.get(selectedUserId);
-      if (lastViewedId && conversationData.messages) {
-        const messages = conversationData.messages;
-        const unreadIdx = messages.findIndex(m => m.id === apiUnreadId);
-        const viewedIdx = messages.findIndex(m => m.id === lastViewedId);
-        if (viewedIdx >= 0 && unreadIdx >= 0 && viewedIdx >= unreadIdx) {
-          // User already viewed past the unread boundary — skip divider
-          return;
-        }
-      }
-      setActiveUnreadDividerId(apiUnreadId);
-      hasScrolledToUnreadRef.current = false;
-    }
-  }, [conversationData, dataUpdatedAt]);
-
-  // Mark as read when fresh conversation data arrives or when new messages come in.
-  // Uses the same dataUpdatedAt timestamp gate as the capture effect above.
-  // Both effects depend on dataUpdatedAt so they fire in the same render cycle
-  // (capture first by declaration order, then mark-as-read).
-  useEffect(() => {
-    if (!selectedUserId || !conversationData) return;
-    // Skip stale cached data — wait for fresh fetch
-    if (dataUpdatedAt < navigationTimestampRef.current) return;
-
-    const messages = conversationData.messages ?? [];
-    const currentMessageCount = messages.length;
-    const isNewConversation = markedAsReadRef.current !== selectedUserId;
-    const hasNewMessages = currentMessageCount > messageCountRef.current && !isNewConversation;
-
-    // Only mark-as-read if there are actual INCOMING messages to mark.
-    // Skips unnecessary API calls when the count increased because WE sent a message.
-    const hasUnreadIncoming = messages.some(m => !m.isFromMe && m.status !== 'Read');
-
-    if ((isNewConversation || hasNewMessages) && hasUnreadIncoming) {
-      markAsReadMutation.mutate(selectedUserId);
-      markedAsReadRef.current = selectedUserId;
-    }
-    messageCountRef.current = currentMessageCount;
-  }, [selectedUserId, conversationData, dataUpdatedAt]);
-
-  // Scroll to bottom (or unread divider) when messages change
-  useEffect(() => {
-    // Don't auto-scroll if we're about to scroll to a specific message
-    if (pendingScrollMessageId) return;
-    // Don't auto-scroll if we just completed a deep-link scroll (View in Chat)
-    if (deepLinkScrolledRef.current) return;
-    // Don't auto-scroll if we just loaded older messages (scroll-up pagination)
-    if (loadingOlderRef.current || isLoadingOlder) return;
-    
-    if (selectedConversation?.messages && selectedConversation.messages.length > 0) {
-      const timeoutId = setTimeout(() => {
-        // If there's an unread divider and we haven't scrolled to it yet, scroll there
-        if (activeUnreadDividerId && !hasScrolledToUnreadRef.current && unreadDividerRef.current) {
-          unreadDividerRef.current.scrollIntoView({ behavior: 'instant', block: 'center' });
-          hasScrolledToUnreadRef.current = true;
-        } else if (!activeUnreadDividerId || hasScrolledToUnreadRef.current) {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-        }
-      }, 50);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [selectedConversation?.messages, pendingScrollMessageId, activeUnreadDividerId]);
-
-  // Scroll to specific message from deep link (View in Chat)
-  useEffect(() => {
-    if (pendingScrollMessageId && selectedConversation?.messages && selectedConversation.messages.length > 0) {
-      // Small delay to ensure DOM is rendered
-      const timeoutId = setTimeout(() => {
-        const found = scrollToMessage(pendingScrollMessageId);
-        if (!found) {
-          showInfo('Could not find this message in the conversation');
-        }
-        // Mark that we completed a deep-link scroll so auto-scroll-to-bottom is suppressed
-        deepLinkScrolledRef.current = true;
-        setPendingScrollMessageId(null);
-      }, 150);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [pendingScrollMessageId, selectedConversation?.messages, scrollToMessage, showInfo]);
-
-  // Handle scroll detection + load older messages on scroll up
-  const loadOlderMessages = useCallback(async () => {
-    if (!selectedUserId || !selectedConversation?.hasMore || loadingOlderRef.current) return;
-    const messages = selectedConversation.messages;
-    if (!messages.length) return;
-
-    loadingOlderRef.current = true;
-    setIsLoadingOlder(true);
-
-    try {
-      // Use the oldest message's timestamp as the cursor
-      const oldestMsg = messages[0];
-      const before = oldestMsg.createdAt;
-      const olderData = await getConversation(selectedUserId, 50, before);
-
-      if (olderData.messages.length > 0) {
-        // Preserve scroll position: measure before DOM update
-        const container = messagesContainerRef.current;
-        const prevScrollHeight = container?.scrollHeight ?? 0;
-
-        // Merge older messages into the query cache
-        queryClient.setQueryData(
-          queryKeys.conversations.detail(selectedUserId),
-          (old: ConversationDetailResponse | undefined) => {
-            if (!old) return old;
-            // Deduplicate by ID — older messages go first
-            const existingIds = new Set(old.messages.map((m) => m.id));
-            const newMsgs = olderData.messages.filter((m) => !existingIds.has(m.id));
-            return {
-              ...old,
-              messages: [...newMsgs, ...old.messages],
-              hasMore: olderData.hasMore,
-            };
-          }
-        );
-
-        // Restore scroll position after React re-renders with the new messages
-        requestAnimationFrame(() => {
-          if (container) {
-            const newScrollHeight = container.scrollHeight;
-            container.scrollTop += newScrollHeight - prevScrollHeight;
-          }
-        });
-      } else {
-        // API returned empty — mark no more
-        queryClient.setQueryData(
-          queryKeys.conversations.detail(selectedUserId),
-          (old: ConversationDetailResponse | undefined) => {
-            if (!old) return old;
-            return { ...old, hasMore: false };
-          }
-        );
-      }
-    } catch (err) {
-      logger.error('Failed to load older messages:', err);
-    } finally {
-      setIsLoadingOlder(false);
-      // Delay clearing the ref so the scroll-to-bottom effect (which depends on
-      // messages) sees loadingOlderRef.current === true through all re-renders
-      // triggered by the cache update + isLoadingOlder state change.
-      setTimeout(() => {
-        loadingOlderRef.current = false;
-      }, 200);
-    }
-  }, [selectedUserId, selectedConversation?.hasMore, selectedConversation?.messages, queryClient]);
-
-  const handleScroll = useCallback(() => {
-    if (messagesContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-      const hasEnoughContent = scrollHeight > clientHeight + 50;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
-      setShowScrollButton(hasEnoughContent && !isNearBottom);
-
-      // Load older messages when scrolled near the top
-      if (scrollTop < 100 && !loadingOlderRef.current) {
-        loadOlderMessages();
-      }
-    }
-  }, [loadOlderMessages]);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+  // Use the API flag if available, fallback to case-insensitive email comparison for backward compatibility
+  const isSelfChat = selectedConversation?.isSelfChat ?? (user?.email?.toLowerCase() === selectedConversation?.counterpartyEmail?.toLowerCase());
 
   // Close search bar - defined before handlers that use it
   const closeSearchBar = useCallback(() => {
@@ -500,15 +274,14 @@ export default function ChatsPage() {
   // Select conversation handler — clear unread divider for the conversation we're leaving
   const handleSelectConversation = useCallback((userId: string) => {
     if (selectedUserId && selectedUserId !== userId) {
-      setActiveUnreadDividerId(null);
-      hasScrolledToUnreadRef.current = false;
+      resetUnreadTracking();
     }
     setSelectedUserId(userId);
     setPendingConversation(null);
     setReplyTo(null);
     setEditingMessage(null);
     closeSearchBar();
-  }, [closeSearchBar, selectedUserId]);
+  }, [closeSearchBar, selectedUserId, resetUnreadTracking]);
 
   // Send message
   const handleSendMessage = useCallback(async () => {
@@ -537,8 +310,9 @@ export default function ChatsPage() {
       setMessageInput('');
       setReplyTo(null);
       setTimeout(scrollToBottom, 100);
-    } catch (error) {
-      logger.error('Failed to send message:', error);
+    } catch (err) {
+      logger.error('Failed to send message:', err);
+      showError('Failed to send message. Please try again.');
     }
   }, [messageInput, selectedUserId, replyTo, sendMessageMutation, scrollToBottom, pendingConversation, queryClient]);
 
@@ -553,8 +327,9 @@ export default function ChatsPage() {
       });
       setEditingMessage(null);
       setEditInput('');
-    } catch (error) {
-      logger.error('Failed to edit message:', error);
+    } catch (err) {
+      logger.error('Failed to edit message:', err);
+      showError('Failed to edit message. Please try again.');
     }
   }, [editingMessage, editInput, editMessageMutation]);
 
@@ -563,8 +338,9 @@ export default function ChatsPage() {
     async (messageId: string) => {
       try {
         await deleteMessageMutation.mutateAsync({ messageId, counterpartyUserId: selectedUserId || undefined });
-      } catch (error) {
-        logger.error('Failed to delete message:', error);
+      } catch (err) {
+        logger.error('Failed to delete message:', err);
+        showError('Failed to delete message. Please try again.');
       }
     },
     [deleteMessageMutation, selectedUserId]
@@ -576,8 +352,9 @@ export default function ChatsPage() {
       if (!selectedUserId) return;
       try {
         await restoreMessageMutation.mutateAsync({ messageId, counterpartyUserId: selectedUserId });
-      } catch (error) {
-        logger.error('Failed to restore message:', error);
+      } catch (err) {
+        logger.error('Failed to restore message:', err);
+        showError('Failed to restore message. Please try again.');
       }
     },
     [restoreMessageMutation, selectedUserId]
@@ -784,12 +561,11 @@ export default function ChatsPage() {
   // Go back (mobile) — clear unread divider for the conversation we're leaving
   const handleBack = useCallback(() => {
     if (selectedUserId) {
-      setActiveUnreadDividerId(null);
-      hasScrolledToUnreadRef.current = false;
+      resetUnreadTracking();
     }
     setSelectedUserId(null);
     setPendingConversation(null);
-  }, [selectedUserId]);
+  }, [selectedUserId, resetUnreadTracking]);
 
   // Loading state
   if (isLoadingConversations) {
@@ -964,14 +740,7 @@ export default function ChatsPage() {
                   onClick={scrollToBottom}
                   className="absolute bottom-4 right-4 p-3 bg-white dark:bg-gray-700 rounded-full shadow-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors z-10"
                 >
-                  <svg
-                    className="w-5 h-5 text-gray-600 dark:text-gray-300"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
+                  <ChevronDownIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                 </button>
               )}
             </div>
@@ -997,19 +766,7 @@ export default function ChatsPage() {
           /* No conversation selected */
           <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50">
             <div className="text-center text-gray-500 dark:text-gray-400">
-              <svg
-                className="w-20 h-20 mx-auto mb-4 opacity-30"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
+              <ChatBubbleIcon className="w-20 h-20 mx-auto mb-4 opacity-30" />
               <h3 className="text-lg font-medium mb-1">Select a conversation</h3>
               <p className="text-sm">Choose a conversation from the list to view messages</p>
             </div>

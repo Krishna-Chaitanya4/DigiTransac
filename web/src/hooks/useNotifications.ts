@@ -6,6 +6,18 @@ import { NOTIFICATION_CONSTANTS } from '../utils/constants';
 import { API_BASE_URL } from '../services/apiClient';
 import { getStoredAccessToken } from '../services/tokenStorage';
 import { logger } from '../services/logger';
+
+/** Extract the user ID (sub claim) from the stored JWT access token. */
+function getUserIdFromToken(): string | null {
+  try {
+    const token = getStoredAccessToken();
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub ?? payload.nameid ?? null;
+  } catch {
+    return null;
+  }
+}
 import { queryKeys } from '../lib/queryClient';
 import type { ConversationDetailResponse, ConversationListResponse, ConversationMessage } from '../types/conversations';
 import { formatCurrency } from '../services/currencyService';
@@ -214,13 +226,9 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       optionsRef.current.onNewChatMessage?.(notification);
 
       // Determine if this is my own message echoed back to me.
-      // We can't use user.id (not in the auth type), so we check which
-      // conversation detail cache exists. If we have a cache keyed by
-      // recipientId, the recipient is our counterparty → we're the sender.
-      const cachedByRecipient = queryClient.getQueryData<ConversationDetailResponse>(
-        queryKeys.conversations.detail(notification.recipientId)
-      );
-      const isMyMessage = !!cachedByRecipient;
+      // Compare senderId directly with the user ID extracted from the JWT.
+      const currentUserId = getUserIdFromToken();
+      const isMyMessage = currentUserId != null && notification.senderId === currentUserId;
       // The detail key is always keyed by the COUNTERPARTY's user ID
       const counterpartyId = isMyMessage ? notification.recipientId : notification.senderId;
       const detailKey = queryKeys.conversations.detail(counterpartyId);
@@ -464,19 +472,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, []);
 
-  // Join a conversation for real-time updates
-  const joinConversation = useCallback(async (counterpartyUserId: string) => {
-    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
-      await connectionRef.current.invoke('JoinConversation', counterpartyUserId);
-    }
-  }, []);
 
-  // Leave a conversation
-  const leaveConversation = useCallback(async (counterpartyUserId: string) => {
-    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
-      await connectionRef.current.invoke('LeaveConversation', counterpartyUserId);
-    }
-  }, []);
 
   // Ping to keep connection alive
   const ping = useCallback(async () => {
@@ -535,8 +531,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     isConnected: connectionState === 'Connected',
     connect: () => accessToken && connect(accessToken),
     disconnect,
-    joinConversation,
-    leaveConversation,
     getOnlineUsers,
     ping,
   };

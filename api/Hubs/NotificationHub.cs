@@ -71,33 +71,6 @@ public class NotificationHub : Hub
     }
 
     /// <summary>
-    /// Join a conversation group to receive real-time updates for that conversation
-    /// </summary>
-    public async Task JoinConversation(string counterpartyUserId)
-    {
-        var userId = GetUserId();
-        if (string.IsNullOrEmpty(userId)) return;
-
-        // Create a deterministic conversation group name (sorted user IDs)
-        var conversationGroup = GetConversationGroupName(userId, counterpartyUserId);
-        await Groups.AddToGroupAsync(Context.ConnectionId, conversationGroup);
-        _logger.LogDebug("User {UserId} joined conversation group {Group}", userId, conversationGroup);
-    }
-
-    /// <summary>
-    /// Leave a conversation group
-    /// </summary>
-    public async Task LeaveConversation(string counterpartyUserId)
-    {
-        var userId = GetUserId();
-        if (string.IsNullOrEmpty(userId)) return;
-
-        var conversationGroup = GetConversationGroupName(userId, counterpartyUserId);
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, conversationGroup);
-        _logger.LogDebug("User {UserId} left conversation group {Group}", userId, conversationGroup);
-    }
-
-    /// <summary>
     /// Ping to keep connection alive
     /// </summary>
     public async Task Ping()
