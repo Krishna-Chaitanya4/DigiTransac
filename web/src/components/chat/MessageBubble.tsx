@@ -33,13 +33,15 @@ export const canUndoDelete = (msg: ConversationMessage): boolean => {
 };
 
 // Helper to check if a deleted transaction can still be restored (undo)
+// The backend resolves message.transaction to the viewer's own copy,
+// so we don't check isFromMe — the viewer always owns the resolved transaction.
 const canUndoTransactionDelete = (
   message: ConversationMessage,
   onRestoreTransaction: ((id: string) => void) | undefined
 ): boolean => {
   if (message.type !== 'Transaction' || !message.transaction?.isDeleted) return false;
   const tx = message.transaction;
-  if (!tx.deletedAt || !onRestoreTransaction || !message.isFromMe) return false;
+  if (!tx.deletedAt || !onRestoreTransaction) return false;
   const minutesElapsed = (Date.now() - new Date(tx.deletedAt).getTime()) / (1000 * 60);
   return minutesElapsed <= UNDO_DELETE_WINDOW_MINUTES;
 };

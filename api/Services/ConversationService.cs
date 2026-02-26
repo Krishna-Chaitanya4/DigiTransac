@@ -330,18 +330,16 @@ public class ConversationService : IConversationService
                     {
                         // Chat message references the sender's transaction; use batch-fetched lookup
                         senderPreviewTxs.TryGetValue(latestMessage.TransactionId!, out var senderTx);
-                        if (senderTx != null && senderTx.IsDeleted)
+                        if (senderTx?.TransactionLinkId != null)
                         {
-                            msgTransaction = senderTx; // will show "deleted" preview
-                        }
-                        else if (senderTx?.TransactionLinkId != null)
-                        {
-                            // Find the viewer's matching transaction via TransactionLinkId
+                            // Always try to find the viewer's own linked transaction first.
+                            // Even if the sender deleted theirs, the viewer may have confirmed
+                            // their copy — show the viewer's own transaction, not "deleted".
                             var linkedTx = txsWithCounterparty.FirstOrDefault(t => 
                                 t.TransactionLinkId == senderTx.TransactionLinkId);
-                            msgTransaction = linkedTx ?? senderTx; // fallback to sender's if not found
+                            msgTransaction = linkedTx ?? senderTx; // fallback to sender's if viewer has none
                         }
-                        else
+                        else if (senderTx != null)
                         {
                             msgTransaction = senderTx;
                         }
@@ -365,14 +363,9 @@ public class ConversationService : IConversationService
             {
                 lastActivityAt = latestTx.Date;
                 lastMessageType = "Transaction";
-                if (latestTx.IsDeleted)
-                {
-                    lastMessagePreview = "This transaction was deleted";
-                }
-                else
-                {
-                    lastMessagePreview = GetTransactionPreview(latestTx, userId);
-                }
+                // latestTx comes from GetP2PTransactionsAsync which filters IsDeleted,
+                // so latestTx.IsDeleted is always false here
+                lastMessagePreview = GetTransactionPreview(latestTx, userId);
             }
             else
             {
