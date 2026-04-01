@@ -642,7 +642,7 @@ jobs:
 
       # ────────────── Docker Buildx (for layer caching) ──────────────
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # ────────────── Build & Push Backend Image ──────────────
       - name: Build & Push Backend Image
